@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @curex24/database db:generate
+        env:
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
+
+      - name: Typecheck shared types package
+        run: pnpm --filter @curex24/types lint
+
+      - name: Lint and typecheck API
+        run: pnpm --filter @curex24/api lint
+
+      - name: Lint admin panel
+        run: pnpm --filter @curex24/admin lint
+
+      - name: Typecheck admin panel
+        run: cd apps/admin && npx tsc --noEmit
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @curex24/database db:generate
+        env:
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
+
+      - name: Build shared types package
+        run: pnpm --filter @curex24/types build
+
+      - name: Build API
+        run: pnpm --filter @curex24/api build
+
+      - name: Build admin panel
+        run: pnpm --filter @curex24/admin build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: curex24_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgresql://test:test@localhost:5432/curex24_test?schema=public"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @curex24/database db:generate
+
+      - name: Push schema to test DB
+        run: cd packages/database && npx prisma db push --skip-generate
+
+      - name: Run API tests
+        run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
+
+  prisma-validate:
+    name: Prisma Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Prisma schema
+        run: cd packages/database && npx prisma validate
+        env:
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
+
+      - name: Check Prisma schema formatting
+        run: |
+          cd packages/database && npx prisma format
+          git diff --exit-code packages/database/prisma/schema.prisma
+        env:
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
