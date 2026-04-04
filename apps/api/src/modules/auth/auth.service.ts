@@ -1,0 +1,97 @@
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
+
+  async sendOtp(dto: SendOtpDto) {
+    const otp = this.generateOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Invalidate old OTPs for this phone
+    await this.prisma.otpVerification.updateMany({
+      where: { phone: dto.phone, verified: false },
+      data: { verified: true },
+    });
+
+    await this.prisma.otpVerification.create({
+      data: {
+        phone: dto.phone,
+        otp,
+        expiresAt,
+        verified: false,
+      },
+    });
+
+    // In production, send via SMS provider
+    // In development, return OTP in response
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    console.log(`OTP for ${dto.phone}: ${otp}`);
+
+    return {
+      success: true,
+      message: 'OTP sent successfully',
+      ...(isDev && { otp }),
+    };
+  }
+
+  async verifyOtp(dto: VerifyOtpDto) {
+    const otpRecord = await this.prisma.otpVerification.findFirst({
+      where: {
+        phone: dto.phone,
+        otp: dto.otp,
+        verified: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Mark OTP as verified
+    await this.prisma.otpVerification.update({
+      where: { id: otpRecord.id },
+      data: { verified: true },
+    });
+
+    // Find or create user
+    let user = await this.prisma.user.findUnique({
+      where: { phone: dto.phone },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          phone: dto.phone,
+          role: 'PATIENT',
+        },
+      });
+    }
+
+    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        role: user.role,
+      },
+    };
+  }
+
+  private generateOtp(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+}
