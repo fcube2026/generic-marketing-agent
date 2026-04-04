@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Curex24 Provider",
+    "slug": "curex24-provider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#0D9488" },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": false, "bundleIdentifier": "com.curex24.provider" },
+    "android": { "package": "com.curex24.provider" }
+  }
+}
