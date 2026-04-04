@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePatientProfileDto } from './dto/create-patient-profile.dto';
-import { UpdatePatientProfileDto, CreateAddressDto } from './dto/update-patient-profile.dto';
+import {
+  UpdatePatientProfileDto,
+  CreateAddressDto,
+} from './dto/update-patient-profile.dto';
 
 @Injectable()
 export class PatientsService {
@@ -26,7 +29,10 @@ export class PatientsService {
     return user.patientProfile;
   }
 
-  async createOrUpdateProfile(userId: string, dto: CreatePatientProfileDto | UpdatePatientProfileDto) {
+  async createOrUpdateProfile(
+    userId: string,
+    dto: CreatePatientProfileDto | UpdatePatientProfileDto,
+  ) {
     const existing = await this.prisma.patientProfile.findUnique({
       where: { userId },
     });

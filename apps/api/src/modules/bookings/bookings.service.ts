@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
@@ -21,17 +25,23 @@ export class BookingsService {
   constructor(private prisma: PrismaService) {}
 
   async createBooking(userId: string, dto: CreateBookingDto) {
-    const patientProfile = await this.prisma.patientProfile.findUnique({ where: { userId } });
-    if (!patientProfile) throw new NotFoundException('Patient profile not found. Please complete your profile first.');
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (!patientProfile)
+      throw new NotFoundException(
+        'Patient profile not found. Please complete your profile first.',
+      );
 
     const provider = await this.prisma.providerProfile.findUnique({
       where: { id: dto.providerId },
     });
     if (!provider) throw new NotFoundException('Provider not found');
 
-    const fee = dto.mode === 'HOME_VISIT'
-      ? provider.consultationFeeHomeVisit
-      : provider.consultationFeeDoctorPlace;
+    const fee =
+      dto.mode === 'HOME_VISIT'
+        ? provider.consultationFeeHomeVisit
+        : provider.consultationFeeDoctorPlace;
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -72,7 +82,8 @@ export class BookingsService {
     return booking;
   }
 
-  async getBooking(bookingId: string, userId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getBooking(bookingId: string, _userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -92,8 +103,14 @@ export class BookingsService {
     return booking;
   }
 
-  async updateBookingStatus(bookingId: string, userId: string, dto: UpdateBookingStatusDto) {
-    const booking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+  async updateBookingStatus(
+    bookingId: string,
+    userId: string,
+    dto: UpdateBookingStatusDto,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
 
     const validNext = VALID_TRANSITIONS[booking.status];
@@ -120,10 +137,14 @@ export class BookingsService {
   }
 
   async acceptBooking(bookingId: string, userId: string) {
-    return this.updateBookingStatus(bookingId, userId, { status: BookingStatus.ACCEPTED });
+    return this.updateBookingStatus(bookingId, userId, {
+      status: BookingStatus.ACCEPTED,
+    });
   }
 
   async cancelBooking(bookingId: string, userId: string) {
-    return this.updateBookingStatus(bookingId, userId, { status: BookingStatus.CANCELLED });
+    return this.updateBookingStatus(bookingId, userId, {
+      status: BookingStatus.CANCELLED,
+    });
   }
 }
