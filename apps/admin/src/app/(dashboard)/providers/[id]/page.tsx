@@ -154,7 +154,7 @@ export default function ProviderDetailPage() {
               <span>{provider.homeVisitEnabled ? `✅ ₹${provider.consultationFeeHomeVisit}` : '❌ Disabled'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Doctor&apos;s Place</span>
+              <span className="text-gray-500">{"Doctor's Place"}</span>
               <span>{provider.doctorPlaceVisitEnabled ? `✅ ₹${provider.consultationFeeDoctorPlace}` : '❌ Disabled'}</span>
             </div>
             <div className="flex justify-between">
