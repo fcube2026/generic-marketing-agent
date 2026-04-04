@@ -5,13 +5,11 @@ import { Colors } from '../../constants/colors';
 interface OtpInputProps {
   length?: number;
   onComplete: (otp: string) => void;
-  value?: string;
 }
 
 export const OtpInput: React.FC<OtpInputProps> = ({
   length = 6,
   onComplete,
-  value = '',
 }) => {
   const [otp, setOtp] = useState<string[]>(Array(length).fill(''));
   const inputs = useRef<(TextInput | null)[]>([]);
