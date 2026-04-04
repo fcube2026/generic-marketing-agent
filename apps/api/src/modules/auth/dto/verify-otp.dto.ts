@@ -1,4 +1,4 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsString, Length, Matches, IsOptional, IsIn } from 'class-validator';
 
 export class VerifyOtpDto {
   @IsString()
@@ -8,4 +8,8 @@ export class VerifyOtpDto {
   @IsString()
   @Length(6, 6, { message: 'OTP must be 6 digits' })
   otp: string;
+
+  @IsOptional()
+  @IsIn(['PATIENT', 'PROVIDER'])
+  role?: string;
 }

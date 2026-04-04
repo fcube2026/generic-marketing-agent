@@ -35,6 +35,8 @@ User ─────────── PatientProfile ──────── B
 | **ReferralStatus** | `RECOMMENDED`, `BOOKED`, `COMPLETED` |
 | **PayoutStatus** | `PENDING`, `PROCESSED` |
 
+> **Note:** The `role` field on `User` is set at registration time. In the unified `apps/mobile` app, users choose their role on the **RoleSelect** screen before OTP verification. The selected role is sent to `POST /auth/verify-otp` and stored when the user account is created. Existing users always retain their stored role.
+
 ---
 
 ## Models

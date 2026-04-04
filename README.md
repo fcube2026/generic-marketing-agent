@@ -12,8 +12,9 @@ Curex24 is an on-demand healthcare platform connecting patients with nearby doct
 curex24/
 ├── apps/
 │   ├── api/              # NestJS REST backend
-│   ├── patient-app/      # Expo React Native — patient mobile app
-│   ├── provider-app/     # Expo React Native — provider mobile app
+│   ├── mobile/           # Expo React Native — unified mobile app (patient + provider)
+│   ├── patient-app/      # Expo React Native — patient mobile app (legacy, to be deprecated)
+│   ├── provider-app/     # Expo React Native — provider mobile app (legacy, to be deprecated)
 │   └── admin/            # Next.js — admin web panel
 ├── packages/
 │   ├── database/         # Prisma schema + client (PostgreSQL)
@@ -37,11 +38,8 @@ pnpm db:generate && pnpm db:migrate
 # Run backend API (port 3000)
 cd apps/api && pnpm dev
 
-# Run patient mobile app (Expo)
-cd apps/patient-app && pnpm start
-
-# Run provider mobile app (Expo)
-cd apps/provider-app && pnpm start
+# Run unified mobile app (Expo)
+cd apps/mobile && pnpm start
 
 # Run admin panel (port 3001)
 cd apps/admin && pnpm dev
@@ -51,8 +49,9 @@ cd apps/admin && pnpm dev
 
 | App | Description | Tech |
 |-----|-------------|------|
-| **Patient App** | Service discovery, smart recommendation, booking, payment, tracking, consultation history | Expo, React Native, Zustand, React Query |
-| **Provider App** | Availability management, booking workflow, consultation summary, earnings | Expo, React Native, Zustand, React Query |
+| **Mobile** *(primary)* | Unified app with role selection at launch — patients book care, providers manage availability and bookings | Expo, React Native, Zustand, React Query |
+| **Patient App** *(legacy)* | Service discovery, smart recommendation, booking, payment, tracking, consultation history | Expo, React Native, Zustand, React Query |
+| **Provider App** *(legacy)* | Availability management, booking workflow, consultation summary, earnings | Expo, React Native, Zustand, React Query |
 
 ## 🖥 Admin Panel
 

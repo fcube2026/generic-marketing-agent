@@ -29,15 +29,22 @@ Send OTP to a phone number.
 
 ### POST /auth/verify-otp
 
-Verify OTP and receive JWT token.
+Verify OTP and receive JWT token. For new users, a `role` field can be passed to set their account role. Existing users retain their stored role regardless of the `role` field.
 
 **Request:**
 ```json
 {
   "phone": "+919876543210",
-  "otp": "123456"
+  "otp": "123456",
+  "role": "PATIENT"
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phone` | string | ✅ | E.164 phone number |
+| `otp` | string | ✅ | 6-digit OTP |
+| `role` | string | ❌ | `"PATIENT"` or `"PROVIDER"`. Used only when creating a new user. Defaults to `"PATIENT"` if omitted. |
 
 **Response (200):**
 ```json
