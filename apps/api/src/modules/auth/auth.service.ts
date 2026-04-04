@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -73,7 +74,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           phone: dto.phone,
-          role: dto.role ?? 'PATIENT',
+          role: (dto.role as Role) ?? Role.PATIENT,
         },
       });
     }

@@ -1,16 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreatePaymentDto, UpdatePaymentStatusDto } from './dto/create-payment.dto';
+import {
+  CreatePaymentDto,
+  UpdatePaymentStatusDto,
+} from './dto/create-payment.dto';
 
 @Injectable()
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
   async initiatePayment(dto: CreatePaymentDto) {
-    const booking = await this.prisma.booking.findUnique({ where: { id: dto.bookingId } });
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: dto.bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
 
-    const existing = await this.prisma.payment.findUnique({ where: { bookingId: dto.bookingId } });
+    const existing = await this.prisma.payment.findUnique({
+      where: { bookingId: dto.bookingId },
+    });
     if (existing) {
       return existing;
     }
@@ -27,7 +34,9 @@ export class PaymentsService {
   }
 
   async getPaymentStatus(bookingId: string) {
-    const payment = await this.prisma.payment.findUnique({ where: { bookingId } });
+    const payment = await this.prisma.payment.findUnique({
+      where: { bookingId },
+    });
     if (!payment) throw new NotFoundException('Payment not found');
     return payment;
   }
@@ -51,7 +60,9 @@ export class PaymentsService {
         data: { paymentStatus: 'PAID' },
       });
 
-      const booking = await this.prisma.booking.findUnique({ where: { id: payment.bookingId } });
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: payment.bookingId },
+      });
       if (booking) {
         const providerCut = booking.totalFee * 0.8;
         await this.prisma.payout.upsert({

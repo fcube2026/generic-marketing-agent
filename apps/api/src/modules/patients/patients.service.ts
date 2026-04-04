@@ -14,9 +14,8 @@ export class PatientsService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        patientProfile: {
-          include: { addresses: true },
-        },
+        patientProfile: true,
+        addresses: true,
       },
     });
 
@@ -41,16 +40,14 @@ export class PatientsService {
       return this.prisma.patientProfile.update({
         where: { userId },
         data: dto,
-        include: { addresses: true },
       });
     }
 
     return this.prisma.patientProfile.create({
       data: {
-        ...dto,
-        userId,
+        ...(dto as CreatePatientProfileDto),
+        user: { connect: { id: userId } },
       },
-      include: { addresses: true },
     });
   }
 

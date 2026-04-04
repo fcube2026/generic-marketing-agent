@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GetRecommendationDto } from './dto/get-recommendation.dto';
 
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function haversineDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -25,7 +30,8 @@ function calculateScore(
   const availabilityScore = isAvailable ? 100 : 0;
   const distanceScore = Math.max(0, 100 - (distance / maxDistance) * 100);
   const feeScore = Math.max(0, 100 - (fee / maxFee) * 100);
-  const urgencyScore = urgency === 'HIGH' ? 100 : urgency === 'MEDIUM' ? 60 : 30;
+  const urgencyScore =
+    urgency === 'HIGH' ? 100 : urgency === 'MEDIUM' ? 60 : 30;
 
   return (
     availabilityScore * 0.4 +
@@ -63,7 +69,12 @@ export class RecommendationService {
       .filter((p) => p.homeVisitEnabled)
       .map((p) => ({
         provider: p,
-        distance: haversineDistance(dto.lat, dto.lng, p.currentLat!, p.currentLng!),
+        distance: haversineDistance(
+          dto.lat,
+          dto.lng,
+          p.currentLat!,
+          p.currentLng!,
+        ),
       }))
       .filter((p) => p.distance <= p.provider.serviceRadius);
 
@@ -71,7 +82,12 @@ export class RecommendationService {
       .filter((p) => p.doctorPlaceVisitEnabled)
       .map((p) => ({
         provider: p,
-        distance: haversineDistance(dto.lat, dto.lng, p.currentLat!, p.currentLng!),
+        distance: haversineDistance(
+          dto.lat,
+          dto.lng,
+          p.currentLat!,
+          p.currentLng!,
+        ),
       }))
       .filter((p) => p.distance <= p.provider.serviceRadius);
 
@@ -81,7 +97,9 @@ export class RecommendationService {
       1,
     );
     const maxFee = Math.max(
-      ...providers.map((p) => Math.max(p.consultationFeeHomeVisit, p.consultationFeeDoctorPlace)),
+      ...providers.map((p) =>
+        Math.max(p.consultationFeeHomeVisit, p.consultationFeeDoctorPlace),
+      ),
       1,
     );
 
@@ -151,7 +169,8 @@ export class RecommendationService {
 
     if (!homeVisitResult) {
       recommended = 'DOCTOR_PLACE';
-      reason = 'No home visit providers are available. Visit the clinic for faster service.';
+      reason =
+        'No home visit providers are available. Visit the clinic for faster service.';
     } else if (!doctorPlaceResult) {
       recommended = 'HOME_VISIT';
       reason = 'A doctor can visit you at home conveniently.';
@@ -161,14 +180,16 @@ export class RecommendationService {
         reason = 'For urgent care, a home visit provides the fastest response.';
       } else {
         recommended = 'DOCTOR_PLACE';
-        reason = 'Visiting the clinic is recommended for urgent care with full diagnostic support.';
+        reason =
+          'Visiting the clinic is recommended for urgent care with full diagnostic support.';
       }
     } else if (homeVisitResult.fee <= doctorPlaceResult.fee) {
       recommended = 'HOME_VISIT';
       reason = 'Home visit is more cost-effective and convenient for you.';
     } else {
       recommended = 'DOCTOR_PLACE';
-      reason = 'Visiting the clinic gives you access to full medical facilities at a lower cost.';
+      reason =
+        'Visiting the clinic gives you access to full medical facilities at a lower cost.';
     }
 
     return {

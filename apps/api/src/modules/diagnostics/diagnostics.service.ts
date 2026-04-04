@@ -1,13 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreateDiagnosticRequestDto, UpdateDiagnosticStatusDto, UploadLabResultDto } from './dto/create-diagnostic-request.dto';
+import {
+  CreateDiagnosticRequestDto,
+  UpdateDiagnosticStatusDto,
+  UploadLabResultDto,
+} from './dto/create-diagnostic-request.dto';
 
 @Injectable()
 export class DiagnosticsService {
   constructor(private prisma: PrismaService) {}
 
   async createRequest(dto: CreateDiagnosticRequestDto) {
-    const booking = await this.prisma.booking.findUnique({ where: { id: dto.bookingId } });
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: dto.bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
 
     return this.prisma.diagnosticRequest.create({
@@ -22,7 +28,9 @@ export class DiagnosticsService {
   }
 
   async updateStatus(id: string, dto: UpdateDiagnosticStatusDto) {
-    const request = await this.prisma.diagnosticRequest.findUnique({ where: { id } });
+    const request = await this.prisma.diagnosticRequest.findUnique({
+      where: { id },
+    });
     if (!request) throw new NotFoundException('Diagnostic request not found');
 
     return this.prisma.diagnosticRequest.update({
@@ -35,7 +43,9 @@ export class DiagnosticsService {
   }
 
   async uploadResult(id: string, dto: UploadLabResultDto) {
-    const request = await this.prisma.diagnosticRequest.findUnique({ where: { id } });
+    const request = await this.prisma.diagnosticRequest.findUnique({
+      where: { id },
+    });
     if (!request) throw new NotFoundException('Diagnostic request not found');
 
     const result = await this.prisma.labResult.create({

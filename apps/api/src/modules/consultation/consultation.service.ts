@@ -6,8 +6,14 @@ import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.
 export class ConsultationService {
   constructor(private prisma: PrismaService) {}
 
-  async createSummary(bookingId: string, userId: string, dto: CreateConsultationSummaryDto) {
-    const booking = await this.prisma.booking.findUnique({ where: { id: bookingId } });
+  async createSummary(
+    bookingId: string,
+    userId: string,
+    dto: CreateConsultationSummaryDto,
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+    });
     if (!booking) throw new NotFoundException('Booking not found');
 
     const summary = await this.prisma.consultationSummary.upsert({
@@ -15,11 +21,15 @@ export class ConsultationService {
       create: {
         bookingId,
         ...dto,
-        medicinesAdvised: dto.medicinesAdvised ? JSON.parse(JSON.stringify(dto.medicinesAdvised)) : undefined,
+        medicinesAdvised: dto.medicinesAdvised
+          ? JSON.parse(JSON.stringify(dto.medicinesAdvised))
+          : undefined,
       },
       update: {
         ...dto,
-        medicinesAdvised: dto.medicinesAdvised ? JSON.parse(JSON.stringify(dto.medicinesAdvised)) : undefined,
+        medicinesAdvised: dto.medicinesAdvised
+          ? JSON.parse(JSON.stringify(dto.medicinesAdvised))
+          : undefined,
       },
     });
 
