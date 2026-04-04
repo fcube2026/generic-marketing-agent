@@ -8,13 +8,14 @@ Curex24 follows a **modular monorepo** architecture with clearly separated front
 ┌─────────────────────────────────────────────────────────────────┐
 │                        CLIENTS                                   │
 │                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Patient App  │  │ Provider App │  │   Admin Panel         │  │
-│  │ (Expo/RN)    │  │ (Expo/RN)    │  │   (Next.js)           │  │
-│  │ Mobile       │  │ Mobile       │  │   Web                 │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                  │                      │              │
-│         └──────────────────┼──────────────────────┘              │
+│  ┌─────────────────────────────┐  ┌──────────────────────────┐  │
+│  │     Mobile App (Unified)    │  │   Admin Panel             │  │
+│  │      (Expo/RN)              │  │   (Next.js)               │  │
+│  │  RoleSelect → Patient or    │  │   Web                     │  │
+│  │      Provider Navigator     │  │                           │  │
+│  └────────────┬────────────────┘  └──────────────┬────────────┘  │
+│               │                                   │              │
+│               └───────────────────────────────────┘              │
 │                            │ REST API (HTTPS)                    │
 ├────────────────────────────┼─────────────────────────────────────┤
 │                            ▼                                     │
@@ -53,8 +54,9 @@ Curex24 follows a **modular monorepo** architecture with clearly separated front
 curex24/
 ├── apps/
 │   ├── api/              # NestJS REST backend
-│   ├── patient-app/      # Expo React Native — patient mobile app
-│   ├── provider-app/     # Expo React Native — provider mobile app
+│   ├── mobile/           # Expo React Native — unified mobile app (primary)
+│   ├── patient-app/      # Expo React Native — patient mobile app (legacy, to be deprecated)
+│   ├── provider-app/     # Expo React Native — provider mobile app (legacy, to be deprecated)
 │   └── admin/            # Next.js — admin web panel
 ├── packages/
 │   ├── database/         # Prisma schema + PrismaClient singleton
@@ -71,8 +73,9 @@ curex24/
 | Package | Purpose |
 |---------|---------|
 | `@curex24/api` | NestJS backend API server |
-| `@curex24/patient-app` | Expo patient mobile app |
-| `@curex24/provider-app` | Expo provider mobile app |
+| `@curex24/mobile` | Expo unified mobile app (primary) |
+| `@curex24/patient-app` | Expo patient mobile app (legacy) |
+| `@curex24/provider-app` | Expo provider mobile app (legacy) |
 | `@curex24/admin` | Next.js admin panel |
 | `@curex24/database` | Prisma schema & client |
 | `@curex24/types` | Shared TypeScript types |
@@ -114,7 +117,10 @@ The NestJS backend is organized into **domain modules**, each encapsulating cont
 ## 4. Authentication Flow
 
 ```
-Patient/Provider                    Backend
+User (Patient or Doctor)             Backend
+     │                                │
+     │  (1) Select role on app        │
+     │      RoleSelect screen         │
      │                                │
      │   POST /auth/send-otp          │
      │   { phone: "+91..." }          │
@@ -125,10 +131,10 @@ Patient/Provider                    Backend
      │  <──────────────────────────── │
      │                                │
      │   POST /auth/verify-otp        │
-     │   { phone, otp }               │
+     │   { phone, otp, role }         │
      │──────────────────────────────>  │
      │                                │ Verify OTP from DB
-     │                                │ Create/find User
+     │                                │ Create/find User with role
      │   { token: "jwt...", user }    │ Issue JWT token
      │  <──────────────────────────── │
      │                                │
@@ -244,7 +250,15 @@ Uses **Haversine formula** for great-circle distance between patient and provide
 
 ## 7. Frontend Architecture
 
-### Mobile Apps (Patient & Provider)
+### Unified Mobile App (`apps/mobile`) — Primary
+
+The `apps/mobile` app consolidates the patient and provider experiences into a single application with role selection at launch.
+
+**Auth flow:** Splash → RoleSelect → Login → OTP → (role-based home)
+
+On the **RoleSelect** screen, users choose "I'm a Patient" or "I'm a Doctor". The chosen role is passed through the Login and OTP screens and sent to the API on verification. After authentication, the `RootNavigator` reads the user's role from the auth store and renders either `PatientNavigator` (for PATIENT) or `ProviderNavigator` (for PROVIDER).
+
+> **Short-term consolidation note:** `apps/patient-app` and `apps/provider-app` remain in the repo as legacy apps and will be deprecated once `apps/mobile` reaches feature parity in production.
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|

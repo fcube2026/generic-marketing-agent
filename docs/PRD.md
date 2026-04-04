@@ -71,7 +71,12 @@ Build a **rural-first but scalable** healthcare marketplace that solves after-ho
 
 ## 5. MVP User Flow
 
+> **Note:** The unified `apps/mobile` app presents a **role selection screen** at first launch. Users choose "I'm a Patient" or "I'm a Doctor" before entering their phone number. This role is passed through OTP verification and stored in their account. After authentication, the app routes to the appropriate patient or provider experience.
+
 ```
+[Launch] → Role Selection (Patient / Doctor)
+  → Phone number entry → OTP verification → Role-based home screen
+
 Patient selects service → Enters symptoms & location
   → System finds nearby providers
   → Smart recommendation (Home Visit vs Clinic)
@@ -83,13 +88,14 @@ Patient selects service → Enters symptoms & location
 
 ### Step-by-Step Breakdown
 
-1. **Select Service** — Choose category (Doctor, Physio, Nursing, etc.), enter symptoms, location, timing
-2. **Find Providers** — Match by service type, distance, availability, service radius, mode support
-3. **Get Recommendation** — Score-based suggestion with ETA, distance, fee for both modes
-4. **Book & Pay** — Confirm option, complete payment, receive booking confirmation
-5. **Service Delivery** — Track provider (home visit) or navigate to clinic
-6. **Consultation Summary** — Provider submits structured summary (mandatory before closure)
-7. **Follow-up** — Diagnostics requests, lab results, specialist referrals
+1. **Role Selection** — User identifies as Patient or Doctor on first launch
+2. **Select Service** — Choose category (Doctor, Physio, Nursing, etc.), enter symptoms, location, timing
+3. **Find Providers** — Match by service type, distance, availability, service radius, mode support
+4. **Get Recommendation** — Score-based suggestion with ETA, distance, fee for both modes
+5. **Book & Pay** — Confirm option, complete payment, receive booking confirmation
+6. **Service Delivery** — Track provider (home visit) or navigate to clinic
+7. **Consultation Summary** — Provider submits structured summary (mandatory before closure)
+8. **Follow-up** — Diagnostics requests, lab results, specialist referrals
 
 ---
 

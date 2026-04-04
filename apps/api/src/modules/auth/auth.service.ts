@@ -73,7 +73,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           phone: dto.phone,
-          role: 'PATIENT',
+          role: dto.role ?? 'PATIENT',
         },
       });
     }

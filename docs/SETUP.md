@@ -85,7 +85,20 @@ pnpm dev
 
 API will be available at `http://localhost:3000`
 
-### Patient Mobile App
+### Unified Mobile App (Primary)
+
+```bash
+cd apps/mobile
+pnpm start
+```
+
+On first launch, users will see the **RoleSelect** screen and choose "I'm a Patient" or "I'm a Doctor". The selected role is passed through the OTP verification and stored in the user's account.
+
+Scan QR code with Expo Go app on your phone, or press:
+- `a` for Android emulator
+- `i` for iOS simulator
+
+### Patient Mobile App *(legacy)*
 
 ```bash
 cd apps/patient-app
@@ -96,7 +109,7 @@ Scan QR code with Expo Go app on your phone, or press:
 - `a` for Android emulator
 - `i` for iOS simulator
 
-### Provider Mobile App
+### Provider Mobile App *(legacy)*
 
 ```bash
 cd apps/provider-app
@@ -124,8 +137,9 @@ Admin panel will be available at `http://localhost:3001`
 curex24/
 ├── apps/
 │   ├── api/              # NestJS backend (port 3000)
-│   ├── patient-app/      # Expo React Native — patient mobile
-│   ├── provider-app/     # Expo React Native — provider mobile
+│   ├── mobile/           # Expo React Native — unified mobile app (primary)
+│   ├── patient-app/      # Expo React Native — patient mobile (legacy)
+│   ├── provider-app/     # Expo React Native — provider mobile (legacy)
 │   └── admin/            # Next.js admin panel (port 3001)
 ├── packages/
 │   ├── database/         # Prisma schema + client
@@ -156,8 +170,9 @@ curex24/
 | App | Dev Command |
 |-----|-------------|
 | API | `cd apps/api && pnpm dev` |
-| Patient App | `cd apps/patient-app && pnpm start` |
-| Provider App | `cd apps/provider-app && pnpm start` |
+| Mobile (unified) | `cd apps/mobile && pnpm start` |
+| Patient App (legacy) | `cd apps/patient-app && pnpm start` |
+| Provider App (legacy) | `cd apps/provider-app && pnpm start` |
 | Admin | `cd apps/admin && pnpm dev` |
 
 ---
@@ -199,10 +214,15 @@ curl -X POST http://localhost:3000/auth/send-otp \
   -H "Content-Type: application/json" \
   -d '{"phone": "+919876543210"}'
 
-# Verify OTP (use the OTP from response)
+# Verify OTP as a Patient (use the OTP from response)
 curl -X POST http://localhost:3000/auth/verify-otp \
   -H "Content-Type: application/json" \
-  -d '{"phone": "+919876543210", "otp": "123456"}'
+  -d '{"phone": "+919876543210", "otp": "123456", "role": "PATIENT"}'
+
+# Verify OTP as a Doctor/Provider
+curl -X POST http://localhost:3000/auth/verify-otp \
+  -H "Content-Type: application/json" \
+  -d '{"phone": "+919876543210", "otp": "123456", "role": "PROVIDER"}'
 ```
 
 ---
@@ -212,8 +232,9 @@ curl -X POST http://localhost:3000/auth/verify-otp \
 ### API URL
 
 Update the API base URL in:
-- `apps/patient-app/src/constants/api.ts`
-- `apps/provider-app/src/constants/api.ts`
+- `apps/mobile/src/constants/api.ts` *(primary app)*
+- `apps/patient-app/src/constants/api.ts` *(legacy)*
+- `apps/provider-app/src/constants/api.ts` *(legacy)*
 
 For local development with a physical device, use your machine's local IP:
 

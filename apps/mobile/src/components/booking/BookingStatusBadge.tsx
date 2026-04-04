@@ -1,0 +1,23 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { BookingStatus } from '../../types';
+import { Colors } from '../../constants/colors';
+const CONFIG: Record<BookingStatus, { label: string; color: string; bg: string }> = {
+  REQUESTED: { label: 'Requested', color: Colors.warning, bg: '#FEF3C7' },
+  ACCEPTED: { label: 'Accepted', color: Colors.success, bg: '#D1FAE5' },
+  ON_THE_WAY: { label: 'On the Way', color: Colors.secondary, bg: '#DBEAFE' },
+  ARRIVED: { label: 'Arrived', color: Colors.primary, bg: Colors.primaryLight },
+  IN_PROGRESS: { label: 'In Progress', color: Colors.primary, bg: Colors.primaryLight },
+  COMPLETED: { label: 'Completed', color: Colors.success, bg: '#D1FAE5' },
+  SUMMARY_SUBMITTED: { label: 'Summary Done', color: Colors.success, bg: '#D1FAE5' },
+  CLOSED: { label: 'Closed', color: Colors.textMuted, bg: Colors.border },
+  CANCELLED: { label: 'Cancelled', color: Colors.error, bg: '#FEE2E2' },
+};
+export const BookingStatusBadge: React.FC<{ status: BookingStatus }> = ({ status }) => {
+  const c = CONFIG[status] || CONFIG.REQUESTED;
+  return <View style={[styles.badge, { backgroundColor: c.bg }]}><Text style={[styles.text, { color: c.color }]}>{c.label}</Text></View>;
+};
+const styles = StyleSheet.create({
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  text: { fontSize: 12, fontWeight: '600' },
+});
