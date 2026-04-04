@@ -15,11 +15,18 @@ export const providerService = {
     const r = await api.put('/providers/me', data);
     return r.data;
   },
-  updateAvailability: async (isAvailable: boolean, lat?: number, lng?: number) => {
-    const r = await api.put('/providers/me/availability', { isAvailable, currentLat: lat, currentLng: lng });
+  updateAvailability: async (isAvailableOrObj: boolean | { isAvailable: boolean; currentLat?: number; currentLng?: number }, lat?: number, lng?: number) => {
+    const payload = typeof isAvailableOrObj === 'object'
+      ? isAvailableOrObj
+      : { isAvailable: isAvailableOrObj, currentLat: lat, currentLng: lng };
+    const r = await api.put('/providers/me/availability', payload);
     return r.data;
   },
   submitConsultation: async (bookingId: string, data: any) => {
+    const r = await api.post(`/consultation/${bookingId}/summary`, data);
+    return r.data;
+  },
+  submitSummary: async (bookingId: string, data: any) => {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
     return r.data;
   },
