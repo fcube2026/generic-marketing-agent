@@ -43,7 +43,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://curex24:curex24password@postgres:5432/curex24
-      JWT_SECRET: curex24-super-secret-jwt-key-change-in-production
+      JWT_SECRET: ${JWT_SECRET:-curex24-super-secret-jwt-key-change-in-production}
       NODE_ENV: development
       PORT: 3000
     depends_on:
