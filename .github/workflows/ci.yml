@@ -15,6 +15,8 @@ jobs:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: lint-and-typecheck
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -92,6 +96,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: lint-and-typecheck
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:16-alpine
@@ -139,6 +145,8 @@ jobs:
     name: Prisma Validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
