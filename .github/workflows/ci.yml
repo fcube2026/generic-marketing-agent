@@ -164,7 +164,7 @@ jobs:
 
       - name: Check Prisma schema formatting
         run: |
-          cd packages/database && npx prisma format
-          git diff --exit-code -- prisma/schema.prisma
+          npx --prefix packages/database prisma format --schema packages/database/prisma/schema.prisma
+          git diff --exit-code -- packages/database/prisma/schema.prisma
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
