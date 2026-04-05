@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
 
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function haversineDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -23,7 +28,9 @@ export class ProvidersService {
   async onboard(userId: string, dto: CreateProviderProfileDto) {
     const { serviceCategoryIds, ...profileData } = dto;
 
-    const existing = await this.prisma.providerProfile.findUnique({ where: { userId } });
+    const existing = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
     if (existing) {
       return this.updateProfile(userId, dto);
     }
@@ -52,7 +59,10 @@ export class ProvidersService {
 
     return this.prisma.providerProfile.findUnique({
       where: { id: profile.id },
-      include: { providerServices: { include: { serviceCategory: true } }, user: true },
+      include: {
+        providerServices: { include: { serviceCategory: true } },
+        user: true,
+      },
     });
   }
 
@@ -74,16 +84,20 @@ export class ProvidersService {
   async updateProfile(userId: string, dto: UpdateProviderProfileDto) {
     const { serviceCategoryIds, ...profileData } = dto as any;
 
-    const profile = await this.prisma.providerProfile.findUnique({ where: { userId } });
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
-    const updated = await this.prisma.providerProfile.update({
+    await this.prisma.providerProfile.update({
       where: { userId },
       data: profileData,
     });
 
     if (serviceCategoryIds) {
-      await this.prisma.providerService.deleteMany({ where: { providerId: profile.id } });
+      await this.prisma.providerService.deleteMany({
+        where: { providerId: profile.id },
+      });
       if (serviceCategoryIds.length > 0) {
         await this.prisma.providerService.createMany({
           data: serviceCategoryIds.map((id: string) => ({
@@ -102,7 +116,9 @@ export class ProvidersService {
   }
 
   async updateAvailability(userId: string, dto: UpdateProviderAvailabilityDto) {
-    const profile = await this.prisma.providerProfile.findUnique({ where: { userId } });
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
     return this.prisma.providerProfile.update({
@@ -116,7 +132,9 @@ export class ProvidersService {
   }
 
   async getMyBookings(userId: string) {
-    const profile = await this.prisma.providerProfile.findUnique({ where: { userId } });
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
     return this.prisma.booking.findMany({
@@ -131,7 +149,12 @@ export class ProvidersService {
     });
   }
 
-  async getNearbyProviders(lat: number, lng: number, serviceCategory?: string, mode?: string) {
+  async getNearbyProviders(
+    lat: number,
+    lng: number,
+    serviceCategory?: string,
+    mode?: string,
+  ) {
     const providers = await this.prisma.providerProfile.findMany({
       where: {
         isAvailable: true,
@@ -158,7 +181,12 @@ export class ProvidersService {
     const withDistance = providers
       .map((provider) => {
         if (!provider.currentLat || !provider.currentLng) return null;
-        const distance = haversineDistance(lat, lng, provider.currentLat, provider.currentLng);
+        const distance = haversineDistance(
+          lat,
+          lng,
+          provider.currentLat,
+          provider.currentLng,
+        );
         return { ...provider, distance };
       })
       .filter(Boolean)

@@ -37,7 +37,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      error: typeof message === 'string' ? message : (message as any).message || message,
+      error:
+        typeof message === 'string'
+          ? message
+          : (message as any).message || message,
     });
   }
 }

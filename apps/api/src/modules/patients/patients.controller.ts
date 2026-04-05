@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 import { CreatePatientProfileDto } from './dto/create-patient-profile.dto';
-import { UpdatePatientProfileDto, CreateAddressDto } from './dto/update-patient-profile.dto';
+import {
+  UpdatePatientProfileDto,
+  CreateAddressDto,
+} from './dto/update-patient-profile.dto';
 
 @Controller('patients')
 export class PatientsController {
@@ -14,12 +17,18 @@ export class PatientsController {
   }
 
   @Put('me')
-  updateProfile(@CurrentUser() user: any, @Body() dto: UpdatePatientProfileDto) {
+  updateProfile(
+    @CurrentUser() user: any,
+    @Body() dto: UpdatePatientProfileDto,
+  ) {
     return this.patientsService.createOrUpdateProfile(user.id, dto);
   }
 
   @Post('me/profile')
-  createProfile(@CurrentUser() user: any, @Body() dto: CreatePatientProfileDto) {
+  createProfile(
+    @CurrentUser() user: any,
+    @Body() dto: CreatePatientProfileDto,
+  ) {
     return this.patientsService.createOrUpdateProfile(user.id, dto);
   }
 
