@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsIn } from 'class-validator';
 
 export class CreatePatientProfileDto {
   @IsString()
@@ -10,6 +10,7 @@ export class CreatePatientProfileDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['MALE', 'FEMALE', 'OTHER'])
   gender?: string;
 
   @IsOptional()

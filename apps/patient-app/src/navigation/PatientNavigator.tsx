@@ -12,6 +12,7 @@ import { TrackingScreen } from '../screens/patient/TrackingScreen';
 import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummaryScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
+import { ProfileSetupScreen } from '../screens/auth/ProfileSetupScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory } from '../types';
 
@@ -24,6 +25,7 @@ export type PatientStackParamList = {
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
+  ProfileSetup: undefined;
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -62,5 +64,6 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ title: 'Edit Profile' }} />
   </Stack.Navigator>
 );

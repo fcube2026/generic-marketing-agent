@@ -7,6 +7,7 @@ export const ENDPOINTS = {
   },
   PATIENTS: {
     ME: '/patients/me',
+    PROFILE_SETUP: '/patients/me/profile',
     ADDRESSES: '/patients/me/addresses',
     BOOKINGS: '/patients/me/bookings',
   },

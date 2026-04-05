@@ -1,15 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
+import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import api from '../../services/api';
 
 export const ProfileScreen: React.FC = () => {
   const { user, logout } = useAuthStore();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<PatientStackParamList>>();
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['patient-profile'],
@@ -67,6 +72,12 @@ export const ProfileScreen: React.FC = () => {
         ) : (
           <Text style={styles.emptyText}>No profile information available</Text>
         )}
+        <Button
+          title="Edit Profile"
+          onPress={() => navigation.navigate('ProfileSetup')}
+          variant="outline"
+          style={styles.editButton}
+        />
       </Card>
 
       {addresses && addresses.length > 0 && (
@@ -122,6 +133,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, color: Colors.textMuted },
   value: { fontSize: 14, fontWeight: '600', color: Colors.text },
   emptyText: { fontSize: 14, color: Colors.textMuted, fontStyle: 'italic' },
+  editButton: { marginTop: 12 },
   addressItem: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border },
   addressLabel: { fontSize: 14, fontWeight: '600', color: Colors.text },
   addressText: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },

@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsBoolean,
   IsNumber,
+  IsIn,
 } from 'class-validator';
 
 export class UpdatePatientProfileDto {
@@ -17,6 +18,7 @@ export class UpdatePatientProfileDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['MALE', 'FEMALE', 'OTHER'])
   gender?: string;
 
   @IsOptional()
