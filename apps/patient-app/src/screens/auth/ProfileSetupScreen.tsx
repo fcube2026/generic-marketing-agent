@@ -42,7 +42,7 @@ const isValidDateOfBirth = (dob: string): boolean => {
   }
   const now = new Date();
   const minYear = now.getFullYear() - 120;
-  return year >= minYear && date < now;
+  return year >= minYear && date <= now;
 };
 
 export const ProfileSetupScreen: React.FC = () => {
