@@ -67,6 +67,24 @@ Next.js web dashboard for platform operations: provider verification, booking mo
 - [Data Model](docs/DATA_MODEL.md)
 - [Setup Guide](docs/SETUP.md)
 
+## 🧪 Testing
+
+```bash
+# Run all tests from the root
+pnpm test
+
+# Run API tests only
+cd apps/api && pnpm test
+
+# Run API tests with coverage report
+cd apps/api && npx jest --coverage
+
+# Run a specific test file
+cd apps/api && npx jest --no-coverage src/modules/auth/auth.service.spec.ts
+```
+
+Tests use [Jest](https://jestjs.io/) with [ts-jest](https://kulshekhar.github.io/ts-jest/) and are colocated with their modules as `*.spec.ts` files under `apps/api/src/modules/`.
+
 ## 🛠 Tech Stack
 
 | Layer | Technology |
