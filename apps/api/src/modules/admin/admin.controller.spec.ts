@@ -54,6 +54,12 @@ describe('AdminController', () => {
               limit: 20,
               totalPages: 0,
             }),
+            getBookingById: jest.fn().mockResolvedValue({
+              id: 'b1',
+              status: 'REQUESTED',
+              patient: { name: 'Patient A' },
+              provider: { name: 'Dr. A' },
+            }),
             getDiagnosticsOverview: jest.fn().mockResolvedValue([]),
             getReferralsOverview: jest.fn().mockResolvedValue([]),
             getAllPayouts: jest.fn().mockResolvedValue({
@@ -200,6 +206,20 @@ describe('AdminController', () => {
         'admin-1',
         'Policy violation',
       );
+    });
+  });
+
+  describe('getBookingById', () => {
+    it('should return booking details', async () => {
+      const result = await controller.getBookingById('b1');
+
+      expect(result).toEqual({
+        id: 'b1',
+        status: 'REQUESTED',
+        patient: { name: 'Patient A' },
+        provider: { name: 'Dr. A' },
+      });
+      expect(service.getBookingById).toHaveBeenCalledWith('b1');
     });
   });
 });

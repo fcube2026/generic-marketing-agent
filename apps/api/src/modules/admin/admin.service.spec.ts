@@ -25,6 +25,7 @@ describe('AdminService', () => {
     booking: {
       count: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
     patientProfile: {
       count: jest.fn(),
@@ -355,6 +356,51 @@ describe('AdminService', () => {
         pendingVerification: 3,
         totalPatients: 100,
       });
+    });
+  });
+
+  describe('getBookingById', () => {
+    it('should return a booking with all relations', async () => {
+      const booking = {
+        id: 'b1',
+        status: 'REQUESTED',
+        patient: { name: 'Patient A' },
+        provider: { name: 'Dr. A', user: { phone: '+1234567890' } },
+        serviceCategory: { name: 'General' },
+        address: null,
+        statusHistory: [],
+        consultationSummary: null,
+        diagnosticRequests: [],
+        referrals: [],
+        payment: null,
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+      const result = await service.getBookingById('b1');
+
+      expect(result).toEqual(booking);
+      expect(mockPrisma.booking.findUnique).toHaveBeenCalledWith({
+        where: { id: 'b1' },
+        include: {
+          patient: true,
+          provider: { include: { user: true } },
+          serviceCategory: true,
+          address: true,
+          statusHistory: { orderBy: { changedAt: 'asc' } },
+          consultationSummary: { include: { prescriptions: true } },
+          diagnosticRequests: { include: { labResults: true } },
+          referrals: true,
+          payment: true,
+        },
+      });
+    });
+
+    it('should throw NotFoundException if booking not found', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBookingById('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

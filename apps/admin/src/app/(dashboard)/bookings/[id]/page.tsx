@@ -41,10 +41,9 @@ export default function BookingDetailPage() {
 
   useEffect(() => {
     api
-      .get(`/admin/bookings`)
+      .get(`/admin/bookings/${params.id}`)
       .then((res) => {
-        const found = res.data.data?.find((b: BookingDetail) => b.id === params.id);
-        setBooking(found || null);
+        setBooking(res.data);
       })
       .catch(() => setBooking(null))
       .finally(() => setLoading(false));
