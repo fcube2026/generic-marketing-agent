@@ -157,7 +157,7 @@ export const KycScreen: React.FC = () => {
             )}
             {licenseDoc.status !== 'APPROVED' && (
               <View style={styles.documentActions}>
-                <TouchableOpacity style={styles.reuploadBtn} onPress={() => { handleDelete(licenseDoc); }}>
+                <TouchableOpacity style={styles.reuploadBtn} onPress={() => handleDelete(licenseDoc)}>
                   <Text style={styles.reuploadBtnText}>🗑 Remove & Re-upload</Text>
                 </TouchableOpacity>
               </View>
@@ -190,7 +190,7 @@ export const KycScreen: React.FC = () => {
             )}
             {govIdDoc.status !== 'APPROVED' && (
               <View style={styles.documentActions}>
-                <TouchableOpacity style={styles.reuploadBtn} onPress={() => { handleDelete(govIdDoc); }}>
+                <TouchableOpacity style={styles.reuploadBtn} onPress={() => handleDelete(govIdDoc)}>
                   <Text style={styles.reuploadBtnText}>🗑 Remove & Re-upload</Text>
                 </TouchableOpacity>
               </View>
