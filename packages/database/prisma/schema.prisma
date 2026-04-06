@@ -122,13 +122,15 @@ model ProviderProfile {
 }
 
 model ProviderLicense {
-  id          String    @id @default(cuid())
-  providerId  String
-  type        String
-  documentUrl String
-  expiresAt   DateTime?
-  verifiedAt  DateTime?
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  providerId      String
+  type            String
+  documentUrl     String
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  expiresAt       DateTime?
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
 
   provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
 

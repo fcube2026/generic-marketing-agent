@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Put, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param } from '@nestjs/common';
 import { ProvidersService } from './providers.service';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
+import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
 import { Public } from '../auth/decorators/roles.decorator';
 
 @Controller('providers')
@@ -55,5 +56,26 @@ export class ProvidersController {
       serviceCategory,
       mode,
     );
+  }
+
+  @Post('me/kyc')
+  uploadKycDocument(
+    @CurrentUser() user: any,
+    @Body() dto: UploadKycDocumentDto,
+  ) {
+    return this.providersService.uploadKycDocument(user.id, dto);
+  }
+
+  @Get('me/kyc')
+  getKycDocuments(@CurrentUser() user: any) {
+    return this.providersService.getKycDocuments(user.id);
+  }
+
+  @Delete('me/kyc/:id')
+  deleteKycDocument(
+    @CurrentUser() user: any,
+    @Param('id') documentId: string,
+  ) {
+    return this.providersService.deleteKycDocument(user.id, documentId);
   }
 }

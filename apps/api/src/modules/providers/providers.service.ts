@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
+import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
 
 function haversineDistance(
   lat1: number,
@@ -194,5 +199,58 @@ export class ProvidersService {
       .sort((a: any, b: any) => a.distance - b.distance);
 
     return withDistance;
+  }
+
+  async uploadKycDocument(userId: string, dto: UploadKycDocumentDto) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const document = await this.prisma.providerLicense.create({
+      data: {
+        providerId: profile.id,
+        type: dto.type,
+        documentUrl: dto.documentUrl,
+        status: 'PENDING',
+        ...(dto.expiresAt && { expiresAt: new Date(dto.expiresAt) }),
+      },
+    });
+
+    return document;
+  }
+
+  async getKycDocuments(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    return this.prisma.providerLicense.findMany({
+      where: { providerId: profile.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async deleteKycDocument(userId: string, documentId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const document = await this.prisma.providerLicense.findFirst({
+      where: { id: documentId, providerId: profile.id },
+    });
+    if (!document) throw new NotFoundException('Document not found');
+
+    if (document.status === 'APPROVED') {
+      throw new BadRequestException('Cannot delete an approved document');
+    }
+
+    await this.prisma.providerLicense.delete({
+      where: { id: documentId },
+    });
+
+    return { message: 'Document deleted successfully' };
   }
 }
