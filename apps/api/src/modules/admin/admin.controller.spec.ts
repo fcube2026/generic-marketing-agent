@@ -33,7 +33,12 @@ describe('AdminController', () => {
               completedBookings: 30,
               cancelledBookings: 5,
               totalEarnings: 25000,
-              bookingsByStatus: { REQUESTED: 5, COMPLETED: 30, CANCELLED: 5, ACCEPTED: 10 },
+              bookingsByStatus: {
+                REQUESTED: 5,
+                COMPLETED: 30,
+                CANCELLED: 5,
+                ACCEPTED: 10,
+              },
             }),
             getDashboardCharts: jest.fn().mockResolvedValue({
               bookingsPerDay: { '2025-01-01': 2, '2025-01-02': 3 },
@@ -117,7 +122,12 @@ describe('AdminController', () => {
         completedBookings: 30,
         cancelledBookings: 5,
         totalEarnings: 25000,
-        bookingsByStatus: { REQUESTED: 5, COMPLETED: 30, CANCELLED: 5, ACCEPTED: 10 },
+        bookingsByStatus: {
+          REQUESTED: 5,
+          COMPLETED: 30,
+          CANCELLED: 5,
+          ACCEPTED: 10,
+        },
       });
       expect(service.getDashboardStats).toHaveBeenCalled();
     });

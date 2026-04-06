@@ -41,6 +41,9 @@ jobs:
       - name: Typecheck shared types package
         run: pnpm --filter @curex24/types lint
 
+      - name: Prettier format check API
+        run: pnpm --filter @curex24/api format:check
+
       - name: Lint and typecheck API
         run: pnpm --filter @curex24/api lint
 
