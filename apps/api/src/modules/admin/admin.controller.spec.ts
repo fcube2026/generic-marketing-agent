@@ -60,7 +60,13 @@ describe('AdminController', () => {
               patient: { name: 'Patient A' },
               provider: { name: 'Dr. A' },
             }),
-            getDiagnosticsOverview: jest.fn().mockResolvedValue([]),
+            getDiagnosticsOverview: jest.fn().mockResolvedValue({
+              data: [],
+              total: 0,
+              page: 1,
+              limit: 20,
+              totalPages: 0,
+            }),
             getReferralsOverview: jest.fn().mockResolvedValue([]),
             getAllPayouts: jest.fn().mockResolvedValue({
               data: [],
@@ -220,6 +226,27 @@ describe('AdminController', () => {
         provider: { name: 'Dr. A' },
       });
       expect(service.getBookingById).toHaveBeenCalledWith('b1');
+    });
+  });
+
+  describe('getDiagnosticsOverview', () => {
+    it('should call service with default pagination and no status filter', async () => {
+      const result = await controller.getDiagnosticsOverview();
+
+      expect(result).toEqual({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+      });
+      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(1, 20, undefined);
+    });
+
+    it('should pass status filter and custom pagination', async () => {
+      await controller.getDiagnosticsOverview('2', '10', 'REQUESTED');
+
+      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(2, 10, 'REQUESTED');
     });
   });
 });

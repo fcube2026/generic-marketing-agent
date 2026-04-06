@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react';
 import { StatusBadge } from '@/components/ui/Badge';
 import api from '@/lib/api';
 
+interface LabResult {
+  id: string;
+  resultFileUrl: string | null;
+  notes: string | null;
+  uploadedAt: string;
+}
+
 interface DiagnosticRequest {
   id: string;
   testType: string;
@@ -16,29 +23,50 @@ interface DiagnosticRequest {
     patient?: { name: string };
     provider?: { name: string };
   };
-  labResults?: { id: string; resultFileUrl: string | null; notes: string | null; uploadedAt: string }[];
+  labResults?: LabResult[];
 }
+
+interface DiagnosticsResponse {
+  data: DiagnosticRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const STATUSES = ['', 'REQUESTED', 'SCHEDULED', 'COLLECTED', 'RESULTED'];
 
 export default function DiagnosticsPage() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
   const [uploadModal, setUploadModal] = useState<string | null>(null);
   const [resultFileUrl, setResultFileUrl] = useState('');
   const [resultNotes, setResultNotes] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [expandedResult, setExpandedResult] = useState<string | null>(null);
 
   const fetchDiagnostics = () => {
     setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    if (statusFilter) params.set('status', statusFilter);
+
     api
-      .get('/admin/diagnostics')
-      .then((res) => setDiagnostics(res.data))
+      .get(`/admin/diagnostics?${params}`)
+      .then((res) => {
+        const data: DiagnosticsResponse = res.data;
+        setDiagnostics(data.data);
+        setTotalPages(data.totalPages);
+      })
       .catch(() => setDiagnostics([]))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchDiagnostics();
-  }, []);
+  }, [page, statusFilter]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -75,6 +103,23 @@ export default function DiagnosticsPage() {
         <p className="text-gray-500 text-sm mt-1">Manage lab test requests, sample collections, and results</p>
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        {STATUSES.map((s) => (
+          <button
+            key={s}
+            onClick={() => { setStatusFilter(s); setPage(1); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              statusFilter === s
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {s || 'All'}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center h-40">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -82,67 +127,155 @@ export default function DiagnosticsPage() {
       ) : diagnostics.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-4">🧪</p>
-          <p className="text-lg font-medium">No pending diagnostic requests</p>
-          <p className="text-sm mt-1">Requests from providers will appear here</p>
+          <p className="text-lg font-medium">No diagnostic requests found</p>
+          <p className="text-sm mt-1">
+            {statusFilter ? `No ${statusFilter.toLowerCase()} requests` : 'Requests from providers will appear here'}
+          </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-              <tr>
-                <th className="px-5 py-3 text-left">Test Type</th>
-                <th className="px-5 py-3 text-left">Patient</th>
-                <th className="px-5 py-3 text-left">Provider</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-left">Scheduled</th>
-                <th className="px-5 py-3 text-left">Notes</th>
-                <th className="px-5 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {diagnostics.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50 transition">
-                  <td className="px-5 py-3 text-sm font-medium text-gray-900">{d.testType}</td>
-                  <td className="px-5 py-3 text-sm text-gray-600">{d.booking?.patient?.name || '—'}</td>
-                  <td className="px-5 py-3 text-sm text-gray-600">{d.booking?.provider?.name || '—'}</td>
-                  <td className="px-5 py-3"><StatusBadge status={d.status} /></td>
-                  <td className="px-5 py-3 text-sm text-gray-500">
-                    {d.scheduledAt ? new Date(d.scheduledAt).toLocaleString() : '—'}
-                  </td>
-                  <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate">{d.notes || '—'}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-2">
-                      {d.status === 'REQUESTED' && (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-left">Test Type</th>
+                  <th className="px-5 py-3 text-left">Patient</th>
+                  <th className="px-5 py-3 text-left">Provider</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-left">Scheduled</th>
+                  <th className="px-5 py-3 text-left">Notes</th>
+                  <th className="px-5 py-3 text-left">Results</th>
+                  <th className="px-5 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {diagnostics.map((d) => (
+                  <tr key={d.id} className="hover:bg-gray-50 transition">
+                    <td className="px-5 py-3 text-sm font-medium text-gray-900">{d.testType}</td>
+                    <td className="px-5 py-3 text-sm text-gray-600">{d.booking?.patient?.name || '—'}</td>
+                    <td className="px-5 py-3 text-sm text-gray-600">{d.booking?.provider?.name || '—'}</td>
+                    <td className="px-5 py-3"><StatusBadge status={d.status} /></td>
+                    <td className="px-5 py-3 text-sm text-gray-500">
+                      {d.scheduledAt ? new Date(d.scheduledAt).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-gray-500 max-w-[200px] truncate">{d.notes || '—'}</td>
+                    <td className="px-5 py-3">
+                      {d.labResults && d.labResults.length > 0 ? (
                         <button
-                          onClick={() => updateStatus(d.id, 'SCHEDULED')}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
+                          onClick={() => setExpandedResult(expandedResult === d.id ? null : d.id)}
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition inline-flex items-center gap-1"
                         >
-                          Schedule
+                          📄 {d.labResults.length} {d.labResults.length === 1 ? 'Report' : 'Reports'}
                         </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
                       )}
-                      {d.status === 'SCHEDULED' && (
-                        <button
-                          onClick={() => updateStatus(d.id, 'COLLECTED')}
-                          className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-semibold hover:bg-yellow-100 transition"
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex gap-2">
+                        {d.status === 'REQUESTED' && (
+                          <button
+                            onClick={() => updateStatus(d.id, 'SCHEDULED')}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition"
+                          >
+                            Schedule
+                          </button>
+                        )}
+                        {d.status === 'SCHEDULED' && (
+                          <button
+                            onClick={() => updateStatus(d.id, 'COLLECTED')}
+                            className="px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-semibold hover:bg-yellow-100 transition"
+                          >
+                            Mark Collected
+                          </button>
+                        )}
+                        {d.status === 'COLLECTED' && (
+                          <button
+                            onClick={() => setUploadModal(d.id)}
+                            className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100 transition"
+                          >
+                            Upload Result
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Expanded Lab Results Panel */}
+          {expandedResult && (() => {
+            const diag = diagnostics.find((d) => d.id === expandedResult);
+            if (!diag || !diag.labResults?.length) return null;
+            return (
+              <div className="mt-4 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Lab Reports — {diag.testType}
+                  </h3>
+                  <button
+                    onClick={() => setExpandedResult(null)}
+                    className="text-gray-400 hover:text-gray-600 text-sm"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {diag.labResults!.map((lr) => (
+                    <div
+                      key={lr.id}
+                      className="flex items-center justify-between border border-gray-100 rounded-lg p-3"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-700">
+                          {lr.notes || 'No notes'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Uploaded: {new Date(lr.uploadedAt).toLocaleString()}
+                        </p>
+                      </div>
+                      {lr.resultFileUrl ? (
+                        <a
+                          href={lr.resultFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-4 px-4 py-2 bg-primary text-white rounded-lg text-xs font-semibold hover:opacity-90 transition inline-flex items-center gap-1"
                         >
-                          Mark Collected
-                        </button>
-                      )}
-                      {d.status === 'COLLECTED' && (
-                        <button
-                          onClick={() => setUploadModal(d.id)}
-                          className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100 transition"
-                        >
-                          Upload Result
-                        </button>
+                          ⬇ Download Report
+                        </a>
+                      ) : (
+                        <span className="ml-4 text-xs text-gray-400">No file attached</span>
                       )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between mt-4">
+            <p className="text-sm text-gray-500">Page {page} of {totalPages}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50 hover:bg-gray-50 transition"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50 hover:bg-gray-50 transition"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Upload Result Modal */}
