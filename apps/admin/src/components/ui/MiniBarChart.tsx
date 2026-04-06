@@ -5,6 +5,8 @@ interface MiniBarChartProps {
   formatValue?: (v: number) => string;
 }
 
+const MIN_BAR_HEIGHT_PERCENT = 2;
+
 export default function MiniBarChart({
   data,
   label,
@@ -28,7 +30,7 @@ export default function MiniBarChart({
             <div
               className="w-full rounded-t transition-all duration-200 group-hover:opacity-80"
               style={{
-                height: `${Math.max((value / max) * 100, 2)}%`,
+                height: `${Math.max((value / max) * 100, MIN_BAR_HEIGHT_PERCENT)}%`,
                 backgroundColor: color,
               }}
             />

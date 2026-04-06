@@ -309,18 +309,18 @@ export class AdminService {
   }
 
   async getDashboardCharts() {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const rangeStart = new Date();
+    rangeStart.setDate(rangeStart.getDate() - 29);
+    rangeStart.setHours(0, 0, 0, 0);
 
     const [recentBookings, recentPayments] = await Promise.all([
       this.prisma.booking.findMany({
-        where: { createdAt: { gte: thirtyDaysAgo } },
+        where: { createdAt: { gte: rangeStart } },
         select: { createdAt: true, status: true },
         orderBy: { createdAt: 'asc' },
       }),
       this.prisma.payment.findMany({
-        where: { status: 'PAID', paidAt: { gte: thirtyDaysAgo } },
+        where: { status: 'PAID', paidAt: { gte: rangeStart } },
         select: { paidAt: true, amount: true },
         orderBy: { paidAt: 'asc' },
       }),
@@ -331,7 +331,7 @@ export class AdminService {
 
     // Initialize last 30 days (including today) with zero
     for (let i = 0; i < 30; i++) {
-      const d = new Date(thirtyDaysAgo);
+      const d = new Date(rangeStart);
       d.setDate(d.getDate() + i);
       const key = d.toISOString().slice(0, 10);
       bookingsPerDay[key] = 0;
