@@ -8,10 +8,11 @@ import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge';
+import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
-import { BookingStatus, Booking } from '../../types';
+import { BookingStatus, PaymentStatus, Booking } from '../../types';
 import { formatEta } from '../../utils/format';
 import { haversineDistance } from '../../utils/location';
 
@@ -245,6 +246,13 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
         </Card>
       )}
 
+      <Card style={styles.paymentCard}>
+        <View style={styles.paymentRow}>
+          <Text style={styles.sectionTitle}>Payment</Text>
+          <PaymentStatusBadge status={booking.paymentStatus as PaymentStatus} />
+        </View>
+      </Card>
+
       {booking.address && (
         <Card style={styles.addressCard}>
           <Text style={styles.sectionTitle}>Visit Address</Text>
@@ -277,6 +285,7 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.errorCardTitle}>Booking Cancelled</Text>
           <Text style={styles.errorCardMessage}>
             This booking has been cancelled.
+            {booking.paymentStatus === 'REFUNDED' && ' Your payment has been refunded.'}
           </Text>
         </Card>
       )}
@@ -326,6 +335,8 @@ const styles = StyleSheet.create({
   stepLine: { position: 'absolute', left: 11, top: 28, width: 2, height: 20, backgroundColor: Colors.border },
   stepLineActive: { backgroundColor: Colors.success },
   providerCard: { marginHorizontal: 16, marginBottom: 12 },
+  paymentCard: { marginHorizontal: 16, marginBottom: 12 },
+  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   addressCard: { marginHorizontal: 16, marginBottom: 12 },
   sectionTitle: { fontSize: 13, color: Colors.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   providerName: { fontSize: 18, fontWeight: '700', color: Colors.text },

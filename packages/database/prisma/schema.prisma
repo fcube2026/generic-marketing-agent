@@ -36,6 +36,7 @@ enum PaymentStatus {
   PENDING
   PAID
   REFUNDED
+  FAILED
 }
 
 enum DiagnosticStatus {

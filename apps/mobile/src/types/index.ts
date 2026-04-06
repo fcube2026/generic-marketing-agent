@@ -11,7 +11,7 @@ export type BookingStatus =
   | 'SUMMARY_SUBMITTED'
   | 'CLOSED'
   | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUNDED';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED';
 
 export interface User {
   id: string;
