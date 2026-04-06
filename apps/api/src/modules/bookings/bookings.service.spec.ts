@@ -370,13 +370,288 @@ describe('BookingsService', () => {
     it('should cancel a REQUESTED booking', async () => {
       const booking = { id: 'booking-1', status: 'REQUESTED' };
       const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { id: 'provider-1', userId: 'provider-user-1' },
+      };
 
-      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking) // for updateBookingStatus
+        .mockResolvedValueOnce(bookingWithRelations); // for cancel notification lookup
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
 
-      const result = await service.cancelBooking('booking-1', 'user-1');
+      const result = await service.cancelBooking('booking-1', 'patient-user-1');
       expect(result).toEqual(updated);
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'provider-user-1',
+          title: 'Booking Cancelled',
+          type: 'BOOKING_CANCELLED',
+        }),
+      );
+    });
+
+    it('should cancel an ACCEPTED booking and notify patient when provider cancels', async () => {
+      const booking = { id: 'booking-1', status: 'ACCEPTED' };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { id: 'provider-1', userId: 'provider-user-1' },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      const result = await service.cancelBooking(
+        'booking-1',
+        'provider-user-1',
+      );
+      expect(result).toEqual(updated);
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'patient-user-1',
+          title: 'Booking Cancelled',
+        }),
+      );
+    });
+
+    it('should reject cancel from ON_THE_WAY status', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'booking-1',
+        status: 'ON_THE_WAY',
+      });
+      await expect(
+        service.cancelBooking('booking-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject cancel from IN_PROGRESS status', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'booking-1',
+        status: 'IN_PROGRESS',
+      });
+      await expect(
+        service.cancelBooking('booking-1', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('full lifecycle transitions', () => {
+    const setupTransition = (fromStatus: string) => {
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        id: 'booking-1',
+        status: fromStatus,
+      });
+      mockPrisma.booking.update.mockImplementation(({ data }) => ({
+        id: 'booking-1',
+        status: data.status,
+      }));
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+    };
+
+    it('should transition ACCEPTED → ON_THE_WAY and notify patient', async () => {
+      const booking = { id: 'booking-1', status: 'ACCEPTED' };
+      const bookingWithPatient = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking) // for status check
+        .mockResolvedValueOnce(bookingWithPatient); // for notification
+      mockPrisma.booking.update.mockResolvedValue({
+        ...booking,
+        status: 'ON_THE_WAY',
+      });
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'ON_THE_WAY' as any,
+      });
+
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'patient-user-1',
+          message: 'Your provider is on the way.',
+          type: 'BOOKING_STATUS_UPDATE',
+        }),
+      );
+    });
+
+    it('should transition ON_THE_WAY → ARRIVED and notify patient', async () => {
+      const booking = { id: 'booking-1', status: 'ON_THE_WAY' };
+      const bookingWithPatient = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithPatient);
+      mockPrisma.booking.update.mockResolvedValue({
+        ...booking,
+        status: 'ARRIVED',
+      });
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'ARRIVED' as any,
+      });
+
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Your provider has arrived.',
+        }),
+      );
+    });
+
+    it('should transition ARRIVED → IN_PROGRESS and notify patient', async () => {
+      const booking = { id: 'booking-1', status: 'ARRIVED' };
+      const bookingWithPatient = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithPatient);
+      mockPrisma.booking.update.mockResolvedValue({
+        ...booking,
+        status: 'IN_PROGRESS',
+      });
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'IN_PROGRESS' as any,
+      });
+
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Your consultation is now in progress.',
+        }),
+      );
+    });
+
+    it('should transition IN_PROGRESS → COMPLETED and notify patient', async () => {
+      const booking = { id: 'booking-1', status: 'IN_PROGRESS' };
+      const bookingWithPatient = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithPatient);
+      mockPrisma.booking.update.mockResolvedValue({
+        ...booking,
+        status: 'COMPLETED',
+      });
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'COMPLETED' as any,
+      });
+
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Your consultation has been completed.',
+        }),
+      );
+    });
+
+    it('should transition COMPLETED → SUMMARY_SUBMITTED when summary exists', async () => {
+      setupTransition('COMPLETED');
+      mockPrisma.consultationSummary.findUnique.mockResolvedValue({
+        id: 'summary-1',
+        bookingId: 'booking-1',
+      });
+
+      const result = await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'SUMMARY_SUBMITTED' as any,
+      });
+
+      expect(result.status).toBe('SUMMARY_SUBMITTED');
+    });
+
+    it('should reject SUMMARY_SUBMITTED when no summary exists', async () => {
+      setupTransition('COMPLETED');
+      mockPrisma.consultationSummary.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateBookingStatus('booking-1', 'user-1', {
+          status: 'SUMMARY_SUBMITTED' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should transition SUMMARY_SUBMITTED → CLOSED when summary exists', async () => {
+      setupTransition('SUMMARY_SUBMITTED');
+      mockPrisma.consultationSummary.findUnique.mockResolvedValue({
+        id: 'summary-1',
+        bookingId: 'booking-1',
+      });
+
+      const result = await service.updateBookingStatus('booking-1', 'user-1', {
+        status: 'CLOSED' as any,
+      });
+
+      expect(result.status).toBe('CLOSED');
+    });
+
+    it('should reject CLOSED when no summary exists', async () => {
+      setupTransition('SUMMARY_SUBMITTED');
+      mockPrisma.consultationSummary.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateBookingStatus('booking-1', 'user-1', {
+          status: 'CLOSED' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject transitions from terminal states', async () => {
+      for (const terminal of ['CLOSED', 'CANCELLED', 'DECLINED']) {
+        mockPrisma.booking.findUnique.mockResolvedValue({
+          id: 'booking-1',
+          status: terminal,
+        });
+        await expect(
+          service.updateBookingStatus('booking-1', 'user-1', {
+            status: 'REQUESTED' as any,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      }
+    });
+
+    it('should reject skipping states (e.g., ACCEPTED → ARRIVED)', async () => {
+      setupTransition('ACCEPTED');
+      await expect(
+        service.updateBookingStatus('booking-1', 'user-1', {
+          status: 'ARRIVED' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject backwards transitions (e.g., COMPLETED → IN_PROGRESS)', async () => {
+      setupTransition('COMPLETED');
+      await expect(
+        service.updateBookingStatus('booking-1', 'user-1', {
+          status: 'IN_PROGRESS' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
