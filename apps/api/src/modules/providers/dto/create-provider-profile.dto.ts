@@ -4,10 +4,12 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
+  IsNotEmpty,
 } from 'class-validator';
 
 export class CreateProviderProfileDto {
   @IsString()
+  @IsNotEmpty({ message: 'Name is required' })
   name: string;
 
   @IsOptional()
@@ -15,7 +17,12 @@ export class CreateProviderProfileDto {
   bio?: string;
 
   @IsString()
+  @IsNotEmpty({ message: 'Specialization is required' })
   specialization: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Contact info is required' })
+  contactInfo: string;
 
   @IsOptional()
   @IsString()

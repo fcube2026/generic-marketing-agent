@@ -5,6 +5,7 @@ export type BookingStatus = 'REQUESTED' | 'ACCEPTED' | 'ON_THE_WAY' | 'ARRIVED' 
 export interface User { id: string; phone: string; role: Role; }
 export interface ProviderProfile {
   id: string; userId: string; name: string; bio?: string; specialization: string;
+  contactInfo: string;
   isVerified: boolean; isActive: boolean; isAvailable: boolean;
   homeVisitEnabled: boolean; doctorPlaceVisitEnabled: boolean;
   consultationFeeHomeVisit: number; consultationFeeDoctorPlace: number;
