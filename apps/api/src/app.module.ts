@@ -14,6 +14,7 @@ import { PayoutsModule } from './modules/payouts/payouts.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
     AdminModule,
     NotificationsModule,
     ReferralsModule,
+    TrackingModule,
   ],
 })
 export class AppModule {}

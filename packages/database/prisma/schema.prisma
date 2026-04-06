@@ -226,6 +226,7 @@ model Booking {
   referrals           Referral[]
   payment             Payment?
   payout              Payout?
+  providerLocations   ProviderLocation[]
 
   @@map("bookings")
 }
@@ -409,6 +410,19 @@ model OtpVerification {
   user User? @relation(fields: [userId], references: [id])
 
   @@map("otp_verifications")
+}
+
+model ProviderLocation {
+  id        String   @id @default(cuid())
+  bookingId String
+  lat       Float
+  lng       Float
+  recordedAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, recordedAt(sort: Desc)])
+  @@map("provider_locations")
 }
 
 model Notification {
