@@ -43,7 +43,7 @@ services:
       DATABASE_URL: postgresql://curex24:curex24password@postgres:5432/curex24
       DIRECT_URL: postgresql://curex24:curex24password@postgres:5432/curex24
       JWT_SECRET: ${JWT_SECRET:-curex24-super-secret-jwt-key-change-in-production}
-      JWT_EXPIRES_IN: 7d
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       NODE_ENV: development
       PORT: 3000
     depends_on:
