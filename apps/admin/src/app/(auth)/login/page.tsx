@@ -30,7 +30,8 @@ export default function LoginPage() {
       );
 
       // Store token in cookie for middleware route protection
-      document.cookie = `admin_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `admin_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${secure}`;
 
       router.push('/dashboard');
     } catch (err: any) {

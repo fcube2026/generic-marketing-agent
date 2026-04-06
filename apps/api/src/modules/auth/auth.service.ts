@@ -6,9 +6,9 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 
-// Hardcoded admin credentials for MVP
-const ADMIN_EMAIL = 'admin@curex24.com';
-const ADMIN_PASSWORD = 'admin123';
+// Hardcoded admin credentials for MVP (override via environment variables)
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 
 @Injectable()
