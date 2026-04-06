@@ -68,6 +68,7 @@ model User {
   auditLogs        AuditLog[]
   adminActions     AdminAction[]     @relation("AdminActions")
   otpVerifications OtpVerification[]
+  notifications    Notification[]
 
   @@map("users")
 }
@@ -404,4 +405,19 @@ model OtpVerification {
   user User? @relation(fields: [userId], references: [id])
 
   @@map("otp_verifications")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }

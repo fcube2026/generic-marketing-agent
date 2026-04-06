@@ -396,6 +396,19 @@ export interface AdminAction {
   createdAt: string;
 }
 
+// ============ NOTIFICATION TYPES ============
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 // ============ PAGINATION TYPES ============
 
 export interface PaginationDto {
