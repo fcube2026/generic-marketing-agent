@@ -240,13 +240,21 @@ describe('AdminController', () => {
         limit: 20,
         totalPages: 0,
       });
-      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(1, 20, undefined);
+      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(
+        1,
+        20,
+        undefined,
+      );
     });
 
     it('should pass status filter and custom pagination', async () => {
       await controller.getDiagnosticsOverview('2', '10', 'REQUESTED');
 
-      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(2, 10, 'REQUESTED');
+      expect(service.getDiagnosticsOverview).toHaveBeenCalledWith(
+        2,
+        10,
+        'REQUESTED',
+      );
     });
   });
 });

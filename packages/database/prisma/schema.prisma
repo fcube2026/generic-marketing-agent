@@ -413,10 +413,10 @@ model OtpVerification {
 }
 
 model ProviderLocation {
-  id        String   @id @default(cuid())
-  bookingId String
-  lat       Float
-  lng       Float
+  id         String   @id @default(cuid())
+  bookingId  String
+  lat        Float
+  lng        Float
   recordedAt DateTime @default(now())
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
