@@ -11,7 +11,7 @@ export interface ProviderProfile {
   currentLat?: number; currentLng?: number; serviceRadius: number;
 }
 export interface PatientProfile { id: string; name: string; emergencyContact?: string; }
-export interface ServiceCategory { id: string; name: string; slug: string; }
+export interface ServiceCategory { id: string; name: string; slug: string; description?: string; iconUrl?: string; }
 export interface Booking {
   id: string; patientId: string; providerId: string; serviceCategoryId: string;
   mode: BookingMode; status: BookingStatus; scheduledAt: string;
