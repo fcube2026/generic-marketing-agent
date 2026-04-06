@@ -25,6 +25,9 @@ describe('ProvidersService', () => {
       findFirst: jest.fn(),
       delete: jest.fn(),
     },
+    serviceCategory: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -69,6 +72,10 @@ describe('ProvidersService', () => {
       });
       mockPrisma.providerProfile.create.mockResolvedValue(createdProfile);
       mockPrisma.providerService.createMany.mockResolvedValue({ count: 2 });
+      mockPrisma.serviceCategory.findMany.mockResolvedValue([
+        { id: 'cat-1' },
+        { id: 'cat-2' },
+      ]);
 
       const result = await service.onboard(userId, dto);
 
@@ -105,6 +112,10 @@ describe('ProvidersService', () => {
       mockPrisma.providerProfile.update.mockResolvedValue(existingProfile);
       mockPrisma.providerService.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.providerService.createMany.mockResolvedValue({ count: 2 });
+      mockPrisma.serviceCategory.findMany.mockResolvedValue([
+        { id: 'cat-1' },
+        { id: 'cat-2' },
+      ]);
 
       const result = await service.onboard(userId, dto);
 
@@ -140,6 +151,56 @@ describe('ProvidersService', () => {
       await service.onboard(userId, dtoWithoutCategories);
 
       expect(mockPrisma.providerService.createMany).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when home visit enabled without fee', async () => {
+      const invalidDto = {
+        name: 'Dr. Smith',
+        specialization: 'General Physician',
+        contactInfo: 'dr.smith@example.com',
+        homeVisitEnabled: true,
+        consultationFeeHomeVisit: 0,
+      };
+
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.onboard(userId, invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException when clinic visit enabled without fee', async () => {
+      const invalidDto = {
+        name: 'Dr. Smith',
+        specialization: 'General Physician',
+        contactInfo: 'dr.smith@example.com',
+        doctorPlaceVisitEnabled: true,
+        consultationFeeDoctorPlace: 0,
+      };
+
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.onboard(userId, invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException for invalid service category IDs', async () => {
+      const invalidDto = {
+        name: 'Dr. Smith',
+        specialization: 'General Physician',
+        contactInfo: 'dr.smith@example.com',
+        serviceCategoryIds: ['valid-1', 'invalid-1'],
+      };
+
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.serviceCategory.findMany.mockResolvedValue([
+        { id: 'valid-1' },
+      ]);
+
+      await expect(service.onboard(userId, invalidDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -215,6 +276,48 @@ describe('ProvidersService', () => {
         service.updateProfile('unknown', { name: 'Test' }),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should throw BadRequestException when enabling home visit without fee', async () => {
+      const existingProfile = { id: 'profile-1', userId: 'user-1' };
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(
+        existingProfile,
+      );
+
+      await expect(
+        service.updateProfile('user-1', {
+          homeVisitEnabled: true,
+          consultationFeeHomeVisit: 0,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when enabling clinic visit without fee', async () => {
+      const existingProfile = { id: 'profile-1', userId: 'user-1' };
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(
+        existingProfile,
+      );
+
+      await expect(
+        service.updateProfile('user-1', {
+          doctorPlaceVisitEnabled: true,
+          consultationFeeDoctorPlace: 0,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for invalid service category IDs on update', async () => {
+      const existingProfile = { id: 'profile-1', userId: 'user-1' };
+      mockPrisma.providerProfile.findUnique.mockResolvedValueOnce(
+        existingProfile,
+      );
+      mockPrisma.serviceCategory.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.updateProfile('user-1', {
+          serviceCategoryIds: ['nonexistent-1'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('uploadKycDocument', () => {
@@ -277,9 +380,9 @@ describe('ProvidersService', () => {
     it('should throw NotFoundException if profile not found', async () => {
       mockPrisma.providerProfile.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.uploadKycDocument('unknown', dto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.uploadKycDocument('unknown', dto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

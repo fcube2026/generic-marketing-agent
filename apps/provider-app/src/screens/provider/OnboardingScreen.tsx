@@ -43,6 +43,12 @@ export const OnboardingScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!form.name || !form.specialization || !form.contactInfo) { Alert.alert('Required', 'Name, specialization, and contact info are required'); return; }
+    const feeHome = parseFloat(form.consultationFeeHomeVisit) || 0;
+    const feeClinic = parseFloat(form.consultationFeeDoctorPlace) || 0;
+    const radius = parseFloat(form.serviceRadius) || 10;
+    if (form.homeVisitEnabled && feeHome <= 0) { Alert.alert('Validation', 'Home visit fee must be greater than 0'); return; }
+    if (form.doctorPlaceVisitEnabled && feeClinic <= 0) { Alert.alert('Validation', 'Clinic visit fee must be greater than 0'); return; }
+    if (radius < 1 || radius > 100) { Alert.alert('Validation', 'Service radius must be between 1 and 100 km'); return; }
     setLoading(true);
     try {
       await providerService.onboard({
