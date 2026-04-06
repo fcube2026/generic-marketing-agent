@@ -13,9 +13,23 @@ import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummar
 import { ConsultationSummariesScreen } from '../screens/patient/ConsultationSummariesScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
+import { AddressListScreen } from '../screens/patient/AddressListScreen';
+import { AddEditAddressScreen } from '../screens/patient/AddEditAddressScreen';
 import { ProfileSetupScreen } from '../screens/auth/ProfileSetupScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory } from '../types';
+
+interface AddressParam {
+  id: string;
+  label: string;
+  addressLine: string;
+  city: string;
+  state: string;
+  pincode: string;
+  lat?: number;
+  lng?: number;
+  isDefault: boolean;
+}
 
 export type PatientStackParamList = {
   Tabs: undefined;
@@ -28,6 +42,8 @@ export type PatientStackParamList = {
   ConsultationSummary: { bookingId: string };
   ConsultationSummaries: undefined;
   ProfileSetup: undefined;
+  AddressList: undefined;
+  AddEditAddress: { address?: AddressParam };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -68,5 +84,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="ConsultationSummaries" component={ConsultationSummariesScreen} options={{ title: 'My Consultation Summaries' }} />
     <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ title: 'Edit Profile' }} />
+    <Stack.Screen name="AddressList" component={AddressListScreen} options={{ title: 'My Addresses' }} />
+    <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} options={({ route }) => ({ title: route.params?.address ? 'Edit Address' : 'Add Address' })} />
   </Stack.Navigator>
 );
