@@ -71,6 +71,11 @@ export class AdminController {
     return this.adminService.getDiagnosticsOverview();
   }
 
+  @Get('referrals')
+  getReferralsOverview() {
+    return this.adminService.getReferralsOverview();
+  }
+
   @Get('payouts')
   getAllPayouts(
     @Query('page') page?: string,

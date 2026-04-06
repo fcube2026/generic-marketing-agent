@@ -138,3 +138,26 @@ export interface RecommendationResponse {
   recommended: BookingMode;
   reason: string;
 }
+
+export type ReferralStatus = 'RECOMMENDED' | 'BOOKED' | 'COMPLETED';
+
+export interface Referral {
+  id: string;
+  bookingId: string;
+  specialistType: string;
+  notes?: string;
+  status: ReferralStatus;
+  createdAt: string;
+  updatedAt: string;
+  booking?: Booking & {
+    provider?: ProviderProfile;
+    serviceCategory?: ServiceCategory;
+  };
+}
+
+export interface ReferralsResponse {
+  data: Referral[];
+  total: number;
+  page: number;
+  limit: number;
+}

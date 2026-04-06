@@ -9,6 +9,7 @@ const navItems = [
   { href: '/bookings', label: 'Bookings', icon: '📋' },
   { href: '/payouts', label: 'Payouts', icon: '💰' },
   { href: '/diagnostics', label: 'Diagnostics', icon: '🧪' },
+  { href: '/referrals', label: 'Referrals', icon: '🏥' },
   { href: '/support', label: 'Support', icon: '💬' },
 ];
 

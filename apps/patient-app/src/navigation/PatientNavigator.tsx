@@ -11,6 +11,7 @@ import { PaymentScreen } from '../screens/patient/PaymentScreen';
 import { TrackingScreen } from '../screens/patient/TrackingScreen';
 import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummaryScreen';
 import { ConsultationSummariesScreen } from '../screens/patient/ConsultationSummariesScreen';
+import { ReferralsScreen } from '../screens/patient/ReferralsScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { AddressListScreen } from '../screens/patient/AddressListScreen';
@@ -41,6 +42,7 @@ export type PatientStackParamList = {
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
   ConsultationSummaries: undefined;
+  Referrals: undefined;
   ProfileSetup: undefined;
   AddressList: undefined;
   AddEditAddress: { address?: AddressParam };
@@ -83,6 +85,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="ConsultationSummaries" component={ConsultationSummariesScreen} options={{ title: 'My Consultation Summaries' }} />
+    <Stack.Screen name="Referrals" component={ReferralsScreen} options={{ title: 'My Referrals' }} />
     <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ title: 'Edit Profile' }} />
     <Stack.Screen name="AddressList" component={AddressListScreen} options={{ title: 'My Addresses' }} />
     <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} options={({ route }) => ({ title: route.params?.address ? 'Edit Address' : 'Add Address' })} />
