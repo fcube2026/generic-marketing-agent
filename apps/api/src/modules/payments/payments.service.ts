@@ -9,7 +9,7 @@ import {
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
-  async initiatePayment(dto: CreatePaymentDto) {
+  async initiatePayment(dto: CreatePaymentDto, _userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: dto.bookingId },
     });
@@ -33,7 +33,7 @@ export class PaymentsService {
     });
   }
 
-  async getPaymentStatus(bookingId: string) {
+  async getPaymentStatus(bookingId: string, _userId: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { bookingId },
     });
@@ -41,7 +41,11 @@ export class PaymentsService {
     return payment;
   }
 
-  async updatePaymentStatus(id: string, dto: UpdatePaymentStatusDto) {
+  async updatePaymentStatus(
+    id: string,
+    dto: UpdatePaymentStatusDto,
+    _userId: string,
+  ) {
     const payment = await this.prisma.payment.findUnique({ where: { id } });
     if (!payment) throw new NotFoundException('Payment not found');
 

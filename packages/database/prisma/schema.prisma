@@ -57,6 +57,12 @@ enum PayoutStatus {
   PROCESSED
 }
 
+enum LicenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id        String   @id @default(cuid())
   phone     String   @unique
@@ -129,7 +135,7 @@ model ProviderLicense {
   providerId      String
   type            String
   documentUrl     String
-  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          LicenseStatus @default(PENDING)
   rejectionReason String?
   expiresAt       DateTime?
   verifiedAt      DateTime?
@@ -230,6 +236,10 @@ model Booking {
   payout              Payout?
   providerLocations   ProviderLocation[]
 
+  @@index([patientId])
+  @@index([providerId])
+  @@index([status])
+  @@index([createdAt])
   @@map("bookings")
 }
 
@@ -242,6 +252,7 @@ model BookingStatusHistory {
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
+  @@index([bookingId])
   @@map("booking_status_history")
 }
 
@@ -288,6 +299,8 @@ model DiagnosticRequest {
   booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   labResults LabResult[]
 
+  @@index([bookingId])
+  @@index([status])
   @@map("diagnostic_requests")
 }
 
@@ -314,6 +327,7 @@ model Referral {
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
+  @@index([bookingId])
   @@map("referrals")
 }
 
@@ -344,6 +358,8 @@ model Payout {
   provider ProviderProfile @relation(fields: [providerId], references: [id])
   booking  Booking         @relation(fields: [bookingId], references: [id])
 
+  @@index([providerId])
+  @@index([status])
   @@map("payouts")
 }
 
@@ -383,6 +399,7 @@ model AuditLog {
 
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId])
   @@map("audit_logs")
 }
 
@@ -411,6 +428,7 @@ model OtpVerification {
 
   user User? @relation(fields: [userId], references: [id])
 
+  @@index([phone])
   @@map("otp_verifications")
 }
 
@@ -439,5 +457,6 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("notifications")
 }

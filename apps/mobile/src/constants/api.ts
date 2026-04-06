@@ -1,4 +1,6 @@
-export const API_BASE_URL = 'http://localhost:3000/api/v1';
+export const API_BASE_URL =
+  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE_URL) ||
+  'http://localhost:3000/api/v1';
 
 export const ENDPOINTS = {
   AUTH: {

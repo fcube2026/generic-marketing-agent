@@ -36,12 +36,17 @@ export class DiagnosticsController {
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateDiagnosticStatusDto,
+    @CurrentUser() user: any,
   ) {
-    return this.diagnosticsService.updateStatus(id, dto);
+    return this.diagnosticsService.updateStatus(id, dto, user.id);
   }
 
   @Post(':id/result')
-  uploadResult(@Param('id') id: string, @Body() dto: UploadLabResultDto) {
-    return this.diagnosticsService.uploadResult(id, dto);
+  uploadResult(
+    @Param('id') id: string,
+    @Body() dto: UploadLabResultDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.diagnosticsService.uploadResult(id, dto, user.id);
   }
 }
