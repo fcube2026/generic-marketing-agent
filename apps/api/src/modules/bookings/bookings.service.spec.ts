@@ -17,6 +17,7 @@ describe('BookingsService', () => {
     booking: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     bookingStatusHistory: {
@@ -27,6 +28,9 @@ describe('BookingsService', () => {
     },
     consultationSummary: {
       findUnique: jest.fn(),
+    },
+    address: {
+      findFirst: jest.fn(),
     },
   };
 
@@ -56,19 +60,24 @@ describe('BookingsService', () => {
     const dto = {
       providerId: 'provider-1',
       serviceCategoryId: 'cat-1',
+      addressId: 'address-1',
       mode: 'HOME_VISIT' as const,
       scheduledAt: '2025-01-01T10:00:00Z',
       symptoms: 'Headache',
     };
 
+    const patient = { id: 'patient-1', userId };
+    const provider = {
+      id: 'provider-1',
+      userId: 'provider-user-1',
+      isAvailable: true,
+      homeVisitEnabled: true,
+      doctorPlaceVisitEnabled: true,
+      consultationFeeHomeVisit: 500,
+      consultationFeeDoctorPlace: 300,
+    };
+
     it('should create booking and notify provider', async () => {
-      const patient = { id: 'patient-1', userId };
-      const provider = {
-        id: 'provider-1',
-        userId: 'provider-user-1',
-        consultationFeeHomeVisit: 500,
-        consultationFeeDoctorPlace: 300,
-      };
       const booking = {
         id: 'booking-1',
         ...dto,
@@ -82,6 +91,11 @@ describe('BookingsService', () => {
 
       mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
       mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue({
+        id: 'address-1',
+        userId,
+      });
+      mockPrisma.booking.findFirst.mockResolvedValue(null);
       mockPrisma.booking.create.mockResolvedValue(booking);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
       mockPrisma.payment.create.mockResolvedValue({});
@@ -107,14 +121,108 @@ describe('BookingsService', () => {
     });
 
     it('should throw if provider not found', async () => {
-      mockPrisma.patientProfile.findUnique.mockResolvedValue({
-        id: 'patient-1',
-        userId,
-      });
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
       mockPrisma.providerProfile.findUnique.mockResolvedValue(null);
       await expect(service.createBooking(userId, dto)).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should throw if provider is not available', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue({
+        ...provider,
+        isAvailable: false,
+      });
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw if home visit not enabled for provider', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue({
+        ...provider,
+        homeVisitEnabled: false,
+      });
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw if clinic visit not enabled for provider', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue({
+        ...provider,
+        doctorPlaceVisitEnabled: false,
+      });
+      const clinicDto = { ...dto, mode: 'DOCTOR_PLACE' as const };
+      await expect(service.createBooking(userId, clinicDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw if address missing for home visit', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      const noAddrDto = { ...dto, addressId: undefined };
+      await expect(service.createBooking(userId, noAddrDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw if address not found or not owned by user', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue(null);
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw if provider has a conflicting booking', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue({
+        id: 'address-1',
+        userId,
+      });
+      mockPrisma.booking.findFirst.mockResolvedValue({
+        id: 'existing-booking',
+        status: 'ACCEPTED',
+      });
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should allow clinic visit without addressId', async () => {
+      const clinicDto = {
+        ...dto,
+        mode: 'DOCTOR_PLACE' as const,
+        addressId: undefined,
+      };
+      const booking = {
+        id: 'booking-2',
+        ...clinicDto,
+        patientId: patient.id,
+        totalFee: 300,
+        status: 'REQUESTED',
+        provider,
+        serviceCategory: { id: 'cat-1', name: 'General' },
+        address: null,
+      };
+
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.booking.findFirst.mockResolvedValue(null);
+      mockPrisma.booking.create.mockResolvedValue(booking);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockPrisma.payment.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      const result = await service.createBooking(userId, clinicDto);
+      expect(result).toEqual(booking);
     });
   });
 
