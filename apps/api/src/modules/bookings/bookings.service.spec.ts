@@ -25,6 +25,7 @@ describe('BookingsService', () => {
     },
     payment: {
       create: jest.fn(),
+      update: jest.fn(),
     },
     consultationSummary: {
       findUnique: jest.fn(),
@@ -441,6 +442,83 @@ describe('BookingsService', () => {
       await expect(
         service.cancelBooking('booking-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should trigger refund when cancelling a booking with PAID payment', async () => {
+      const booking = { id: 'booking-1', status: 'ACCEPTED' };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { id: 'provider-1', userId: 'provider-user-1' },
+        payment: { id: 'payment-1', status: 'PAID', amount: 500 },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking) // for updateBookingStatus
+        .mockResolvedValueOnce(bookingWithRelations); // for cancel with payment lookup
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+      mockPrisma.payment.update.mockResolvedValue({
+        id: 'payment-1',
+        status: 'REFUNDED',
+      });
+
+      await service.cancelBooking('booking-1', 'patient-user-1');
+
+      expect(mockPrisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'payment-1' },
+        data: { status: 'REFUNDED' },
+      });
+      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        data: { paymentStatus: 'REFUNDED' },
+      });
+    });
+
+    it('should not trigger refund when cancelling a booking with PENDING payment', async () => {
+      const booking = { id: 'booking-1', status: 'REQUESTED' };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { id: 'provider-1', userId: 'provider-user-1' },
+        payment: { id: 'payment-1', status: 'PENDING', amount: 500 },
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.cancelBooking('booking-1', 'patient-user-1');
+
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger refund when cancelling a booking with no payment', async () => {
+      const booking = { id: 'booking-1', status: 'REQUESTED' };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { id: 'provider-1', userId: 'provider-user-1' },
+        payment: null,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.createNotification.mockResolvedValue({});
+
+      await service.cancelBooking('booking-1', 'patient-user-1');
+
+      expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
   });
 

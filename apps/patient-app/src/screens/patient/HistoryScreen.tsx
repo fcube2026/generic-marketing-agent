@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge';
+import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
-import { Booking, BookingStatus } from '../../types';
+import { Booking, BookingStatus, PaymentStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -63,6 +64,7 @@ export const HistoryScreen: React.FC = () => {
                   <Text style={styles.service}>{item.serviceCategory?.name}</Text>
                   <View style={styles.itemFooter}>
                     <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
+                    <PaymentStatusBadge status={item.paymentStatus as PaymentStatus} />
                     <Text style={styles.fee}>{formatCurrency(item.totalFee)}</Text>
                   </View>
                 </TouchableOpacity>

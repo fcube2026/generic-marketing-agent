@@ -78,6 +78,13 @@ export class PaymentsService {
       }
     }
 
+    if (dto.status === 'REFUNDED' || dto.status === 'FAILED') {
+      await this.prisma.booking.update({
+        where: { id: payment.bookingId },
+        data: { paymentStatus: dto.status as any },
+      });
+    }
+
     return updated;
   }
 }

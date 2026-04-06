@@ -333,7 +333,7 @@ export class BookingsService {
     // Notify the other party about cancellation
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { patient: true, provider: true },
+      include: { patient: true, provider: true, payment: true },
     });
     if (booking) {
       const isPatientCancelling = booking.patient.userId === userId;
@@ -349,6 +349,18 @@ export class BookingsService {
         type: 'BOOKING_CANCELLED',
         metadata: { bookingId },
       });
+
+      // Trigger mock refund if payment was completed
+      if (booking.payment && booking.payment.status === 'PAID') {
+        await this.prisma.payment.update({
+          where: { id: booking.payment.id },
+          data: { status: 'REFUNDED' },
+        });
+        await this.prisma.booking.update({
+          where: { id: bookingId },
+          data: { paymentStatus: 'REFUNDED' },
+        });
+      }
     }
 
     return updated;

@@ -179,7 +179,7 @@ describe('PaymentsService', () => {
       });
     });
 
-    it('should update status without payout when not PAID', async () => {
+    it('should update booking paymentStatus when status is REFUNDED', async () => {
       const mockPayment = {
         id: 'payment-1',
         bookingId: 'booking-1',
@@ -190,13 +190,42 @@ describe('PaymentsService', () => {
 
       mockPrisma.payment.findUnique.mockResolvedValue(mockPayment);
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
+      mockPrisma.booking.update.mockResolvedValue({});
 
       const result = await service.updatePaymentStatus(paymentId, {
         status: 'REFUNDED',
       });
 
       expect(result.status).toBe('REFUNDED');
-      expect(mockPrisma.booking.update).not.toHaveBeenCalled();
+      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        data: { paymentStatus: 'REFUNDED' },
+      });
+      expect(mockPrisma.payout.upsert).not.toHaveBeenCalled();
+    });
+
+    it('should update booking paymentStatus when status is FAILED', async () => {
+      const mockPayment = {
+        id: 'payment-1',
+        bookingId: 'booking-1',
+        amount: 500,
+        status: 'PENDING',
+      };
+      const updatedPayment = { ...mockPayment, status: 'FAILED' };
+
+      mockPrisma.payment.findUnique.mockResolvedValue(mockPayment);
+      mockPrisma.payment.update.mockResolvedValue(updatedPayment);
+      mockPrisma.booking.update.mockResolvedValue({});
+
+      const result = await service.updatePaymentStatus(paymentId, {
+        status: 'FAILED',
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(mockPrisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        data: { paymentStatus: 'FAILED' },
+      });
       expect(mockPrisma.payout.upsert).not.toHaveBeenCalled();
     });
 
