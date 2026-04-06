@@ -76,7 +76,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should return OTP in non-production environment', async () => {
+    it('should include OTP in response during development mode', async () => {
       (prisma.otpVerification.updateMany as jest.Mock).mockResolvedValue({
         count: 0,
       });
