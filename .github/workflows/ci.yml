@@ -109,7 +109,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: "postgresql://test:test@localhost:5432/curex24_test?schema=public"
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        DIRECT_URL: ${{ secrets.DIRECT_URL }}   # Add this line
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
