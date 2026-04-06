@@ -55,11 +55,12 @@ export class ProvidersService {
 
   private async validateServiceCategoryIds(ids: string[]) {
     if (ids.length === 0) return;
+    const uniqueIds = [...new Set(ids)];
     const categories = await this.prisma.serviceCategory.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: uniqueIds } },
       select: { id: true },
     });
-    if (categories.length !== ids.length) {
+    if (categories.length !== uniqueIds.length) {
       throw new BadRequestException(
         'One or more service category IDs are invalid',
       );
