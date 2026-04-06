@@ -96,7 +96,7 @@ This starts a PostgreSQL instance:
 - **Port:** 5432
 - **Database:** curex24
 - **Username:** curex24
-- **Password:** curex24_pass
+- **Password:** curex24password
 
 ---
 
@@ -111,7 +111,8 @@ cp apps/api/.env.example apps/api/.env
 Default `.env` contents:
 
 ```env
-DATABASE_URL="postgresql://curex24:curex24_pass@localhost:5432/curex24?schema=public"
+DATABASE_URL="postgresql://curex24:curex24password@localhost:5432/curex24?schema=public"
+DIRECT_URL="postgresql://curex24:curex24password@localhost:5432/curex24?schema=public"
 JWT_SECRET="curex24-jwt-secret-change-in-production"
 PORT=3000
 NODE_ENV=development
@@ -228,6 +229,8 @@ curex24/
 | `pnpm db:generate` | Generate Prisma client |
 | `pnpm db:migrate` | Run database migrations |
 | `pnpm db:studio` | Open Prisma Studio (DB GUI) |
+| `pnpm db:seed` | Seed the database with initial data |
+| `pnpm db:reset` | Reset database (drops all data & re-migrates) |
 
 ### Per-app
 
@@ -253,7 +256,13 @@ Opens a web-based database browser at `http://localhost:5555`
 
 ### Seed Data
 
-Currently, service categories should be created manually via Prisma Studio or API. Default categories to create:
+To seed the database with initial data, run:
+
+```bash
+pnpm db:seed
+```
+
+This populates the database with default service categories and other initial records. Alternatively, you can create records manually via Prisma Studio or the API. Default categories:
 
 | Name | Slug |
 |------|------|
@@ -264,9 +273,49 @@ Currently, service categories should be created manually via Prisma Studio or AP
 | Elderly Care | elderly-care |
 | Occupational Therapy | occupational-therapy |
 
+### Reset Database
+
+```bash
+pnpm db:reset
+```
+
+This drops all data, re-runs all migrations, and optionally re-seeds. Useful for starting fresh during development.
+
 ---
 
-## 9. API Testing
+## 9. Accessing the Database in Code
+
+### In the NestJS API (`apps/api/`)
+
+The `PrismaService` extends `PrismaClient` and is registered globally via `PrismaModule`. Inject it into any NestJS service:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../common/prisma/prisma.service';
+
+@Injectable()
+export class MyService {
+  constructor(private prisma: PrismaService) {}
+
+  async getUsers() {
+    return this.prisma.user.findMany();
+  }
+}
+```
+
+### In other packages (Admin panel, scripts, etc.)
+
+Import the singleton Prisma client from the `@curex24/database` package:
+
+```typescript
+import { prisma } from '@curex24/database';
+
+const users = await prisma.user.findMany();
+```
+
+---
+
+## 10. API Testing
 
 ### Development OTP Flow
 
@@ -291,7 +340,7 @@ curl -X POST http://localhost:3000/auth/verify-otp \
 
 ---
 
-## 10. Mobile App Configuration
+## 11. Mobile App Configuration
 
 ### API URL
 
@@ -312,7 +361,7 @@ For emulators:
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
