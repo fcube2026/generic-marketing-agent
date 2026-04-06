@@ -24,6 +24,10 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
   const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
+    if (mode === 'HOME_VISIT' && !selectedAddress) {
+      setError('Please select an address for home visit bookings.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

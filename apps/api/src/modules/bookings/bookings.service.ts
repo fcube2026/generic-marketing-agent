@@ -9,6 +9,8 @@ import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
+const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   REQUESTED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
   ACCEPTED: ['ON_THE_WAY', 'CANCELLED'],
@@ -81,9 +83,8 @@ export class BookingsService {
 
     // Check for scheduling conflicts (overlapping active bookings for same provider)
     const scheduledAt = new Date(dto.scheduledAt);
-    const conflictWindow = 60 * 60 * 1000; // 1 hour window
-    const windowStart = new Date(scheduledAt.getTime() - conflictWindow);
-    const windowEnd = new Date(scheduledAt.getTime() + conflictWindow);
+    const windowStart = new Date(scheduledAt.getTime() - BOOKING_CONFLICT_WINDOW_MS);
+    const windowEnd = new Date(scheduledAt.getTime() + BOOKING_CONFLICT_WINDOW_MS);
 
     const conflictingBooking = await this.prisma.booking.findFirst({
       where: {
