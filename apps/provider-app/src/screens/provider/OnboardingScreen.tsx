@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Toggle } from '../../components/common/Toggle';
 import { providerService } from '../../services/providerService';
+import { serviceService } from '../../services/serviceService';
+import { ServiceCategory } from '../../types';
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: '', bio: '', specialization: '',
     homeVisitEnabled: false, consultationFeeHomeVisit: '',
@@ -20,7 +23,23 @@ export const OnboardingScreen: React.FC = () => {
     serviceRadius: '10',
   });
 
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useQuery<ServiceCategory[]>({
+    queryKey: ['services'],
+    queryFn: serviceService.getCategories,
+  });
+
   const update = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    );
+  };
 
   const handleSubmit = async () => {
     if (!form.name || !form.specialization) { Alert.alert('Required', 'Name and specialization are required'); return; }
@@ -33,6 +52,7 @@ export const OnboardingScreen: React.FC = () => {
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
         consultationFeeDoctorPlace: parseFloat(form.consultationFeeDoctorPlace) || 0,
         serviceRadius: parseFloat(form.serviceRadius) || 10,
+        serviceCategoryIds: selectedCategoryIds,
       });
       queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
       Alert.alert('Success', 'Profile created! You can now receive bookings after verification.', [
@@ -59,6 +79,37 @@ export const OnboardingScreen: React.FC = () => {
           <Input label="Full Name *" value={form.name} onChangeText={(t) => update('name', t)} placeholder="Dr. John Smith" />
           <Input label="Specialization *" value={form.specialization} onChangeText={(t) => update('specialization', t)} placeholder="General Physician" />
           <Input label="Bio" value={form.bio} onChangeText={(t) => update('bio', t)} placeholder="Brief description..." multiline numberOfLines={4} style={{ height: 100, textAlignVertical: 'top' } as any} />
+
+          <Text style={styles.categoryLabel}>Service Categories</Text>
+          {categoriesLoading ? (
+            <Text style={styles.categoryHint}>Loading categories...</Text>
+          ) : categoriesError ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Unable to load categories</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => refetchCategories()}>
+                <Text style={styles.retryText}>Tap to retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.categoryGrid}>
+              {(categories || []).map((cat) => {
+                const selected = selectedCategoryIds.includes(cat.id);
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[styles.categoryChip, selected && styles.categoryChipSelected]}
+                    onPress={() => toggleCategory(cat.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.categoryChipText, selected && styles.categoryChipTextSelected]}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           <Button title="Next →" onPress={() => setStep(2)} disabled={!form.name || !form.specialization} />
         </View>
       )}
@@ -91,6 +142,14 @@ export const OnboardingScreen: React.FC = () => {
           <Text style={styles.stepTitle}>Review & Submit</Text>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Name</Text><Text style={styles.reviewValue}>{form.name}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Specialization</Text><Text style={styles.reviewValue}>{form.specialization}</Text></View>
+          <View style={styles.reviewItem}>
+            <Text style={styles.reviewLabel}>Services</Text>
+            <Text style={styles.reviewValue}>
+              {selectedCategoryIds.length > 0
+                ? (categories || []).filter((c) => selectedCategoryIds.includes(c.id)).map((c) => c.name).join(', ')
+                : 'None selected'}
+            </Text>
+          </View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Home Visit</Text><Text style={styles.reviewValue}>{form.homeVisitEnabled ? `Yes — ₹${form.consultationFeeHomeVisit}` : 'No'}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Clinic Visit</Text><Text style={styles.reviewValue}>{form.doctorPlaceVisitEnabled ? `Yes — ₹${form.consultationFeeDoctorPlace}` : 'No'}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Service Radius</Text><Text style={styles.reviewValue}>{form.serviceRadius} km</Text></View>
@@ -116,5 +175,19 @@ const styles = StyleSheet.create({
   btnRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   reviewItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   reviewLabel: { fontSize: 14, color: Colors.textMuted },
-  reviewValue: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  reviewValue: { fontSize: 14, fontWeight: '600', color: Colors.text, flexShrink: 1, textAlign: 'right' },
+  categoryLabel: { fontSize: 15, fontWeight: '600', color: Colors.text, marginTop: 16, marginBottom: 8 },
+  categoryHint: { fontSize: 13, color: Colors.textMuted, marginBottom: 12 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  categoryChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.border,
+  },
+  categoryChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  categoryChipText: { fontSize: 13, color: Colors.text },
+  categoryChipTextSelected: { color: Colors.white, fontWeight: '600' },
+  errorContainer: { alignItems: 'center', padding: 16, backgroundColor: Colors.white, borderRadius: 12, marginBottom: 12 },
+  errorText: { fontSize: 14, color: Colors.error, marginBottom: 8 },
+  retryButton: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.primary, borderRadius: 8 },
+  retryText: { color: Colors.white, fontWeight: '600', fontSize: 13 },
 });

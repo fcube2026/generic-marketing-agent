@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
@@ -13,6 +12,7 @@ import { Colors } from '../../constants/colors';
 import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
+import { serviceService } from '../../services/serviceService';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,14 +28,12 @@ export const HomeScreen: React.FC = () => {
   const {
     data: services,
     isLoading,
+    isError,
     refetch,
     isRefetching,
   } = useQuery<ServiceCategory[]>({
     queryKey: ['services'],
-    queryFn: async () => {
-      const res = await api.get('/services');
-      return res.data;
-    },
+    queryFn: serviceService.getCategories,
   });
 
   const { data: recentBookings } = useQuery({
@@ -76,6 +74,13 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>Services</Text>
         {isLoading ? (
           <LoadingSpinner message="Loading services..." />
+        ) : isError ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Unable to load services</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+              <Text style={styles.retryText}>Tap to retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.servicesGrid}>
             {(services || []).map((category) => (
@@ -174,4 +179,26 @@ const styles = StyleSheet.create({
   bookingProvider: { fontWeight: '600', color: Colors.text, marginBottom: 2 },
   bookingService: { fontSize: 13, color: Colors.textMuted },
   bookingStatus: { fontWeight: '600', fontSize: 13 },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+  },
+  errorText: {
+    fontSize: 14,
+    color: Colors.error,
+    marginBottom: 12,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });
