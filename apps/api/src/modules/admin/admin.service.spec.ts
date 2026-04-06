@@ -357,9 +357,9 @@ describe('AdminService', () => {
   describe('getDashboardStats', () => {
     it('should return dashboard statistics with extended KPIs', async () => {
       mockPrisma.booking.count
-        .mockResolvedValueOnce(50)  // totalBookings
-        .mockResolvedValueOnce(30)  // completedBookings
-        .mockResolvedValueOnce(5);  // cancelledBookings
+        .mockResolvedValueOnce(50) // totalBookings
+        .mockResolvedValueOnce(30) // completedBookings
+        .mockResolvedValueOnce(5); // cancelledBookings
       mockPrisma.providerProfile.count
         .mockResolvedValueOnce(10) // activeProviders
         .mockResolvedValueOnce(3); // pendingVerification
