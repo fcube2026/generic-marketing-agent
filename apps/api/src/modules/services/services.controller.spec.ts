@@ -7,8 +7,24 @@ describe('ServicesController', () => {
   let service: ServicesService;
 
   const mockCategories = [
-    { id: '1', name: 'Dentistry', slug: 'dentistry', description: 'Dental care services', iconUrl: null, createdAt: new Date(), updatedAt: new Date() },
-    { id: '2', name: 'Doctor', slug: 'doctor', description: 'General physician consultation', iconUrl: null, createdAt: new Date(), updatedAt: new Date() },
+    {
+      id: '1',
+      name: 'Dentistry',
+      slug: 'dentistry',
+      description: 'Dental care services',
+      iconUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: '2',
+      name: 'Doctor',
+      slug: 'doctor',
+      description: 'General physician consultation',
+      iconUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   ];
 
   beforeEach(async () => {

@@ -151,10 +151,7 @@ describe('ProvidersController', () => {
       const result = await controller.deleteKycDocument(user, 'doc-1');
 
       expect(result).toEqual({ message: 'Document deleted successfully' });
-      expect(service.deleteKycDocument).toHaveBeenCalledWith(
-        'user-1',
-        'doc-1',
-      );
+      expect(service.deleteKycDocument).toHaveBeenCalledWith('user-1', 'doc-1');
     });
   });
 });

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Query, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Query,
+  Param,
+} from '@nestjs/common';
 import { ProvidersService } from './providers.service';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
@@ -72,10 +81,7 @@ export class ProvidersController {
   }
 
   @Delete('me/kyc/:id')
-  deleteKycDocument(
-    @CurrentUser() user: any,
-    @Param('id') documentId: string,
-  ) {
+  deleteKycDocument(@CurrentUser() user: any, @Param('id') documentId: string) {
     return this.providersService.deleteKycDocument(user.id, documentId);
   }
 }
