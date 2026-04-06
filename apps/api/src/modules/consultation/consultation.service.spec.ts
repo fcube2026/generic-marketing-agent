@@ -45,9 +45,14 @@ describe('ConsultationService', () => {
             consultationSummary: {
               upsert: jest.fn(),
               findUnique: jest.fn(),
+              findMany: jest.fn(),
+              count: jest.fn(),
             },
             bookingStatusHistory: {
               create: jest.fn(),
+            },
+            patientProfile: {
+              findUnique: jest.fn(),
             },
           },
         },
@@ -198,6 +203,78 @@ describe('ConsultationService', () => {
 
       await expect(service.getSummary('booking-1')).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('getPatientSummaries', () => {
+    const mockPatientProfile = { id: 'patient-1', userId: 'user-patient-1' };
+    const mockSummaries = [
+      {
+        ...mockSummary,
+        prescriptions: [],
+        booking: {
+          id: 'booking-1',
+          provider: { id: 'provider-1', name: 'Dr. Smith' },
+          serviceCategory: { id: 'cat-1', name: 'General' },
+        },
+      },
+    ];
+
+    it('should return paginated summaries for a patient', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(
+        mockPatientProfile,
+      );
+      (prisma.consultationSummary.findMany as jest.Mock).mockResolvedValue(
+        mockSummaries,
+      );
+      (prisma.consultationSummary.count as jest.Mock).mockResolvedValue(1);
+
+      const result = await service.getPatientSummaries('user-patient-1', 1, 10);
+
+      expect(result).toEqual({
+        data: mockSummaries,
+        total: 1,
+        page: 1,
+        limit: 10,
+      });
+      expect(prisma.consultationSummary.findMany).toHaveBeenCalledWith({
+        where: { booking: { patientId: 'patient-1' } },
+        include: {
+          prescriptions: true,
+          booking: {
+            include: {
+              provider: true,
+              serviceCategory: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 10,
+      });
+    });
+
+    it('should return empty result when patient profile does not exist', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.getPatientSummaries('user-unknown', 1, 10);
+
+      expect(result).toEqual({ data: [], total: 0, page: 1, limit: 10 });
+    });
+
+    it('should handle pagination correctly', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(
+        mockPatientProfile,
+      );
+      (prisma.consultationSummary.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.consultationSummary.count as jest.Mock).mockResolvedValue(15);
+
+      const result = await service.getPatientSummaries('user-patient-1', 2, 10);
+
+      expect(result).toEqual({ data: [], total: 15, page: 2, limit: 10 });
+      expect(prisma.consultationSummary.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 }),
       );
     });
   });

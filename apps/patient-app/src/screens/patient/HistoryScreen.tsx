@@ -13,6 +13,11 @@ import { PatientStackParamList } from '../../navigation/PatientNavigator';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
+const SUMMARY_STATUSES: BookingStatus[] = [
+  'SUMMARY_SUBMITTED',
+  'CLOSED',
+];
+
 export const HistoryScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { data: bookings, isLoading } = useQuery<Booking[]>({
@@ -24,7 +29,15 @@ export const HistoryScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Booking History</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>Booking History</Text>
+        <TouchableOpacity
+          style={styles.summariesButton}
+          onPress={() => navigation.navigate('ConsultationSummaries')}
+        >
+          <Text style={styles.summariesButtonText}>📋 Summaries</Text>
+        </TouchableOpacity>
+      </View>
       {(!bookings || bookings.length === 0) ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📋</Text>
@@ -36,22 +49,35 @@ export const HistoryScreen: React.FC = () => {
           data={bookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.item}
-              onPress={() => navigation.navigate('Tracking', { bookingId: item.id })}
-            >
-              <View style={styles.itemHeader}>
-                <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
-                <BookingStatusBadge status={item.status as BookingStatus} />
-              </View>
-              <Text style={styles.service}>{item.serviceCategory?.name}</Text>
-              <View style={styles.itemFooter}>
-                <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
-                <Text style={styles.fee}>{formatCurrency(item.totalFee)}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const hasSummary = SUMMARY_STATUSES.includes(item.status as BookingStatus);
+            return (
+              <TouchableOpacity
+                style={styles.item}
+                onPress={() => navigation.navigate('Tracking', { bookingId: item.id })}
+              >
+                <View style={styles.itemHeader}>
+                  <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
+                  <BookingStatusBadge status={item.status as BookingStatus} />
+                </View>
+                <Text style={styles.service}>{item.serviceCategory?.name}</Text>
+                <View style={styles.itemFooter}>
+                  <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
+                  <Text style={styles.fee}>{formatCurrency(item.totalFee)}</Text>
+                </View>
+                {hasSummary && (
+                  <TouchableOpacity
+                    style={styles.viewSummaryButton}
+                    onPress={() =>
+                      navigation.navigate('ConsultationSummary', { bookingId: item.id })
+                    }
+                  >
+                    <Text style={styles.viewSummaryText}>View Summary →</Text>
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </View>
@@ -60,15 +86,32 @@ export const HistoryScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 16,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
   header: {
     fontSize: 24,
     fontWeight: '800',
     color: Colors.text,
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+  },
+  summariesButton: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  summariesButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   list: { padding: 16 },
   item: {
@@ -88,6 +131,18 @@ const styles = StyleSheet.create({
   itemFooter: { flexDirection: 'row', justifyContent: 'space-between' },
   date: { fontSize: 12, color: Colors.textMuted },
   fee: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  viewSummaryButton: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    alignItems: 'center',
+  },
+  viewSummaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8 },

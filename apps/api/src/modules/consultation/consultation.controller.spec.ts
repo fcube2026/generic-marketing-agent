@@ -30,6 +30,12 @@ describe('ConsultationController', () => {
             getSummary: jest
               .fn()
               .mockResolvedValue({ ...mockSummary, prescriptions: [] }),
+            getPatientSummaries: jest.fn().mockResolvedValue({
+              data: [{ ...mockSummary, prescriptions: [], booking: {} }],
+              total: 1,
+              page: 1,
+              limit: 10,
+            }),
           },
         },
       ],
@@ -68,6 +74,30 @@ describe('ConsultationController', () => {
 
       expect(result).toEqual({ ...mockSummary, prescriptions: [] });
       expect(service.getSummary).toHaveBeenCalledWith('booking-1');
+    });
+  });
+
+  describe('getPatientSummaries', () => {
+    it('should call service.getPatientSummaries with default pagination', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.getPatientSummaries(user);
+
+      expect(result).toEqual({
+        data: [{ ...mockSummary, prescriptions: [], booking: {} }],
+        total: 1,
+        page: 1,
+        limit: 10,
+      });
+      expect(service.getPatientSummaries).toHaveBeenCalledWith('user-1', 1, 10);
+    });
+
+    it('should call service.getPatientSummaries with custom pagination', async () => {
+      const user = { id: 'user-1' };
+
+      await controller.getPatientSummaries(user, '2', '5');
+
+      expect(service.getPatientSummaries).toHaveBeenCalledWith('user-1', 2, 5);
     });
   });
 });

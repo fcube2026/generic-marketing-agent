@@ -86,6 +86,37 @@ export interface ProviderWithDistance extends ProviderProfile {
   distance: number;
 }
 
+export interface ConsultationSummary {
+  id: string;
+  bookingId: string;
+  symptoms?: string;
+  observations?: string;
+  diagnosis?: string;
+  medicinesAdvised?: {
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    notes?: string;
+  }[];
+  nextSteps?: string;
+  followUpRecommendation?: string;
+  createdAt: string;
+  updatedAt: string;
+  prescriptions?: { id: string; details?: string; fileUrl?: string }[];
+  booking?: Booking & {
+    provider?: ProviderProfile;
+    serviceCategory?: ServiceCategory;
+  };
+}
+
+export interface ConsultationSummariesResponse {
+  data: ConsultationSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface RecommendationOption {
   provider: ProviderProfile;
   distance: number;

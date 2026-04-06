@@ -18,5 +18,6 @@ export const ENDPOINTS = {
   BOOKINGS: '/bookings',
   RECOMMENDATION: '/recommendation',
   CONSULTATION: '/consultation',
+  CONSULTATION_PATIENT_SUMMARIES: '/consultation/patient/summaries',
   PAYMENTS: '/payments',
 };

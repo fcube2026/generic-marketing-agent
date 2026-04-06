@@ -76,4 +76,43 @@ export class ConsultationService {
     if (!summary) throw new NotFoundException('Consultation summary not found');
     return summary;
   }
+
+  async getPatientSummaries(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!patientProfile) {
+      return { data: [], total: 0, page, limit };
+    }
+
+    const where = {
+      booking: { patientId: patientProfile.id },
+    };
+
+    const [summaries, total] = await Promise.all([
+      this.prisma.consultationSummary.findMany({
+        where,
+        include: {
+          prescriptions: true,
+          booking: {
+            include: {
+              provider: true,
+              serviceCategory: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.consultationSummary.count({ where }),
+    ]);
+
+    return { data: summaries, total, page, limit };
+  }
 }
