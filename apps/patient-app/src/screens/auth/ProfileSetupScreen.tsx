@@ -67,11 +67,15 @@ export const ProfileSetupScreen: React.FC = () => {
       newErrors.name = 'Name must be at least 2 characters';
     }
 
-    if (dateOfBirth && !isValidDateOfBirth(dateOfBirth)) {
+    if (!dateOfBirth) {
+      newErrors.dateOfBirth = 'Date of birth is required';
+    } else if (!isValidDateOfBirth(dateOfBirth)) {
       newErrors.dateOfBirth = 'Enter a valid date in YYYY-MM-DD format';
     }
 
-    if (gender && !['MALE', 'FEMALE', 'OTHER'].includes(gender)) {
+    if (!gender) {
+      newErrors.gender = 'Please select a gender';
+    } else if (!['MALE', 'FEMALE', 'OTHER'].includes(gender)) {
       newErrors.gender = 'Select a valid gender';
     }
 
@@ -85,8 +89,8 @@ export const ProfileSetupScreen: React.FC = () => {
     try {
       await patientService.createOrUpdateProfile({
         name: name.trim(),
-        ...(dateOfBirth ? { dateOfBirth } : {}),
-        ...(gender ? { gender } : {}),
+        dateOfBirth,
+        gender,
       });
       setHasProfile(true);
     } catch (err: any) {
@@ -131,7 +135,7 @@ export const ProfileSetupScreen: React.FC = () => {
           />
 
           <Input
-            label="Date of Birth (optional)"
+            label="Date of Birth *"
             placeholder="YYYY-MM-DD"
             value={dateOfBirth}
             onChangeText={(text) => {
@@ -145,7 +149,7 @@ export const ProfileSetupScreen: React.FC = () => {
           />
 
           <View style={styles.genderSection}>
-            <Text style={styles.genderLabel}>Gender (optional)</Text>
+            <Text style={styles.genderLabel}>Gender *</Text>
             <View style={styles.genderRow}>
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option.value;
@@ -184,7 +188,7 @@ export const ProfileSetupScreen: React.FC = () => {
             title="Save Profile"
             onPress={handleSubmit}
             loading={loading}
-            disabled={!name.trim()}
+            disabled={!name.trim() || !dateOfBirth || !gender}
             style={styles.submitButton}
           />
         </View>
