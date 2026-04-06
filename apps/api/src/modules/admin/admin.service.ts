@@ -253,23 +253,106 @@ export class AdminService {
   }
 
   async getDashboardStats() {
-    const [totalBookings, activeProviders, pendingVerification, totalPatients] =
-      await Promise.all([
-        this.prisma.booking.count(),
-        this.prisma.providerProfile.count({
-          where: { isActive: true, isAvailable: true },
-        }),
-        this.prisma.providerProfile.count({
-          where: { isVerified: false, isActive: true },
-        }),
-        this.prisma.patientProfile.count(),
-      ]);
+    const [
+      totalBookings,
+      activeProviders,
+      pendingVerification,
+      totalPatients,
+      completedBookings,
+      cancelledBookings,
+      totalEarningsAgg,
+      bookingsByStatus,
+    ] = await Promise.all([
+      this.prisma.booking.count(),
+      this.prisma.providerProfile.count({
+        where: { isActive: true, isAvailable: true },
+      }),
+      this.prisma.providerProfile.count({
+        where: { isVerified: false, isActive: true },
+      }),
+      this.prisma.patientProfile.count(),
+      this.prisma.booking.count({
+        where: {
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+      }),
+      this.prisma.booking.count({ where: { status: 'CANCELLED' } }),
+      this.prisma.payment.aggregate({
+        where: { status: 'PAID' },
+        _sum: { amount: true },
+      }),
+      this.prisma.booking.groupBy({
+        by: ['status'],
+        _count: true,
+      }),
+    ]);
+
+    const statusBreakdown: Record<string, number> = {};
+    for (const entry of bookingsByStatus) {
+      statusBreakdown[entry.status] = entry._count;
+    }
 
     return {
       totalBookings,
       activeProviders,
       pendingVerification,
       totalPatients,
+      completedBookings,
+      cancelledBookings,
+      totalEarnings: totalEarningsAgg._sum.amount || 0,
+      bookingsByStatus: statusBreakdown,
+    };
+  }
+
+  async getDashboardCharts() {
+    const rangeStart = new Date();
+    rangeStart.setDate(rangeStart.getDate() - 29);
+    rangeStart.setHours(0, 0, 0, 0);
+
+    const [recentBookings, recentPayments] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: { createdAt: { gte: rangeStart } },
+        select: { createdAt: true, status: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.payment.findMany({
+        where: { status: 'PAID', paidAt: { gte: rangeStart } },
+        select: { paidAt: true, amount: true },
+        orderBy: { paidAt: 'asc' },
+      }),
+    ]);
+
+    const bookingsPerDay: Record<string, number> = {};
+    const earningsPerDay: Record<string, number> = {};
+
+    // Initialize last 30 days (including today) with zero
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(rangeStart);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      bookingsPerDay[key] = 0;
+      earningsPerDay[key] = 0;
+    }
+
+    for (const b of recentBookings) {
+      const key = b.createdAt.toISOString().slice(0, 10);
+      if (bookingsPerDay[key] !== undefined) {
+        bookingsPerDay[key]++;
+      }
+    }
+
+    for (const p of recentPayments) {
+      if (p.paidAt) {
+        const key = p.paidAt.toISOString().slice(0, 10);
+        if (earningsPerDay[key] !== undefined) {
+          earningsPerDay[key] += p.amount;
+        }
+      }
+    }
+
+    return {
+      bookingsPerDay,
+      earningsPerDay,
     };
   }
 

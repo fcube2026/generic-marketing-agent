@@ -30,6 +30,14 @@ describe('AdminController', () => {
               activeProviders: 10,
               pendingVerification: 3,
               totalPatients: 100,
+              completedBookings: 30,
+              cancelledBookings: 5,
+              totalEarnings: 25000,
+              bookingsByStatus: { REQUESTED: 5, COMPLETED: 30, CANCELLED: 5, ACCEPTED: 10 },
+            }),
+            getDashboardCharts: jest.fn().mockResolvedValue({
+              bookingsPerDay: { '2025-01-01': 2, '2025-01-02': 3 },
+              earningsPerDay: { '2025-01-01': 500, '2025-01-02': 700 },
             }),
             getAllProviders: jest.fn().mockResolvedValue([mockProvider]),
             getPendingProviders: jest.fn().mockResolvedValue([mockProvider]),
@@ -98,7 +106,7 @@ describe('AdminController', () => {
   });
 
   describe('getDashboardStats', () => {
-    it('should return dashboard stats', async () => {
+    it('should return dashboard stats with extended KPIs', async () => {
       const result = await controller.getDashboardStats();
 
       expect(result).toEqual({
@@ -106,8 +114,24 @@ describe('AdminController', () => {
         activeProviders: 10,
         pendingVerification: 3,
         totalPatients: 100,
+        completedBookings: 30,
+        cancelledBookings: 5,
+        totalEarnings: 25000,
+        bookingsByStatus: { REQUESTED: 5, COMPLETED: 30, CANCELLED: 5, ACCEPTED: 10 },
       });
       expect(service.getDashboardStats).toHaveBeenCalled();
+    });
+  });
+
+  describe('getDashboardCharts', () => {
+    it('should return chart data', async () => {
+      const result = await controller.getDashboardCharts();
+
+      expect(result).toEqual({
+        bookingsPerDay: { '2025-01-01': 2, '2025-01-02': 3 },
+        earningsPerDay: { '2025-01-01': 500, '2025-01-02': 700 },
+      });
+      expect(service.getDashboardCharts).toHaveBeenCalled();
     });
   });
 
