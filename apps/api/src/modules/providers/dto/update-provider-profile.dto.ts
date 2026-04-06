@@ -26,6 +26,10 @@ export class UpdateProviderProfileDto {
   contactInfo?: string;
 
   @IsOptional()
+  @IsString()
+  clinicAddress?: string;
+
+  @IsOptional()
   @IsBoolean()
   homeVisitEnabled?: boolean;
 

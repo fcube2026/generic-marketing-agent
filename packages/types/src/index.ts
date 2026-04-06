@@ -125,6 +125,8 @@ export interface ProviderProfile {
   name: string;
   bio?: string;
   specialization: string;
+  contactInfo?: string;
+  clinicAddress?: string;
   licenseNumber?: string;
   isVerified: boolean;
   isActive: boolean;
@@ -169,6 +171,7 @@ export interface CreateProviderProfileDto {
   serviceRadius?: number;
   consultationFeeHomeVisit?: number;
   consultationFeeDoctorPlace?: number;
+  clinicAddress?: string;
   serviceCategoryIds?: string[];
 }
 
