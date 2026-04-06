@@ -12,12 +12,10 @@ export class CreatePatientProfileDto {
   name: string;
 
   @IsDateString()
-  @IsNotEmpty()
   dateOfBirth: string;
 
   @IsString()
   @IsIn(['MALE', 'FEMALE', 'OTHER'])
-  @IsNotEmpty()
   gender: string;
 
   @IsOptional()
