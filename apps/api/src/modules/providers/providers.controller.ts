@@ -42,6 +42,11 @@ export class ProvidersController {
     return this.providersService.getMyBookings(user.id);
   }
 
+  @Get('me/incoming-requests')
+  getIncomingRequests(@CurrentUser() user: any) {
+    return this.providersService.getIncomingRequests(user.id);
+  }
+
   @Public()
   @Get('nearby')
   getNearbyProviders(

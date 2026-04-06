@@ -203,6 +203,23 @@ export class ProvidersService {
     });
   }
 
+  async getIncomingRequests(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    return this.prisma.booking.findMany({
+      where: { providerId: profile.id, status: 'REQUESTED' },
+      include: {
+        patient: true,
+        serviceCategory: true,
+        address: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getNearbyProviders(
     lat: number,
     lng: number,
