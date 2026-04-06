@@ -150,7 +150,7 @@ describe('PaymentsService', () => {
       };
 
       mockPrisma.payment.findUnique
-        .mockResolvedValueOnce(mockPayment)
+        .mockResolvedValueOnce(mockPayment);
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
       mockPrisma.booking.update.mockResolvedValue({});
       mockPrisma.booking.findUnique.mockResolvedValue(mockBooking);
