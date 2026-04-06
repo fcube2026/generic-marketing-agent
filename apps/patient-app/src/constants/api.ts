@@ -19,5 +19,6 @@ export const ENDPOINTS = {
   RECOMMENDATION: '/recommendation',
   CONSULTATION: '/consultation',
   CONSULTATION_PATIENT_SUMMARIES: '/consultation/patient/summaries',
+  REFERRALS_PATIENT: '/referrals/patient/me',
   PAYMENTS: '/payments',
 };

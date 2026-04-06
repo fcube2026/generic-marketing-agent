@@ -24,3 +24,17 @@ export const providerService = {
     return r.data;
   },
 };
+
+export const consultationService = {
+  submitSummary: async (bookingId: string, data: any) => {
+    const r = await api.post(`/consultation/${bookingId}/summary`, data);
+    return r.data;
+  },
+};
+
+export const referralService = {
+  createReferral: async (data: { bookingId: string; specialistType: string; notes?: string }) => {
+    const r = await api.post('/referrals', data);
+    return r.data;
+  },
+};

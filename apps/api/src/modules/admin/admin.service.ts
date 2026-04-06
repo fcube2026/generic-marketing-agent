@@ -206,6 +206,17 @@ export class AdminService {
     });
   }
 
+  async getReferralsOverview() {
+    return this.prisma.referral.findMany({
+      include: {
+        booking: {
+          include: { patient: true, provider: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async getDashboardStats() {
     const [totalBookings, activeProviders, pendingVerification, totalPatients] =
       await Promise.all([

@@ -13,6 +13,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { PayoutsModule } from './modules/payouts/payouts.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     PayoutsModule,
     AdminModule,
     NotificationsModule,
+    ReferralsModule,
   ],
 })
 export class AppModule {}

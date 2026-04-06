@@ -6,7 +6,7 @@ import {
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
-import { consultationService } from '../../services/providerService';
+import { consultationService, referralService } from '../../services/providerService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 
 type Route = RouteProp<ProviderStackParamList, 'ConsultationForm'>;
@@ -30,6 +30,7 @@ export const ConsultationFormScreen: React.FC = () => {
   const [diagnosticTests, setDiagnosticTests] = useState('');
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
+  const [referralNotes, setReferralNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const addMedicine = () => setMedicines(prev => [...prev, { name: '', dosage: '' }]);
@@ -53,8 +54,16 @@ export const ConsultationFormScreen: React.FC = () => {
         nextSteps,
         followUpRecommendation: followUpNeeded ? followUpNotes : undefined,
         diagnosticTests: diagnosticNeeded ? diagnosticTests : undefined,
-        specialistReferral: referralNeeded ? specialistType : undefined,
       });
+
+      if (referralNeeded && specialistType.trim()) {
+        await referralService.createReferral({
+          bookingId,
+          specialistType: specialistType.trim(),
+          notes: referralNotes.trim() || undefined,
+        });
+      }
+
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('Tabs') },
       ]);
@@ -135,8 +144,12 @@ export const ConsultationFormScreen: React.FC = () => {
           <Switch value={referralNeeded} onValueChange={setReferralNeeded} trackColor={{ true: Colors.primary }} />
         </View>
         {referralNeeded && (
-          <TextInput style={styles.input} value={specialistType} onChangeText={setSpecialistType}
-            placeholder="e.g. Cardiologist, Orthopedic Surgeon" />
+          <>
+            <TextInput style={styles.input} value={specialistType} onChangeText={setSpecialistType}
+              placeholder="e.g. Cardiologist, Orthopedic Surgeon" />
+            <TextInput style={styles.textarea} value={referralNotes} onChangeText={setReferralNotes}
+              placeholder="Referral reason / additional notes…" multiline numberOfLines={2} />
+          </>
         )}
 
         <TouchableOpacity
