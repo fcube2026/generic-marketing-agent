@@ -131,7 +131,7 @@ model ProviderProfile {
 }
 
 model ProviderLicense {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
   providerId      String
   type            String
   documentUrl     String
@@ -139,7 +139,7 @@ model ProviderLicense {
   rejectionReason String?
   expiresAt       DateTime?
   verifiedAt      DateTime?
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime      @default(now())
 
   provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
