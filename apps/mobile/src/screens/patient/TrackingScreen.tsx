@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, Linking, Platform } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import MapView, { Marker } from 'react-native-maps';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,8 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { BookingStatus, Booking } from '../../types';
+import { formatEta } from '../../utils/format';
+import { haversineDistance } from '../../utils/location';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'Tracking'>;
@@ -40,6 +42,7 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   });
 
   const isHomeVisit = booking?.mode === 'HOME_VISIT';
+  const isDoctorPlace = booking?.mode === 'DOCTOR_PLACE';
   const isTrackable =
     isHomeVisit &&
     !!booking?.status &&
@@ -69,6 +72,26 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
     ]);
   };
 
+  /** Open external maps app with the clinic's coordinates or address. */
+  const handleNavigateToClinic = () => {
+    const providerLat = booking?.provider?.currentLat;
+    const providerLng = booking?.provider?.currentLng;
+    const clinicAddr = booking?.provider?.clinicAddress;
+
+    let url: string;
+    if (providerLat != null && providerLng != null) {
+      url = Platform.select({
+        ios: `maps:0,0?daddr=${providerLat},${providerLng}`,
+        default: `https://maps.google.com/?daddr=${providerLat},${providerLng}`,
+      })!;
+    } else if (clinicAddr) {
+      url = `https://maps.google.com/?daddr=${encodeURIComponent(clinicAddr)}`;
+    } else {
+      return;
+    }
+    Linking.openURL(url);
+  };
+
   if (isLoading) return <LoadingSpinner fullScreen message="Loading booking..." />;
   if (!booking) return null;
 
@@ -79,6 +102,22 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const addressLat = booking.address?.lat;
   const addressLng = booking.address?.lng;
+
+  // Clinic location from provider profile (used for DOCTOR_PLACE map)
+  const clinicLat = booking.provider?.currentLat;
+  const clinicLng = booking.provider?.currentLng;
+  const hasClinicCoords = clinicLat != null && clinicLng != null;
+  const clinicAddress = booking.provider?.clinicAddress;
+  const providerContact = booking.provider?.contactInfo;
+
+  // Compute ETA for clinic visit: haversineDistance returns km, multiplied by
+  // minutes-per-km (2 min/km, matching the recommendation engine ETA_MULTIPLIERS.doctorPlace).
+  const CLINIC_ETA_MINUTES_PER_KM = 2;
+  let clinicEta: number | null = null;
+  if (isDoctorPlace && hasClinicCoords && addressLat != null && addressLng != null) {
+    const distKm = haversineDistance(addressLat, addressLng, clinicLat!, clinicLng!);
+    clinicEta = Math.max(1, Math.round(distKm * CLINIC_ETA_MINUTES_PER_KM));
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -120,6 +159,52 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
               {new Date(providerLocation.recordedAt).toLocaleTimeString()}
             </Text>
           )}
+        </Card>
+      )}
+
+      {/* Clinic location map for doctor-place bookings */}
+      {isDoctorPlace && hasClinicCoords && (
+        <Card style={styles.mapCard}>
+          <Text style={styles.sectionTitle}>Clinic Location</Text>
+          <View style={styles.mapWrapper}>
+            <MapView
+              style={styles.map}
+              region={{
+                latitude: clinicLat!,
+                longitude: clinicLng!,
+                latitudeDelta: 0.015,
+                longitudeDelta: 0.015,
+              }}
+            >
+              <Marker
+                coordinate={{ latitude: clinicLat!, longitude: clinicLng! }}
+                title={booking.provider?.name ?? 'Clinic'}
+                description={clinicAddress || 'Clinic location'}
+                pinColor={Colors.primary}
+              />
+            </MapView>
+          </View>
+          {clinicEta != null && (
+            <Text style={styles.etaText}>Estimated travel time: {formatEta(clinicEta)}</Text>
+          )}
+          <Button
+            title="🧭 Navigate to Clinic"
+            onPress={handleNavigateToClinic}
+            style={styles.navigateBtn}
+          />
+        </Card>
+      )}
+
+      {/* Clinic address & contact for doctor-place bookings */}
+      {isDoctorPlace && (clinicAddress || providerContact) && (
+        <Card style={styles.clinicInfoCard}>
+          <Text style={styles.sectionTitle}>Clinic Details</Text>
+          {clinicAddress ? (
+            <Text style={styles.addressText}>{clinicAddress}</Text>
+          ) : null}
+          {providerContact ? (
+            <Text style={styles.contactText}>📞 Contact: {providerContact}</Text>
+          ) : null}
         </Card>
       )}
 
@@ -214,6 +299,10 @@ const styles = StyleSheet.create({
   mapWrapper: { borderRadius: 10, overflow: 'hidden', marginTop: 8 },
   map: { width: '100%', height: 220 },
   lastUpdated: { fontSize: 11, color: Colors.textMuted, marginTop: 6, textAlign: 'right' },
+  etaText: { fontSize: 14, fontWeight: '600', color: Colors.primary, marginTop: 10 },
+  navigateBtn: { marginTop: 10 },
+  clinicInfoCard: { marginHorizontal: 16, marginBottom: 12 },
+  contactText: { fontSize: 14, color: Colors.text, lineHeight: 20, marginTop: 4 },
   statusCard: { margin: 16 },
   statusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   statusTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },

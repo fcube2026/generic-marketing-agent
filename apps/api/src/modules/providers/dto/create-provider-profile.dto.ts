@@ -28,6 +28,10 @@ export class CreateProviderProfileDto {
 
   @IsOptional()
   @IsString()
+  clinicAddress?: string;
+
+  @IsOptional()
+  @IsString()
   licenseNumber?: string;
 
   @IsOptional()

@@ -319,6 +319,31 @@ describe('ProvidersService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should update profile with clinicAddress', async () => {
+      const existingProfile = { id: 'profile-1', userId: 'user-1' };
+      const updateDto = { clinicAddress: '123 Clinic Rd, City, State 560001' };
+
+      mockPrisma.providerProfile.findUnique
+        .mockResolvedValueOnce(existingProfile)
+        .mockResolvedValueOnce({
+          ...existingProfile,
+          ...updateDto,
+          providerServices: [],
+        });
+      mockPrisma.providerProfile.update.mockResolvedValue({
+        ...existingProfile,
+        ...updateDto,
+      });
+
+      const result = await service.updateProfile('user-1', updateDto);
+
+      expect(mockPrisma.providerProfile.update).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: updateDto,
+      });
+      expect(result).toBeDefined();
+    });
   });
 
   describe('uploadKycDocument', () => {
