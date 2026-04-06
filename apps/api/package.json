@@ -8,6 +8,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "format:check": "prettier --check \"{src,apps,libs,test}/**/*.ts\"",
+    "format:fix": "prettier --write \"{src,apps,libs,test}/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest"
   },
