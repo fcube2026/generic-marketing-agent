@@ -17,7 +17,7 @@ export const OnboardingScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [form, setForm] = useState({
-    name: '', bio: '', specialization: '',
+    name: '', bio: '', specialization: '', contactInfo: '',
     homeVisitEnabled: false, consultationFeeHomeVisit: '',
     doctorPlaceVisitEnabled: false, consultationFeeDoctorPlace: '',
     serviceRadius: '10',
@@ -42,11 +42,12 @@ export const OnboardingScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.specialization) { Alert.alert('Required', 'Name and specialization are required'); return; }
+    if (!form.name || !form.specialization || !form.contactInfo) { Alert.alert('Required', 'Name, specialization, and contact info are required'); return; }
     setLoading(true);
     try {
       await providerService.onboard({
         name: form.name, bio: form.bio, specialization: form.specialization,
+        contactInfo: form.contactInfo,
         homeVisitEnabled: form.homeVisitEnabled,
         consultationFeeHomeVisit: parseFloat(form.consultationFeeHomeVisit) || 0,
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
@@ -78,6 +79,7 @@ export const OnboardingScreen: React.FC = () => {
           <Text style={styles.stepTitle}>Personal Information</Text>
           <Input label="Full Name *" value={form.name} onChangeText={(t) => update('name', t)} placeholder="Dr. John Smith" />
           <Input label="Specialization *" value={form.specialization} onChangeText={(t) => update('specialization', t)} placeholder="General Physician" />
+          <Input label="Contact Info *" value={form.contactInfo} onChangeText={(t) => update('contactInfo', t)} placeholder="Email or phone number" />
           <Input label="Bio" value={form.bio} onChangeText={(t) => update('bio', t)} placeholder="Brief description..." multiline numberOfLines={4} style={{ height: 100, textAlignVertical: 'top' } as any} />
 
           <Text style={styles.categoryLabel}>Service Categories</Text>
@@ -110,7 +112,7 @@ export const OnboardingScreen: React.FC = () => {
             </View>
           )}
 
-          <Button title="Next →" onPress={() => setStep(2)} disabled={!form.name || !form.specialization} />
+          <Button title="Next →" onPress={() => setStep(2)} disabled={!form.name || !form.specialization || !form.contactInfo} />
         </View>
       )}
 
@@ -142,6 +144,7 @@ export const OnboardingScreen: React.FC = () => {
           <Text style={styles.stepTitle}>Review & Submit</Text>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Name</Text><Text style={styles.reviewValue}>{form.name}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Specialization</Text><Text style={styles.reviewValue}>{form.specialization}</Text></View>
+          <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Contact</Text><Text style={styles.reviewValue}>{form.contactInfo}</Text></View>
           <View style={styles.reviewItem}>
             <Text style={styles.reviewLabel}>Services</Text>
             <Text style={styles.reviewValue}>

@@ -20,6 +20,10 @@ export class UpdateProviderProfileDto {
   specialization?: string;
 
   @IsOptional()
+  @IsString()
+  contactInfo?: string;
+
+  @IsOptional()
   @IsBoolean()
   homeVisitEnabled?: boolean;
 
