@@ -232,16 +232,29 @@ export class BookingsService {
     });
 
     // Send notifications for provider-driven status transitions
-    const PROVIDER_TRANSITION_MESSAGES: Partial<Record<BookingStatus, string>> =
-      {
-        ON_THE_WAY: 'Your provider is on the way.',
-        ARRIVED: 'Your provider has arrived.',
-        IN_PROGRESS: 'Your consultation is now in progress.',
-        COMPLETED: 'Your consultation has been completed.',
-      };
+    const PROVIDER_TRANSITION_MESSAGES: Partial<
+      Record<BookingStatus, { title: string; message: string }>
+    > = {
+      ON_THE_WAY: {
+        title: 'Provider On the Way',
+        message: 'Your provider is on the way.',
+      },
+      ARRIVED: {
+        title: 'Provider Arrived',
+        message: 'Your provider has arrived.',
+      },
+      IN_PROGRESS: {
+        title: 'Consultation Started',
+        message: 'Your consultation is now in progress.',
+      },
+      COMPLETED: {
+        title: 'Consultation Completed',
+        message: 'Your consultation has been completed.',
+      },
+    };
 
-    const message = PROVIDER_TRANSITION_MESSAGES[dto.status];
-    if (message) {
+    const notification = PROVIDER_TRANSITION_MESSAGES[dto.status];
+    if (notification) {
       const fullBooking = await this.prisma.booking.findUnique({
         where: { id: bookingId },
         include: { patient: true },
@@ -249,8 +262,8 @@ export class BookingsService {
       if (fullBooking) {
         await this.notificationsService.createNotification({
           userId: fullBooking.patient.userId,
-          title: `Booking ${dto.status.replace(/_/g, ' ').toLowerCase()}`,
-          message,
+          title: notification.title,
+          message: notification.message,
           type: 'BOOKING_STATUS_UPDATE',
           metadata: { bookingId, status: dto.status },
         });
