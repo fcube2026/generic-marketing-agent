@@ -26,6 +26,10 @@ describe('PatientsController', () => {
             createOrUpdateProfile: jest.fn().mockResolvedValue(mockProfile),
             getAddresses: jest.fn().mockResolvedValue([]),
             addAddress: jest.fn().mockResolvedValue({ id: 'addr-1' }),
+            updateAddress: jest
+              .fn()
+              .mockResolvedValue({ id: 'addr-1', label: 'Updated' }),
+            deleteAddress: jest.fn().mockResolvedValue({ id: 'addr-1' }),
             getMyBookings: jest.fn().mockResolvedValue([]),
           },
         },
@@ -119,6 +123,33 @@ describe('PatientsController', () => {
 
       expect(result).toEqual({ id: 'addr-1' });
       expect(service.addAddress).toHaveBeenCalledWith('user-1', dto);
+    });
+  });
+
+  describe('updateAddress', () => {
+    it('should update an existing address', async () => {
+      const user = { id: 'user-1' };
+      const dto = { label: 'Updated', city: 'Delhi' };
+
+      const result = await controller.updateAddress(user, 'addr-1', dto);
+
+      expect(result).toEqual({ id: 'addr-1', label: 'Updated' });
+      expect(service.updateAddress).toHaveBeenCalledWith(
+        'user-1',
+        'addr-1',
+        dto,
+      );
+    });
+  });
+
+  describe('deleteAddress', () => {
+    it('should delete an address', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.deleteAddress(user, 'addr-1');
+
+      expect(result).toEqual({ id: 'addr-1' });
+      expect(service.deleteAddress).toHaveBeenCalledWith('user-1', 'addr-1');
     });
   });
 

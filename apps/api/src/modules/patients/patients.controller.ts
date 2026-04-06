@@ -1,10 +1,19 @@
-import { Controller, Get, Post, Put, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+} from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 import { CreatePatientProfileDto } from './dto/create-patient-profile.dto';
 import {
   UpdatePatientProfileDto,
   CreateAddressDto,
+  UpdateAddressDto,
 } from './dto/update-patient-profile.dto';
 
 @Controller('patients')
@@ -40,6 +49,20 @@ export class PatientsController {
   @Post('me/addresses')
   addAddress(@CurrentUser() user: any, @Body() dto: CreateAddressDto) {
     return this.patientsService.addAddress(user.id, dto);
+  }
+
+  @Put('me/addresses/:id')
+  updateAddress(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateAddressDto,
+  ) {
+    return this.patientsService.updateAddress(user.id, id, dto);
+  }
+
+  @Delete('me/addresses/:id')
+  deleteAddress(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.patientsService.deleteAddress(user.id, id);
   }
 
   @Get('me/bookings')

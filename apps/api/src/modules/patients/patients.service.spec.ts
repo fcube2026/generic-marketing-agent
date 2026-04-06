@@ -17,8 +17,11 @@ describe('PatientsService', () => {
     },
     address: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
+      delete: jest.fn(),
     },
     booking: {
       findMany: jest.fn(),
@@ -221,6 +224,118 @@ describe('PatientsService', () => {
       await service.addAddress(userId, nonDefaultDto);
 
       expect(mockPrisma.address.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateAddress', () => {
+    const userId = 'user-1';
+    const addressId = 'addr-1';
+    const existingAddress = {
+      id: addressId,
+      userId,
+      label: 'Home',
+      addressLine: '123 Main St',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      pincode: '400001',
+      isDefault: false,
+    };
+
+    it('should update an existing address', async () => {
+      const dto = { label: 'Office', city: 'Delhi' };
+      const updatedAddress = { ...existingAddress, ...dto };
+
+      mockPrisma.address.findFirst.mockResolvedValue(existingAddress);
+      mockPrisma.address.update.mockResolvedValue(updatedAddress);
+
+      const result = await service.updateAddress(userId, addressId, dto);
+
+      expect(result).toEqual(updatedAddress);
+      expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+        where: { id: addressId, userId },
+      });
+      expect(mockPrisma.address.update).toHaveBeenCalledWith({
+        where: { id: addressId },
+        data: dto,
+      });
+    });
+
+    it('should clear existing defaults when setting address as default', async () => {
+      const dto = { isDefault: true };
+      const updatedAddress = { ...existingAddress, ...dto };
+
+      mockPrisma.address.findFirst.mockResolvedValue(existingAddress);
+      mockPrisma.address.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.address.update.mockResolvedValue(updatedAddress);
+
+      const result = await service.updateAddress(userId, addressId, dto);
+
+      expect(result).toEqual(updatedAddress);
+      expect(mockPrisma.address.updateMany).toHaveBeenCalledWith({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    });
+
+    it('should throw NotFoundException when address does not exist', async () => {
+      mockPrisma.address.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateAddress(userId, 'non-existent', { label: 'New' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when address belongs to another user', async () => {
+      mockPrisma.address.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateAddress('other-user', addressId, { label: 'New' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteAddress', () => {
+    const userId = 'user-1';
+    const addressId = 'addr-1';
+    const existingAddress = {
+      id: addressId,
+      userId,
+      label: 'Home',
+      addressLine: '123 Main St',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      pincode: '400001',
+    };
+
+    it('should delete an existing address', async () => {
+      mockPrisma.address.findFirst.mockResolvedValue(existingAddress);
+      mockPrisma.address.delete.mockResolvedValue(existingAddress);
+
+      const result = await service.deleteAddress(userId, addressId);
+
+      expect(result).toEqual(existingAddress);
+      expect(mockPrisma.address.findFirst).toHaveBeenCalledWith({
+        where: { id: addressId, userId },
+      });
+      expect(mockPrisma.address.delete).toHaveBeenCalledWith({
+        where: { id: addressId },
+      });
+    });
+
+    it('should throw NotFoundException when address does not exist', async () => {
+      mockPrisma.address.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteAddress(userId, 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when address belongs to another user', async () => {
+      mockPrisma.address.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteAddress('other-user', addressId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
