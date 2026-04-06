@@ -11,9 +11,19 @@ export class AdminController {
     return this.adminService.getDashboardStats();
   }
 
+  @Get('providers')
+  getAllProviders(@Query('status') status?: string) {
+    return this.adminService.getAllProviders(status);
+  }
+
   @Get('providers/pending')
   getPendingProviders() {
     return this.adminService.getPendingProviders();
+  }
+
+  @Get('providers/:id')
+  getProviderById(@Param('id') providerId: string) {
+    return this.adminService.getProviderById(providerId);
   }
 
   @Put('providers/:id/verify')
@@ -23,6 +33,15 @@ export class AdminController {
     @Body('notes') notes?: string,
   ) {
     return this.adminService.verifyProvider(providerId, user.id, notes);
+  }
+
+  @Put('providers/:id/reject')
+  rejectProvider(
+    @Param('id') providerId: string,
+    @CurrentUser() user: any,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.rejectProvider(providerId, user.id, reason);
   }
 
   @Put('providers/:id/deactivate')

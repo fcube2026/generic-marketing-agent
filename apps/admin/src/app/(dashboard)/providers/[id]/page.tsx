@@ -22,8 +22,15 @@ interface Provider {
   consultationFeeDoctorPlace: number;
   createdAt: string;
   user?: { phone: string };
-  licenses?: { id: string; type: string; documentUrl: string; verifiedAt: string | null }[];
+  licenses?: { id: string; type: string; documentUrl: string; expiresAt: string | null; verifiedAt: string | null }[];
   providerServices?: { serviceCategory?: { name: string } }[];
+}
+
+function getProviderStatus(p: Provider): string {
+  if (p.isVerified && p.isActive) return 'verified';
+  if (!p.isVerified && p.isActive) return 'pending';
+  if (!p.isVerified && !p.isActive) return 'rejected';
+  return 'inactive';
 }
 
 export default function ProviderDetailPage() {
@@ -31,25 +38,39 @@ export default function ProviderDetailPage() {
   const router = useRouter();
   const [provider, setProvider] = useState<Provider | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
-  useEffect(() => {
-    // Re-use pending providers endpoint & find by ID for MVP
+  const fetchProvider = () => {
+    setLoading(true);
     api
-      .get('/admin/providers/pending')
-      .then((res) => {
-        const found = res.data.find((p: Provider) => p.id === params.id);
-        setProvider(found || null);
-      })
+      .get(`/admin/providers/${params.id}`)
+      .then((res) => setProvider(res.data))
       .catch(() => setProvider(null))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProvider();
   }, [params.id]);
 
   const handleVerify = async () => {
     try {
       await api.put(`/admin/providers/${params.id}/verify`, { notes: 'Approved via admin panel' });
-      setProvider((prev) => prev ? { ...prev, isVerified: true } : null);
+      setProvider((prev) => prev ? { ...prev, isVerified: true, isActive: true } : null);
     } catch {
       alert('Failed to verify provider');
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      await api.put(`/admin/providers/${params.id}/reject`, { reason: rejectReason });
+      setProvider((prev) => prev ? { ...prev, isVerified: false, isActive: false } : null);
+      setShowRejectModal(false);
+      setRejectReason('');
+    } catch {
+      alert('Failed to reject provider');
     }
   };
 
@@ -83,6 +104,8 @@ export default function ProviderDetailPage() {
     );
   }
 
+  const status = getProviderStatus(provider);
+
   return (
     <div>
       <button onClick={() => router.push('/providers')} className="text-sm text-primary font-medium hover:underline mb-4 inline-block">
@@ -95,15 +118,23 @@ export default function ProviderDetailPage() {
           <p className="text-gray-500">{provider.specialization}</p>
         </div>
         <div className="flex gap-2">
-          {!provider.isVerified && (
-            <button
-              onClick={handleVerify}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-            >
-              ✓ Approve & Verify
-            </button>
+          {status === 'pending' && (
+            <>
+              <button
+                onClick={handleVerify}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+              >
+                ✓ Approve & Verify
+              </button>
+              <button
+                onClick={() => setShowRejectModal(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+              >
+                ✗ Reject
+              </button>
+            </>
           )}
-          {provider.isActive && (
+          {status === 'verified' && (
             <button
               onClick={handleDeactivate}
               className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-semibold hover:bg-red-100 transition"
@@ -113,6 +144,42 @@ export default function ProviderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Reject Provider</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Please provide a reason for rejecting this provider. This will be sent as a notification to the provider.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason for rejection (optional)..."
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+              rows={3}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectReason('');
+                }}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReject}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+              >
+                Reject Provider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Profile */}
@@ -127,10 +194,21 @@ export default function ProviderDetailPage() {
               <span className="font-medium">{provider.licenseNumber || '—'}</span>
             </div>
             <div className="flex justify-between">
+              <span className="text-gray-500">Registered</span>
+              <span className="font-medium">{new Date(provider.createdAt).toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-500">Status</span>
               <div className="flex gap-2">
-                {provider.isVerified ? <Badge variant="success">Verified</Badge> : <Badge variant="warning">Pending</Badge>}
-                {provider.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="error">Inactive</Badge>}
+                {status === 'verified' && <Badge variant="success">Verified</Badge>}
+                {status === 'pending' && <Badge variant="warning">Pending Review</Badge>}
+                {status === 'rejected' && <Badge variant="error">Rejected</Badge>}
+                {status === 'inactive' && (
+                  <>
+                    <Badge variant="success">Verified</Badge>
+                    <Badge variant="error">Deactivated</Badge>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex justify-between">
@@ -172,8 +250,8 @@ export default function ProviderDetailPage() {
           </div>
         </Card>
 
-        {/* License Documents */}
-        <Card title="License Documents" className="lg:col-span-2">
+        {/* License Documents (KYC) */}
+        <Card title="KYC / License Documents" className="lg:col-span-2">
           {provider.licenses && provider.licenses.length > 0 ? (
             <div className="space-y-3">
               {provider.licenses.map((lic) => (
@@ -181,8 +259,15 @@ export default function ProviderDetailPage() {
                   <div>
                     <p className="font-medium text-sm text-gray-900">{lic.type}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {lic.verifiedAt ? `Verified on ${new Date(lic.verifiedAt).toLocaleDateString()}` : 'Not verified'}
+                      {lic.verifiedAt
+                        ? `✅ Verified on ${new Date(lic.verifiedAt).toLocaleDateString()}`
+                        : '⏳ Not verified'}
                     </p>
+                    {lic.expiresAt && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Expires: {new Date(lic.expiresAt).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                   <a
                     href={lic.documentUrl}
@@ -196,7 +281,7 @@ export default function ProviderDetailPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">No documents uploaded</p>
+            <p className="text-sm text-gray-400">No KYC documents uploaded</p>
           )}
         </Card>
       </div>
