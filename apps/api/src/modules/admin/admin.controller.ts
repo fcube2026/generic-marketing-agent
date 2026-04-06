@@ -72,8 +72,16 @@ export class AdminController {
   }
 
   @Get('diagnostics')
-  getDiagnosticsOverview() {
-    return this.adminService.getDiagnosticsOverview();
+  getDiagnosticsOverview(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getDiagnosticsOverview(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      status,
+    );
   }
 
   @Get('referrals')

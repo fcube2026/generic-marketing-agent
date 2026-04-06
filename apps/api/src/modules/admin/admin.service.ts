@@ -212,17 +212,37 @@ export class AdminService {
     };
   }
 
-  async getDiagnosticsOverview() {
-    return this.prisma.diagnosticRequest.findMany({
-      where: { status: { not: 'RESULTED' } },
-      include: {
-        booking: {
-          include: { patient: true, provider: true },
+  async getDiagnosticsOverview(
+    page = 1,
+    limit = 20,
+    status?: string,
+  ) {
+    const skip = (page - 1) * limit;
+    const where = status ? { status: status as any } : {};
+
+    const [data, total] = await Promise.all([
+      this.prisma.diagnosticRequest.findMany({
+        where,
+        include: {
+          booking: {
+            include: { patient: true, provider: true },
+          },
+          labResults: true,
         },
-        labResults: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.diagnosticRequest.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getReferralsOverview() {

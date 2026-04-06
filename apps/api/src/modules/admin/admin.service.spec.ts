@@ -32,6 +32,7 @@ describe('AdminService', () => {
     },
     diagnosticRequest: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     referral: {
       findMany: jest.fn(),
@@ -408,6 +409,81 @@ describe('AdminService', () => {
 
       await expect(service.getBookingById('nonexistent')).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('getDiagnosticsOverview', () => {
+    const mockDiagnostics = [
+      {
+        id: 'diag-1',
+        testType: 'Blood Test',
+        status: 'REQUESTED',
+        booking: { patient: { name: 'John' }, provider: { name: 'Dr. A' } },
+        labResults: [],
+      },
+    ];
+
+    it('should return paginated diagnostics without status filter', async () => {
+      mockPrisma.diagnosticRequest.findMany.mockResolvedValue(mockDiagnostics);
+      mockPrisma.diagnosticRequest.count.mockResolvedValue(1);
+
+      const result = await service.getDiagnosticsOverview();
+
+      expect(result).toEqual({
+        data: mockDiagnostics,
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
+      expect(mockPrisma.diagnosticRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+          skip: 0,
+          take: 20,
+        }),
+      );
+    });
+
+    it('should filter by status when provided', async () => {
+      mockPrisma.diagnosticRequest.findMany.mockResolvedValue(mockDiagnostics);
+      mockPrisma.diagnosticRequest.count.mockResolvedValue(1);
+
+      const result = await service.getDiagnosticsOverview(1, 20, 'REQUESTED');
+
+      expect(result).toEqual({
+        data: mockDiagnostics,
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
+      expect(mockPrisma.diagnosticRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'REQUESTED' },
+        }),
+      );
+    });
+
+    it('should handle pagination correctly', async () => {
+      mockPrisma.diagnosticRequest.findMany.mockResolvedValue([]);
+      mockPrisma.diagnosticRequest.count.mockResolvedValue(25);
+
+      const result = await service.getDiagnosticsOverview(2, 10);
+
+      expect(result).toEqual({
+        data: [],
+        total: 25,
+        page: 2,
+        limit: 10,
+        totalPages: 3,
+      });
+      expect(mockPrisma.diagnosticRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 10,
+        }),
       );
     });
   });
