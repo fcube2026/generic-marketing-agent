@@ -99,8 +99,8 @@ async function main() {
 
 main()
   .then(() => prisma.$disconnect())
-  .catch((e) => {
+  .catch(async (e) => {
     console.error('❌ Seed failed:', e);
-    prisma.$disconnect();
+    await prisma.$disconnect();
     process.exit(1);
   });
