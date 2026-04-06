@@ -4,6 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ReferralStatus } from '@prisma/client';
 import {
   CreateReferralDto,
   UpdateReferralStatusDto,
@@ -44,7 +45,7 @@ export class ReferralsService {
 
     return this.prisma.referral.update({
       where: { id },
-      data: { status: dto.status as any },
+      data: { status: dto.status as ReferralStatus },
     });
   }
 

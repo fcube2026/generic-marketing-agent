@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsIn } from 'class-validator';
 
 export class CreateReferralDto {
   @IsString()
@@ -14,5 +14,6 @@ export class CreateReferralDto {
 
 export class UpdateReferralStatusDto {
   @IsString()
+  @IsIn(['RECOMMENDED', 'BOOKED', 'COMPLETED'])
   status: string;
 }

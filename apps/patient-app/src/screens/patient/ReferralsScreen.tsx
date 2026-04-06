@@ -96,7 +96,7 @@ export const ReferralsScreen: React.FC = () => {
             </View>
 
             <Text style={styles.providerName}>
-              Referred by {item.booking?.provider?.name || 'Provider'}
+              Referred by {item.booking?.provider?.name || 'Unknown Provider'}
             </Text>
 
             {item.booking?.serviceCategory?.name ? (
