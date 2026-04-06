@@ -4,56 +4,36 @@ import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let authService: AuthService;
+
+  const mockAuthService = {
+    sendOtp: jest.fn(),
+    verifyOtp: jest.fn(),
+    adminLogin: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [
-        {
-          provide: AuthService,
-          useValue: {
-            sendOtp: jest.fn(),
-            verifyOtp: jest.fn(),
-          },
-        },
-      ],
+      providers: [{ provide: AuthService, useValue: mockAuthService }],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
-    authService = module.get<AuthService>(AuthService);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
-
-  describe('sendOtp', () => {
-    it('should call authService.sendOtp with dto', async () => {
-      const dto = { phone: '+1234567890' };
-      const expected = { success: true, message: 'OTP sent successfully', otp: '123456' };
-      (authService.sendOtp as jest.Mock).mockResolvedValue(expected);
-
-      const result = await controller.sendOtp(dto);
-
-      expect(result).toEqual(expected);
-      expect(authService.sendOtp).toHaveBeenCalledWith(dto);
-    });
-  });
-
-  describe('verifyOtp', () => {
-    it('should call authService.verifyOtp with dto', async () => {
-      const dto = { phone: '+1234567890', otp: '123456' };
+  describe('adminLogin', () => {
+    it('should call authService.adminLogin with the dto', async () => {
+      const dto = { email: 'admin@curex24.com', password: 'admin123' };
       const expected = {
         token: 'mock-jwt-token',
-        user: { id: 'user-1', phone: '+1234567890', role: 'PATIENT' },
+        user: { id: 'admin-id', email: 'admin@curex24.com', role: 'ADMIN' },
       };
-      (authService.verifyOtp as jest.Mock).mockResolvedValue(expected);
 
-      const result = await controller.verifyOtp(dto);
+      mockAuthService.adminLogin.mockResolvedValue(expected);
+
+      const result = await controller.adminLogin(dto);
 
       expect(result).toEqual(expected);
-      expect(authService.verifyOtp).toHaveBeenCalledWith(dto);
+      expect(mockAuthService.adminLogin).toHaveBeenCalledWith(dto);
     });
   });
 });

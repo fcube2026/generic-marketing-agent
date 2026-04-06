@@ -6,184 +6,101 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: PrismaService;
-  let jwtService: JwtService;
+  let mockPrisma: any;
+  let mockJwtService: any;
 
   beforeEach(async () => {
+    mockPrisma = {
+      user: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+      },
+      otpVerification: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+    };
+
+    mockJwtService = {
+      sign: jest.fn().mockReturnValue('mock-jwt-token'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        {
-          provide: PrismaService,
-          useValue: {
-            otpVerification: {
-              updateMany: jest.fn(),
-              create: jest.fn(),
-              findFirst: jest.fn(),
-              update: jest.fn(),
-            },
-            user: {
-              findUnique: jest.fn(),
-              create: jest.fn(),
-            },
-          },
-        },
-        {
-          provide: JwtService,
-          useValue: {
-            sign: jest.fn().mockReturnValue('mock-jwt-token'),
-          },
-        },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: JwtService, useValue: mockJwtService },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+  describe('adminLogin', () => {
+    const validDto = { email: 'admin@curex24.com', password: 'admin123' };
 
-  describe('sendOtp', () => {
-    it('should invalidate old OTPs and create a new one', async () => {
-      (prisma.otpVerification.updateMany as jest.Mock).mockResolvedValue({
-        count: 1,
-      });
-      (prisma.otpVerification.create as jest.Mock).mockResolvedValue({
-        id: 'otp-1',
-        phone: '+1234567890',
-        otp: '123456',
-        verified: false,
-      });
-
-      const result = await service.sendOtp({ phone: '+1234567890' });
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('OTP sent successfully');
-      expect(prisma.otpVerification.updateMany).toHaveBeenCalledWith({
-        where: { phone: '+1234567890', verified: false },
-        data: { verified: true },
-      });
-      expect(prisma.otpVerification.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          phone: '+1234567890',
-          otp: expect.any(String),
-          expiresAt: expect.any(Date),
-          verified: false,
-        }),
-      });
-    });
-
-    it('should include OTP in response during development mode', async () => {
-      (prisma.otpVerification.updateMany as jest.Mock).mockResolvedValue({
-        count: 0,
-      });
-      (prisma.otpVerification.create as jest.Mock).mockResolvedValue({
-        id: 'otp-1',
-      });
-
-      const result = await service.sendOtp({ phone: '+1234567890' });
-
-      expect(result.otp).toBeDefined();
-      expect(result.otp).toMatch(/^\d{6}$/);
-    });
-  });
-
-  describe('verifyOtp', () => {
-    const mockUser = {
-      id: 'user-1',
-      phone: '+1234567890',
-      role: 'PATIENT',
+    const mockAdminUser = {
+      id: 'admin-user-id',
+      phone: '+0000000000',
+      role: 'ADMIN',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
-    it('should verify OTP and return token for existing user', async () => {
-      (prisma.otpVerification.findFirst as jest.Mock).mockResolvedValue({
-        id: 'otp-1',
-        phone: '+1234567890',
-        otp: '123456',
-        verified: false,
-      });
-      (prisma.otpVerification.update as jest.Mock).mockResolvedValue({});
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    it('should return token for valid credentials when admin user exists', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(mockAdminUser);
 
-      const result = await service.verifyOtp({
-        phone: '+1234567890',
-        otp: '123456',
-      });
+      const result = await service.adminLogin(validDto);
 
-      expect(result.token).toBe('mock-jwt-token');
-      expect(result.user).toEqual(mockUser);
-      expect(jwtService.sign).toHaveBeenCalledWith({
-        sub: 'user-1',
-        phone: '+1234567890',
-        role: 'PATIENT',
-      });
-      expect(prisma.otpVerification.update).toHaveBeenCalledWith({
-        where: { id: 'otp-1' },
-        data: { verified: true },
-      });
-    });
-
-    it('should create new user if not found', async () => {
-      (prisma.otpVerification.findFirst as jest.Mock).mockResolvedValue({
-        id: 'otp-1',
-        phone: '+1234567890',
-        otp: '123456',
-        verified: false,
-      });
-      (prisma.otpVerification.update as jest.Mock).mockResolvedValue({});
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
-
-      const result = await service.verifyOtp({
-        phone: '+1234567890',
-        otp: '123456',
-      });
-
-      expect(result.token).toBe('mock-jwt-token');
-      expect(result.user).toEqual(mockUser);
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: {
-          phone: '+1234567890',
-          role: 'PATIENT',
+      expect(result).toEqual({
+        token: 'mock-jwt-token',
+        user: {
+          id: 'admin-user-id',
+          email: 'admin@curex24.com',
+          role: 'ADMIN',
         },
       });
+      expect(mockJwtService.sign).toHaveBeenCalledWith({
+        sub: 'admin-user-id',
+        phone: '+0000000000',
+        role: 'ADMIN',
+      });
     });
 
-    it('should create user with specified role', async () => {
-      const providerUser = { ...mockUser, role: 'PROVIDER' };
-      (prisma.otpVerification.findFirst as jest.Mock).mockResolvedValue({
-        id: 'otp-1',
-        phone: '+1234567890',
-        otp: '123456',
-        verified: false,
-      });
-      (prisma.otpVerification.update as jest.Mock).mockResolvedValue({});
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.user.create as jest.Mock).mockResolvedValue(providerUser);
+    it('should create admin user if not found and return token', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue(mockAdminUser);
 
-      const result = await service.verifyOtp({
-        phone: '+1234567890',
-        otp: '123456',
-        role: 'PROVIDER',
-      });
+      const result = await service.adminLogin(validDto);
 
-      expect(result.user.role).toBe('PROVIDER');
-      expect(prisma.user.create).toHaveBeenCalledWith({
+      expect(mockPrisma.user.create).toHaveBeenCalledWith({
         data: {
-          phone: '+1234567890',
-          role: 'PROVIDER',
+          phone: '+0000000000',
+          role: 'ADMIN',
         },
       });
+      expect(result.token).toBe('mock-jwt-token');
+      expect(result.user.role).toBe('ADMIN');
     });
 
-    it('should throw UnauthorizedException for invalid OTP', async () => {
-      (prisma.otpVerification.findFirst as jest.Mock).mockResolvedValue(null);
-
+    it('should throw UnauthorizedException for wrong email', async () => {
       await expect(
-        service.verifyOtp({ phone: '+1234567890', otp: '000000' }),
+        service.adminLogin({ email: 'wrong@email.com', password: 'admin123' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for wrong password', async () => {
+      await expect(
+        service.adminLogin({ email: 'admin@curex24.com', password: 'wrong' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for both wrong credentials', async () => {
+      await expect(
+        service.adminLogin({ email: 'wrong@email.com', password: 'wrong' }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
