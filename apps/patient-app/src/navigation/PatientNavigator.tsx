@@ -10,6 +10,7 @@ import { BookingConfirmScreen } from '../screens/patient/BookingConfirmScreen';
 import { PaymentScreen } from '../screens/patient/PaymentScreen';
 import { TrackingScreen } from '../screens/patient/TrackingScreen';
 import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummaryScreen';
+import { ConsultationSummariesScreen } from '../screens/patient/ConsultationSummariesScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { ProfileSetupScreen } from '../screens/auth/ProfileSetupScreen';
@@ -25,6 +26,7 @@ export type PatientStackParamList = {
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
+  ConsultationSummaries: undefined;
   ProfileSetup: undefined;
 };
 
@@ -64,6 +66,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="ConsultationSummaries" component={ConsultationSummariesScreen} options={{ title: 'My Consultation Summaries' }} />
     <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ title: 'Edit Profile' }} />
   </Stack.Navigator>
 );
