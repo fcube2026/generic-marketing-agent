@@ -100,6 +100,19 @@ export default function DashboardPage() {
             Coordinate lab tests, sample collections, and result uploads
           </p>
         </Link>
+
+        <Link
+          href="/payouts"
+          className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition group"
+        >
+          <div className="text-2xl mb-3">💰</div>
+          <h3 className="text-lg font-semibold text-gray-800 group-hover:text-primary transition">
+            Payouts
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Track provider payouts and manage the 80/20 revenue split
+          </p>
+        </Link>
       </div>
     </div>
   );

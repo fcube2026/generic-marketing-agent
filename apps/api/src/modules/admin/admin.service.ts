@@ -221,4 +221,91 @@ export class AdminService {
       totalPatients,
     };
   }
+
+  async getAllPayouts(page = 1, limit = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where = status ? { status: status as any } : {};
+
+    const [payouts, total] = await Promise.all([
+      this.prisma.payout.findMany({
+        where,
+        include: {
+          provider: true,
+          booking: {
+            include: {
+              patient: true,
+              serviceCategory: true,
+              payment: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payout.count({ where }),
+    ]);
+
+    return {
+      data: payouts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getPayoutsSummary() {
+    const [totalAgg, pendingAgg, processedAgg] = await Promise.all([
+      this.prisma.payout.aggregate({
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.payout.aggregate({
+        where: { status: 'PENDING' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.payout.aggregate({
+        where: { status: 'PROCESSED' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
+
+    return {
+      totalPayouts: totalAgg._count,
+      pendingCount: pendingAgg._count,
+      processedCount: processedAgg._count,
+      totalAmount: totalAgg._sum.amount || 0,
+      pendingAmount: pendingAgg._sum.amount || 0,
+      processedAmount: processedAgg._sum.amount || 0,
+    };
+  }
+
+  async processPayoutRecord(payoutId: string, adminId: string) {
+    const payout = await this.prisma.payout.findUnique({
+      where: { id: payoutId },
+    });
+    if (!payout) throw new NotFoundException('Payout not found');
+
+    const updated = await this.prisma.payout.update({
+      where: { id: payoutId },
+      data: {
+        status: 'PROCESSED',
+        processedAt: new Date(),
+      },
+    });
+
+    await this.prisma.adminAction.create({
+      data: {
+        adminId,
+        action: 'PROCESS_PAYOUT',
+        targetId: payoutId,
+        targetType: 'Payout',
+      },
+    });
+
+    return updated;
+  }
 }
