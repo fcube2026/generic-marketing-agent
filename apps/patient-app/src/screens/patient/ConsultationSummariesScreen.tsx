@@ -194,13 +194,13 @@ const styles = StyleSheet.create({
   },
   medicinesBadgeText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   followUp: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: Colors.primaryLight,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
     alignSelf: 'flex-start',
   },
-  followUpText: { fontSize: 12, color: Colors.warning, fontWeight: '600' },
+  followUpText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   empty: {
     flex: 1,
     alignItems: 'center',

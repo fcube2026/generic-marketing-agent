@@ -52,19 +52,20 @@ export const HistoryScreen: React.FC = () => {
           renderItem={({ item }) => {
             const hasSummary = SUMMARY_STATUSES.includes(item.status as BookingStatus);
             return (
-              <TouchableOpacity
-                style={styles.item}
-                onPress={() => navigation.navigate('Tracking', { bookingId: item.id })}
-              >
-                <View style={styles.itemHeader}>
-                  <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
-                  <BookingStatusBadge status={item.status as BookingStatus} />
-                </View>
-                <Text style={styles.service}>{item.serviceCategory?.name}</Text>
-                <View style={styles.itemFooter}>
-                  <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
-                  <Text style={styles.fee}>{formatCurrency(item.totalFee)}</Text>
-                </View>
+              <View style={styles.item}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Tracking', { bookingId: item.id })}
+                >
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
+                    <BookingStatusBadge status={item.status as BookingStatus} />
+                  </View>
+                  <Text style={styles.service}>{item.serviceCategory?.name}</Text>
+                  <View style={styles.itemFooter}>
+                    <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
+                    <Text style={styles.fee}>{formatCurrency(item.totalFee)}</Text>
+                  </View>
+                </TouchableOpacity>
                 {hasSummary && (
                   <TouchableOpacity
                     style={styles.viewSummaryButton}
@@ -75,7 +76,7 @@ export const HistoryScreen: React.FC = () => {
                     <Text style={styles.viewSummaryText}>View Summary →</Text>
                   </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
             );
           }}
         />
