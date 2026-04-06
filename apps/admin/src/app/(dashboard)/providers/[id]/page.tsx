@@ -22,7 +22,7 @@ interface Provider {
   consultationFeeDoctorPlace: number;
   createdAt: string;
   user?: { phone: string };
-  licenses?: { id: string; type: string; documentUrl: string; expiresAt: string | null; verifiedAt: string | null }[];
+  licenses?: { id: string; type: string; documentUrl: string; status: string; rejectionReason: string | null; expiresAt: string | null; verifiedAt: string | null }[];
   providerServices?: { serviceCategory?: { name: string } }[];
 }
 
@@ -259,10 +259,15 @@ export default function ProviderDetailPage() {
                   <div>
                     <p className="font-medium text-sm text-gray-900">{lic.type}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {lic.verifiedAt
-                        ? `✅ Verified on ${new Date(lic.verifiedAt).toLocaleDateString()}`
-                        : '⏳ Not verified'}
+                      {lic.status === 'APPROVED'
+                        ? `✅ Approved${lic.verifiedAt ? ` on ${new Date(lic.verifiedAt).toLocaleDateString()}` : ''}`
+                        : lic.status === 'REJECTED'
+                          ? '❌ Rejected'
+                          : '⏳ Pending review'}
                     </p>
+                    {lic.status === 'REJECTED' && lic.rejectionReason && (
+                      <p className="text-xs text-red-500 mt-0.5">Reason: {lic.rejectionReason}</p>
+                    )}
                     {lic.expiresAt && (
                       <p className="text-xs text-gray-400 mt-0.5">
                         Expires: {new Date(lic.expiresAt).toLocaleDateString()}
