@@ -90,6 +90,25 @@ export const ProfileScreen: React.FC = () => {
               {addr.isDefault && <Text style={styles.defaultBadge}>Default</Text>}
             </View>
           ))}
+          <Button
+            title="Manage Addresses"
+            onPress={() => navigation.navigate('AddressList')}
+            variant="outline"
+            style={styles.editButton}
+          />
+        </Card>
+      )}
+
+      {(!addresses || addresses.length === 0) && (
+        <Card style={styles.card}>
+          <Text style={styles.sectionTitle}>Saved Addresses</Text>
+          <Text style={styles.emptyText}>No addresses saved yet</Text>
+          <Button
+            title="Add Address"
+            onPress={() => navigation.navigate('AddressList')}
+            variant="outline"
+            style={styles.editButton}
+          />
         </Card>
       )}
 
