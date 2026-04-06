@@ -25,12 +25,42 @@ curex24/
 
 ## 🚀 Quick Start
 
+### Option 1: Docker (Recommended — No Local Setup Required)
+
+Run the entire stack with a single command:
+
+```bash
+docker compose up --build
+```
+
+This starts PostgreSQL, Redis, the API (port 3000), and the admin panel (port 3001). The database schema is applied automatically on startup.
+
+| Service | URL |
+|---------|-----|
+| API | http://localhost:3000 |
+| Admin Panel | http://localhost:3001 |
+
+To stop all services:
+
+```bash
+docker compose down
+```
+
+To reset the database:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+### Option 2: Manual Local Setup
+
 ```bash
 # Install dependencies
 pnpm install
 
 # Start PostgreSQL
-docker-compose up -d
+docker-compose up -d postgres redis
 
 # Setup database
 pnpm db:generate && pnpm db:migrate
