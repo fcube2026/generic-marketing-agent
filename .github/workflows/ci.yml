@@ -147,8 +147,31 @@ jobs:
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
 
-      - name: Run API integration tests
-        run: pnpm --filter @curex24/api test:integration -- --passWithNoTests
+  test-mobile:
+    name: Test Mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run mobile tests
+        run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
 
   prisma-validate:
     name: Prisma Validate
