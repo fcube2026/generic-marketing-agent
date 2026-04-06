@@ -84,6 +84,14 @@ jobs:
       - name: Build API
         run: pnpm --filter @curex24/api build
 
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: apps/admin/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('apps/admin/**/*.{js,jsx,ts,tsx}') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
+
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
 
@@ -109,8 +117,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        DIRECT_URL: ${{ secrets.DIRECT_URL }}   # Add this line
+        DATABASE_URL: postgresql://test:test@localhost:5432/curex24_test
+        DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
