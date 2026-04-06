@@ -9,6 +9,8 @@ import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
+const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   REQUESTED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
   ACCEPTED: ['ON_THE_WAY', 'CANCELLED'],
@@ -42,6 +44,66 @@ export class BookingsService {
       where: { id: dto.providerId },
     });
     if (!provider) throw new NotFoundException('Provider not found');
+
+    // Validate provider is available
+    if (!provider.isAvailable) {
+      throw new BadRequestException('Provider is not currently available.');
+    }
+
+    // Validate booking mode is supported by provider
+    if (dto.mode === 'HOME_VISIT' && !provider.homeVisitEnabled) {
+      throw new BadRequestException(
+        'This provider does not offer home visits.',
+      );
+    }
+    if (dto.mode === 'DOCTOR_PLACE' && !provider.doctorPlaceVisitEnabled) {
+      throw new BadRequestException(
+        'This provider does not offer clinic visits.',
+      );
+    }
+
+    // Validate address is provided for home visits
+    if (dto.mode === 'HOME_VISIT' && !dto.addressId) {
+      throw new BadRequestException(
+        'Address is required for home visit bookings.',
+      );
+    }
+
+    // Validate address exists and belongs to user if provided
+    if (dto.addressId) {
+      const address = await this.prisma.address.findFirst({
+        where: { id: dto.addressId, userId },
+      });
+      if (!address) {
+        throw new NotFoundException(
+          'Address not found or does not belong to you.',
+        );
+      }
+    }
+
+    // Check for scheduling conflicts (overlapping active bookings for same provider)
+    const scheduledAt = new Date(dto.scheduledAt);
+    const windowStart = new Date(scheduledAt.getTime() - BOOKING_CONFLICT_WINDOW_MS);
+    const windowEnd = new Date(scheduledAt.getTime() + BOOKING_CONFLICT_WINDOW_MS);
+
+    const conflictingBooking = await this.prisma.booking.findFirst({
+      where: {
+        providerId: dto.providerId,
+        status: {
+          in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'],
+        },
+        scheduledAt: {
+          gte: windowStart,
+          lte: windowEnd,
+        },
+      },
+    });
+
+    if (conflictingBooking) {
+      throw new BadRequestException(
+        'Provider has a conflicting booking at the requested time. Please choose a different time.',
+      );
+    }
 
     const fee =
       dto.mode === 'HOME_VISIT'
