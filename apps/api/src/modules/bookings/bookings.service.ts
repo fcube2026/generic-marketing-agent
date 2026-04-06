@@ -120,6 +120,28 @@ export class BookingsService {
       );
     }
 
+    if (dto.status === 'SUMMARY_SUBMITTED') {
+      const summary = await this.prisma.consultationSummary.findUnique({
+        where: { bookingId },
+      });
+      if (!summary) {
+        throw new BadRequestException(
+          'Cannot transition to SUMMARY_SUBMITTED without a consultation summary. Use the consultation summary endpoint.',
+        );
+      }
+    }
+
+    if (dto.status === 'CLOSED') {
+      const summary = await this.prisma.consultationSummary.findUnique({
+        where: { bookingId },
+      });
+      if (!summary) {
+        throw new BadRequestException(
+          'Cannot close booking without a consultation summary.',
+        );
+      }
+    }
+
     const updated = await this.prisma.booking.update({
       where: { id: bookingId },
       data: { status: dto.status },

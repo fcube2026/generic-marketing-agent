@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
 
@@ -13,8 +18,21 @@ export class ConsultationService {
   ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { provider: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.provider.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can submit a consultation summary',
+      );
+    }
+
+    if (booking.status !== 'COMPLETED' && booking.status !== 'IN_PROGRESS') {
+      throw new BadRequestException(
+        `Cannot submit summary for booking in ${booking.status} status. Booking must be COMPLETED or IN_PROGRESS.`,
+      );
+    }
 
     const summary = await this.prisma.consultationSummary.upsert({
       where: { bookingId },

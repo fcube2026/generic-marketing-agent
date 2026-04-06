@@ -46,7 +46,7 @@ export const BookingDetailScreen: React.FC = () => {
     try {
       await bookingService.updateStatus(bookingId, newStatus);
       setBooking((prev: any) => ({ ...prev, status: newStatus }));
-      if (newStatus === 'IN_PROGRESS') {
+      if (newStatus === 'COMPLETED') {
         navigation.navigate('ConsultationForm', { bookingId });
       }
     } catch {
@@ -144,6 +144,16 @@ export const BookingDetailScreen: React.FC = () => {
             disabled={updating}
           >
             <Text style={styles.actionBtnText}>{updating ? 'Updating…' : nextAction.label}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Submit Summary Button (fallback for COMPLETED bookings) */}
+        {booking.status === 'COMPLETED' && (
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('ConsultationForm', { bookingId })}
+          >
+            <Text style={styles.actionBtnText}>📝 Submit Consultation Summary</Text>
           </TouchableOpacity>
         )}
       </ScrollView>

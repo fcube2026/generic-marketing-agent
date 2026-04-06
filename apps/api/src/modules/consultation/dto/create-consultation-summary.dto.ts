@@ -1,17 +1,17 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNotEmpty } from 'class-validator';
 
 export class CreateConsultationSummaryDto {
-  @IsOptional()
   @IsString()
-  symptoms?: string;
+  @IsNotEmpty()
+  symptoms: string;
 
   @IsOptional()
   @IsString()
   observations?: string;
 
-  @IsOptional()
   @IsString()
-  diagnosis?: string;
+  @IsNotEmpty()
+  diagnosis: string;
 
   @IsOptional()
   @IsArray()
