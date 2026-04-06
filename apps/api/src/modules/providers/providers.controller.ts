@@ -14,6 +14,7 @@ import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
 import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
+import { SearchNearbyProvidersDto } from './dto/search-nearby-providers.dto';
 import { Public } from '../auth/decorators/roles.decorator';
 
 @Controller('providers')
@@ -53,17 +54,12 @@ export class ProvidersController {
 
   @Public()
   @Get('nearby')
-  getNearbyProviders(
-    @Query('lat') lat: string,
-    @Query('lng') lng: string,
-    @Query('serviceCategory') serviceCategory?: string,
-    @Query('mode') mode?: string,
-  ) {
+  getNearbyProviders(@Query() query: SearchNearbyProvidersDto) {
     return this.providersService.getNearbyProviders(
-      parseFloat(lat),
-      parseFloat(lng),
-      serviceCategory,
-      mode,
+      query.lat,
+      query.lng,
+      query.serviceCategory,
+      query.mode,
     );
   }
 

@@ -12,6 +12,7 @@ import { RouteProp } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { ProviderCard } from '../../components/booking/ProviderCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Button } from '../../components/common/Button';
 import { providerService } from '../../services/providerService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { ProviderWithDistance } from '../../types';
@@ -27,7 +28,7 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
   const [sortBy, setSortBy] = useState<'distance' | 'fee'>('distance');
   const { setSelectedProvider, setSelectedMode } = useBookingStore();
 
-  const { data: providers, isLoading } = useQuery<ProviderWithDistance[]>({
+  const { data: providers, isLoading, isError, refetch } = useQuery<ProviderWithDistance[]>({
     queryKey: ['nearby-providers', categorySlug, lat, lng],
     queryFn: () => providerService.getNearbyProviders({ lat, lng, serviceCategory: categorySlug }),
   });
@@ -54,6 +55,19 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   if (isLoading) return <LoadingSpinner fullScreen message="Finding providers..." />;
+
+  if (isError) {
+    return (
+      <View style={styles.empty}>
+        <Text style={styles.emptyIcon}>⚠️</Text>
+        <Text style={styles.emptyTitle}>Something went wrong</Text>
+        <Text style={styles.emptySubtitle}>
+          We couldn't load nearby providers. Please check your connection and try again.
+        </Text>
+        <Button title="Retry" onPress={() => refetch()} style={{ marginTop: 16 }} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
