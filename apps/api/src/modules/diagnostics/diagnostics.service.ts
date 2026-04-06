@@ -77,19 +77,23 @@ export class DiagnosticsService {
       data: { status: 'RESULTED' },
     });
 
-    await this.prisma.notification.create({
-      data: {
-        userId: request.booking.patient.userId,
-        title: 'Lab Result Ready',
-        message: `Your lab result for "${request.testType}" is now available. Please check your diagnostics section.`,
-        type: 'LAB_RESULT_READY',
-        metadata: {
-          diagnosticRequestId: id,
-          testType: request.testType,
-          bookingId: request.bookingId,
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: request.booking.patient.userId,
+          title: 'Lab Result Ready',
+          message: `Your lab result for "${request.testType}" is now available. Please check your diagnostics section.`,
+          type: 'LAB_RESULT_READY',
+          metadata: {
+            diagnosticRequestId: id,
+            testType: request.testType,
+            bookingId: request.bookingId,
+          },
         },
-      },
-    });
+      });
+    } catch {
+      // Notification failure should not block the result upload
+    }
 
     return result;
   }
