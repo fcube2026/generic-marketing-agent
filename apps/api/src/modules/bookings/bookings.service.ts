@@ -231,6 +231,32 @@ export class BookingsService {
       },
     });
 
+    // Send notifications for provider-driven status transitions
+    const PROVIDER_TRANSITION_MESSAGES: Partial<Record<BookingStatus, string>> =
+      {
+        ON_THE_WAY: 'Your provider is on the way.',
+        ARRIVED: 'Your provider has arrived.',
+        IN_PROGRESS: 'Your consultation is now in progress.',
+        COMPLETED: 'Your consultation has been completed.',
+      };
+
+    const message = PROVIDER_TRANSITION_MESSAGES[dto.status];
+    if (message) {
+      const fullBooking = await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { patient: true },
+      });
+      if (fullBooking) {
+        await this.notificationsService.createNotification({
+          userId: fullBooking.patient.userId,
+          title: `Booking ${dto.status.replace(/_/g, ' ').toLowerCase()}`,
+          message,
+          type: 'BOOKING_STATUS_UPDATE',
+          metadata: { bookingId, status: dto.status },
+        });
+      }
+    }
+
     return updated;
   }
 
@@ -283,8 +309,31 @@ export class BookingsService {
   }
 
   async cancelBooking(bookingId: string, userId: string) {
-    return this.updateBookingStatus(bookingId, userId, {
+    const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.CANCELLED,
     });
+
+    // Notify the other party about cancellation
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (booking) {
+      const isPatientCancelling = booking.patient.userId === userId;
+      const notifyUserId = isPatientCancelling
+        ? booking.provider.userId
+        : booking.patient.userId;
+      const cancelledBy = isPatientCancelling ? 'the patient' : 'the provider';
+
+      await this.notificationsService.createNotification({
+        userId: notifyUserId,
+        title: 'Booking Cancelled',
+        message: `A booking has been cancelled by ${cancelledBy}.`,
+        type: 'BOOKING_CANCELLED',
+        metadata: { bookingId },
+      });
+    }
+
+    return updated;
   }
 }

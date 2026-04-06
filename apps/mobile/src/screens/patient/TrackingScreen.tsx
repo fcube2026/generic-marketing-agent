@@ -110,6 +110,24 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       )}
 
+      {booking.status === 'DECLINED' && (
+        <Card style={styles.declinedCard}>
+          <Text style={styles.declinedTitle}>Booking Declined</Text>
+          <Text style={styles.declinedMessage}>
+            Your booking request was declined by the provider. Please try booking with another provider.
+          </Text>
+        </Card>
+      )}
+
+      {booking.status === 'CANCELLED' && (
+        <Card style={styles.cancelledCard}>
+          <Text style={styles.cancelledTitle}>Booking Cancelled</Text>
+          <Text style={styles.cancelledMessage}>
+            This booking has been cancelled.
+          </Text>
+        </Card>
+      )}
+
       {(booking.status === 'REQUESTED' || booking.status === 'ACCEPTED') && (
         <Button
           title="Cancel Booking"
@@ -154,4 +172,10 @@ const styles = StyleSheet.create({
   addressText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
   summaryBtn: { marginHorizontal: 16, marginBottom: 12 },
   cancelBtn: { marginHorizontal: 16, marginBottom: 16 },
+  declinedCard: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FEE2E2' },
+  declinedTitle: { fontSize: 16, fontWeight: '700', color: Colors.error, marginBottom: 4 },
+  declinedMessage: { fontSize: 14, color: Colors.error, lineHeight: 20 },
+  cancelledCard: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FEE2E2' },
+  cancelledTitle: { fontSize: 16, fontWeight: '700', color: Colors.error, marginBottom: 4 },
+  cancelledMessage: { fontSize: 14, color: Colors.error, lineHeight: 20 },
 });
