@@ -147,6 +147,9 @@ jobs:
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
 
+      - name: Run API integration tests
+        run: pnpm --filter @curex24/api test:integration -- --passWithNoTests
+
   prisma-validate:
     name: Prisma Validate
     runs-on: ubuntu-latest
