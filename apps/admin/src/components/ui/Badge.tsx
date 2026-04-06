@@ -36,6 +36,7 @@ export function StatusBadge({ status }: { status: string }) {
     SCHEDULED: { variant: 'info', label: 'Scheduled' },
     COLLECTED: { variant: 'info', label: 'Collected' },
     RESULTED: { variant: 'success', label: 'Resulted' },
+    PROCESSED: { variant: 'success', label: 'Processed' },
   };
   const config = map[status] || { variant: 'default' as const, label: status };
   return <Badge variant={config.variant}>{config.label}</Badge>;

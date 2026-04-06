@@ -10,6 +10,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { ConsultationModule } from './modules/consultation/consultation.module';
 import { DiagnosticsModule } from './modules/diagnostics/diagnostics.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { PayoutsModule } from './modules/payouts/payouts.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
@@ -28,6 +29,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ConsultationModule,
     DiagnosticsModule,
     PaymentsModule,
+    PayoutsModule,
     AdminModule,
     NotificationsModule,
   ],

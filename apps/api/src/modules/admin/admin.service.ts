@@ -221,4 +221,84 @@ export class AdminService {
       totalPatients,
     };
   }
+
+  async getAllPayouts(page = 1, limit = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where = status ? { status: status as any } : {};
+
+    const [payouts, total] = await Promise.all([
+      this.prisma.payout.findMany({
+        where,
+        include: {
+          provider: true,
+          booking: {
+            include: {
+              patient: true,
+              serviceCategory: true,
+              payment: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payout.count({ where }),
+    ]);
+
+    return {
+      data: payouts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getPayoutsSummary() {
+    const payouts = await this.prisma.payout.findMany();
+
+    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+    const pendingAmount = payouts
+      .filter((p) => p.status === 'PENDING')
+      .reduce((sum, p) => sum + p.amount, 0);
+    const processedAmount = payouts
+      .filter((p) => p.status === 'PROCESSED')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    return {
+      totalPayouts: payouts.length,
+      pendingCount: payouts.filter((p) => p.status === 'PENDING').length,
+      processedCount: payouts.filter((p) => p.status === 'PROCESSED').length,
+      totalAmount,
+      pendingAmount,
+      processedAmount,
+    };
+  }
+
+  async processPayoutRecord(payoutId: string, adminId: string) {
+    const payout = await this.prisma.payout.findUnique({
+      where: { id: payoutId },
+    });
+    if (!payout) throw new NotFoundException('Payout not found');
+
+    const updated = await this.prisma.payout.update({
+      where: { id: payoutId },
+      data: {
+        status: 'PROCESSED',
+        processedAt: new Date(),
+      },
+    });
+
+    await this.prisma.adminAction.create({
+      data: {
+        adminId,
+        action: 'PROCESS_PAYOUT',
+        targetId: payoutId,
+        targetType: 'Payout',
+      },
+    });
+
+    return updated;
+  }
 }

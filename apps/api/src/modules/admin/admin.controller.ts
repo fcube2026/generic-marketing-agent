@@ -70,4 +70,27 @@ export class AdminController {
   getDiagnosticsOverview() {
     return this.adminService.getDiagnosticsOverview();
   }
+
+  @Get('payouts')
+  getAllPayouts(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getAllPayouts(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      status,
+    );
+  }
+
+  @Get('payouts/summary')
+  getPayoutsSummary() {
+    return this.adminService.getPayoutsSummary();
+  }
+
+  @Put('payouts/:id/process')
+  processPayoutRecord(@Param('id') payoutId: string, @CurrentUser() user: any) {
+    return this.adminService.processPayoutRecord(payoutId, user.id);
+  }
 }
