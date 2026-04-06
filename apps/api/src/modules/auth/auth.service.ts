@@ -38,10 +38,11 @@ export class AuthService {
     });
 
     // In production, send via SMS provider
-    // In development, return OTP in response
     const isDev = process.env.NODE_ENV !== 'production';
 
-    console.log(`OTP for ${dto.phone}: ${otp}`);
+    if (isDev) {
+      console.log(`OTP for ${dto.phone}: ${otp}`);
+    }
 
     return {
       success: true,

@@ -40,32 +40,43 @@ describe('PaymentsController', () => {
   });
 
   describe('initiatePayment', () => {
-    it('should call service.initiatePayment with dto', async () => {
+    it('should call service.initiatePayment with dto and user id', async () => {
       const dto = { bookingId: 'booking-1', amount: 500 };
-      const result = await controller.initiatePayment(dto);
+      const user = { id: 'user-1' };
+      const result = await controller.initiatePayment(dto, user);
 
-      expect(service.initiatePayment).toHaveBeenCalledWith(dto);
+      expect(service.initiatePayment).toHaveBeenCalledWith(dto, 'user-1');
       expect(result).toEqual(mockPayment);
     });
   });
 
   describe('getPaymentStatus', () => {
-    it('should call service.getPaymentStatus with bookingId', async () => {
-      const result = await controller.getPaymentStatus('booking-1');
+    it('should call service.getPaymentStatus with bookingId and user id', async () => {
+      const user = { id: 'user-1' };
+      const result = await controller.getPaymentStatus('booking-1', user);
 
-      expect(service.getPaymentStatus).toHaveBeenCalledWith('booking-1');
+      expect(service.getPaymentStatus).toHaveBeenCalledWith(
+        'booking-1',
+        'user-1',
+      );
       expect(result).toEqual(mockPayment);
     });
   });
 
   describe('updatePaymentStatus', () => {
-    it('should call service.updatePaymentStatus with id and dto', async () => {
+    it('should call service.updatePaymentStatus with id, dto, and user id', async () => {
       const dto = { status: 'PAID', transactionId: 'TXN_456' };
-      const result = await controller.updatePaymentStatus('payment-1', dto);
+      const user = { id: 'user-1' };
+      const result = await controller.updatePaymentStatus(
+        'payment-1',
+        dto,
+        user,
+      );
 
       expect(service.updatePaymentStatus).toHaveBeenCalledWith(
         'payment-1',
         dto,
+        'user-1',
       );
       expect(result.status).toBe('PAID');
     });

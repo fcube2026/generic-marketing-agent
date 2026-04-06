@@ -74,30 +74,40 @@ describe('DiagnosticsController', () => {
   });
 
   describe('updateStatus', () => {
-    it('should call service.updateStatus with id and dto', async () => {
+    it('should call service.updateStatus with id, dto, and user id', async () => {
       const dto = { status: 'SCHEDULED' };
+      const user = { id: 'user-1' };
 
-      const result = await controller.updateStatus('diag-1', dto);
+      const result = await controller.updateStatus('diag-1', dto, user);
 
       expect(result).toEqual({
         ...mockDiagnosticRequest,
         status: 'SCHEDULED',
       });
-      expect(service.updateStatus).toHaveBeenCalledWith('diag-1', dto);
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        'diag-1',
+        dto,
+        'user-1',
+      );
     });
   });
 
   describe('uploadResult', () => {
-    it('should call service.uploadResult with id and dto', async () => {
+    it('should call service.uploadResult with id, dto, and user id', async () => {
       const dto = {
         resultFileUrl: 'https://storage.example.com/result.pdf',
         notes: 'Normal values',
       };
+      const user = { id: 'user-1' };
 
-      const result = await controller.uploadResult('diag-1', dto);
+      const result = await controller.uploadResult('diag-1', dto, user);
 
       expect(result).toEqual(mockLabResult);
-      expect(service.uploadResult).toHaveBeenCalledWith('diag-1', dto);
+      expect(service.uploadResult).toHaveBeenCalledWith(
+        'diag-1',
+        dto,
+        'user-1',
+      );
     });
   });
 

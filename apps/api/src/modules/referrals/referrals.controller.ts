@@ -29,7 +29,11 @@ export class ReferralsController {
   }
 
   @Put(':id')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateReferralStatusDto) {
-    return this.referralsService.updateStatus(id, dto);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateReferralStatusDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.referralsService.updateStatus(id, dto, user.id);
   }
 }

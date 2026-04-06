@@ -1,7 +1,8 @@
 import { Controller, Get, Put, Body, Param, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { CurrentUser } from '../auth/decorators/roles.decorator';
+import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 
+@Roles('ADMIN')
 @Controller('admin')
 export class AdminController {
   constructor(private adminService: AdminService) {}

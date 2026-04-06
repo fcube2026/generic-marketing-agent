@@ -38,7 +38,11 @@ export class DiagnosticsService {
     });
   }
 
-  async updateStatus(id: string, dto: UpdateDiagnosticStatusDto) {
+  async updateStatus(
+    id: string,
+    dto: UpdateDiagnosticStatusDto,
+    _userId: string,
+  ) {
     const request = await this.prisma.diagnosticRequest.findUnique({
       where: { id },
     });
@@ -53,7 +57,7 @@ export class DiagnosticsService {
     });
   }
 
-  async uploadResult(id: string, dto: UploadLabResultDto) {
+  async uploadResult(id: string, dto: UploadLabResultDto, _userId: string) {
     const request = await this.prisma.diagnosticRequest.findUnique({
       where: { id },
       include: {

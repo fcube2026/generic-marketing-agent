@@ -37,7 +37,11 @@ export class ReferralsService {
     });
   }
 
-  async updateStatus(id: string, dto: UpdateReferralStatusDto) {
+  async updateStatus(
+    id: string,
+    dto: UpdateReferralStatusDto,
+    _userId: string,
+  ) {
     const referral = await this.prisma.referral.findUnique({
       where: { id },
     });
