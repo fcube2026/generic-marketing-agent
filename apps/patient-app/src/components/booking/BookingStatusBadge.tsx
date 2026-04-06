@@ -6,6 +6,7 @@ import { Colors } from '../../constants/colors';
 const STATUS_CONFIG: Record<BookingStatus, { label: string; color: string; bg: string }> = {
   REQUESTED: { label: 'Requested', color: Colors.warning, bg: '#FEF3C7' },
   ACCEPTED: { label: 'Accepted', color: Colors.success, bg: '#D1FAE5' },
+  DECLINED: { label: 'Declined', color: Colors.error, bg: '#FEE2E2' },
   ON_THE_WAY: { label: 'On the Way', color: Colors.secondary, bg: '#DBEAFE' },
   ARRIVED: { label: 'Arrived', color: Colors.primary, bg: Colors.primaryLight },
   IN_PROGRESS: { label: 'In Progress', color: Colors.primary, bg: Colors.primaryLight },

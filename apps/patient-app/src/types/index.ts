@@ -3,6 +3,7 @@ export type BookingMode = 'HOME_VISIT' | 'DOCTOR_PLACE';
 export type BookingStatus =
   | 'REQUESTED'
   | 'ACCEPTED'
+  | 'DECLINED'
   | 'ON_THE_WAY'
   | 'ARRIVED'
   | 'IN_PROGRESS'

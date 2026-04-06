@@ -30,4 +30,22 @@ export class NotificationsService {
       where: { userId, isRead: false },
     });
   }
+
+  async createNotification(data: {
+    userId: string;
+    title: string;
+    message: string;
+    type: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    return this.prisma.notification.create({
+      data: {
+        userId: data.userId,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        metadata: data.metadata ? (data.metadata as any) : undefined,
+      },
+    });
+  }
 }

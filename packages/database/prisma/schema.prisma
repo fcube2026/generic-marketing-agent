@@ -22,6 +22,7 @@ enum BookingMode {
 enum BookingStatus {
   REQUESTED
   ACCEPTED
+  DECLINED
   ON_THE_WAY
   ARRIVED
   IN_PROGRESS

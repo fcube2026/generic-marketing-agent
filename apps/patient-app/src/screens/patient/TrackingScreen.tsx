@@ -110,6 +110,15 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       )}
 
+      {booking.status === 'DECLINED' && (
+        <Card style={styles.declinedCard}>
+          <Text style={styles.declinedTitle}>Booking Declined</Text>
+          <Text style={styles.declinedMessage}>
+            Your booking request was declined by the provider. Please try booking with another provider.
+          </Text>
+        </Card>
+      )}
+
       {(booking.status === 'REQUESTED' || booking.status === 'ACCEPTED') && (
         <Button
           title="Cancel Booking"
@@ -154,4 +163,7 @@ const styles = StyleSheet.create({
   addressText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
   summaryBtn: { marginHorizontal: 16, marginBottom: 12 },
   cancelBtn: { marginHorizontal: 16, marginBottom: 16 },
+  declinedCard: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FEE2E2', borderRadius: 12, padding: 16 },
+  declinedTitle: { fontSize: 16, fontWeight: '700', color: Colors.error, marginBottom: 6 },
+  declinedMessage: { fontSize: 14, color: Colors.text, lineHeight: 20 },
 });

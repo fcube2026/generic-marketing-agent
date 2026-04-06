@@ -7,10 +7,12 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  REQUESTED: ['ACCEPTED', 'CANCELLED'],
+  REQUESTED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
   ACCEPTED: ['ON_THE_WAY', 'CANCELLED'],
+  DECLINED: [],
   ON_THE_WAY: ['ARRIVED'],
   ARRIVED: ['IN_PROGRESS'],
   IN_PROGRESS: ['COMPLETED'],
@@ -22,7 +24,10 @@ const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
 
 @Injectable()
 export class BookingsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async createBooking(userId: string, dto: CreateBookingDto) {
     const patientProfile = await this.prisma.patientProfile.findUnique({
@@ -77,6 +82,15 @@ export class BookingsService {
         amount: fee,
         status: 'PENDING',
       },
+    });
+
+    // Notify provider of new booking request
+    await this.notificationsService.createNotification({
+      userId: provider.userId,
+      title: 'New Booking Request',
+      message: `You have a new ${dto.mode === 'HOME_VISIT' ? 'home visit' : 'clinic visit'} booking request.`,
+      type: 'BOOKING_REQUEST',
+      metadata: { bookingId: booking.id },
     });
 
     return booking;
@@ -159,9 +173,51 @@ export class BookingsService {
   }
 
   async acceptBooking(bookingId: string, userId: string) {
-    return this.updateBookingStatus(bookingId, userId, {
+    const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.ACCEPTED,
     });
+
+    // Notify patient that booking was accepted
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (booking) {
+      await this.notificationsService.createNotification({
+        userId: booking.patient.userId,
+        title: 'Booking Accepted',
+        message: `Your booking has been accepted by ${booking.provider.name}.`,
+        type: 'BOOKING_ACCEPTED',
+        metadata: { bookingId },
+      });
+    }
+
+    return updated;
+  }
+
+  async declineBooking(bookingId: string, userId: string, reason?: string) {
+    const updated = await this.updateBookingStatus(bookingId, userId, {
+      status: BookingStatus.DECLINED,
+    });
+
+    // Notify patient that booking was declined
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (booking) {
+      await this.notificationsService.createNotification({
+        userId: booking.patient.userId,
+        title: 'Booking Declined',
+        message: reason
+          ? `Your booking was declined by ${booking.provider.name}. Reason: ${reason}`
+          : `Your booking was declined by ${booking.provider.name}.`,
+        type: 'BOOKING_DECLINED',
+        metadata: { bookingId, reason },
+      });
+    }
+
+    return updated;
   }
 
   async cancelBooking(bookingId: string, userId: string) {
