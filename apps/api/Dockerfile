@@ -1,0 +1,34 @@
+FROM node:18-alpine
+
+RUN corepack enable && corepack prepare pnpm@9.4.0 --activate
+
+WORKDIR /app
+
+# Copy workspace configuration for dependency installation
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/database/package.json ./packages/database/
+COPY packages/types/package.json ./packages/types/
+
+# Install all dependencies (cached layer when package.json files don't change)
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
+COPY packages/database/ ./packages/database/
+COPY packages/types/ ./packages/types/
+COPY apps/api/ ./apps/api/
+
+# Generate Prisma client and build the API
+RUN pnpm --filter @curex24/database db:generate
+RUN pnpm --filter @curex24/api build
+
+# Copy entrypoint script
+COPY apps/api/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+WORKDIR /app/apps/api
+
+EXPOSE 3000
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["node", "dist/main"]

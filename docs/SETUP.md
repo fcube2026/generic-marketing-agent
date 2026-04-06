@@ -1,6 +1,70 @@
 # Curex24 — Local Development Setup
 
-## Prerequisites
+## Option A: Docker Setup (No Local Dependencies)
+
+The fastest way to run the full stack without installing Node.js, pnpm, or databases locally. You only need **Docker** installed.
+
+### 1. Start Everything
+
+```bash
+docker compose up --build
+```
+
+This single command will:
+- Start PostgreSQL and Redis
+- Build the NestJS API and Next.js admin panel
+- Apply the database schema automatically
+- Start all services
+
+### 2. Access the Applications
+
+| Service | URL |
+|---------|-----|
+| API | http://localhost:3000 |
+| Admin Panel | http://localhost:3001 |
+| PostgreSQL | localhost:5432 (user: `curex24`, password: `curex24password`) |
+| Redis | localhost:6379 |
+
+**Admin login:** `admin@curex24.com` / `admin123`
+
+### 3. Useful Docker Commands
+
+```bash
+# Start in background (detached mode)
+docker compose up --build -d
+
+# View logs
+docker compose logs -f api
+docker compose logs -f admin
+
+# Restart a single service
+docker compose restart api
+
+# Stop all services
+docker compose down
+
+# Stop and remove all data (reset database)
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up --build
+```
+
+### 4. Running Tests via Docker
+
+```bash
+# Run API tests
+docker compose exec api sh -c "cd /app/apps/api && npx jest --no-coverage"
+
+# If the container isn't running, use a one-off container
+docker compose run --rm api sh -c "cd /app/apps/api && npx jest --no-coverage"
+```
+
+---
+
+## Option B: Manual Setup
+
+### Prerequisites
 
 | Tool | Version | Install |
 |------|---------|---------|
