@@ -83,8 +83,12 @@ export class BookingsService {
 
     // Check for scheduling conflicts (overlapping active bookings for same provider)
     const scheduledAt = new Date(dto.scheduledAt);
-    const windowStart = new Date(scheduledAt.getTime() - BOOKING_CONFLICT_WINDOW_MS);
-    const windowEnd = new Date(scheduledAt.getTime() + BOOKING_CONFLICT_WINDOW_MS);
+    const windowStart = new Date(
+      scheduledAt.getTime() - BOOKING_CONFLICT_WINDOW_MS,
+    );
+    const windowEnd = new Date(
+      scheduledAt.getTime() + BOOKING_CONFLICT_WINDOW_MS,
+    );
 
     const conflictingBooking = await this.prisma.booking.findFirst({
       where: {

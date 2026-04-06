@@ -50,10 +50,7 @@ describe('BookingsController', () => {
     it('should call service.acceptBooking with correct params', async () => {
       const user = { id: 'user-1' };
       const result = await controller.acceptBooking(user, 'booking-1');
-      expect(service.acceptBooking).toHaveBeenCalledWith(
-        'booking-1',
-        'user-1',
-      );
+      expect(service.acceptBooking).toHaveBeenCalledWith('booking-1', 'user-1');
       expect(result.status).toBe('ACCEPTED');
     });
   });
@@ -62,11 +59,7 @@ describe('BookingsController', () => {
     it('should call service.declineBooking with reason', async () => {
       const user = { id: 'user-1' };
       const dto = { reason: 'Not available' };
-      const result = await controller.declineBooking(
-        user,
-        'booking-1',
-        dto,
-      );
+      const result = await controller.declineBooking(user, 'booking-1', dto);
       expect(service.declineBooking).toHaveBeenCalledWith(
         'booking-1',
         'user-1',
@@ -91,10 +84,7 @@ describe('BookingsController', () => {
     it('should call service.cancelBooking', async () => {
       const user = { id: 'user-1' };
       const result = await controller.cancelBooking(user, 'booking-1');
-      expect(service.cancelBooking).toHaveBeenCalledWith(
-        'booking-1',
-        'user-1',
-      );
+      expect(service.cancelBooking).toHaveBeenCalledWith('booking-1', 'user-1');
       expect(result.status).toBe('CANCELLED');
     });
   });
