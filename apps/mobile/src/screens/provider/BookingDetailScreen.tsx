@@ -7,6 +7,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { bookingService } from '../../services/bookingService';
+import { useProviderLocationTracking } from '../../hooks/useProviderLocationTracking';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 
 type Route = RouteProp<ProviderStackParamList, 'BookingDetail'>;
@@ -33,6 +34,9 @@ export const BookingDetailScreen: React.FC = () => {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  // Push provider location at intervals for active home-visit bookings
+  useProviderLocationTracking(bookingId, booking?.status);
 
   useEffect(() => {
     bookingService.getBookingById(bookingId).then(data => {

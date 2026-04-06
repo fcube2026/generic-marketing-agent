@@ -65,4 +65,14 @@ export const bookingService = {
     const r = await api.put(`/bookings/${id}/status`, { status });
     return r.data;
   },
+
+  updateProviderLocation: async (bookingId: string, lat: number, lng: number) => {
+    const r = await api.put('/tracking/location', { bookingId, lat, lng });
+    return r.data;
+  },
+
+  getProviderLocation: async (bookingId: string) => {
+    const r = await api.get(`/tracking/${bookingId}/location`);
+    return r.data;
+  },
 };

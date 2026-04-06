@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import MapView, { Marker } from 'react-native-maps';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
@@ -26,6 +27,9 @@ const STATUS_STEPS: BookingStatus[] = [
   'COMPLETED',
 ];
 
+/** Statuses where the provider is actively en route / on-site. */
+const TRACKING_STATUSES: BookingStatus[] = ['ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'];
+
 export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   const { bookingId } = route.params;
 
@@ -33,6 +37,23 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
     queryKey: ['booking', bookingId],
     queryFn: () => bookingService.getBooking(bookingId),
     refetchInterval: 10000,
+  });
+
+  const isHomeVisit = booking?.mode === 'HOME_VISIT';
+  const isTrackable =
+    isHomeVisit &&
+    !!booking?.status &&
+    TRACKING_STATUSES.includes(booking.status as BookingStatus);
+
+  const { data: providerLocation } = useQuery<{
+    lat: number | null;
+    lng: number | null;
+    recordedAt: string | null;
+  }>({
+    queryKey: ['provider-location', bookingId],
+    queryFn: () => bookingService.getProviderLocation(bookingId),
+    refetchInterval: 5000,
+    enabled: isTrackable,
   });
 
   const handleCancel = async () => {
@@ -53,8 +74,55 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const currentStepIndex = STATUS_STEPS.indexOf(booking.status as BookingStatus);
 
+  const hasProviderCoords =
+    providerLocation?.lat != null && providerLocation?.lng != null;
+
+  const addressLat = booking.address?.lat;
+  const addressLng = booking.address?.lng;
+
   return (
     <ScrollView style={styles.container}>
+      {/* Map view for home-visit bookings when provider is trackable */}
+      {isTrackable && hasProviderCoords && (
+        <Card style={styles.mapCard}>
+          <Text style={styles.sectionTitle}>Provider Location</Text>
+          <View style={styles.mapWrapper}>
+            <MapView
+              style={styles.map}
+              region={{
+                latitude: providerLocation!.lat!,
+                longitude: providerLocation!.lng!,
+                latitudeDelta: 0.015,
+                longitudeDelta: 0.015,
+              }}
+            >
+              <Marker
+                coordinate={{
+                  latitude: providerLocation!.lat!,
+                  longitude: providerLocation!.lng!,
+                }}
+                title="Provider"
+                description="Provider's current location"
+                pinColor={Colors.primary}
+              />
+              {addressLat != null && addressLng != null && (
+                <Marker
+                  coordinate={{ latitude: addressLat, longitude: addressLng }}
+                  title="Your Address"
+                  pinColor={Colors.error}
+                />
+              )}
+            </MapView>
+          </View>
+          {providerLocation?.recordedAt && (
+            <Text style={styles.lastUpdated}>
+              Last updated:{' '}
+              {new Date(providerLocation.recordedAt).toLocaleTimeString()}
+            </Text>
+          )}
+        </Card>
+      )}
+
       <Card style={styles.statusCard}>
         <View style={styles.statusHeader}>
           <Text style={styles.statusTitle}>Booking Status</Text>
@@ -142,6 +210,10 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  mapCard: { margin: 16, marginBottom: 0 },
+  mapWrapper: { borderRadius: 10, overflow: 'hidden', marginTop: 8 },
+  map: { width: '100%', height: 220 },
+  lastUpdated: { fontSize: 11, color: Colors.textMuted, marginTop: 6, textAlign: 'right' },
   statusCard: { margin: 16 },
   statusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   statusTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
