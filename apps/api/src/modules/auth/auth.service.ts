@@ -4,6 +4,12 @@ import { Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
+
+// Hardcoded admin credentials for MVP
+const ADMIN_EMAIL = 'admin@curex24.com';
+const ADMIN_PASSWORD = 'admin123';
+const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 
 @Injectable()
 export class AuthService {
@@ -87,6 +93,38 @@ export class AuthService {
       user: {
         id: user.id,
         phone: user.phone,
+        role: user.role,
+      },
+    };
+  }
+
+  async adminLogin(dto: AdminLoginDto) {
+    if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    // Find or create the admin user
+    let user = await this.prisma.user.findFirst({
+      where: { phone: ADMIN_PHONE, role: Role.ADMIN },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          phone: ADMIN_PHONE,
+          role: Role.ADMIN,
+        },
+      });
+    }
+
+    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: ADMIN_EMAIL,
         role: user.role,
       },
     };

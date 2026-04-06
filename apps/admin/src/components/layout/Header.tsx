@@ -8,6 +8,8 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
+    // Clear the auth cookie
+    document.cookie = 'admin_token=; path=/; max-age=0; SameSite=Lax';
     router.push('/login');
   };
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,15 +16,30 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    // MVP: Simple hardcoded admin login
-    if (email === 'admin@curex24.com' && password === 'admin123') {
-      localStorage.setItem('admin_token', 'admin-jwt-token-placeholder');
-      localStorage.setItem('admin_user', JSON.stringify({ email, role: 'ADMIN' }));
+    try {
+      const { data } = await api.post('/api/v1/auth/admin-login', {
+        email,
+        password,
+      });
+
+      // Store token in localStorage for API requests
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem(
+        'admin_user',
+        JSON.stringify({ email: data.user.email, role: data.user.role }),
+      );
+
+      // Store token in cookie for middleware route protection
+      document.cookie = `admin_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+
       router.push('/dashboard');
-    } else {
-      setError('Invalid credentials. Use admin@curex24.com / admin123');
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || 'Login failed. Please try again.';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
