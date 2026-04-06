@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StatCard } from '@/components/ui/Card';
+import MiniBarChart from '@/components/ui/MiniBarChart';
+import StatusBreakdownChart from '@/components/ui/StatusBreakdownChart';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -10,24 +12,46 @@ interface DashboardStats {
   activeProviders: number;
   pendingVerification: number;
   totalPatients: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  totalEarnings: number;
+  bookingsByStatus: Record<string, number>;
+}
+
+interface DashboardCharts {
+  bookingsPerDay: Record<string, number>;
+  earningsPerDay: Record<string, number>;
 }
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [charts, setCharts] = useState<DashboardCharts | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api
-      .get('/admin/dashboard')
-      .then((res) => setStats(res.data))
-      .catch(() => {
-        // Fallback demo data when API unavailable
-        setStats({
+    Promise.all([
+      api.get('/admin/dashboard').catch(() => ({
+        data: {
           totalBookings: 0,
           activeProviders: 0,
           pendingVerification: 0,
           totalPatients: 0,
-        });
+          completedBookings: 0,
+          cancelledBookings: 0,
+          totalEarnings: 0,
+          bookingsByStatus: {},
+        },
+      })),
+      api.get('/admin/dashboard/charts').catch(() => ({
+        data: {
+          bookingsPerDay: {},
+          earningsPerDay: {},
+        },
+      })),
+    ])
+      .then(([statsRes, chartsRes]) => {
+        setStats(statsRes.data);
+        setCharts(chartsRes.data);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -39,6 +63,9 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const formatCurrency = (v: number) =>
+    `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
   return (
     <div>
@@ -59,6 +86,49 @@ export default function DashboardPage() {
         />
         <StatCard icon="🧑‍🤝‍🧑" label="Total Patients" value={stats?.totalPatients ?? 0} />
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+        <StatCard
+          icon="💰"
+          label="Total Earnings"
+          value={formatCurrency(stats?.totalEarnings ?? 0)}
+        />
+        <StatCard
+          icon="✅"
+          label="Completed Bookings"
+          value={stats?.completedBookings ?? 0}
+        />
+        <StatCard
+          icon="❌"
+          label="Cancelled Bookings"
+          value={stats?.cancelledBookings ?? 0}
+        />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+        {charts && Object.keys(charts.bookingsPerDay).length > 0 && (
+          <MiniBarChart
+            data={charts.bookingsPerDay}
+            label="Bookings (Last 30 Days)"
+            color="#6366f1"
+          />
+        )}
+        {charts && Object.keys(charts.earningsPerDay).length > 0 && (
+          <MiniBarChart
+            data={charts.earningsPerDay}
+            label="Earnings (Last 30 Days)"
+            color="#22c55e"
+            formatValue={formatCurrency}
+          />
+        )}
+      </div>
+
+      {stats && Object.keys(stats.bookingsByStatus).length > 0 && (
+        <div className="mb-8">
+          <StatusBreakdownChart data={stats.bookingsByStatus} />
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

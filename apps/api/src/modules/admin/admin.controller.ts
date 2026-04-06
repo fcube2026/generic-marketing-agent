@@ -11,6 +11,11 @@ export class AdminController {
     return this.adminService.getDashboardStats();
   }
 
+  @Get('dashboard/charts')
+  getDashboardCharts() {
+    return this.adminService.getDashboardCharts();
+  }
+
   @Get('providers')
   getAllProviders(@Query('status') status?: string) {
     return this.adminService.getAllProviders(status);

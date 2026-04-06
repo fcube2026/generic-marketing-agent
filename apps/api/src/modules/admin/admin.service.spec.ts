@@ -26,9 +26,14 @@ describe('AdminService', () => {
       count: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      groupBy: jest.fn(),
     },
     patientProfile: {
       count: jest.fn(),
+    },
+    payment: {
+      aggregate: jest.fn(),
+      findMany: jest.fn(),
     },
     diagnosticRequest: {
       findMany: jest.fn(),
@@ -350,12 +355,24 @@ describe('AdminService', () => {
   });
 
   describe('getDashboardStats', () => {
-    it('should return dashboard statistics', async () => {
-      mockPrisma.booking.count.mockResolvedValue(50);
+    it('should return dashboard statistics with extended KPIs', async () => {
+      mockPrisma.booking.count
+        .mockResolvedValueOnce(50)  // totalBookings
+        .mockResolvedValueOnce(30)  // completedBookings
+        .mockResolvedValueOnce(5);  // cancelledBookings
       mockPrisma.providerProfile.count
         .mockResolvedValueOnce(10) // activeProviders
         .mockResolvedValueOnce(3); // pendingVerification
       mockPrisma.patientProfile.count.mockResolvedValue(100);
+      mockPrisma.payment.aggregate.mockResolvedValue({
+        _sum: { amount: 25000 },
+      });
+      mockPrisma.booking.groupBy.mockResolvedValue([
+        { status: 'REQUESTED', _count: 5 },
+        { status: 'COMPLETED', _count: 30 },
+        { status: 'CANCELLED', _count: 5 },
+        { status: 'ACCEPTED', _count: 10 },
+      ]);
 
       const result = await service.getDashboardStats();
 
@@ -364,7 +381,79 @@ describe('AdminService', () => {
         activeProviders: 10,
         pendingVerification: 3,
         totalPatients: 100,
+        completedBookings: 30,
+        cancelledBookings: 5,
+        totalEarnings: 25000,
+        bookingsByStatus: {
+          REQUESTED: 5,
+          COMPLETED: 30,
+          CANCELLED: 5,
+          ACCEPTED: 10,
+        },
       });
+    });
+
+    it('should handle zero earnings gracefully', async () => {
+      mockPrisma.booking.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      mockPrisma.providerProfile.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0);
+      mockPrisma.patientProfile.count.mockResolvedValue(0);
+      mockPrisma.payment.aggregate.mockResolvedValue({
+        _sum: { amount: null },
+      });
+      mockPrisma.booking.groupBy.mockResolvedValue([]);
+
+      const result = await service.getDashboardStats();
+
+      expect(result.totalEarnings).toBe(0);
+      expect(result.bookingsByStatus).toEqual({});
+    });
+  });
+
+  describe('getDashboardCharts', () => {
+    it('should return bookings and earnings per day for last 30 days', async () => {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+
+      mockPrisma.booking.findMany.mockResolvedValue([
+        { createdAt: today, status: 'REQUESTED' },
+        { createdAt: today, status: 'COMPLETED' },
+      ]);
+      mockPrisma.payment.findMany.mockResolvedValue([
+        { paidAt: today, amount: 500 },
+        { paidAt: today, amount: 300 },
+      ]);
+
+      const result = await service.getDashboardCharts();
+
+      expect(result.bookingsPerDay).toBeDefined();
+      expect(result.earningsPerDay).toBeDefined();
+      expect(Object.keys(result.bookingsPerDay).length).toBe(30);
+      expect(Object.keys(result.earningsPerDay).length).toBe(30);
+      expect(result.bookingsPerDay[todayStr]).toBe(2);
+      expect(result.earningsPerDay[todayStr]).toBe(800);
+    });
+
+    it('should return zeroes when no data exists', async () => {
+      mockPrisma.booking.findMany.mockResolvedValue([]);
+      mockPrisma.payment.findMany.mockResolvedValue([]);
+
+      const result = await service.getDashboardCharts();
+
+      expect(Object.keys(result.bookingsPerDay).length).toBe(30);
+      const allBookingsZero = Object.values(result.bookingsPerDay).every(
+        (v) => v === 0,
+      );
+      expect(allBookingsZero).toBe(true);
+
+      const allEarningsZero = Object.values(result.earningsPerDay).every(
+        (v) => v === 0,
+      );
+      expect(allEarningsZero).toBe(true);
     });
   });
 
