@@ -7,8 +7,24 @@ describe('ServicesService', () => {
   let prisma: PrismaService;
 
   const mockCategories = [
-    { id: '1', name: 'Dentistry', slug: 'dentistry', description: 'Dental care services', iconUrl: null, createdAt: new Date(), updatedAt: new Date() },
-    { id: '2', name: 'Doctor', slug: 'doctor', description: 'General physician consultation', iconUrl: null, createdAt: new Date(), updatedAt: new Date() },
+    {
+      id: '1',
+      name: 'Dentistry',
+      slug: 'dentistry',
+      description: 'Dental care services',
+      iconUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    {
+      id: '2',
+      name: 'Doctor',
+      slug: 'doctor',
+      description: 'General physician consultation',
+      iconUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   ];
 
   beforeEach(async () => {
@@ -37,7 +53,9 @@ describe('ServicesService', () => {
 
   describe('getAllCategories', () => {
     it('should return categories when they exist', async () => {
-      (prisma.serviceCategory.findMany as jest.Mock).mockResolvedValue(mockCategories);
+      (prisma.serviceCategory.findMany as jest.Mock).mockResolvedValue(
+        mockCategories,
+      );
 
       const result = await service.getAllCategories();
 
@@ -51,7 +69,9 @@ describe('ServicesService', () => {
       (prisma.serviceCategory.findMany as jest.Mock)
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(mockCategories);
-      (prisma.serviceCategory.createMany as jest.Mock).mockResolvedValue({ count: 10 });
+      (prisma.serviceCategory.createMany as jest.Mock).mockResolvedValue({
+        count: 10,
+      });
 
       const result = await service.getAllCategories();
 
