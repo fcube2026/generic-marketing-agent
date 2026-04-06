@@ -33,6 +33,16 @@ describe('ProvidersController', () => {
             updateAvailability: jest.fn().mockResolvedValue(mockProfile),
             getMyBookings: jest.fn().mockResolvedValue([]),
             getNearbyProviders: jest.fn().mockResolvedValue([]),
+            uploadKycDocument: jest.fn().mockResolvedValue({
+              id: 'doc-1',
+              type: 'Medical License',
+              documentUrl: 'https://example.com/doc.pdf',
+              status: 'PENDING',
+            }),
+            getKycDocuments: jest.fn().mockResolvedValue([]),
+            deleteKycDocument: jest
+              .fn()
+              .mockResolvedValue({ message: 'Document deleted successfully' }),
           },
         },
       ],
@@ -99,6 +109,52 @@ describe('ProvidersController', () => {
 
       expect(result).toEqual(mockProfile);
       expect(service.updateProfile).toHaveBeenCalledWith('user-1', dto);
+    });
+  });
+
+  describe('uploadKycDocument', () => {
+    it('should upload a KYC document', async () => {
+      const user = { id: 'user-1' };
+      const dto = {
+        type: 'Medical License',
+        documentUrl: 'https://example.com/doc.pdf',
+      };
+
+      const result = await controller.uploadKycDocument(user, dto);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'doc-1',
+          type: 'Medical License',
+          status: 'PENDING',
+        }),
+      );
+      expect(service.uploadKycDocument).toHaveBeenCalledWith('user-1', dto);
+    });
+  });
+
+  describe('getKycDocuments', () => {
+    it('should return KYC documents for provider', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.getKycDocuments(user);
+
+      expect(result).toEqual([]);
+      expect(service.getKycDocuments).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('deleteKycDocument', () => {
+    it('should delete a KYC document', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.deleteKycDocument(user, 'doc-1');
+
+      expect(result).toEqual({ message: 'Document deleted successfully' });
+      expect(service.deleteKycDocument).toHaveBeenCalledWith(
+        'user-1',
+        'doc-1',
+      );
     });
   });
 });

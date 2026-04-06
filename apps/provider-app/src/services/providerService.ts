@@ -11,4 +11,16 @@ export const providerService = {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
     return r.data;
   },
+  uploadKycDocument: async (data: { type: string; documentUrl: string; expiresAt?: string }) => {
+    const r = await api.post('/providers/me/kyc', data);
+    return r.data;
+  },
+  getKycDocuments: async () => {
+    const r = await api.get('/providers/me/kyc');
+    return r.data;
+  },
+  deleteKycDocument: async (documentId: string) => {
+    const r = await api.delete(`/providers/me/kyc/${documentId}`);
+    return r.data;
+  },
 };

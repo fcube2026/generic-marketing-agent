@@ -63,7 +63,7 @@ export class AdminService {
 
     await this.prisma.providerLicense.updateMany({
       where: { providerId },
-      data: { verifiedAt: new Date() },
+      data: { verifiedAt: new Date(), status: 'APPROVED' },
     });
 
     const updated = await this.prisma.providerProfile.update({
@@ -100,6 +100,11 @@ export class AdminService {
       where: { id: providerId },
     });
     if (!provider) throw new NotFoundException('Provider not found');
+
+    await this.prisma.providerLicense.updateMany({
+      where: { providerId },
+      data: { status: 'REJECTED', rejectionReason: reason || null },
+    });
 
     const updated = await this.prisma.providerProfile.update({
       where: { id: providerId },
