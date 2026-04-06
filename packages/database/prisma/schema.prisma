@@ -95,7 +95,7 @@ model ProviderProfile {
   name                       String
   bio                        String?
   specialization             String
-  contactInfo                String
+  contactInfo                String   @default("")
   licenseNumber              String?
   isVerified                 Boolean  @default(false)
   isActive                   Boolean  @default(true)
