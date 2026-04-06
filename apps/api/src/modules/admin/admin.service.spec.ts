@@ -195,7 +195,11 @@ describe('AdminService', () => {
       mockPrisma.adminAction.create.mockResolvedValue({});
       mockPrisma.notification.create.mockResolvedValue({});
 
-      const result = await service.verifyProvider(providerId, adminId, 'Looks good');
+      const result = await service.verifyProvider(
+        providerId,
+        adminId,
+        'Looks good',
+      );
 
       expect(result).toEqual(updated);
       expect(mockPrisma.providerLicense.updateMany).toHaveBeenCalledWith({
@@ -316,7 +320,11 @@ describe('AdminService', () => {
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
       mockPrisma.adminAction.create.mockResolvedValue({});
 
-      const result = await service.deactivateProvider('p1', 'admin-1', 'Policy violation');
+      const result = await service.deactivateProvider(
+        'p1',
+        'admin-1',
+        'Policy violation',
+      );
 
       expect(result).toEqual(updated);
       expect(mockPrisma.providerProfile.update).toHaveBeenCalledWith({
