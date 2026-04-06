@@ -2,7 +2,28 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GetRecommendationDto } from './dto/get-recommendation.dto';
 
-function haversineDistance(
+/** Tweakable scoring weights – adjust these to change recommendation priority */
+export const SCORING_WEIGHTS = {
+  availability: 0.4,
+  distance: 0.3,
+  fee: 0.2,
+  urgency: 0.1,
+};
+
+/** Urgency level scores mapped to each urgency tier */
+export const URGENCY_SCORES: Record<string, number> = {
+  HIGH: 100,
+  MEDIUM: 60,
+  LOW: 30,
+};
+
+/** ETA multiplier (minutes per km) for each mode */
+export const ETA_MULTIPLIERS = {
+  homeVisit: 3,
+  doctorPlace: 2,
+};
+
+export function haversineDistance(
   lat1: number,
   lng1: number,
   lat2: number,
@@ -19,7 +40,7 @@ function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function calculateScore(
+export function calculateScore(
   isAvailable: boolean,
   distance: number,
   fee: number,
@@ -30,14 +51,13 @@ function calculateScore(
   const availabilityScore = isAvailable ? 100 : 0;
   const distanceScore = Math.max(0, 100 - (distance / maxDistance) * 100);
   const feeScore = Math.max(0, 100 - (fee / maxFee) * 100);
-  const urgencyScore =
-    urgency === 'HIGH' ? 100 : urgency === 'MEDIUM' ? 60 : 30;
+  const urgencyScore = URGENCY_SCORES[urgency] ?? 30;
 
   return (
-    availabilityScore * 0.4 +
-    distanceScore * 0.3 +
-    feeScore * 0.2 +
-    urgencyScore * 0.1
+    availabilityScore * SCORING_WEIGHTS.availability +
+    distanceScore * SCORING_WEIGHTS.distance +
+    feeScore * SCORING_WEIGHTS.fee +
+    urgencyScore * SCORING_WEIGHTS.urgency
   );
 }
 
@@ -123,7 +143,7 @@ export class RecommendationService {
       homeVisitResult = {
         provider: best.provider,
         distance: best.distance,
-        eta: Math.round(best.distance * 3),
+        eta: Math.round(best.distance * ETA_MULTIPLIERS.homeVisit),
         fee: best.provider.consultationFeeHomeVisit,
         score: best.score,
       };
@@ -149,7 +169,7 @@ export class RecommendationService {
       doctorPlaceResult = {
         provider: best.provider,
         distance: best.distance,
-        eta: Math.round(best.distance * 2),
+        eta: Math.round(best.distance * ETA_MULTIPLIERS.doctorPlace),
         fee: best.provider.consultationFeeDoctorPlace,
         score: best.score,
       };
