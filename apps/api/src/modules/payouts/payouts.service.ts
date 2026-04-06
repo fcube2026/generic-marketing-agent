@@ -31,23 +31,27 @@ export class PayoutsService {
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
-    const payouts = await this.prisma.payout.findMany({
-      where: { providerId: profile.id },
-    });
-
-    const totalEarnings = payouts.reduce((sum, p) => sum + p.amount, 0);
-    const pendingAmount = payouts
-      .filter((p) => p.status === 'PENDING')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const processedAmount = payouts
-      .filter((p) => p.status === 'PROCESSED')
-      .reduce((sum, p) => sum + p.amount, 0);
+    const [totalAgg, pendingAgg, processedAgg] = await Promise.all([
+      this.prisma.payout.aggregate({
+        where: { providerId: profile.id },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.payout.aggregate({
+        where: { providerId: profile.id, status: 'PENDING' },
+        _sum: { amount: true },
+      }),
+      this.prisma.payout.aggregate({
+        where: { providerId: profile.id, status: 'PROCESSED' },
+        _sum: { amount: true },
+      }),
+    ]);
 
     return {
-      totalEarnings,
-      pendingAmount,
-      processedAmount,
-      totalPayouts: payouts.length,
+      totalEarnings: totalAgg._sum.amount || 0,
+      pendingAmount: pendingAgg._sum.amount || 0,
+      processedAmount: processedAgg._sum.amount || 0,
+      totalPayouts: totalAgg._count,
     };
   }
 }

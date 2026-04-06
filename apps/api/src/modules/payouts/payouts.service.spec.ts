@@ -12,6 +12,7 @@ describe('PayoutsService', () => {
     },
     payout: {
       findMany: jest.fn(),
+      aggregate: jest.fn(),
     },
   };
 
@@ -80,14 +81,12 @@ describe('PayoutsService', () => {
   describe('getProviderEarningsSummary', () => {
     it('should return correct earnings summary', async () => {
       const mockProfile = { id: 'provider-1', userId: 'user-1' };
-      const mockPayouts = [
-        { amount: 800, status: 'PENDING' },
-        { amount: 1200, status: 'PROCESSED' },
-        { amount: 600, status: 'PENDING' },
-      ];
 
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
-      mockPrisma.payout.findMany.mockResolvedValue(mockPayouts);
+      mockPrisma.payout.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: 2600 }, _count: 3 })
+        .mockResolvedValueOnce({ _sum: { amount: 1400 } })
+        .mockResolvedValueOnce({ _sum: { amount: 1200 } });
 
       const result = await service.getProviderEarningsSummary('user-1');
 
@@ -102,7 +101,10 @@ describe('PayoutsService', () => {
     it('should return zero summary when no payouts exist', async () => {
       const mockProfile = { id: 'provider-1', userId: 'user-1' };
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
-      mockPrisma.payout.findMany.mockResolvedValue([]);
+      mockPrisma.payout.aggregate.mockResolvedValue({
+        _sum: { amount: null },
+        _count: 0,
+      });
 
       const result = await service.getProviderEarningsSummary('user-1');
 

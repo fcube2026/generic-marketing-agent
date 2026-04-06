@@ -256,23 +256,30 @@ export class AdminService {
   }
 
   async getPayoutsSummary() {
-    const payouts = await this.prisma.payout.findMany();
-
-    const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
-    const pendingAmount = payouts
-      .filter((p) => p.status === 'PENDING')
-      .reduce((sum, p) => sum + p.amount, 0);
-    const processedAmount = payouts
-      .filter((p) => p.status === 'PROCESSED')
-      .reduce((sum, p) => sum + p.amount, 0);
+    const [totalAgg, pendingAgg, processedAgg] = await Promise.all([
+      this.prisma.payout.aggregate({
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.payout.aggregate({
+        where: { status: 'PENDING' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.payout.aggregate({
+        where: { status: 'PROCESSED' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ]);
 
     return {
-      totalPayouts: payouts.length,
-      pendingCount: payouts.filter((p) => p.status === 'PENDING').length,
-      processedCount: payouts.filter((p) => p.status === 'PROCESSED').length,
-      totalAmount,
-      pendingAmount,
-      processedAmount,
+      totalPayouts: totalAgg._count,
+      pendingCount: pendingAgg._count,
+      processedCount: processedAgg._count,
+      totalAmount: totalAgg._sum.amount || 0,
+      pendingAmount: pendingAgg._sum.amount || 0,
+      processedAmount: processedAgg._sum.amount || 0,
     };
   }
 
