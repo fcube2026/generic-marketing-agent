@@ -30,6 +30,42 @@ function haversineDistance(
 export class ProvidersService {
   constructor(private prisma: PrismaService) {}
 
+  private validateServiceConfig(
+    dto: CreateProviderProfileDto | UpdateProviderProfileDto,
+  ) {
+    if (
+      dto.homeVisitEnabled &&
+      (dto.consultationFeeHomeVisit === undefined ||
+        dto.consultationFeeHomeVisit <= 0)
+    ) {
+      throw new BadRequestException(
+        'Home visit fee must be greater than 0 when home visit is enabled',
+      );
+    }
+    if (
+      dto.doctorPlaceVisitEnabled &&
+      (dto.consultationFeeDoctorPlace === undefined ||
+        dto.consultationFeeDoctorPlace <= 0)
+    ) {
+      throw new BadRequestException(
+        'Clinic visit fee must be greater than 0 when clinic visit is enabled',
+      );
+    }
+  }
+
+  private async validateServiceCategoryIds(ids: string[]) {
+    if (ids.length === 0) return;
+    const categories = await this.prisma.serviceCategory.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    if (categories.length !== ids.length) {
+      throw new BadRequestException(
+        'One or more service category IDs are invalid',
+      );
+    }
+  }
+
   async onboard(userId: string, dto: CreateProviderProfileDto) {
     const { serviceCategoryIds, ...profileData } = dto;
 
@@ -38,6 +74,12 @@ export class ProvidersService {
     });
     if (existing) {
       return this.updateProfile(userId, dto);
+    }
+
+    this.validateServiceConfig(dto);
+
+    if (serviceCategoryIds && serviceCategoryIds.length > 0) {
+      await this.validateServiceCategoryIds(serviceCategoryIds);
     }
 
     await this.prisma.user.update({
@@ -93,6 +135,12 @@ export class ProvidersService {
       where: { userId },
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
+
+    this.validateServiceConfig(dto);
+
+    if (serviceCategoryIds && serviceCategoryIds.length > 0) {
+      await this.validateServiceCategoryIds(serviceCategoryIds);
+    }
 
     await this.prisma.providerProfile.update({
       where: { userId },
