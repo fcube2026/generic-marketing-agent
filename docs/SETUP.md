@@ -317,6 +317,58 @@ const users = await prisma.user.findMany();
 
 ## 10. API Testing
 
+### Unit Tests
+
+Run the existing unit tests (mocked dependencies, no database required):
+
+```bash
+# From apps/api
+cd apps/api
+npx jest --no-coverage
+
+# Or from the repo root
+pnpm --filter @curex24/api test
+```
+
+### Integration Tests
+
+Integration tests hit actual API endpoints against a real PostgreSQL database.
+They cover auth (OTP flow, admin login) and patient endpoints (profile CRUD, addresses).
+
+**Prerequisites:** A running PostgreSQL instance and the schema pushed to the test database.
+
+```bash
+# 1. Start PostgreSQL (e.g., via docker compose)
+docker compose up -d postgres
+
+# 2. Set environment variables (adjust for your local setup)
+export DATABASE_URL="postgresql://curex24:curex24password@localhost:5432/curex24"
+export DIRECT_URL="postgresql://curex24:curex24password@localhost:5432/curex24"
+
+# 3. Push schema to test DB
+cd packages/database && npx prisma db push --skip-generate && cd ../..
+
+# 4. Run integration tests
+cd apps/api
+npx jest --config jest.integration.config.js --forceExit --no-coverage
+
+# Or from the repo root
+pnpm --filter @curex24/api test:integration
+```
+
+Integration tests run automatically in CI (GitHub Actions) with a PostgreSQL service container.
+
+### Adding New Integration Tests
+
+1. Create a file named `*.integration.spec.ts` alongside your module
+2. Import the helpers from `test/integration-setup.ts`:
+   ```typescript
+   import { createTestApp, cleanDatabase } from '../../../test/integration-setup';
+   ```
+3. Use `createTestApp()` in `beforeAll` to bootstrap the NestJS app
+4. Use `cleanDatabase(prisma)` in `beforeEach` / `afterAll` for test isolation
+5. Use `supertest` to make HTTP requests against `app.getHttpServer()`
+
 ### Development OTP Flow
 
 In development mode (`NODE_ENV=development`), the OTP is returned in the API response for easy testing:

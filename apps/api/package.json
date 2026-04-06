@@ -10,7 +10,8 @@
     "format:check": "prettier --check \"{src,apps,libs,test}/**/*.ts\"",
     "format:fix": "prettier --write \"{src,apps,libs,test}/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "test": "jest"
+    "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js --forceExit"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
@@ -38,6 +39,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^20.14.2",
     "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^7.2.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
@@ -46,6 +48,7 @@
     "jest": "^30.3.0",
     "prettier": "^3.3.0",
     "prisma": "^5.15.0",
+    "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
