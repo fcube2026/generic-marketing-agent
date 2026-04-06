@@ -40,14 +40,13 @@ describe('ServicesController', () => {
       expect(service.getAllCategories).toHaveBeenCalled();
     });
 
-    it('should return categories from the service', async () => {
+    it('should return an empty array when no categories exist', async () => {
+      (service.getAllCategories as jest.Mock).mockResolvedValueOnce([]);
+
       const result = await controller.getAllCategories();
 
-      expect(Array.isArray(result)).toBe(true);
-      expect(result).toHaveLength(2);
-      expect(result[0]).toHaveProperty('id');
-      expect(result[0]).toHaveProperty('name');
-      expect(result[0]).toHaveProperty('slug');
+      expect(result).toEqual([]);
+      expect(service.getAllCategories).toHaveBeenCalled();
     });
   });
 });
