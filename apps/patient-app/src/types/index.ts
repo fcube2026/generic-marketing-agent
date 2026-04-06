@@ -83,8 +83,14 @@ export interface Booking {
   address?: Address;
 }
 
+export interface ProviderService {
+  id: string;
+  serviceCategory: ServiceCategory;
+}
+
 export interface ProviderWithDistance extends ProviderProfile {
   distance: number;
+  providerServices?: ProviderService[];
 }
 
 export interface ConsultationSummary {

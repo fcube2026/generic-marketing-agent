@@ -154,4 +154,38 @@ describe('ProvidersController', () => {
       expect(service.deleteKycDocument).toHaveBeenCalledWith('user-1', 'doc-1');
     });
   });
+
+  describe('getNearbyProviders', () => {
+    it('should call service with parsed query params', async () => {
+      const mockProviders = [{ id: 'p1', name: 'Dr. Smith', distance: 2.5 }];
+      (service.getNearbyProviders as jest.Mock).mockResolvedValue(
+        mockProviders,
+      );
+
+      const query = {
+        lat: 12.9716,
+        lng: 77.5946,
+        serviceCategory: 'doctor',
+        mode: undefined,
+      };
+      const result = await controller.getNearbyProviders(query as any);
+
+      expect(result).toEqual(mockProviders);
+      expect(service.getNearbyProviders).toHaveBeenCalledWith(
+        12.9716,
+        77.5946,
+        'doctor',
+        undefined,
+      );
+    });
+
+    it('should return empty array when no providers found', async () => {
+      (service.getNearbyProviders as jest.Mock).mockResolvedValue([]);
+
+      const query = { lat: 12.9716, lng: 77.5946 };
+      const result = await controller.getNearbyProviders(query as any);
+
+      expect(result).toEqual([]);
+    });
+  });
 });

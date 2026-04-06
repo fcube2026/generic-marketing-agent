@@ -12,6 +12,7 @@ describe('ProvidersService', () => {
     },
     providerProfile: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -496,6 +497,182 @@ describe('ProvidersService', () => {
       await expect(
         service.deleteKycDocument('unknown', 'doc-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getNearbyProviders', () => {
+    const patientLat = 12.9716;
+    const patientLng = 77.5946;
+
+    const makeProvider = (overrides: Record<string, any> = {}) => ({
+      id: 'provider-1',
+      userId: 'user-1',
+      name: 'Dr. Smith',
+      specialization: 'General Physician',
+      isAvailable: true,
+      isActive: true,
+      isVerified: true,
+      homeVisitEnabled: true,
+      doctorPlaceVisitEnabled: false,
+      consultationFeeHomeVisit: 500,
+      consultationFeeDoctorPlace: 0,
+      serviceRadius: 10,
+      currentLat: 12.9726,
+      currentLng: 77.5956,
+      providerServices: [
+        {
+          serviceCategory: { id: 'cat-1', name: 'Doctor', slug: 'doctor' },
+        },
+      ],
+      user: { id: 'user-1', phone: '+919876543210' },
+      ...overrides,
+    });
+
+    it('should return providers within radius sorted by distance', async () => {
+      const nearProvider = makeProvider({
+        id: 'near',
+        currentLat: 12.972,
+        currentLng: 77.595,
+      });
+      const farProvider = makeProvider({
+        id: 'far',
+        currentLat: 12.975,
+        currentLng: 77.598,
+        serviceRadius: 10,
+      });
+
+      mockPrisma.providerProfile.findMany.mockResolvedValue([
+        farProvider,
+        nearProvider,
+      ]);
+
+      const result = await service.getNearbyProviders(patientLat, patientLng);
+
+      expect(result.length).toBe(2);
+      expect(result[0].id).toBe('near');
+      expect(result[1].id).toBe('far');
+      expect(result[0].distance).toBeLessThan(result[1].distance);
+    });
+
+    it('should filter out providers outside their service radius', async () => {
+      const nearProvider = makeProvider({
+        id: 'near',
+        currentLat: 12.972,
+        currentLng: 77.595,
+        serviceRadius: 10,
+      });
+      const tooFarProvider = makeProvider({
+        id: 'toofar',
+        currentLat: 13.1,
+        currentLng: 77.7,
+        serviceRadius: 1,
+      });
+
+      mockPrisma.providerProfile.findMany.mockResolvedValue([
+        nearProvider,
+        tooFarProvider,
+      ]);
+
+      const result = await service.getNearbyProviders(patientLat, patientLng);
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('near');
+    });
+
+    it('should pass serviceCategory filter to query', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(patientLat, patientLng, 'doctor');
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            providerServices: {
+              some: {
+                serviceCategory: { slug: 'doctor' },
+              },
+            },
+          }),
+        }),
+      );
+    });
+
+    it('should pass HOME_VISIT mode filter to query', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(
+        patientLat,
+        patientLng,
+        undefined,
+        'HOME_VISIT',
+      );
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            homeVisitEnabled: true,
+          }),
+        }),
+      );
+    });
+
+    it('should pass DOCTOR_PLACE mode filter to query', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(
+        patientLat,
+        patientLng,
+        undefined,
+        'DOCTOR_PLACE',
+      );
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            doctorPlaceVisitEnabled: true,
+          }),
+        }),
+      );
+    });
+
+    it('should return empty array when no providers found', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      const result = await service.getNearbyProviders(patientLat, patientLng);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should include distance in returned results', async () => {
+      const provider = makeProvider();
+      mockPrisma.providerProfile.findMany.mockResolvedValue([provider]);
+
+      const result = await service.getNearbyProviders(patientLat, patientLng);
+
+      expect(result.length).toBe(1);
+      expect(result[0]).toHaveProperty('distance');
+      expect(typeof result[0].distance).toBe('number');
+      expect(result[0].distance).toBeGreaterThan(0);
+    });
+
+    it('should filter providers with null coordinates', async () => {
+      const validProvider = makeProvider({ id: 'valid' });
+      const nullLatProvider = makeProvider({
+        id: 'null-lat',
+        currentLat: null,
+        currentLng: 77.595,
+      });
+
+      mockPrisma.providerProfile.findMany.mockResolvedValue([
+        validProvider,
+        nullLatProvider,
+      ]);
+
+      const result = await service.getNearbyProviders(patientLat, patientLng);
+
+      const ids = result.map((p: any) => p.id);
+      expect(ids).toContain('valid');
+      expect(ids).not.toContain('null-lat');
     });
   });
 });

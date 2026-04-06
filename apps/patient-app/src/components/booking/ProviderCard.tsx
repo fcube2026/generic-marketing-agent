@@ -20,6 +20,11 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }
         <View style={styles.info}>
           <Text style={styles.name}>{provider.name}</Text>
           <Text style={styles.specialization}>{provider.specialization}</Text>
+          {provider.providerServices && provider.providerServices.length > 0 && (
+            <Text style={styles.serviceType}>
+              {provider.providerServices.map((ps) => ps.serviceCategory.name).join(', ')}
+            </Text>
+          )}
           <View style={styles.badges}>
             {provider.homeVisitEnabled && (
               <View style={[styles.badge, styles.badgePrimary]}>
@@ -69,7 +74,8 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 20, fontWeight: '700', color: Colors.primary },
   info: { flex: 1 },
   name: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
-  specialization: { fontSize: 13, color: Colors.textMuted, marginBottom: 6 },
+  specialization: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
+  serviceType: { fontSize: 12, color: Colors.primary, marginBottom: 6, fontWeight: '500' },
   badges: { flexDirection: 'row', gap: 6 },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   badgePrimary: { backgroundColor: Colors.primaryLight },
