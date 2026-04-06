@@ -22,6 +22,10 @@ interface DiagnosticRequest {
 export default function DiagnosticsPage() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadModal, setUploadModal] = useState<string | null>(null);
+  const [resultFileUrl, setResultFileUrl] = useState('');
+  const [resultNotes, setResultNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const fetchDiagnostics = () => {
     setLoading(true);
@@ -42,6 +46,25 @@ export default function DiagnosticsPage() {
       fetchDiagnostics();
     } catch {
       alert('Failed to update status');
+    }
+  };
+
+  const handleUploadResult = async () => {
+    if (!uploadModal) return;
+    setUploading(true);
+    try {
+      await api.post(`/diagnostics/${uploadModal}/result`, {
+        resultFileUrl: resultFileUrl || undefined,
+        notes: resultNotes || undefined,
+      });
+      setUploadModal(null);
+      setResultFileUrl('');
+      setResultNotes('');
+      fetchDiagnostics();
+    } catch {
+      alert('Failed to upload result');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -107,7 +130,7 @@ export default function DiagnosticsPage() {
                       )}
                       {d.status === 'COLLECTED' && (
                         <button
-                          onClick={() => updateStatus(d.id, 'RESULTED')}
+                          onClick={() => setUploadModal(d.id)}
                           className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100 transition"
                         >
                           Upload Result
@@ -119,6 +142,56 @@ export default function DiagnosticsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Upload Result Modal */}
+      {uploadModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Upload Lab Result</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Result File URL</label>
+                <input
+                  type="text"
+                  value={resultFileUrl}
+                  onChange={(e) => setResultFileUrl(e.target.value)}
+                  placeholder="https://storage.example.com/results/..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={resultNotes}
+                  onChange={(e) => setResultNotes(e.target.value)}
+                  placeholder="Add any notes about the result..."
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6 justify-end">
+              <button
+                onClick={() => {
+                  setUploadModal(null);
+                  setResultFileUrl('');
+                  setResultNotes('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUploadResult}
+                disabled={uploading}
+                className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+              >
+                {uploading ? 'Uploading...' : 'Upload Result'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

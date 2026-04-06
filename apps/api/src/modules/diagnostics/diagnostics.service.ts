@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   CreateDiagnosticRequestDto,
@@ -10,11 +14,18 @@ import {
 export class DiagnosticsService {
   constructor(private prisma: PrismaService) {}
 
-  async createRequest(dto: CreateDiagnosticRequestDto) {
+  async createRequest(dto: CreateDiagnosticRequestDto, userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: dto.bookingId },
+      include: { provider: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.provider.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can request diagnostics',
+      );
+    }
 
     return this.prisma.diagnosticRequest.create({
       data: {
@@ -45,6 +56,11 @@ export class DiagnosticsService {
   async uploadResult(id: string, dto: UploadLabResultDto) {
     const request = await this.prisma.diagnosticRequest.findUnique({
       where: { id },
+      include: {
+        booking: {
+          include: { patient: true },
+        },
+      },
     });
     if (!request) throw new NotFoundException('Diagnostic request not found');
 
@@ -61,6 +77,63 @@ export class DiagnosticsService {
       data: { status: 'RESULTED' },
     });
 
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: request.booking.patient.userId,
+          title: 'Lab Result Ready',
+          message: `Your lab result for "${request.testType}" is now available. Please check your diagnostics section.`,
+          type: 'LAB_RESULT_READY',
+          metadata: {
+            diagnosticRequestId: id,
+            testType: request.testType,
+            bookingId: request.bookingId,
+          },
+        },
+      });
+    } catch {
+      // Notification failure should not block the result upload
+    }
+
     return result;
+  }
+
+  async getPatientDiagnostics(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!patientProfile) {
+      return { data: [], total: 0, page, limit };
+    }
+
+    const where = {
+      booking: { patientId: patientProfile.id },
+    };
+
+    const [diagnostics, total] = await Promise.all([
+      this.prisma.diagnosticRequest.findMany({
+        where,
+        include: {
+          labResults: true,
+          booking: {
+            include: {
+              provider: true,
+              serviceCategory: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.diagnosticRequest.count({ where }),
+    ]);
+
+    return { data: diagnostics, total, page, limit };
   }
 }
