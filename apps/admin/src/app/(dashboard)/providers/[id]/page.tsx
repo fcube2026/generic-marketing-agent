@@ -203,8 +203,12 @@ export default function ProviderDetailPage() {
                 {status === 'verified' && <Badge variant="success">Verified</Badge>}
                 {status === 'pending' && <Badge variant="warning">Pending Review</Badge>}
                 {status === 'rejected' && <Badge variant="error">Rejected</Badge>}
-                {status === 'inactive' && <Badge variant="default">Inactive</Badge>}
-                {provider.isActive ? <Badge variant="success">Active</Badge> : status !== 'rejected' && <Badge variant="error">Inactive</Badge>}
+                {status === 'inactive' && (
+                  <>
+                    <Badge variant="success">Verified</Badge>
+                    <Badge variant="error">Deactivated</Badge>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex justify-between">

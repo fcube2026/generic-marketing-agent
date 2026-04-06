@@ -414,7 +414,7 @@ model Notification {
   message   String
   type      String
   isRead    Boolean  @default(false)
-  metadata  Json?
+  metadata  Json? // Contextual data e.g. { providerId, reason } for provider actions
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
