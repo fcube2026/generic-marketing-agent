@@ -96,6 +96,7 @@ Next.js web dashboard for platform operations: provider verification, booking mo
 - [API Reference](docs/API.md)
 - [Data Model](docs/DATA_MODEL.md)
 - [Setup Guide](docs/SETUP.md)
+- [Health Data Privacy & Compliance](docs/PRIVACY.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
 ## 🧪 Testing
