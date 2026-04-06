@@ -66,6 +66,11 @@ export class AdminController {
     );
   }
 
+  @Get('bookings/:id')
+  getBookingById(@Param('id') bookingId: string) {
+    return this.adminService.getBookingById(bookingId);
+  }
+
   @Get('diagnostics')
   getDiagnosticsOverview() {
     return this.adminService.getDiagnosticsOverview();

@@ -23,6 +23,7 @@ export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { variant: BadgeProps['variant']; label: string }> = {
     REQUESTED: { variant: 'warning', label: 'Requested' },
     ACCEPTED: { variant: 'info', label: 'Accepted' },
+    DECLINED: { variant: 'error', label: 'Declined' },
     ON_THE_WAY: { variant: 'info', label: 'On the Way' },
     ARRIVED: { variant: 'info', label: 'Arrived' },
     IN_PROGRESS: { variant: 'info', label: 'In Progress' },

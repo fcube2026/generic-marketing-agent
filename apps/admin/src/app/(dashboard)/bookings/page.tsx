@@ -52,7 +52,7 @@ export default function BookingsPage() {
   }, [page, statusFilter]);
 
   const statuses = [
-    '', 'REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS',
+    '', 'REQUESTED', 'ACCEPTED', 'DECLINED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS',
     'COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED', 'CANCELLED',
   ];
 

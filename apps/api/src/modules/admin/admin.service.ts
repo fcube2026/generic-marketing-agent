@@ -164,6 +164,25 @@ export class AdminService {
     return updated;
   }
 
+  async getBookingById(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        patient: true,
+        provider: { include: { user: true } },
+        serviceCategory: true,
+        address: true,
+        statusHistory: { orderBy: { changedAt: 'asc' } },
+        consultationSummary: { include: { prescriptions: true } },
+        diagnosticRequests: { include: { labResults: true } },
+        referrals: true,
+        payment: true,
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    return booking;
+  }
+
   async getAllBookings(page = 1, limit = 20, status?: string) {
     const skip = (page - 1) * limit;
     const where = status ? { status: status as any } : {};
