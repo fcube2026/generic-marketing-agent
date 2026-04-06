@@ -13,6 +13,8 @@ import { BookingMode, RecommendationResponse } from '../../types';
 import { Card } from '../../components/common/Card';
 import { useBookingStore } from '../../store/bookingStore';
 
+const formatScore = (score: number): number => Math.round(score * 100);
+
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'Recommendation'>;
   route: RouteProp<PatientStackParamList, 'Recommendation'>;
@@ -86,8 +88,6 @@ export const RecommendationScreen: React.FC<Props> = ({ navigation, route }) => 
       fee: option.fee,
     });
   };
-
-  const formatScore = (score: number): number => Math.round(score * 100);
 
   const renderOption = (
     type: 'homeVisit' | 'doctorPlace',
@@ -255,7 +255,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     zIndex: 1,
   },
-  selectedBadge: { backgroundColor: Colors.success },
+  selectedBadge: {
+    backgroundColor: Colors.success,
+  },
   unavailableBadge: {
     position: 'absolute',
     top: 0,
