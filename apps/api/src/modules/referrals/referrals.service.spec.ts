@@ -128,9 +128,13 @@ describe('ReferralsService', () => {
       (prisma.referral.findUnique as jest.Mock).mockResolvedValue(mockReferral);
       (prisma.referral.update as jest.Mock).mockResolvedValue(updatedReferral);
 
-      const result = await service.updateStatus('referral-1', {
-        status: 'BOOKED',
-      });
+      const result = await service.updateStatus(
+        'referral-1',
+        {
+          status: 'BOOKED',
+        },
+        'user-1',
+      );
 
       expect(result).toEqual(updatedReferral);
       expect(prisma.referral.update).toHaveBeenCalledWith({
@@ -143,7 +147,7 @@ describe('ReferralsService', () => {
       (prisma.referral.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.updateStatus('nonexistent', { status: 'BOOKED' }),
+        service.updateStatus('nonexistent', { status: 'BOOKED' }, 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
   });

@@ -54,7 +54,7 @@ describe('PaymentsService', () => {
       mockPrisma.payment.findUnique.mockResolvedValue(null);
       mockPrisma.payment.create.mockResolvedValue(mockPayment);
 
-      const result = await service.initiatePayment(dto);
+      const result = await service.initiatePayment(dto, 'user-1');
 
       expect(result).toEqual(mockPayment);
       expect(result.status).toBe('PENDING');
@@ -83,7 +83,7 @@ describe('PaymentsService', () => {
       mockPrisma.booking.findUnique.mockResolvedValue(mockBooking);
       mockPrisma.payment.findUnique.mockResolvedValue(existingPayment);
 
-      const result = await service.initiatePayment(dto);
+      const result = await service.initiatePayment(dto, 'user-1');
 
       expect(result).toEqual(existingPayment);
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe('PaymentsService', () => {
     it('should throw NotFoundException if booking does not exist', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue(null);
 
-      await expect(service.initiatePayment(dto)).rejects.toThrow(
+      await expect(service.initiatePayment(dto, 'user-1')).rejects.toThrow(
         NotFoundException,
       );
       expect(mockPrisma.payment.create).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe('PaymentsService', () => {
 
       mockPrisma.payment.findUnique.mockResolvedValue(mockPayment);
 
-      const result = await service.getPaymentStatus('booking-1');
+      const result = await service.getPaymentStatus('booking-1', 'user-1');
 
       expect(result).toEqual(mockPayment);
       expect(mockPrisma.payment.findUnique).toHaveBeenCalledWith({
@@ -121,9 +121,9 @@ describe('PaymentsService', () => {
     it('should throw NotFoundException if payment not found', async () => {
       mockPrisma.payment.findUnique.mockResolvedValue(null);
 
-      await expect(service.getPaymentStatus('unknown')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getPaymentStatus('unknown', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -155,10 +155,14 @@ describe('PaymentsService', () => {
       mockPrisma.booking.findUnique.mockResolvedValue(mockBooking);
       mockPrisma.payout.upsert.mockResolvedValue({});
 
-      const result = await service.updatePaymentStatus(paymentId, {
-        status: 'PAID',
-        transactionId: 'TXN_456',
-      });
+      const result = await service.updatePaymentStatus(
+        paymentId,
+        {
+          status: 'PAID',
+          transactionId: 'TXN_456',
+        },
+        'user-1',
+      );
 
       expect(result.status).toBe('PAID');
       // Verify booking paymentStatus updated to PAID
@@ -192,9 +196,13 @@ describe('PaymentsService', () => {
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
       mockPrisma.booking.update.mockResolvedValue({});
 
-      const result = await service.updatePaymentStatus(paymentId, {
-        status: 'REFUNDED',
-      });
+      const result = await service.updatePaymentStatus(
+        paymentId,
+        {
+          status: 'REFUNDED',
+        },
+        'user-1',
+      );
 
       expect(result.status).toBe('REFUNDED');
       expect(mockPrisma.booking.update).toHaveBeenCalledWith({
@@ -217,9 +225,13 @@ describe('PaymentsService', () => {
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
       mockPrisma.booking.update.mockResolvedValue({});
 
-      const result = await service.updatePaymentStatus(paymentId, {
-        status: 'FAILED',
-      });
+      const result = await service.updatePaymentStatus(
+        paymentId,
+        {
+          status: 'FAILED',
+        },
+        'user-1',
+      );
 
       expect(result.status).toBe('FAILED');
       expect(mockPrisma.booking.update).toHaveBeenCalledWith({
@@ -233,7 +245,7 @@ describe('PaymentsService', () => {
       mockPrisma.payment.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updatePaymentStatus('unknown', { status: 'PAID' }),
+        service.updatePaymentStatus('unknown', { status: 'PAID' }, 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
   });

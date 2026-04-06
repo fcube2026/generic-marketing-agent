@@ -143,9 +143,13 @@ describe('DiagnosticsService', () => {
         updatedRequest,
       );
 
-      const result = await service.updateStatus('diag-1', {
-        status: 'SCHEDULED',
-      });
+      const result = await service.updateStatus(
+        'diag-1',
+        {
+          status: 'SCHEDULED',
+        },
+        'user-1',
+      );
 
       expect(result).toEqual(updatedRequest);
       expect(prisma.diagnosticRequest.update).toHaveBeenCalledWith({
@@ -160,7 +164,7 @@ describe('DiagnosticsService', () => {
       );
 
       await expect(
-        service.updateStatus('nonexistent', { status: 'SCHEDULED' }),
+        service.updateStatus('nonexistent', { status: 'SCHEDULED' }, 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -173,10 +177,14 @@ describe('DiagnosticsService', () => {
         status: 'SCHEDULED',
       });
 
-      await service.updateStatus('diag-1', {
-        status: 'SCHEDULED',
-        scheduledAt: '2026-05-01T10:00:00Z',
-      });
+      await service.updateStatus(
+        'diag-1',
+        {
+          status: 'SCHEDULED',
+          scheduledAt: '2026-05-01T10:00:00Z',
+        },
+        'user-1',
+      );
 
       expect(prisma.diagnosticRequest.update).toHaveBeenCalledWith({
         where: { id: 'diag-1' },
@@ -208,10 +216,14 @@ describe('DiagnosticsService', () => {
       });
       (prisma.notification.create as jest.Mock).mockResolvedValue({});
 
-      const result = await service.uploadResult('diag-1', {
-        resultFileUrl: 'https://storage.example.com/result.pdf',
-        notes: 'Normal values',
-      });
+      const result = await service.uploadResult(
+        'diag-1',
+        {
+          resultFileUrl: 'https://storage.example.com/result.pdf',
+          notes: 'Normal values',
+        },
+        'user-1',
+      );
 
       expect(result).toEqual(mockLabResult);
       expect(prisma.labResult.create).toHaveBeenCalledWith({
@@ -247,9 +259,13 @@ describe('DiagnosticsService', () => {
       );
 
       await expect(
-        service.uploadResult('nonexistent', {
-          resultFileUrl: 'https://example.com/result.pdf',
-        }),
+        service.uploadResult(
+          'nonexistent',
+          {
+            resultFileUrl: 'https://example.com/result.pdf',
+          },
+          'user-1',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

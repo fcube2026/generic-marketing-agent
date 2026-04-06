@@ -64,16 +64,21 @@ describe('ReferralsController', () => {
   });
 
   describe('updateStatus', () => {
-    it('should call service.updateStatus with id and dto', async () => {
+    it('should call service.updateStatus with id, dto, and user id', async () => {
       const dto = { status: 'BOOKED' };
+      const user = { id: 'user-1' };
 
-      const result = await controller.updateStatus('referral-1', dto);
+      const result = await controller.updateStatus('referral-1', dto, user);
 
       expect(result).toEqual({
         ...mockReferral,
         status: 'BOOKED',
       });
-      expect(service.updateStatus).toHaveBeenCalledWith('referral-1', dto);
+      expect(service.updateStatus).toHaveBeenCalledWith(
+        'referral-1',
+        dto,
+        'user-1',
+      );
     });
   });
 
