@@ -110,12 +110,13 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   const clinicAddress = booking.provider?.clinicAddress;
   const providerContact = booking.provider?.contactInfo;
 
-  // Compute ETA for clinic visit (distance × 2 min/km, same multiplier as recommendation engine)
-  const ETA_MULTIPLIER_DOCTOR_PLACE = 2;
+  // Compute ETA for clinic visit: haversineDistance returns km, multiplied by
+  // minutes-per-km (2 min/km, matching the recommendation engine ETA_MULTIPLIERS.doctorPlace).
+  const CLINIC_ETA_MINUTES_PER_KM = 2;
   let clinicEta: number | null = null;
   if (isDoctorPlace && hasClinicCoords && addressLat != null && addressLng != null) {
-    const dist = haversineDistance(addressLat, addressLng, clinicLat!, clinicLng!);
-    clinicEta = Math.max(1, Math.round(dist * ETA_MULTIPLIER_DOCTOR_PLACE));
+    const distKm = haversineDistance(addressLat, addressLng, clinicLat!, clinicLng!);
+    clinicEta = Math.max(1, Math.round(distKm * CLINIC_ETA_MINUTES_PER_KM));
   }
 
   return (
