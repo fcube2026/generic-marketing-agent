@@ -36,7 +36,9 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: any) {
       const message =
-        err?.response?.data?.message || 'Login failed. Please try again.';
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'Login failed. Please try again.';
       setError(message);
     } finally {
       setLoading(false);
