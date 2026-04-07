@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,6 +18,7 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 
 @Module({
+  controllers: [AppController],
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,

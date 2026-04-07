@@ -24,7 +24,9 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/'],
+  });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
