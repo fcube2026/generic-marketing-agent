@@ -1,5 +1,7 @@
 FROM node:18-alpine
 
+RUN apk add --no-cache openssl
+
 RUN corepack enable && corepack prepare pnpm@9.4.0 --activate
 
 WORKDIR /app
