@@ -24,9 +24,9 @@ COPY apps/api/ ./apps/api/
 RUN pnpm --filter @curex24/database db:generate
 RUN pnpm --filter @curex24/api build
 
-# Copy entrypoint script
+# Copy entrypoint script (strip Windows CRLF if present, then make executable)
 COPY apps/api/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 WORKDIR /app/apps/api
 
