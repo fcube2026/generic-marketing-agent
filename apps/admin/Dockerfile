@@ -1,5 +1,7 @@
 FROM node:18-alpine
 
+RUN corepack enable && corepack prepare pnpm@9.4.0 --activate
+
 WORKDIR /app
 
 # Copy only the admin package.json for an isolated install.
@@ -8,16 +10,16 @@ WORKDIR /app
 # React instance mismatch that breaks Next.js error page pre-rendering.
 COPY apps/admin/package.json ./package.json
 
-# Install dependencies in isolation so react and react-dom resolve to
-# the same compatible version (^18.3.1 → 18.3.1 for both).
-RUN npm install
+# Install dependencies in isolation (no workspace config) so react and
+# react-dom both resolve to the same compatible version (^18.3.1 → 18.3.1).
+RUN pnpm install
 
 # Copy source files (node_modules is excluded via root .dockerignore)
 COPY apps/admin/ .
 
 # Build the Next.js app
-RUN npm run build
+RUN pnpm build
 
 EXPOSE 3001
 
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
