@@ -49,6 +49,7 @@ coverage
 
 # TypeScript
 *.tsbuildinfo
+**/*.tsbuildinfo
 
 # Documentation (not needed in containers)
 docs
