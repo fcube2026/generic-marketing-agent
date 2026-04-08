@@ -108,15 +108,20 @@ Create `.env` in `apps/api/`:
 cp apps/api/.env.example apps/api/.env
 ```
 
-Default `.env` contents:
+Also create `.env` in `packages/database/` (required for Prisma CLI commands like `db:migrate`):
+
+```bash
+cp packages/database/.env.example packages/database/.env
+```
+
+Default `.env` contents (both files use the same local database values):
 
 ```env
 DATABASE_URL="postgresql://curex24:curex24password@localhost:5432/curex24?schema=public"
 DIRECT_URL="postgresql://curex24:curex24password@localhost:5432/curex24?schema=public"
-JWT_SECRET="curex24-jwt-secret-change-in-production"
-PORT=3000
-NODE_ENV=development
 ```
+
+> **Note:** `DIRECT_URL` is a non-pooled connection used by Prisma for migrations. For local development it is the same as `DATABASE_URL`. For cloud databases (e.g. Supabase) they may differ.
 
 ---
 
@@ -420,6 +425,7 @@ For emulators:
 | `pnpm install` fails | Delete `node_modules` and `pnpm-lock.yaml`, try again |
 | Database connection error | Ensure Docker is running: `docker-compose up -d` |
 | Prisma client not found | Run `pnpm db:generate` |
+| `DIRECT_URL` env var not found | Create `packages/database/.env` from `packages/database/.env.example` |
 | Expo app can't reach API | Check API URL constant matches your network IP |
 | Port already in use | Kill existing process or change port in config |
 | Admin login fails | Use `admin@curex24.com` / `admin123` |
