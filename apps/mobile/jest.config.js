@@ -6,6 +6,12 @@ module.exports = {
     'node_modules/(?!(.pnpm/.+/node_modules/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|native-base|react-native-svg))',
   ],
   moduleNameMapper: {
+    // Pin react and react-native to a single resolved instance so that
+    // @testing-library/react-native's detectHostComponentNames() and
+    // react-test-renderer share the same React dispatcher, preventing
+    // "Cannot read properties of null (reading 'useRef')" in tests.
+    '^react$': require.resolve('react'),
+    '^react-native$': require.resolve('react-native'),
     '^@/(.*)$': '<rootDir>/src/$1',
   },
 };
