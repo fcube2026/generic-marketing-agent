@@ -7,14 +7,16 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Toggle } from '../../components/common/Toggle';
 import { providerService } from '../../services/providerService';
+import { useAuthStore } from '../../store/authStore';
 
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    name: '', bio: '', specialization: '',
+    name: '', bio: '', specialization: '', contactInfo: '',
     homeVisitEnabled: false, consultationFeeHomeVisit: '',
     doctorPlaceVisitEnabled: false, consultationFeeDoctorPlace: '',
     serviceRadius: '10',
@@ -28,6 +30,7 @@ export const OnboardingScreen: React.FC = () => {
     try {
       await providerService.onboard({
         name: form.name, bio: form.bio, specialization: form.specialization,
+        contactInfo: form.contactInfo || user?.phone || '',
         homeVisitEnabled: form.homeVisitEnabled,
         consultationFeeHomeVisit: parseFloat(form.consultationFeeHomeVisit) || 0,
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
@@ -59,6 +62,7 @@ export const OnboardingScreen: React.FC = () => {
           <Input label="Full Name *" value={form.name} onChangeText={(t) => update('name', t)} placeholder="Dr. John Smith" />
           <Input label="Specialization *" value={form.specialization} onChangeText={(t) => update('specialization', t)} placeholder="General Physician" />
           <Input label="Bio" value={form.bio} onChangeText={(t) => update('bio', t)} placeholder="Brief description..." multiline numberOfLines={4} style={{ height: 100, textAlignVertical: 'top' } as any} />
+          <Input label="Contact Info *" value={form.contactInfo} onChangeText={(t) => update('contactInfo', t)} placeholder="Phone or email" />
           <Button title="Next →" onPress={() => setStep(2)} disabled={!form.name || !form.specialization} />
         </View>
       )}

@@ -3,9 +3,10 @@
     "name": "Curex24",
     "slug": "curex24",
     "version": "1.0.0",
+    "sdkVersion": "51.0.0",
+    "runtimeVersion": "51.0.0",
     "updates": {
       "enabled": false
-      
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,11 +28,6 @@
 },
     "web": {
       "favicon": "./assets/icon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "53af45f5-a0d1-4f7f-b5a7-41fe80702aea"
-      }
     }
   }
 }

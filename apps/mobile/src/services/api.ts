@@ -22,7 +22,13 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('auth_token');
+      // Only clear token if the auth endpoint itself rejected us,
+      // not for regular API calls that might fail for other reasons
+      const url = error.config?.url || '';
+      const isAuthEndpoint = url.includes('/auth/');
+      if (isAuthEndpoint) {
+        await AsyncStorage.removeItem('auth_token');
+      }
     }
     return Promise.reject(error);
   }

@@ -8,6 +8,7 @@ import { AvailabilityScreen } from '../screens/provider/AvailabilityScreen';
 import { IncomingBookingScreen } from '../screens/provider/IncomingBookingScreen';
 import { BookingDetailScreen } from '../screens/provider/BookingDetailScreen';
 import { ConsultationFormScreen } from '../screens/provider/ConsultationFormScreen';
+import { KycScreen } from '../screens/provider/KycScreen';
 import { HistoryScreen } from '../screens/provider/HistoryScreen';
 import { EarningsScreen } from '../screens/provider/EarningsScreen';
 import { ProfileScreen } from '../screens/provider/ProfileScreen';
@@ -20,6 +21,7 @@ export type ProviderStackParamList = {
   IncomingBooking: undefined;
   BookingDetail: { bookingId: string };
   ConsultationForm: { bookingId: string };
+  Kyc: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProviderStackParamList>();
@@ -53,5 +55,6 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="IncomingBooking" component={IncomingBookingScreen} options={{ title: 'New Booking' }} />
     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} options={{ title: 'Booking Details' }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
   </Stack.Navigator>
 );

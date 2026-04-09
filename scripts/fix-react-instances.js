@@ -55,8 +55,12 @@ for (const dup of duplicates) {
   }
 
   // Replace with a relative symlink.
-  const rel = path.relative(path.dirname(dup), canonical);
-  fs.rmSync(dup, { recursive: true, force: true });
-  fs.symlinkSync(rel, dup, 'dir');
-  console.log('[fix-react-instances] symlinked', dup, '->', rel);
+  try {
+    const rel = path.relative(path.dirname(dup), canonical);
+    fs.rmSync(dup, { recursive: true, force: true });
+    fs.symlinkSync(rel, dup, 'dir');
+    console.log('[fix-react-instances] symlinked', dup, '->', rel);
+  } catch (err) {
+    console.warn('[fix-react-instances] could not create symlink (permissions/OneDrive issue):', dup, err.message);
+  }
 }

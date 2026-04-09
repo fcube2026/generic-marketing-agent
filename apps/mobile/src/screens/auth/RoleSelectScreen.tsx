@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
@@ -22,6 +23,7 @@ export const RoleSelectScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.logo}>⚕️</Text>
         <Text style={styles.title}>Curex24</Text>
@@ -68,6 +70,7 @@ export const RoleSelectScreen: React.FC<Props> = ({ navigation }) => {
       <Text style={styles.footer}>
         Your role cannot be changed after registration.
       </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -76,7 +79,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
+    paddingBottom: 32,
   },
   header: {
     alignItems: 'center',
