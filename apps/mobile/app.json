@@ -1,5 +1,6 @@
 {
   "expo": {
+    "plugins": ["./plugins/withStaticEntryFile"],
     "name": "Curex24",
     "slug": "curex24",
     "version": "1.0.0",
