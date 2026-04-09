@@ -25,7 +25,7 @@
   "package": "com.curex24.mobile"
 },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     },
     "extra": {
       "eas": {
