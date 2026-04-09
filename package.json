@@ -36,7 +36,6 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
-    "expo-dev-client": "~4.0.29",
     "react-native-web": "~0.19.10"
   }
 }
