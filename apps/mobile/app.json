@@ -17,11 +17,13 @@
       "bundleIdentifier": "com.curex24.mobile"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#0D9488"
-      },
-      "package": "com.curex24.mobile"
-    },
+  "icon": "./assets/icon.png",
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/icon.png",
+    "backgroundColor": "#0D9488"
+  },
+  "package": "com.curex24.mobile"
+},
     "web": {
       "favicon": "./assets/favicon.png"
     },
