@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/ui/Badge';
 import api from '@/lib/api';
@@ -31,7 +31,7 @@ export default function BookingsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
 
-  const fetchBookings = () => {
+  const fetchBookings = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter) params.set('status', statusFilter);
@@ -45,11 +45,11 @@ export default function BookingsPage() {
       })
       .catch(() => setBookings([]))
       .finally(() => setLoading(false));
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     fetchBookings();
-  }, [page, statusFilter]);
+  }, [fetchBookings]);
 
   const statuses = [
     '', 'REQUESTED', 'ACCEPTED', 'DECLINED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS',

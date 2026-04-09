@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
@@ -41,18 +41,18 @@ export default function ProviderDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
-  const fetchProvider = () => {
+  const fetchProvider = useCallback(() => {
     setLoading(true);
     api
       .get(`/admin/providers/${params.id}`)
       .then((res) => setProvider(res.data))
       .catch(() => setProvider(null))
       .finally(() => setLoading(false));
-  };
+  }, [params.id]);
 
   useEffect(() => {
     fetchProvider();
-  }, [params.id]);
+  }, [fetchProvider]);
 
   const handleVerify = async () => {
     try {

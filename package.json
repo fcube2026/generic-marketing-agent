@@ -14,7 +14,8 @@
     "typecheck": "turbo lint",
     "format:check": "turbo format:check",
     "ci": "turbo lint build test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "node scripts/fix-react-instances.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

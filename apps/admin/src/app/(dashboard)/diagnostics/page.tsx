@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StatusBadge } from '@/components/ui/Badge';
 import api from '@/lib/api';
 
@@ -48,7 +48,7 @@ export default function DiagnosticsPage() {
   const [uploading, setUploading] = useState(false);
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
 
-  const fetchDiagnostics = () => {
+  const fetchDiagnostics = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter) params.set('status', statusFilter);
@@ -62,11 +62,11 @@ export default function DiagnosticsPage() {
       })
       .catch(() => setDiagnostics([]))
       .finally(() => setLoading(false));
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     fetchDiagnostics();
-  }, [page, statusFilter]);
+  }, [fetchDiagnostics]);
 
   const updateStatus = async (id: string, status: string) => {
     try {

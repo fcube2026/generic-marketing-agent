@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StatusBadge } from '@/components/ui/Badge';
 import { StatCard } from '@/components/ui/Card';
 import api from '@/lib/api';
@@ -47,7 +47,7 @@ export default function PayoutsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [processing, setProcessing] = useState<string | null>(null);
 
-  const fetchPayouts = () => {
+  const fetchPayouts = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter) params.set('status', statusFilter);
@@ -67,11 +67,11 @@ export default function PayoutsPage() {
         setSummary(null);
       })
       .finally(() => setLoading(false));
-  };
+  }, [page, statusFilter]);
 
   useEffect(() => {
     fetchPayouts();
-  }, [page, statusFilter]);
+  }, [fetchPayouts]);
 
   const handleProcess = (payoutId: string) => {
     setProcessing(payoutId);
