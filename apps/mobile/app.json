@@ -7,7 +7,7 @@
       "enabled": false
     },
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "/assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#0D9488"
@@ -23,7 +23,12 @@
       "package": "com.curex24.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "/assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "53af45f5-a0d1-4f7f-b5a7-41fe80702aea"
+      }
     }
   }
 }
