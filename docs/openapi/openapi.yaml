@@ -81,7 +81,7 @@ paths:
                 phone:
                   type: string
                   pattern: '^\+?[1-9]\d{9,14}$'
-                  description: Phone number in E.164-like format
+                  description: Phone number in E.164-like format. The leading '+' is optional.
                   example: "+919876543210"
             example:
               phone: "+919876543210"
@@ -1904,8 +1904,8 @@ components:
           example: Priya Sharma
         dateOfBirth:
           type: string
-          format: date
-          example: "1990-05-15"
+          format: date-time
+          example: "1990-05-15T00:00:00.000Z"
         gender:
           type: string
           enum: [MALE, FEMALE, OTHER]
@@ -2650,8 +2650,8 @@ components:
           example: Priya Sharma
         dateOfBirth:
           type: string
-          format: date
-          example: "1990-05-15"
+          format: date-time
+          example: "1990-05-15T00:00:00.000Z"
         gender:
           type: string
           enum: [MALE, FEMALE, OTHER]
@@ -2666,7 +2666,7 @@ components:
           type: string
         dateOfBirth:
           type: string
-          format: date
+          format: date-time
         gender:
           type: string
           enum: [MALE, FEMALE, OTHER]

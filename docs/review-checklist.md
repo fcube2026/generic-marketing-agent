@@ -127,13 +127,10 @@
 
 ```bash
 # Install validation tool
-npm install -g @redocly/cli
-
-# Lint the spec
-redocly lint docs/openapi/openapi.yaml
+npx @redocly/cli lint docs/openapi/openapi.yaml
 
 # Preview locally
-redocly preview-docs docs/openapi/openapi.yaml
+npx @redocly/cli preview-docs docs/openapi/openapi.yaml
 # Opens browser at http://localhost:8080
 
 # Or use Swagger Editor online
