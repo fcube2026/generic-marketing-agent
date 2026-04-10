@@ -1,0 +1,3061 @@
+openapi: 3.0.3
+info:
+  title: Curex24 Healthcare Platform API
+  description: |
+    Curex24 is a healthcare platform connecting patients with medical providers
+    for home visits and clinic consultations. This API powers authentication,
+    booking, consultation management, diagnostics, referrals, payments, and
+    real-time provider tracking.
+
+    ## Authentication
+    Most endpoints require a JWT Bearer token obtained via the `/auth` endpoints.
+    Include the token in the `Authorization` header as `Bearer <token>`.
+    Endpoints marked **Public** do not require authentication.
+
+    ## Error Handling
+    All error responses follow a consistent shape (see the `ErrorResponse` schema).
+  version: 1.0.0
+  contact:
+    name: Curex24 Engineering
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: OTP-based login for patients/providers and credential-based admin login
+  - name: Admin
+    description: Administrative dashboard, provider verification, and platform management
+  - name: Patients
+    description: Patient profile, addresses, and booking history
+  - name: Providers
+    description: Provider onboarding, profile management, availability, and KYC
+  - name: Services
+    description: Service category catalogue
+  - name: Bookings
+    description: Booking lifecycle — create, accept, decline, cancel, and status transitions
+  - name: Consultation
+    description: Post-visit consultation summaries and prescriptions
+  - name: Diagnostics
+    description: Diagnostic test requests, scheduling, and lab results
+  - name: Referrals
+    description: Specialist referral management
+  - name: Payments
+    description: Payment creation and status management
+  - name: Payouts
+    description: Provider payout tracking and summaries
+  - name: Notifications
+    description: In-app notification management
+  - name: Tracking
+    description: Real-time provider location tracking during visits
+  - name: Recommendation
+    description: AI-powered provider recommendation engine
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ──────────────────────────────────────────────
+  # Authentication
+  # ──────────────────────────────────────────────
+  /auth/send-otp:
+    post:
+      tags: [Authentication]
+      summary: Send OTP to phone number
+      description: |
+        Sends a one-time password to the provided phone number for authentication.
+        In development environments the OTP may be returned in the response body.
+      operationId: sendOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+?[1-9]\d{9,14}$'
+                  description: Phone number in E.164-like format. The leading '+' is optional.
+                  example: "+919876543210"
+            example:
+              phone: "+919876543210"
+      responses:
+        "201":
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OTP sent successfully
+                  otp:
+                    type: string
+                    description: Present only in development environments
+                    example: "123456"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/verify-otp:
+    post:
+      tags: [Authentication]
+      summary: Verify OTP and obtain JWT
+      description: |
+        Verifies the OTP sent to the phone number and returns a JWT token.
+        If the user does not exist, a new account is created with the specified role.
+      operationId: verifyOtp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone:
+                  type: string
+                  example: "+919876543210"
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: "123456"
+                role:
+                  $ref: "#/components/schemas/PatientProviderRole"
+            example:
+              phone: "+919876543210"
+              otp: "123456"
+              role: PATIENT
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/admin-login:
+    post:
+      tags: [Authentication]
+      summary: Admin credential login
+      description: Authenticates an administrator with email and password.
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@curex24.com
+                password:
+                  type: string
+                  format: password
+                  example: "s3cur3Pa$$"
+            example:
+              email: admin@curex24.com
+              password: "s3cur3Pa$$"
+      responses:
+        "200":
+          description: Admin authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Admin
+  # ──────────────────────────────────────────────
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Get dashboard overview
+      description: Returns aggregate statistics for the admin dashboard. Requires ADMIN role.
+      operationId: getDashboard
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/dashboard/charts:
+    get:
+      tags: [Admin]
+      summary: Get dashboard chart data
+      description: Returns time-series data for bookings and earnings charts. Requires ADMIN role.
+      operationId: getDashboardCharts
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookingsPerDay:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    example:
+                      "2024-01-15": 12
+                      "2024-01-16": 8
+                  earningsPerDay:
+                    type: object
+                    additionalProperties:
+                      type: number
+                    example:
+                      "2024-01-15": 4500.00
+                      "2024-01-16": 3200.00
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/providers:
+    get:
+      tags: [Admin]
+      summary: List providers by verification status
+      description: Returns providers filtered by their verification status. Requires ADMIN role.
+      operationId: getAdminProviders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, rejected]
+          description: Filter providers by verification status
+      responses:
+        "200":
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/providers/pending:
+    get:
+      tags: [Admin]
+      summary: List providers pending verification
+      description: Shortcut to list providers awaiting admin verification. Requires ADMIN role.
+      operationId: getPendingProviders
+      responses:
+        "200":
+          description: Pending providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/providers/{id}:
+    get:
+      tags: [Admin]
+      summary: Get provider details
+      description: Returns full details of a specific provider. Requires ADMIN role.
+      operationId: getAdminProvider
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Provider details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/providers/{id}/verify:
+    put:
+      tags: [Admin]
+      summary: Verify a provider
+      description: Approves a provider's registration. Requires ADMIN role.
+      operationId: verifyProvider
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  description: Optional verification notes
+      responses:
+        "200":
+          description: Provider verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/providers/{id}/reject:
+    put:
+      tags: [Admin]
+      summary: Reject a provider
+      description: Rejects a provider's registration with an optional reason. Requires ADMIN role.
+      operationId: rejectProvider
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for rejection
+      responses:
+        "200":
+          description: Provider rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/providers/{id}/deactivate:
+    put:
+      tags: [Admin]
+      summary: Deactivate a provider
+      description: Deactivates an active provider account. Requires ADMIN role.
+      operationId: deactivateProvider
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  description: Reason for deactivation
+      responses:
+        "200":
+          description: Provider deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/bookings:
+    get:
+      tags: [Admin]
+      summary: List all bookings (paginated)
+      description: Returns a paginated list of all bookings with optional status filter. Requires ADMIN role.
+      operationId: getAdminBookings
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+          description: Filter bookings by status
+      responses:
+        "200":
+          description: Paginated list of bookings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/bookings/{id}:
+    get:
+      tags: [Admin]
+      summary: Get booking details
+      description: Returns full details of a specific booking. Requires ADMIN role.
+      operationId: getAdminBooking
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Full booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/diagnostics:
+    get:
+      tags: [Admin]
+      summary: List all diagnostics (paginated)
+      description: Returns a paginated list of all diagnostic requests. Requires ADMIN role.
+      operationId: getAdminDiagnostics
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated diagnostics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DiagnosticRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/referrals:
+    get:
+      tags: [Admin]
+      summary: List all referrals
+      description: Returns all referrals in the system. Requires ADMIN role.
+      operationId: getAdminReferrals
+      responses:
+        "200":
+          description: List of referrals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Referral"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/payouts:
+    get:
+      tags: [Admin]
+      summary: List all payouts (paginated)
+      description: Returns a paginated list of all provider payouts. Requires ADMIN role.
+      operationId: getAdminPayouts
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated payouts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Payout"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/payouts/summary:
+    get:
+      tags: [Admin]
+      summary: Get payouts summary
+      description: Returns aggregate payout statistics. Requires ADMIN role.
+      operationId: getAdminPayoutsSummary
+      responses:
+        "200":
+          description: Payout summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPayoutSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/payouts/{id}/process:
+    put:
+      tags: [Admin]
+      summary: Process a payout
+      description: Marks a pending payout as processed. Requires ADMIN role.
+      operationId: processPayout
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Payout processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payout"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Patients
+  # ──────────────────────────────────────────────
+  /patients/me:
+    get:
+      tags: [Patients]
+      summary: Get current patient profile
+      description: Returns the authenticated patient's profile including saved addresses.
+      operationId: getPatientProfile
+      responses:
+        "200":
+          description: Patient profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Patients]
+      summary: Update patient profile
+      description: Updates the authenticated patient's profile fields.
+      operationId: updatePatientProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatientProfileInput"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients/me/profile:
+    post:
+      tags: [Patients]
+      summary: Create patient profile
+      description: Creates a profile for the authenticated patient (first-time setup).
+      operationId: createPatientProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePatientProfileInput"
+      responses:
+        "201":
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients/me/addresses:
+    get:
+      tags: [Patients]
+      summary: List patient addresses
+      description: Returns all saved addresses for the authenticated patient.
+      operationId: getPatientAddresses
+      responses:
+        "200":
+          description: List of addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Address"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Patients]
+      summary: Add a new address
+      description: Adds a new address to the authenticated patient's address book.
+      operationId: createPatientAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAddressInput"
+      responses:
+        "201":
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /patients/me/addresses/{id}:
+    put:
+      tags: [Patients]
+      summary: Update an address
+      description: Updates an existing address for the authenticated patient.
+      operationId: updatePatientAddress
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAddressInput"
+      responses:
+        "200":
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Patients]
+      summary: Delete an address
+      description: Removes an address from the authenticated patient's address book.
+      operationId: deletePatientAddress
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Address deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /patients/me/bookings:
+    get:
+      tags: [Patients]
+      summary: List patient bookings
+      description: Returns all bookings for the authenticated patient.
+      operationId: getPatientBookings
+      responses:
+        "200":
+          description: Patient bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Providers
+  # ──────────────────────────────────────────────
+  /providers/onboard:
+    post:
+      tags: [Providers]
+      summary: Onboard a new provider
+      description: Creates a provider profile for the authenticated user. This is the first step after registration.
+      operationId: onboardProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardProviderInput"
+      responses:
+        "201":
+          description: Provider profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/me:
+    get:
+      tags: [Providers]
+      summary: Get current provider profile
+      description: Returns the authenticated provider's full profile including services, slots, and licenses.
+      operationId: getProviderProfile
+      responses:
+        "200":
+          description: Provider profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Providers]
+      summary: Update provider profile
+      description: Updates the authenticated provider's profile fields.
+      operationId: updateProviderProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderInput"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/me/availability:
+    put:
+      tags: [Providers]
+      summary: Update availability status
+      description: Toggles the provider's availability and optionally updates their current location.
+      operationId: updateProviderAvailability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isAvailable]
+              properties:
+                isAvailable:
+                  type: boolean
+                  description: Whether the provider is currently available
+                currentLat:
+                  type: number
+                  format: double
+                  description: Current latitude
+                  example: 12.9716
+                currentLng:
+                  type: number
+                  format: double
+                  description: Current longitude
+                  example: 77.5946
+            example:
+              isAvailable: true
+              currentLat: 12.9716
+              currentLng: 77.5946
+      responses:
+        "200":
+          description: Availability updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/me/bookings:
+    get:
+      tags: [Providers]
+      summary: List provider bookings
+      description: Returns all bookings assigned to the authenticated provider.
+      operationId: getProviderBookings
+      responses:
+        "200":
+          description: Provider bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/me/incoming-requests:
+    get:
+      tags: [Providers]
+      summary: List incoming booking requests
+      description: Returns bookings in REQUESTED status assigned to the authenticated provider.
+      operationId: getIncomingRequests
+      responses:
+        "200":
+          description: Incoming requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/nearby:
+    get:
+      tags: [Providers]
+      summary: Find nearby providers
+      description: |
+        Returns providers near the given coordinates, optionally filtered by service category and booking mode.
+        This is a **public** endpoint — no authentication required.
+      operationId: getNearbyProviders
+      security: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: Latitude of the search point
+          example: 12.9716
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: Longitude of the search point
+          example: 77.5946
+        - name: serviceCategory
+          in: query
+          schema:
+            type: string
+          description: Filter by service category slug or ID
+        - name: mode
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingMode"
+          description: Filter by booking mode
+      responses:
+        "200":
+          description: Nearby providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderProfile"
+
+  /providers/me/kyc:
+    post:
+      tags: [Providers]
+      summary: Upload KYC document
+      description: Submits a KYC/license document for verification.
+      operationId: createKycDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKycInput"
+      responses:
+        "201":
+          description: KYC document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLicense"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      tags: [Providers]
+      summary: List KYC documents
+      description: Returns all KYC documents for the authenticated provider.
+      operationId: getKycDocuments
+      responses:
+        "200":
+          description: KYC documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderLicense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /providers/me/kyc/{id}:
+    delete:
+      tags: [Providers]
+      summary: Delete KYC document
+      description: Removes a KYC document by ID.
+      operationId: deleteKycDocument
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: KYC document deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLicense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Services
+  # ──────────────────────────────────────────────
+  /services:
+    get:
+      tags: [Services]
+      summary: List all service categories
+      description: Returns the catalogue of available service categories. This is a **public** endpoint.
+      operationId: getServiceCategories
+      security: []
+      responses:
+        "200":
+          description: Service categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceCategory"
+
+  # ──────────────────────────────────────────────
+  # Bookings
+  # ──────────────────────────────────────────────
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Create a new booking
+      description: Creates a new booking request for a provider's service.
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingInput"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Get booking details
+      description: |
+        Returns full booking details including provider, patient, service, address,
+        status history, consultation summary, diagnostics, referrals, and payment.
+      operationId: getBooking
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Full booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /bookings/{id}/status:
+    put:
+      tags: [Bookings]
+      summary: Update booking status
+      description: |
+        Advances the booking through its lifecycle. Valid status transitions:
+        - `REQUESTED` → `ACCEPTED`, `DECLINED`, `CANCELLED`
+        - `ACCEPTED` → `ON_THE_WAY`, `CANCELLED`
+        - `ON_THE_WAY` → `ARRIVED`
+        - `ARRIVED` → `IN_PROGRESS`
+        - `IN_PROGRESS` → `COMPLETED`
+        - `COMPLETED` → `SUMMARY_SUBMITTED`
+        - `SUMMARY_SUBMITTED` → `CLOSED`
+      operationId: updateBookingStatus
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/BookingStatus"
+      responses:
+        "200":
+          description: Booking status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /bookings/{id}/accept:
+    post:
+      tags: [Bookings]
+      summary: Accept a booking
+      description: Provider accepts an incoming booking request. Transitions status from REQUESTED to ACCEPTED.
+      operationId: acceptBooking
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Booking accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /bookings/{id}/decline:
+    post:
+      tags: [Bookings]
+      summary: Decline a booking
+      description: Provider declines an incoming booking request with an optional reason.
+      operationId: declineBooking
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for declining
+      responses:
+        "200":
+          description: Booking declined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /bookings/{id}/cancel:
+    post:
+      tags: [Bookings]
+      summary: Cancel a booking
+      description: Cancels a booking. Available to both patients and providers when the booking is in a cancellable state.
+      operationId: cancelBooking
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Consultation
+  # ──────────────────────────────────────────────
+  /consultation/{bookingId}/summary:
+    post:
+      tags: [Consultation]
+      summary: Submit consultation summary
+      description: Provider submits a post-visit consultation summary including diagnosis and prescriptions.
+      operationId: createConsultationSummary
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConsultationSummaryInput"
+      responses:
+        "201":
+          description: Summary created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultationSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [Consultation]
+      summary: Get consultation summary
+      description: Returns the consultation summary for a booking, including prescriptions.
+      operationId: getConsultationSummary
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      responses:
+        "200":
+          description: Consultation summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultationSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /consultation/patient/summaries:
+    get:
+      tags: [Consultation]
+      summary: List patient consultation summaries
+      description: Returns paginated consultation summaries for the authenticated patient.
+      operationId: getPatientSummaries
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated summaries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ConsultationSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Diagnostics
+  # ──────────────────────────────────────────────
+  /diagnostics:
+    post:
+      tags: [Diagnostics]
+      summary: Create diagnostic request
+      description: Creates a new diagnostic test request linked to a booking.
+      operationId: createDiagnostic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDiagnosticInput"
+      responses:
+        "201":
+          description: Diagnostic request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /diagnostics/{id}:
+    put:
+      tags: [Diagnostics]
+      summary: Update diagnostic request
+      description: Updates the status or scheduled date of a diagnostic request.
+      operationId: updateDiagnostic
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/DiagnosticStatus"
+                scheduledAt:
+                  type: string
+                  format: date-time
+                  description: Rescheduled date/time
+      responses:
+        "200":
+          description: Diagnostic updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /diagnostics/{id}/result:
+    post:
+      tags: [Diagnostics]
+      summary: Submit lab result
+      description: Attaches a lab result (file URL or notes) to a diagnostic request.
+      operationId: createLabResult
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLabResultInput"
+      responses:
+        "201":
+          description: Lab result created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LabResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /diagnostics/patient/me:
+    get:
+      tags: [Diagnostics]
+      summary: List patient diagnostics
+      description: Returns paginated diagnostic requests for the authenticated patient.
+      operationId: getPatientDiagnostics
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated diagnostics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DiagnosticRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Referrals
+  # ──────────────────────────────────────────────
+  /referrals:
+    post:
+      tags: [Referrals]
+      summary: Create a referral
+      description: Creates a specialist referral linked to a booking.
+      operationId: createReferral
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReferralInput"
+      responses:
+        "201":
+          description: Referral created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Referral"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /referrals/{id}:
+    put:
+      tags: [Referrals]
+      summary: Update referral status
+      description: Updates the status of an existing referral.
+      operationId: updateReferral
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/ReferralStatus"
+      responses:
+        "200":
+          description: Referral updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Referral"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /referrals/patient/me:
+    get:
+      tags: [Referrals]
+      summary: List patient referrals
+      description: Returns paginated referrals for the authenticated patient.
+      operationId: getPatientReferrals
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated referrals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Referral"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Payments
+  # ──────────────────────────────────────────────
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      description: Creates a payment record for a booking with PENDING status.
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentInput"
+      responses:
+        "201":
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /payments/{bookingId}:
+    get:
+      tags: [Payments]
+      summary: Get payment for a booking
+      description: Returns the payment record associated with a booking.
+      operationId: getPaymentByBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      responses:
+        "200":
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /payments/{id}/status:
+    put:
+      tags: [Payments]
+      summary: Update payment status
+      description: |
+        Updates the status of a payment. When status is set to `PAID`, an automatic
+        payout record is created for the provider at 80% of the payment amount.
+      operationId: updatePaymentStatus
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: "#/components/schemas/PaymentStatus"
+                transactionId:
+                  type: string
+                  description: External payment gateway transaction ID
+      responses:
+        "200":
+          description: Payment status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Payouts
+  # ──────────────────────────────────────────────
+  /payouts/me:
+    get:
+      tags: [Payouts]
+      summary: List provider payouts
+      description: Returns all payouts for the authenticated provider with booking details.
+      operationId: getProviderPayouts
+      responses:
+        "200":
+          description: Provider payouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payout"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /payouts/me/summary:
+    get:
+      tags: [Payouts]
+      summary: Get provider payout summary
+      description: Returns aggregate payout statistics for the authenticated provider.
+      operationId: getProviderPayoutSummary
+      responses:
+        "200":
+          description: Payout summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderPayoutSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Notifications
+  # ──────────────────────────────────────────────
+  /notifications/me:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Returns the last 50 notifications for the authenticated user.
+      operationId: getNotifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /notifications/me/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get unread notification count
+      description: Returns the count of unread notifications for the authenticated user.
+      operationId: getUnreadNotificationCount
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 5
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      summary: Mark notification as read
+      description: Marks a specific notification as read.
+      operationId: markNotificationRead
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Tracking
+  # ──────────────────────────────────────────────
+  /tracking/location:
+    put:
+      tags: [Tracking]
+      summary: Update provider location
+      description: |
+        Provider updates their real-time location during an active booking.
+        The booking must be in ACCEPTED, ON_THE_WAY, ARRIVED, or IN_PROGRESS status.
+      operationId: updateProviderLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationInput"
+      responses:
+        "200":
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLocation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /tracking/{bookingId}/location:
+    get:
+      tags: [Tracking]
+      summary: Get provider location for booking
+      description: Patient retrieves the provider's last known location for an active booking.
+      operationId: getProviderLocation
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Booking ID
+      responses:
+        "200":
+          description: Provider location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderLocation"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ──────────────────────────────────────────────
+  # Recommendation
+  # ──────────────────────────────────────────────
+  /recommendation:
+    post:
+      tags: [Recommendation]
+      summary: Get provider recommendation
+      description: |
+        Returns an AI-powered recommendation for the best provider based on location,
+        service category, and urgency. Compares home visit vs. doctor place options.
+        This is a **public** endpoint.
+      operationId: getRecommendation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationInput"
+      responses:
+        "200":
+          description: Provider recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+# ════════════════════════════════════════════════
+# Components
+# ════════════════════════════════════════════════
+components:
+  # ── Security ──────────────────────────────────
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the authentication endpoints
+
+  # ── Parameters ────────────────────────────────
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique resource identifier
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of results per page
+
+  # ── Responses ─────────────────────────────────
+  responses:
+    BadRequest:
+      description: Bad Request — validation error or invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            statusCode: 400
+            timestamp: "2024-01-15T10:30:00.000Z"
+            path: "/api/v1/auth/send-otp"
+            error: "Validation failed: phone must match pattern ^\\+?[1-9]\\d{9,14}$"
+    Unauthorized:
+      description: Unauthorized — missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            statusCode: 401
+            timestamp: "2024-01-15T10:30:00.000Z"
+            path: "/api/v1/patients/me"
+            error: "Unauthorized"
+    Forbidden:
+      description: Forbidden — insufficient permissions for the requested resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            statusCode: 403
+            timestamp: "2024-01-15T10:30:00.000Z"
+            path: "/api/v1/admin/dashboard"
+            error: "Forbidden resource"
+    NotFound:
+      description: Not Found — the requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            statusCode: 404
+            timestamp: "2024-01-15T10:30:00.000Z"
+            path: "/api/v1/bookings/abc-123"
+            error: "Resource not found"
+
+  # ── Schemas ───────────────────────────────────
+  schemas:
+    # ── Enums ─────────────────────────────────
+    Role:
+      type: string
+      enum: [PATIENT, PROVIDER, ADMIN]
+      description: User role in the system
+
+    PatientProviderRole:
+      type: string
+      enum: [PATIENT, PROVIDER]
+      description: Role for self-registration (admin excluded)
+
+    BookingMode:
+      type: string
+      enum: [HOME_VISIT, DOCTOR_PLACE]
+      description: Whether the provider visits the patient or vice versa
+
+    BookingStatus:
+      type: string
+      enum:
+        - REQUESTED
+        - ACCEPTED
+        - DECLINED
+        - ON_THE_WAY
+        - ARRIVED
+        - IN_PROGRESS
+        - COMPLETED
+        - SUMMARY_SUBMITTED
+        - CLOSED
+        - CANCELLED
+      description: Current status of a booking
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, PAID, REFUNDED, FAILED]
+      description: Payment processing status
+
+    DiagnosticStatus:
+      type: string
+      enum: [REQUESTED, SCHEDULED, COLLECTED, RESULTED]
+      description: Diagnostic test lifecycle status
+
+    ReferralStatus:
+      type: string
+      enum: [RECOMMENDED, BOOKED, COMPLETED]
+      description: Specialist referral status
+
+    PayoutStatus:
+      type: string
+      enum: [PENDING, PROCESSED]
+      description: Provider payout processing status
+
+    LicenseStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+      description: KYC / license verification status
+
+    # ── Core entities ─────────────────────────
+
+    User:
+      type: object
+      description: Base user account
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+          example: "+919876543210"
+        role:
+          $ref: "#/components/schemas/Role"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PatientProfile:
+      type: object
+      description: Patient profile with personal details and addresses
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Priya Sharma
+        dateOfBirth:
+          type: string
+          format: date-time
+          example: "1990-05-15T00:00:00.000Z"
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        emergencyContact:
+          type: string
+          example: "+919876543211"
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+        user:
+          $ref: "#/components/schemas/User"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProviderProfile:
+      type: object
+      description: Healthcare provider profile with services, licenses, and availability
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dr. Anil Kumar
+        bio:
+          type: string
+          example: General physician with 10 years of experience
+        specialization:
+          type: string
+          example: General Medicine
+        contactInfo:
+          type: string
+          example: "+919876543212"
+        clinicAddress:
+          type: string
+          example: "123, MG Road, Bengaluru"
+        licenseNumber:
+          type: string
+          example: KA-MED-2024-001
+        homeVisitEnabled:
+          type: boolean
+        doctorPlaceVisitEnabled:
+          type: boolean
+        serviceRadius:
+          type: number
+          minimum: 1
+          maximum: 100
+          description: Service radius in kilometers
+          example: 15
+        consultationFeeHomeVisit:
+          type: number
+          minimum: 0
+          description: Fee for home visit consultations
+          example: 800
+        consultationFeeDoctorPlace:
+          type: number
+          minimum: 0
+          description: Fee for clinic consultations
+          example: 500
+        isAvailable:
+          type: boolean
+        currentLat:
+          type: number
+          format: double
+        currentLng:
+          type: number
+          format: double
+        isVerified:
+          type: boolean
+        verificationStatus:
+          type: string
+          enum: [PENDING, VERIFIED, REJECTED]
+        user:
+          $ref: "#/components/schemas/User"
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceCategory"
+        licenses:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderLicense"
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailabilitySlot"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Address:
+      type: object
+      description: Patient address
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          example: Home
+        addressLine:
+          type: string
+          example: "42, Indiranagar, 12th Main"
+        city:
+          type: string
+          example: Bengaluru
+        state:
+          type: string
+          example: Karnataka
+        pincode:
+          type: string
+          example: "560038"
+        lat:
+          type: number
+          format: double
+          example: 12.9716
+        lng:
+          type: number
+          format: double
+          example: 77.5946
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ServiceCategory:
+      type: object
+      description: A category of healthcare service
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: General Consultation
+        slug:
+          type: string
+          example: general-consultation
+        description:
+          type: string
+          example: General health check-up and consultation
+        iconUrl:
+          type: string
+          format: uri
+          example: https://cdn.curex24.com/icons/general.png
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Booking:
+      type: object
+      description: A consultation booking between a patient and provider
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        serviceCategoryId:
+          type: string
+          format: uuid
+        addressId:
+          type: string
+          format: uuid
+          nullable: true
+        mode:
+          $ref: "#/components/schemas/BookingMode"
+        status:
+          $ref: "#/components/schemas/BookingStatus"
+        scheduledAt:
+          type: string
+          format: date-time
+        symptoms:
+          type: string
+          nullable: true
+          example: Fever and headache for 3 days
+        declineReason:
+          type: string
+          nullable: true
+        provider:
+          $ref: "#/components/schemas/ProviderProfile"
+        patient:
+          $ref: "#/components/schemas/PatientProfile"
+        serviceCategory:
+          $ref: "#/components/schemas/ServiceCategory"
+        address:
+          $ref: "#/components/schemas/Address"
+        statusHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingStatusHistory"
+        consultationSummary:
+          $ref: "#/components/schemas/ConsultationSummary"
+        diagnostics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosticRequest"
+        referrals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Referral"
+        payment:
+          $ref: "#/components/schemas/Payment"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BookingStatusHistory:
+      type: object
+      description: Audit trail of booking status changes
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/BookingStatus"
+        changedAt:
+          type: string
+          format: date-time
+
+    ConsultationSummary:
+      type: object
+      description: Post-visit consultation summary with diagnosis and prescriptions
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        symptoms:
+          type: string
+          example: Fever, body ache, mild cough
+        observations:
+          type: string
+          nullable: true
+          example: Temperature 101°F, throat slightly inflamed
+        diagnosis:
+          type: string
+          example: Viral fever with upper respiratory infection
+        nextSteps:
+          type: string
+          nullable: true
+          example: Rest for 3 days, increase fluid intake
+        followUpRecommendation:
+          type: string
+          nullable: true
+          example: Follow-up in 5 days if fever persists
+        prescriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prescription"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Prescription:
+      type: object
+      description: Individual medicine prescription within a consultation summary
+      properties:
+        id:
+          type: string
+          format: uuid
+        consultationSummaryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Paracetamol 500mg
+        dosage:
+          type: string
+          example: 1 tablet
+        frequency:
+          type: string
+          example: 3 times a day
+        duration:
+          type: string
+          example: 5 days
+        notes:
+          type: string
+          nullable: true
+          example: Take after meals
+        createdAt:
+          type: string
+          format: date-time
+
+    DiagnosticRequest:
+      type: object
+      description: A diagnostic test request linked to a booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        testType:
+          type: string
+          example: Complete Blood Count
+        notes:
+          type: string
+          nullable: true
+          example: Fasting sample required
+        status:
+          $ref: "#/components/schemas/DiagnosticStatus"
+        scheduledAt:
+          type: string
+          format: date-time
+          nullable: true
+        labResult:
+          $ref: "#/components/schemas/LabResult"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LabResult:
+      type: object
+      description: Lab result attached to a diagnostic request
+      properties:
+        id:
+          type: string
+          format: uuid
+        diagnosticRequestId:
+          type: string
+          format: uuid
+        resultFileUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://cdn.curex24.com/results/cbc-report.pdf
+        notes:
+          type: string
+          nullable: true
+          example: All values within normal range
+        createdAt:
+          type: string
+          format: date-time
+
+    Referral:
+      type: object
+      description: Specialist referral from a consultation
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        specialistType:
+          type: string
+          example: Cardiologist
+        notes:
+          type: string
+          nullable: true
+          example: ECG shows minor irregularity, further evaluation needed
+        status:
+          $ref: "#/components/schemas/ReferralStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Payment:
+      type: object
+      description: Payment record for a booking
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+          example: 800.00
+        status:
+          $ref: "#/components/schemas/PaymentStatus"
+        transactionId:
+          type: string
+          nullable: true
+          example: txn_abc123xyz
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Payout:
+      type: object
+      description: Provider payout record (auto-created at 80% of payment when PAID)
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+          description: Payout amount (80% of payment)
+          example: 640.00
+        status:
+          $ref: "#/components/schemas/PayoutStatus"
+        booking:
+          $ref: "#/components/schemas/Booking"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      description: In-app notification
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Booking Accepted
+        body:
+          type: string
+          example: Your booking with Dr. Anil Kumar has been accepted.
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ProviderLocation:
+      type: object
+      description: Real-time provider location during an active booking
+      properties:
+        lat:
+          type: number
+          format: double
+          example: 12.9716
+        lng:
+          type: number
+          format: double
+          example: 77.5946
+        recordedAt:
+          type: string
+          format: date-time
+
+    ProviderLicense:
+      type: object
+      description: Provider KYC / license document
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          example: Medical License
+        documentUrl:
+          type: string
+          format: uri
+          example: https://cdn.curex24.com/docs/license-001.pdf
+        status:
+          $ref: "#/components/schemas/LicenseStatus"
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AvailabilitySlot:
+      type: object
+      description: Provider availability time slot
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: "0 = Sunday, 6 = Saturday"
+        startTime:
+          type: string
+          example: "09:00"
+        endTime:
+          type: string
+          example: "17:00"
+        createdAt:
+          type: string
+          format: date-time
+
+    DoctorKit:
+      type: object
+      description: Provider's medical equipment kit
+      properties:
+        id:
+          type: string
+          format: uuid
+        providerId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DoctorKitItem"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DoctorKitItem:
+      type: object
+      description: Individual item in a doctor's kit
+      properties:
+        id:
+          type: string
+          format: uuid
+        kitId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Stethoscope
+        quantity:
+          type: integer
+          example: 1
+        notes:
+          type: string
+          nullable: true
+
+    Medicine:
+      type: object
+      description: Medicine entry in a consultation summary
+      properties:
+        name:
+          type: string
+          example: Paracetamol 500mg
+        dosage:
+          type: string
+          example: 1 tablet
+        frequency:
+          type: string
+          example: 3 times a day
+        duration:
+          type: string
+          example: 5 days
+        notes:
+          type: string
+          nullable: true
+          example: Take after meals
+
+    # ── Auth responses ────────────────────────
+
+    AuthResponse:
+      type: object
+      description: JWT authentication response
+      properties:
+        token:
+          type: string
+          description: JWT Bearer token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            phone:
+              type: string
+              example: "+919876543210"
+            role:
+              type: string
+              enum: [PATIENT, PROVIDER]
+
+    AdminAuthResponse:
+      type: object
+      description: Admin JWT authentication response
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            phone:
+              type: string
+              example: "+919999999999"
+            role:
+              type: string
+              enum: [ADMIN]
+
+    # ── Dashboard ─────────────────────────────
+
+    DashboardStats:
+      type: object
+      description: Admin dashboard aggregate statistics
+      properties:
+        totalBookings:
+          type: integer
+          example: 1250
+        activeProviders:
+          type: integer
+          example: 85
+        pendingVerification:
+          type: integer
+          example: 12
+        totalPatients:
+          type: integer
+          example: 3200
+        completedBookings:
+          type: integer
+          example: 980
+        cancelledBookings:
+          type: integer
+          example: 45
+        totalEarnings:
+          type: number
+          example: 625000.00
+        bookingsByStatus:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            REQUESTED: 25
+            ACCEPTED: 40
+            IN_PROGRESS: 15
+            COMPLETED: 980
+            CANCELLED: 45
+
+    AdminPayoutSummary:
+      type: object
+      description: Admin-level payout summary statistics
+      properties:
+        totalPayouts:
+          type: integer
+          example: 850
+        pendingCount:
+          type: integer
+          example: 30
+        processedCount:
+          type: integer
+          example: 820
+        totalAmount:
+          type: number
+          example: 500000.00
+        pendingAmount:
+          type: number
+          example: 24000.00
+        processedAmount:
+          type: number
+          example: 476000.00
+
+    ProviderPayoutSummary:
+      type: object
+      description: Provider-level payout summary
+      properties:
+        totalEarnings:
+          type: number
+          example: 48000.00
+        pendingAmount:
+          type: number
+          example: 3200.00
+        processedAmount:
+          type: number
+          example: 44800.00
+        totalPayouts:
+          type: integer
+          example: 60
+
+    # ── Input schemas ─────────────────────────
+
+    CreatePatientProfileInput:
+      type: object
+      required: [name, dateOfBirth, gender]
+      properties:
+        name:
+          type: string
+          example: Priya Sharma
+        dateOfBirth:
+          type: string
+          format: date-time
+          example: "1990-05-15T00:00:00.000Z"
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        emergencyContact:
+          type: string
+          example: "+919876543211"
+
+    UpdatePatientProfileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date-time
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        emergencyContact:
+          type: string
+
+    CreateAddressInput:
+      type: object
+      required: [label, addressLine, city, state, pincode]
+      properties:
+        label:
+          type: string
+          example: Home
+        addressLine:
+          type: string
+          example: "42, Indiranagar, 12th Main"
+        city:
+          type: string
+          example: Bengaluru
+        state:
+          type: string
+          example: Karnataka
+        pincode:
+          type: string
+          example: "560038"
+        lat:
+          type: number
+          format: double
+          example: 12.9716
+        lng:
+          type: number
+          format: double
+          example: 77.5946
+        isDefault:
+          type: boolean
+          default: false
+
+    UpdateAddressInput:
+      type: object
+      properties:
+        label:
+          type: string
+        addressLine:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        isDefault:
+          type: boolean
+
+    OnboardProviderInput:
+      type: object
+      required: [name, specialization, contactInfo]
+      properties:
+        name:
+          type: string
+          example: Dr. Anil Kumar
+        bio:
+          type: string
+          example: General physician with 10 years of experience
+        specialization:
+          type: string
+          example: General Medicine
+        contactInfo:
+          type: string
+          example: "+919876543212"
+        clinicAddress:
+          type: string
+          example: "123, MG Road, Bengaluru"
+        licenseNumber:
+          type: string
+          example: KA-MED-2024-001
+        homeVisitEnabled:
+          type: boolean
+          default: false
+        doctorPlaceVisitEnabled:
+          type: boolean
+          default: false
+        serviceRadius:
+          type: number
+          minimum: 1
+          maximum: 100
+          description: Service radius in kilometers
+          example: 15
+        consultationFeeHomeVisit:
+          type: number
+          minimum: 0
+          example: 800
+        consultationFeeDoctorPlace:
+          type: number
+          minimum: 0
+          example: 500
+        serviceCategoryIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: IDs of service categories the provider offers
+
+    UpdateProviderInput:
+      type: object
+      description: All fields are optional for partial updates
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+        specialization:
+          type: string
+        contactInfo:
+          type: string
+        clinicAddress:
+          type: string
+        licenseNumber:
+          type: string
+        homeVisitEnabled:
+          type: boolean
+        doctorPlaceVisitEnabled:
+          type: boolean
+        serviceRadius:
+          type: number
+          minimum: 1
+          maximum: 100
+        consultationFeeHomeVisit:
+          type: number
+          minimum: 0
+        consultationFeeDoctorPlace:
+          type: number
+          minimum: 0
+        serviceCategoryIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    CreateKycInput:
+      type: object
+      required: [type, documentUrl]
+      properties:
+        type:
+          type: string
+          example: Medical License
+        documentUrl:
+          type: string
+          format: uri
+          example: https://cdn.curex24.com/docs/license-001.pdf
+        expiresAt:
+          type: string
+          format: date-time
+
+    CreateBookingInput:
+      type: object
+      required: [providerId, serviceCategoryId, mode, scheduledAt]
+      properties:
+        providerId:
+          type: string
+          format: uuid
+        serviceCategoryId:
+          type: string
+          format: uuid
+        addressId:
+          type: string
+          format: uuid
+          description: Required for HOME_VISIT mode
+        mode:
+          $ref: "#/components/schemas/BookingMode"
+        scheduledAt:
+          type: string
+          format: date-time
+        symptoms:
+          type: string
+          example: Fever and headache for 3 days
+
+    CreateConsultationSummaryInput:
+      type: object
+      required: [symptoms, diagnosis]
+      properties:
+        symptoms:
+          type: string
+          example: Fever, body ache, mild cough
+        observations:
+          type: string
+          example: Temperature 101°F, throat slightly inflamed
+        diagnosis:
+          type: string
+          example: Viral fever with upper respiratory infection
+        medicinesAdvised:
+          type: array
+          items:
+            $ref: "#/components/schemas/Medicine"
+        nextSteps:
+          type: string
+          example: Rest for 3 days, increase fluid intake
+        followUpRecommendation:
+          type: string
+          example: Follow-up in 5 days if fever persists
+
+    CreateDiagnosticInput:
+      type: object
+      required: [bookingId, testType]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        testType:
+          type: string
+          example: Complete Blood Count
+        notes:
+          type: string
+          example: Fasting sample required
+        scheduledAt:
+          type: string
+          format: date-time
+
+    CreateLabResultInput:
+      type: object
+      properties:
+        resultFileUrl:
+          type: string
+          format: uri
+          example: https://cdn.curex24.com/results/cbc-report.pdf
+        notes:
+          type: string
+          example: All values within normal range
+
+    CreateReferralInput:
+      type: object
+      required: [bookingId, specialistType]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        specialistType:
+          type: string
+          example: Cardiologist
+        notes:
+          type: string
+          example: ECG shows minor irregularity, further evaluation needed
+
+    CreatePaymentInput:
+      type: object
+      required: [bookingId, amount]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          example: 800.00
+
+    UpdateLocationInput:
+      type: object
+      required: [bookingId, lat, lng]
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        lat:
+          type: number
+          format: double
+          example: 12.9716
+        lng:
+          type: number
+          format: double
+          example: 77.5946
+
+    RecommendationInput:
+      type: object
+      required: [lat, lng, serviceCategory, urgency]
+      properties:
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: 12.9716
+        lng:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: 77.5946
+        serviceCategory:
+          type: string
+          example: general-consultation
+        urgency:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+
+    RecommendationResponse:
+      type: object
+      description: AI-powered provider recommendation comparing home visit and doctor place options
+      properties:
+        homeVisit:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RecommendationOption"
+        doctorPlace:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/RecommendationOption"
+        recommended:
+          type: string
+          enum: [HOME_VISIT, DOCTOR_PLACE]
+          nullable: true
+          description: The recommended booking mode, or null if no providers available
+        reason:
+          type: string
+          example: Home visit recommended due to high urgency and provider proximity
+
+    RecommendationOption:
+      type: object
+      description: A single recommendation option (home visit or doctor place)
+      properties:
+        provider:
+          $ref: "#/components/schemas/ProviderProfile"
+        distance:
+          type: number
+          format: double
+          description: Distance in kilometers
+          example: 3.5
+        eta:
+          type: number
+          format: double
+          description: Estimated time of arrival in minutes
+          example: 15
+        fee:
+          type: number
+          format: double
+          description: Consultation fee
+          example: 800
+        score:
+          type: number
+          format: double
+          description: Recommendation score (higher is better)
+          example: 0.85
+
+    # ── Generic schemas ───────────────────────
+
+    ErrorResponse:
+      type: object
+      description: Standard error response returned by all endpoints on failure
+      required: [success, statusCode, timestamp, path, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        statusCode:
+          type: integer
+          example: 400
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.000Z"
+        path:
+          type: string
+          example: "/api/v1/auth/send-otp"
+        error:
+          type: string
+          example: "Validation failed"
+
+    PaginatedResponse:
+      type: object
+      description: Wrapper for paginated list responses
+      properties:
+        data:
+          type: array
+          items: {}
+          description: Array of result items
+        total:
+          type: integer
+          description: Total number of matching records
+          example: 142
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        limit:
+          type: integer
+          description: Results per page
+          example: 20
