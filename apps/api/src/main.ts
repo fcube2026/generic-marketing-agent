@@ -34,19 +34,20 @@ async function bootstrap() {
 
   // Swagger / OpenAPI documentation
   const openapiPath = path.join(
-    __dirname,
-    '..',
-    '..',
-    '..',
+    process.cwd(),
     'docs',
     'openapi',
     'openapi.yaml',
   );
-  if (fs.existsSync(openapiPath)) {
-    const openapiDocument = yaml.load(
-      fs.readFileSync(openapiPath, 'utf8'),
-    ) as OpenAPIObject;
-    SwaggerModule.setup('swagger', app, openapiDocument);
+  try {
+    if (fs.existsSync(openapiPath)) {
+      const openapiDocument = yaml.load(
+        fs.readFileSync(openapiPath, 'utf8'),
+      ) as OpenAPIObject;
+      SwaggerModule.setup('swagger', app, openapiDocument);
+    }
+  } catch (error) {
+    console.warn('Failed to load OpenAPI spec for Swagger UI:', error.message);
   }
 
   const port = process.env.PORT || 3000;
