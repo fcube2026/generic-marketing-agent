@@ -1,7 +1,21 @@
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 
-const sections = [
+type PillarItem = { icon: string; label: string; detail: string };
+type BarItem = { label: string; pct: number; color: string };
+type StepItem = { step: string; title: string; detail: string };
+type TwoColItem = { label: string; detail: string };
+
+type Subsection =
+  | { heading: string; type: 'quote'; content: string }
+  | { heading: string; type: 'text'; content: string }
+  | { heading: string; type: 'pillars'; items: PillarItem[] }
+  | { heading: string; type: 'table'; headers: string[]; rows: string[][] }
+  | { heading: string; type: 'bars'; items: BarItem[] }
+  | { heading: string; type: 'steps'; items: StepItem[] }
+  | { heading: string; type: 'two-col'; items: TwoColItem[] };
+
+const sections: Array<{ id: string; icon: string; title: string; subsections: Subsection[] }> = [
   {
     id: 'brand',
     icon: '🏷️',
@@ -198,10 +212,7 @@ export default function StrategyPage() {
       {sections.map((section) => (
         <Card key={section.id} title={`${section.icon} ${section.title}`}>
           <div className="space-y-6">
-            {section.subsections.map((rawSub) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const sub = rawSub as any;
-              return (
+            {section.subsections.map((sub) => (
               <div key={sub.heading}>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">{sub.heading}</h4>
 
@@ -215,9 +226,9 @@ export default function StrategyPage() {
                   <p className="text-sm text-gray-600">{sub.content}</p>
                 )}
 
-                {sub.type === 'pillars' && sub.items && (
+                {sub.type === 'pillars' && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {sub.items.map((item: { icon: string; label: string; detail: string }) => (
+                    {sub.items.map((item) => (
                       <div key={item.label} className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">
                         <div className="text-2xl mb-1">{item.icon}</div>
                         <p className="text-sm font-semibold text-gray-800">{item.label}</p>
@@ -227,18 +238,18 @@ export default function StrategyPage() {
                   </div>
                 )}
 
-                {sub.type === 'table' && sub.headers && sub.rows && (
+                {sub.type === 'table' && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200">
-                          {(sub.headers as string[]).map((h) => (
+                          {sub.headers.map((h) => (
                             <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {(sub.rows as string[][]).map((row, ri) => (
+                        {sub.rows.map((row, ri) => (
                           <tr key={ri} className="border-b border-gray-50 hover:bg-gray-50">
                             {row.map((cell, ci) => (
                               <td key={ci} className="py-2.5 px-3 text-gray-700">{ci === 0 ? <strong>{cell}</strong> : cell}</td>
@@ -250,9 +261,9 @@ export default function StrategyPage() {
                   </div>
                 )}
 
-                {sub.type === 'bars' && sub.items && (
+                {sub.type === 'bars' && (
                   <div className="space-y-3">
-                    {(sub.items as { label: string; pct: number; color: string }[]).map((item) => (
+                    {sub.items.map((item) => (
                       <div key={item.label}>
                         <div className="flex justify-between text-xs text-gray-600 mb-1">
                           <span>{item.label}</span>
@@ -266,9 +277,9 @@ export default function StrategyPage() {
                   </div>
                 )}
 
-                {sub.type === 'steps' && sub.items && (
+                {sub.type === 'steps' && (
                   <div className="space-y-3">
-                    {(sub.items as { step: string; title: string; detail: string }[]).map((item) => (
+                    {sub.items.map((item) => (
                       <div key={item.title} className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
                           {item.step}
@@ -282,9 +293,9 @@ export default function StrategyPage() {
                   </div>
                 )}
 
-                {sub.type === 'two-col' && sub.items && (
+                {sub.type === 'two-col' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(sub.items as { label: string; detail: string }[]).map((item) => (
+                    {sub.items.map((item) => (
                       <div key={item.label} className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                         <p className="text-sm font-semibold text-gray-800 mb-1">
                           <Badge variant="purple">{item.label}</Badge>
@@ -295,8 +306,7 @@ export default function StrategyPage() {
                   </div>
                 )}
               </div>
-              );
-            })}
+            ))}
           </div>
         </Card>
       ))}

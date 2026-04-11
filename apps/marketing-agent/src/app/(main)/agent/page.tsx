@@ -192,7 +192,7 @@ function MessageBubble({ msg }: { msg: AgentMessage }) {
   return (
     <div className={`flex ${isAgent ? 'justify-start' : 'justify-end'} mb-4`}>
       {isAgent && (
-        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 mr-3 mt-1">
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 mr-3 mt-1" aria-label="AI Marketing Agent">
           🤖
         </div>
       )}
@@ -207,7 +207,7 @@ function MessageBubble({ msg }: { msg: AgentMessage }) {
         <div className={`text-xs mt-1 ${isAgent ? 'text-gray-400' : 'text-primary-light'}`}>{msg.timestamp}</div>
       </div>
       {!isAgent && (
-        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold shrink-0 ml-3 mt-1">
+        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold shrink-0 ml-3 mt-1" aria-label="User avatar">
           You
         </div>
       )}
@@ -262,7 +262,7 @@ export default function AgentPage() {
         ))}
         {isTyping && (
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0">🤖</div>
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0" aria-label="AI Marketing Agent">🤖</div>
             <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
               <div className="flex gap-1">
                 <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
