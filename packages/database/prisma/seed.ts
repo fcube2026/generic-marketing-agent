@@ -371,7 +371,7 @@ async function main() {
       });
 
       // Payout (80% of fee) for completed bookings
-      if ([BookingStatus.COMPLETED, BookingStatus.SUMMARY_SUBMITTED, BookingStatus.CLOSED].includes(spec.status)) {
+      if (([BookingStatus.COMPLETED, BookingStatus.SUMMARY_SUBMITTED, BookingStatus.CLOSED] as string[]).includes(spec.status)) {
         await prisma.payout.create({
           data: {
             providerId: provider.id,

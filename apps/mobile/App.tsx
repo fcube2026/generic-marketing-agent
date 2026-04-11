@@ -58,11 +58,7 @@ export default function App() {
 
   useEffect(() => {
     console.log('[App] Initializing...');
-    try {
-      setIsReady(true);
-    } catch (err) {
-      console.error('[App] Init error:', err);
-    }
+    setIsReady(true);
   }, []);
 
   if (!isReady) {
