@@ -8,6 +8,7 @@ WORKDIR /app
 
 # Copy workspace configuration for dependency installation
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY scripts/fix-react-instances.js ./scripts/
 COPY apps/api/package.json ./apps/api/
 COPY packages/database/package.json ./packages/database/
 COPY packages/types/package.json ./packages/types/
