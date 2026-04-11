@@ -22,9 +22,6 @@
       },
       "channel": "staging"
     },
-    "preview": {
-      "distribution": "internal"
-    },
     "production": {
       "autoIncrement": true,
       "env": {

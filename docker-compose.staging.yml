@@ -1,0 +1,39 @@
+# docker-compose.staging.yml
+# Staging environment — uses staging Supabase, separate secrets.
+# Usage: docker compose -f docker-compose.staging.yml up --build
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: curex24-api-staging
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - apps/api/.env.staging
+    environment:
+      NODE_ENV: production
+      APP_ENV: staging
+      PORT: 3000
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${STAGING_API_URL:-https://api-staging.curex24.com}
+    container_name: curex24-admin-staging
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
+        condition: service_healthy

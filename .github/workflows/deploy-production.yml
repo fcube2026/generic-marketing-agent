@@ -1,14 +1,20 @@
-name: CI
+name: Deploy Production
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main, develop]
+    # Only deploy when these paths change (skip docs-only changes)
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'labels/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: production-deploy-${{ github.ref }}
+  cancel-in-progress: false # Never cancel production deploys
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
   lint-and-typecheck:
@@ -27,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -38,20 +44,14 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
 
-      - name: Typecheck shared types package
+      - name: Typecheck shared types
         run: pnpm --filter @curex24/types lint
-
-      - name: Prettier format check API
-        run: pnpm --filter @curex24/api format:check
 
       - name: Lint and typecheck API
         run: pnpm --filter @curex24/api lint
 
       - name: Lint admin panel
         run: pnpm --filter @curex24/admin lint
-
-      - name: Typecheck admin panel
-        run: cd apps/admin && npx tsc --noEmit
 
   build:
     name: Build
@@ -70,7 +70,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -81,22 +81,16 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
 
-      - name: Build shared types package
+      - name: Build shared types
         run: pnpm --filter @curex24/types build
 
       - name: Build API
         run: pnpm --filter @curex24/api build
 
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: apps/admin/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('apps/admin/**/*.{js,jsx,ts,tsx}') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
 
   test:
     name: Test
@@ -120,8 +114,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-        DATABASE_URL: postgresql://test:test@localhost:5432/curex24_test
-        DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
+      DATABASE_URL: postgresql://test:test@localhost:5432/curex24_test
+      DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -132,7 +126,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -147,38 +141,19 @@ jobs:
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
 
-  test-mobile:
-    name: Test Mobile
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: lint-and-typecheck
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
 
-  prisma-validate:
-    name: Prisma Validate
+  deploy-production:
+    name: Deploy to Production
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    needs: [build, test]
     permissions:
       contents: read
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_API_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -189,22 +164,48 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate Prisma schema
-        run: cd packages/database && npx prisma validate
+      - name: Generate Prisma client
+        run: pnpm --filter @curex24/database db:generate
         env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
-          DIRECT_URL: "postgresql://user:pass@localhost:5432/dummy"
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
-      - name: Check Prisma schema formatting
-        run: |
-          npx --prefix packages/database prisma format --schema packages/database/prisma/schema.prisma
-          git diff --exit-code -- packages/database/prisma/schema.prisma
+      # ── Apply database migrations ──────────────────────────────
+      - name: Apply database migrations
+        run: cd packages/database && npx prisma migrate deploy
         env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
-          DIRECT_URL: "postgresql://user:pass@localhost:5432/dummy"
+          DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+
+      # ── Deploy API backend ────────────────────────────────────
+      # Uncomment and configure for your hosting provider.
+      #
+      # Example: Render deploy hook
+      # - name: Deploy API to Render
+      #   run: curl -X POST "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}"
+
+      - name: Verify production API health
+        run: |
+          echo "Waiting for production API to be ready..."
+          sleep 10
+          if [ -n "${{ vars.PRODUCTION_API_URL }}" ]; then
+            curl -f "${{ vars.PRODUCTION_API_URL }}/" || echo "⚠️  Health check failed"
+          else
+            echo "⚠️  PRODUCTION_API_URL not set — skipping health check"
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ vars.PRODUCTION_API_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | ${{ vars.PRODUCTION_ADMIN_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

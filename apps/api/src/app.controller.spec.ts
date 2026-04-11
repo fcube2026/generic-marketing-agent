@@ -14,10 +14,21 @@ describe('AppController', () => {
 
   describe('healthCheck', () => {
     it('should return ok status', () => {
-      expect(controller.healthCheck()).toEqual({
+      const result = controller.healthCheck();
+      expect(result).toMatchObject({
         status: 'ok',
         service: 'Curex24 API',
       });
+      expect(result).toHaveProperty('environment');
+    });
+  });
+
+  describe('version', () => {
+    it('should return version info', () => {
+      const result = controller.version();
+      expect(result).toHaveProperty('version');
+      expect(result).toHaveProperty('environment');
+      expect(result).toHaveProperty('timestamp');
     });
   });
 });
