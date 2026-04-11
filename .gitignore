@@ -44,7 +44,7 @@ Thumbs.db
 .turbo
 
 # Prisma
-packages/database/prisma/migrations/
+# Migration files MUST be version-controlled — do NOT ignore them
 
 # TypeScript
 *.tsbuildinfo
