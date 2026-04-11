@@ -66,9 +66,7 @@ echo "${GREEN}✅ Prisma client generated${NC}"
 # ── Step 2: Apply migrations ───────────────────────────────
 echo ""
 echo "Step 2/3: Applying database migrations..."
-cd packages/database
-npx prisma migrate deploy
-cd ../..
+pnpm --filter @curex24/database db:migrate:deploy
 echo "${GREEN}✅ Migrations applied successfully${NC}"
 
 # ── Step 3: Optionally seed ─────────────────────────────────
