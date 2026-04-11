@@ -16,6 +16,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
+import { BootstrapService } from './common/bootstrap.service';
 
 @Module({
   controllers: [AppController],
@@ -39,5 +40,6 @@ import { TrackingModule } from './modules/tracking/tracking.module';
     ReferralsModule,
     TrackingModule,
   ],
+  providers: [BootstrapService],
 })
 export class AppModule {}
