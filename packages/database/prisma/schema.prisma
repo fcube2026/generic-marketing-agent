@@ -71,13 +71,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  patientProfile   PatientProfile?
-  providerProfile  ProviderProfile?
-  addresses        Address[]
-  auditLogs        AuditLog[]
-  adminActions     AdminAction[]     @relation("AdminActions")
-  otpVerifications OtpVerification[]
-  notifications    Notification[]
+  patientProfile         PatientProfile?
+  providerProfile        ProviderProfile?
+  addresses              Address[]
+  auditLogs              AuditLog[]
+  adminActions           AdminAction[]          @relation("AdminActions")
+  otpVerifications       OtpVerification[]
+  notifications          Notification[]
+  questionnaireResponse  QuestionnaireResponse?
 
   @@map("users")
 }
@@ -460,4 +461,33 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+model QuestionnaireResponse {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  primarySpecialization  String?
+  highestQualification   String?
+  licensedToPractice     String?
+  clinicalExperience     String?
+  servicesProvided       String?
+  patientGroups          String?
+  preferredSchedule      String?
+  availableTimes         String?
+  travelDistance         String?
+  mobileAppComfort       String?
+  onlineConsultation     String?
+  medicalEquipment       String?
+  preferredPayment       String?
+  handleEmergency        String?
+  platformExpectations   String?
+  followGuidelines       String?
+  homeVisitComfort       String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("questionnaire_responses")
 }
