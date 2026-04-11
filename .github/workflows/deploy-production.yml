@@ -3,7 +3,6 @@ name: Deploy Production
 on:
   push:
     branches: [main]
-    # Only deploy when these paths change (skip docs-only changes)
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -11,7 +10,7 @@ on:
 
 concurrency:
   group: production-deploy-${{ github.ref }}
-  cancel-in-progress: false # Never cancel production deploys
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '20'
@@ -90,7 +89,7 @@ jobs:
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          NEXT_PUBLIC_API_URL: https://api.curex24.com/api/v1
 
   test:
     name: Test
@@ -144,8 +143,11 @@ jobs:
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
 
-  deploy-production:
-    name: Deploy to Production
+  # ────────────────────────────────────────────────────────────
+  # Deploy API to Railway (production environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API → Railway (production)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [build, test]
@@ -153,7 +155,7 @@ jobs:
       contents: read
     environment:
       name: production
-      url: ${{ vars.PRODUCTION_API_URL }}
+      url: https://api.curex24.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -175,37 +177,43 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
-      # ── Apply database migrations ──────────────────────────────
       - name: Apply database migrations
         run: cd packages/database && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
 
-      # ── Deploy API backend ────────────────────────────────────
-      # Uncomment and configure for your hosting provider.
-      #
-      # Example: Render deploy hook
-      # - name: Deploy API to Render
-      #   run: curl -X POST "${{ secrets.RENDER_PRODUCTION_DEPLOY_HOOK }}"
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service ${{ vars.RAILWAY_PRODUCTION_SERVICE_ID }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        run: sleep 30
 
       - name: Verify production API health
         run: |
-          echo "Waiting for production API to be ready..."
-          sleep 10
-          if [ -n "${{ vars.PRODUCTION_API_URL }}" ]; then
-            curl -f "${{ vars.PRODUCTION_API_URL }}/" || echo "⚠️  Health check failed"
-          else
-            echo "⚠️  PRODUCTION_API_URL not set — skipping health check"
-          fi
+          for i in 1 2 3 4 5; do
+            if curl -sf https://api.curex24.com/ > /dev/null 2>&1; then
+              echo "✅ Production API is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i — waiting 15s..."
+            sleep 15
+          done
+          echo "❌ Health check failed after 5 attempts"
+          exit 1
 
       - name: Deployment summary
         run: |
           echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
-          echo "| API | ${{ vars.PRODUCTION_API_URL }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Admin | ${{ vars.PRODUCTION_ADMIN_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | https://api.curex24.com | Railway |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | https://admin.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`main\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

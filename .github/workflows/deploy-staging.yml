@@ -85,7 +85,7 @@ jobs:
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.STAGING_API_URL }}
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
 
   test:
     name: Test
@@ -139,8 +139,11 @@ jobs:
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
 
-  deploy-staging:
-    name: Deploy to Staging
+  # ────────────────────────────────────────────────────────────
+  # Deploy API to Railway (staging environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API → Railway (staging)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [build, test]
@@ -148,7 +151,7 @@ jobs:
       contents: read
     environment:
       name: staging
-      url: ${{ vars.STAGING_API_URL }}
+      url: https://api.staging.curex24.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -170,43 +173,42 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
-      # ── Apply database migrations ──────────────────────────────
       - name: Apply database migrations
         run: cd packages/database && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
-      # ── Deploy API backend ────────────────────────────────────
-      # Uncomment and configure for your hosting provider.
-      #
-      # Example: Render deploy hook
-      # - name: Deploy API to Render
-      #   run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
-      #
-      # Example: Docker build + push to container registry
-      # - name: Build and push API Docker image
-      #   run: |
-      #     docker build -f apps/api/Dockerfile -t registry/curex24-api:staging .
-      #     docker push registry/curex24-api:staging
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service ${{ vars.RAILWAY_STAGING_SERVICE_ID }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        run: sleep 30
 
       - name: Verify staging API health
         run: |
-          echo "Waiting for staging API to be ready..."
-          sleep 10
-          if [ -n "${{ vars.STAGING_API_URL }}" ]; then
-            curl -f "${{ vars.STAGING_API_URL }}/" || echo "⚠️  Health check skipped — configure STAGING_API_URL"
-          else
-            echo "⚠️  STAGING_API_URL not set — skipping health check"
-          fi
+          for i in 1 2 3 4 5; do
+            if curl -sf https://api.staging.curex24.com/ > /dev/null 2>&1; then
+              echo "✅ Staging API is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i — waiting 15s..."
+            sleep 15
+          done
+          echo "⚠️  Health check did not pass after 5 attempts"
 
       - name: Deployment summary
         run: |
           echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
-          echo "| API | ${{ vars.STAGING_API_URL }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Admin | ${{ vars.STAGING_ADMIN_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | https://api.staging.curex24.com | Railway |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** \`develop\`" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

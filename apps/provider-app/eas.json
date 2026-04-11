@@ -16,7 +16,7 @@
       "distribution": "internal",
       "env": {
         "APP_ENV": "staging",
-        "EXPO_PUBLIC_API_URL": "https://api-staging.curex24.com/api/v1",
+        "EXPO_PUBLIC_API_URL": "https://api.staging.curex24.com/api/v1",
         "EXPO_PUBLIC_SUPABASE_URL": "https://STAGING_PROJECT_REF.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "staging-anon-key"
       },

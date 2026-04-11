@@ -14,7 +14,7 @@
 │                              │    │                                │
 │  ┌──────────────────────┐    │    │  ┌──────────────────────┐      │
 │  │  API (Fastify/Nest)  │    │    │  │  API (Fastify/Nest)  │      │
-│  │  api-staging.curex24  │    │    │  │  api.curex24.com     │      │
+│  │  api.staging.curex24  │    │    │  │  api.curex24.com     │      │
 │  └──────────┬───────────┘    │    │  └──────────┬───────────┘      │
 │             │                │    │             │                  │
 │  ┌──────────▼───────────┐    │    │  ┌──────────▼───────────┐      │
@@ -25,7 +25,7 @@
 │                              │    │                                │
 │  ┌──────────────────────┐    │    │  ┌──────────────────────┐      │
 │  │  Admin Dashboard     │    │    │  │  Admin Dashboard     │      │
-│  │  admin-staging.curex24│    │    │  │  admin.curex24.com   │      │
+│  │  admin.staging.curex24│    │    │  │  admin.curex24.com   │      │
 │  └──────────────────────┘    │    │  └──────────────────────┘      │
 │                              │    │                                │
 │  ┌──────────────────────┐    │    │  ┌──────────────────────┐      │
@@ -73,8 +73,8 @@ feature/xyz ──► develop (staging) ──► main (production)
 
 | Service            | Staging URL                          | Production URL                |
 |--------------------|--------------------------------------|-------------------------------|
-| API                | `https://api-staging.curex24.com`    | `https://api.curex24.com`     |
-| Admin Dashboard    | `https://admin-staging.curex24.com`  | `https://admin.curex24.com`   |
+| API                | `https://api.staging.curex24.com`    | `https://api.curex24.com`     |
+| Admin Dashboard    | `https://admin.staging.curex24.com`  | `https://admin.curex24.com`   |
 | Supabase Dashboard | Staging project console              | Production project console    |
 | API Health         | `GET /`                              | `GET /`                       |
 | API Version        | `GET /api/v1/version`                | `GET /api/v1/version`         |
@@ -100,7 +100,7 @@ feature/xyz ──► develop (staging) ──► main (production)
 
 | Variable                          | Development                | Staging                              | Production                         |
 |-----------------------------------|----------------------------|--------------------------------------|------------------------------------|
-| `NEXT_PUBLIC_API_URL`             | `http://localhost:3000/api/v1` | `https://api-staging.curex24.com/api/v1` | `https://api.curex24.com/api/v1` |
+| `NEXT_PUBLIC_API_URL`             | `http://localhost:3000/api/v1` | `https://api.staging.curex24.com/api/v1` | `https://api.curex24.com/api/v1` |
 | `NEXT_PUBLIC_SUPABASE_URL`        | —                          | Staging Supabase URL                 | Production Supabase URL            |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | —                          | Staging anon key                     | Production anon key                |
 
@@ -109,7 +109,7 @@ feature/xyz ──► develop (staging) ──► main (production)
 | Variable                          | Development                | Staging                              | Production                         |
 |-----------------------------------|----------------------------|--------------------------------------|------------------------------------|
 | `APP_ENV`                         | `development`              | `staging`                            | `production`                       |
-| `EXPO_PUBLIC_API_URL`             | `http://localhost:3000/api/v1` | `https://api-staging.curex24.com/api/v1` | `https://api.curex24.com/api/v1` |
+| `EXPO_PUBLIC_API_URL`             | `http://localhost:3000/api/v1` | `https://api.staging.curex24.com/api/v1` | `https://api.curex24.com/api/v1` |
 | `EXPO_PUBLIC_SUPABASE_URL`        | —                          | Staging Supabase URL                 | Production Supabase URL            |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY`   | —                          | Staging anon key                     | Production anon key                |
 
@@ -135,7 +135,7 @@ In your Supabase staging project dashboard:
 
 1. Go to **Authentication → URL Configuration**
 2. Add staging redirect URLs:
-   - `https://admin-staging.curex24.com/**`
+   - `https://admin.staging.curex24.com/**`
    - `com.curex24.mobile.staging://`
    - `com.curex24.patient.staging://`
    - `com.curex24.provider.staging://`
@@ -257,8 +257,8 @@ Configure in **Settings → Environments** on GitHub:
 - `STAGING_SUPABASE_SERVICE_ROLE_KEY` — Supabase service role key
 
 **Variables** (visible):
-- `STAGING_API_URL` — `https://api-staging.curex24.com`
-- `STAGING_ADMIN_URL` — `https://admin-staging.curex24.com`
+- `STAGING_API_URL` — `https://api.staging.curex24.com`
+- `STAGING_ADMIN_URL` — `https://admin.staging.curex24.com`
 
 ### `production` environment
 
@@ -293,7 +293,7 @@ Configure in **Settings → Environments** on GitHub:
 | App name       | Curex24 Dev           | Curex24 Staging            | Curex24              |
 | Bundle ID (iOS)| com.curex24.mobile.dev| com.curex24.mobile.staging | com.curex24.mobile   |
 | Package (Android)| com.curex24.mobile.dev| com.curex24.mobile.staging| com.curex24.mobile   |
-| API URL        | localhost:3000        | api-staging.curex24.com    | api.curex24.com      |
+| API URL        | localhost:3000        | api.staging.curex24.com    | api.curex24.com      |
 | Distribution   | Development client    | Internal                   | App Store / Play Store|
 
 ---
@@ -359,8 +359,8 @@ npx prisma migrate dev --name rollback_xyz
 
 Before declaring staging ready, verify:
 
-- [ ] **API health check**: `curl https://api-staging.curex24.com/` returns `{"status":"ok"}`
-- [ ] **API version**: `curl https://api-staging.curex24.com/api/v1/version` returns version info
+- [ ] **API health check**: `curl https://api.staging.curex24.com/` returns `{"status":"ok"}`
+- [ ] **API version**: `curl https://api.staging.curex24.com/api/v1/version` returns version info
 - [ ] **Database isolation**: Staging DB has no production data
 - [ ] **Seed data loaded**: Demo patients, providers, and bookings exist
 - [ ] **Admin dashboard**: Accessible at staging URL, can log in
