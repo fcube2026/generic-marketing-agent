@@ -29,7 +29,7 @@ services:
       context: .
       dockerfile: apps/admin/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${STAGING_API_URL:-https://api-staging.curex24.com}
+        NEXT_PUBLIC_API_URL: ${STAGING_API_URL:-https://api.staging.curex24.com}
     container_name: curex24-admin-staging
     restart: unless-stopped
     ports:
