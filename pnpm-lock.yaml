@@ -198,6 +198,49 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
+  apps/marketing-agent:
+    dependencies:
+      date-fns:
+        specifier: ^3.6.0
+        version: 3.6.0
+      next:
+        specifier: 14.2.3
+        version: 14.2.3(@babel/core@7.29.0)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      react:
+        specifier: 18.2.0
+        version: 18.2.0
+      react-dom:
+        specifier: 18.2.0
+        version: 18.2.0(react@18.2.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.2
+        version: 20.19.39
+      '@types/react':
+        specifier: ~18.2.45
+        version: 18.2.79
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.2.79)
+      autoprefixer:
+        specifier: ^10.4.19
+        version: 10.4.27(postcss@8.5.9)
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      eslint-config-next:
+        specifier: 14.2.3
+        version: 14.2.3(eslint@8.57.1)(typescript@5.9.3)
+      postcss:
+        specifier: ^8.4.38
+        version: 8.5.9
+      tailwindcss:
+        specifier: ^3.4.4
+        version: 3.4.19(yaml@2.8.3)
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
   apps/mobile:
     dependencies:
       '@expo/config-plugins':
@@ -12064,7 +12107,7 @@ snapshots:
       '@typescript-eslint/parser': 7.2.0(eslint@8.57.1)(typescript@5.9.3)
       eslint: 8.57.1
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.1)
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.1)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.57.1)
       eslint-plugin-react: 7.37.5(eslint@8.57.1)
@@ -12088,7 +12131,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.1):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3
@@ -12110,7 +12153,7 @@ snapshots:
       '@typescript-eslint/parser': 7.2.0(eslint@8.57.1)(typescript@5.9.3)
       eslint: 8.57.1
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1)
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.1)
     transitivePeerDependencies:
       - supports-color
 
