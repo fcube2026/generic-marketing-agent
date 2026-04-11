@@ -1,14 +1,19 @@
-name: CI
+name: Deploy Production
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'labels/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: production-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
   lint-and-typecheck:
@@ -27,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -38,20 +43,14 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
 
-      - name: Typecheck shared types package
+      - name: Typecheck shared types
         run: pnpm --filter @curex24/types lint
-
-      - name: Prettier format check API
-        run: pnpm --filter @curex24/api format:check
 
       - name: Lint and typecheck API
         run: pnpm --filter @curex24/api lint
 
       - name: Lint admin panel
         run: pnpm --filter @curex24/admin lint
-
-      - name: Typecheck admin panel
-        run: cd apps/admin && npx tsc --noEmit
 
   build:
     name: Build
@@ -70,7 +69,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -81,22 +80,16 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
 
-      - name: Build shared types package
+      - name: Build shared types
         run: pnpm --filter @curex24/types build
 
       - name: Build API
         run: pnpm --filter @curex24/api build
 
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: apps/admin/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('apps/admin/**/*.{js,jsx,ts,tsx}') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.curex24.com/api/v1
 
   test:
     name: Test
@@ -120,8 +113,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-        DATABASE_URL: postgresql://test:test@localhost:5432/curex24_test
-        DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
+      DATABASE_URL: postgresql://test:test@localhost:5432/curex24_test
+      DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -132,7 +125,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -147,38 +140,22 @@ jobs:
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
 
-  test-mobile:
-    name: Test Mobile
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: lint-and-typecheck
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
 
-  prisma-validate:
-    name: Prisma Validate
+  # ────────────────────────────────────────────────────────────
+  # Deploy API to Railway (production environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API → Railway (production)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    needs: [build, test]
     permissions:
       contents: read
+    environment:
+      name: production
+      url: https://api.curex24.com
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -189,22 +166,54 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate Prisma schema
-        run: cd packages/database && npx prisma validate
+      - name: Generate Prisma client
+        run: pnpm --filter @curex24/database db:generate
         env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
-          DIRECT_URL: "postgresql://user:pass@localhost:5432/dummy"
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
-      - name: Check Prisma schema formatting
-        run: |
-          npx --prefix packages/database prisma format --schema packages/database/prisma/schema.prisma
-          git diff --exit-code -- packages/database/prisma/schema.prisma
+      - name: Apply database migrations
+        run: cd packages/database && npx prisma migrate deploy
         env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
-          DIRECT_URL: "postgresql://user:pass@localhost:5432/dummy"
+          DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service ${{ vars.RAILWAY_PRODUCTION_SERVICE_ID }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Verify production API health
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -sf https://api.curex24.com/ > /dev/null 2>&1; then
+              echo "✅ Production API is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i — waiting 15s..."
+            sleep 15
+          done
+          echo "❌ Health check failed after 5 attempts"
+          exit 1
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | https://api.curex24.com | Railway |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | https://admin.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

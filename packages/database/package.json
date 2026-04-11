@@ -10,6 +10,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:staging": "ts-node prisma/seed.ts && ts-node prisma/seed-staging.ts",
     "db:reset": "prisma migrate reset",
     "lint": "prisma validate"
   },
