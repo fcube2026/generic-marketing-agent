@@ -40,6 +40,12 @@ export class BootstrapService implements OnApplicationBootstrap {
 
   // ─── helpers ────────────────────────────────────────────────────────────────
 
+  private readonly PAYOUT_ELIGIBLE_STATUSES: BookingStatus[] = [
+    BookingStatus.COMPLETED,
+    BookingStatus.SUMMARY_SUBMITTED,
+    BookingStatus.CLOSED,
+  ];
+
   private daysAgo(n: number): Date {
     const d = new Date();
     d.setDate(d.getDate() - n);
@@ -617,13 +623,7 @@ export class BootstrapService implements OnApplicationBootstrap {
             updatedAt: paidAt,
           },
         });
-        if (
-          [
-            BookingStatus.COMPLETED,
-            BookingStatus.SUMMARY_SUBMITTED,
-            BookingStatus.CLOSED,
-          ].includes(s.status)
-        ) {
+        if (this.PAYOUT_ELIGIBLE_STATUSES.includes(s.status)) {
           await this.prisma.payout.create({
             data: {
               providerId: provider.id,
