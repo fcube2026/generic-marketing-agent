@@ -1,26 +1,16 @@
 #!/bin/sh
 set -e
 
-echo "Pushing database schema..."
+echo "Applying database migrations..."
 cd /app
 
-if [ "$NODE_ENV" = "production" ]; then
-  echo "Production mode: running prisma migrate deploy..."
-  npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma 2>&1 || {
-    echo "Warning: Migration deploy failed. Ensure migrations exist."
-    exit 1
-  }
-else
-  echo "Development mode: running prisma db push..."
-  npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate 2>&1 || {
-    echo "Warning: Database push failed. The database may not be ready yet."
-    echo "Retrying in 5 seconds..."
-    sleep 5
-    npx prisma db push --schema=packages/database/prisma/schema.prisma --skip-generate
-  }
-fi
+npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma 2>&1 || {
+  echo "Error: Migration deploy failed."
+  echo "Check that migration files exist and DATABASE_URL is correct."
+  exit 1
+}
 
-echo "Database schema is up to date."
+echo "Database migrations applied successfully."
 
 cd /app/apps/api
 exec "$@"

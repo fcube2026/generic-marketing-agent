@@ -11,7 +11,7 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "db:seed:staging": "ts-node prisma/seed.ts && ts-node prisma/seed-staging.ts",
-    "db:reset": "prisma migrate reset",
+    "db:reset": "echo '⚠️  WARNING: This drops ALL tables! Use only on local dev databases.' && prisma migrate reset",
     "lint": "prisma validate"
   },
   "dependencies": {
