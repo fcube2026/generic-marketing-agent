@@ -36,14 +36,19 @@ export default function BookingsPage() {
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter) params.set('status', statusFilter);
 
+    console.log(`[Bookings] Fetching /admin/bookings?${params}`);
     api
       .get(`/admin/bookings?${params}`)
       .then((res) => {
         const data: BookingsResponse = res.data;
+        console.log('[Bookings] Response:', data.total, 'total records, page', data.page, 'of', data.totalPages);
         setBookings(data.data);
         setTotalPages(data.totalPages);
       })
-      .catch(() => setBookings([]))
+      .catch((err) => {
+        console.error('[Bookings] Fetch error:', err?.response?.status, err?.message);
+        setBookings([]);
+      })
       .finally(() => setLoading(false));
   }, [page, statusFilter]);
 
@@ -58,9 +63,19 @@ export default function BookingsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
-        <p className="text-gray-500 text-sm mt-1">Monitor all platform bookings</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+          <p className="text-gray-500 text-sm mt-1">Monitor all platform bookings</p>
+        </div>
+        <button
+          onClick={fetchBookings}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60 flex-shrink-0"
+        >
+          <span className={loading ? 'animate-spin' : ''}>↻</span>
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}

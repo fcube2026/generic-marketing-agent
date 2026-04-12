@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StatCard } from '@/components/ui/Card';
 import MiniBarChart from '@/components/ui/MiniBarChart';
@@ -23,37 +23,77 @@ interface DashboardCharts {
   earningsPerDay: Record<string, number>;
 }
 
+const REFRESH_INTERVAL_MS = 30_000;
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [charts, setCharts] = useState<DashboardCharts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback((isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else if (!stats) setLoading(true);
+
+    console.log('[Dashboard] Fetching data from API…', new Date().toISOString());
+
     Promise.all([
-      api.get('/admin/dashboard').catch(() => ({
-        data: {
-          totalBookings: 0,
-          activeProviders: 0,
-          pendingVerification: 0,
-          totalPatients: 0,
-          completedBookings: 0,
-          cancelledBookings: 0,
-          totalEarnings: 0,
-          bookingsByStatus: {},
-        },
-      })),
-      api.get('/admin/dashboard/charts').catch(() => ({
-        data: {
-          bookingsPerDay: {},
-          earningsPerDay: {},
-        },
-      })),
+      api.get('/admin/dashboard').catch((err) => {
+        console.error('[Dashboard] /admin/dashboard error:', err?.response?.status, err?.message);
+        return {
+          data: {
+            totalBookings: 0,
+            activeProviders: 0,
+            pendingVerification: 0,
+            totalPatients: 0,
+            completedBookings: 0,
+            cancelledBookings: 0,
+            totalEarnings: 0,
+            bookingsByStatus: {},
+          },
+        };
+      }),
+      api.get('/admin/dashboard/charts').catch((err) => {
+        console.error('[Dashboard] /admin/dashboard/charts error:', err?.response?.status, err?.message);
+        return {
+          data: {
+            bookingsPerDay: {},
+            earningsPerDay: {},
+          },
+        };
+      }),
     ])
       .then(([statsRes, chartsRes]) => {
+        console.log('[Dashboard] Stats response:', statsRes.data);
+        console.log('[Dashboard] Charts response:', chartsRes.data);
         setStats(statsRes.data);
         setCharts(chartsRes.data);
+        setLastUpdated(new Date());
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  }, [stats]);
+
+  // Initial load + auto-refresh every 30 seconds
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(() => fetchData(), REFRESH_INTERVAL_MS);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when the browser tab regains focus
+  useEffect(() => {
+    const onFocus = () => {
+      console.log('[Dashboard] Window focused — refreshing data');
+      fetchData();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {
@@ -69,9 +109,26 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Overview of your healthcare platform</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-1">Overview of your healthcare platform</p>
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <button
+            onClick={() => fetchData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
+          >
+            <span className={refreshing ? 'animate-spin' : ''}>↻</span>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}
