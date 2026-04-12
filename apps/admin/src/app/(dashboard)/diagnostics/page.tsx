@@ -53,14 +53,19 @@ export default function DiagnosticsPage() {
     const params = new URLSearchParams({ page: String(page), limit: '20' });
     if (statusFilter) params.set('status', statusFilter);
 
+    console.log(`[Diagnostics] Fetching /admin/diagnostics?${params}`);
     api
       .get(`/admin/diagnostics?${params}`)
       .then((res) => {
         const data: DiagnosticsResponse = res.data;
+        console.log('[Diagnostics] Response:', data.total, 'total records');
         setDiagnostics(data.data);
         setTotalPages(data.totalPages);
       })
-      .catch(() => setDiagnostics([]))
+      .catch((err) => {
+        console.error('[Diagnostics] Fetch error:', err?.response?.status, err?.message);
+        setDiagnostics([]);
+      })
       .finally(() => setLoading(false));
   }, [page, statusFilter]);
 
@@ -98,9 +103,19 @@ export default function DiagnosticsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Diagnostics Coordination</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage lab test requests, sample collections, and results</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Diagnostics Coordination</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage lab test requests, sample collections, and results</p>
+        </div>
+        <button
+          onClick={fetchDiagnostics}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60 flex-shrink-0"
+        >
+          <span className={loading ? 'animate-spin' : ''}>↻</span>
+          Refresh
+        </button>
       </div>
 
       {/* Status Filter Tabs */}

@@ -37,10 +37,17 @@ export default function ProvidersPage() {
   const fetchProviders = (status?: string) => {
     setLoading(true);
     const query = status && status !== 'all' ? `?status=${status}` : '';
+    console.log(`[Providers] Fetching /admin/providers${query}`);
     api
       .get(`/admin/providers${query}`)
-      .then((res) => setProviders(res.data))
-      .catch(() => setProviders([]))
+      .then((res) => {
+        console.log('[Providers] Response:', res.data?.length, 'records');
+        setProviders(res.data);
+      })
+      .catch((err) => {
+        console.error('[Providers] Fetch error:', err?.response?.status, err?.message);
+        setProviders([]);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -88,9 +95,19 @@ export default function ProvidersPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Providers</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage healthcare provider accounts</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Providers</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage healthcare provider accounts</p>
+        </div>
+        <button
+          onClick={() => fetchProviders(tab)}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60 flex-shrink-0"
+        >
+          <span className={loading ? 'animate-spin' : ''}>↻</span>
+          Refresh
+        </button>
       </div>
 
       {/* Tabs */}

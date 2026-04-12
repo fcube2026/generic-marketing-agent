@@ -24,10 +24,17 @@ export default function ReferralsPage() {
 
   const fetchReferrals = () => {
     setLoading(true);
+    console.log('[Referrals] Fetching /admin/referrals');
     api
       .get('/admin/referrals')
-      .then((res) => setReferrals(res.data))
-      .catch(() => setReferrals([]))
+      .then((res) => {
+        console.log('[Referrals] Response:', res.data?.length, 'records');
+        setReferrals(res.data);
+      })
+      .catch((err) => {
+        console.error('[Referrals] Fetch error:', err?.response?.status, err?.message);
+        setReferrals([]);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -46,9 +53,19 @@ export default function ReferralsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Specialist Referrals</h1>
-        <p className="text-gray-500 text-sm mt-1">View and manage specialist referrals from providers</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Specialist Referrals</h1>
+          <p className="text-gray-500 text-sm mt-1">View and manage specialist referrals from providers</p>
+        </div>
+        <button
+          onClick={fetchReferrals}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60 flex-shrink-0"
+        >
+          <span className={loading ? 'animate-spin' : ''}>↻</span>
+          Refresh
+        </button>
       </div>
 
       {loading ? (

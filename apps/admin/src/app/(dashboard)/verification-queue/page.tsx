@@ -49,10 +49,17 @@ export default function VerificationQueuePage() {
 
   const fetchQueue = () => {
     setLoading(true);
+    console.log('[VerificationQueue] Fetching /admin/providers/pending');
     api
       .get('/admin/providers/pending')
-      .then((res) => setProviders(res.data))
-      .catch(() => setProviders([]))
+      .then((res) => {
+        console.log('[VerificationQueue] Response:', res.data?.length, 'pending providers');
+        setProviders(res.data);
+      })
+      .catch((err) => {
+        console.error('[VerificationQueue] Fetch error:', err?.response?.status, err?.message);
+        setProviders([]);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -118,11 +125,21 @@ export default function VerificationQueuePage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Verification Queue</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Review and approve new provider registrations
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Verification Queue</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Review and approve new provider registrations
+          </p>
+        </div>
+        <button
+          onClick={fetchQueue}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition disabled:opacity-60 flex-shrink-0"
+        >
+          <span className={loading ? 'animate-spin' : ''}>↻</span>
+          Refresh
+        </button>
       </div>
 
       {/* Feedback Banner */}
