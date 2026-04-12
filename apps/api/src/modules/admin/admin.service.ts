@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private verificationService: DoctorVerificationService,
+  ) {}
 
   async getAllProviders(status?: string) {
     const where: Record<string, unknown> = {};
@@ -441,5 +445,13 @@ export class AdminService {
     });
 
     return updated;
+  }
+
+  async getVerificationQueue(page = 1, limit = 20) {
+    return this.verificationService.getVerificationQueue(page, limit);
+  }
+
+  async retryNmcVerification(licenseId: string, adminId: string) {
+    return this.verificationService.retryVerification(licenseId, adminId);
   }
 }

@@ -16,6 +16,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
+import { DoctorVerificationModule } from './modules/doctor-verification/doctor-verification.module';
 import { BootstrapService } from './common/bootstrap.service';
 
 @Module({
@@ -39,6 +40,7 @@ import { BootstrapService } from './common/bootstrap.service';
     NotificationsModule,
     ReferralsModule,
     TrackingModule,
+    DoctorVerificationModule,
   ],
   providers: [BootstrapService],
 })
