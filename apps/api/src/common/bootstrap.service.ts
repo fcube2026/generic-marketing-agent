@@ -20,7 +20,9 @@ export class BootstrapService implements OnApplicationBootstrap {
   async onApplicationBootstrap() {
     // Fire-and-forget: do NOT await so the HTTP server can start immediately
     // and pass the Railway healthcheck while the seed runs in the background.
-    this.runSeedIfNeeded();
+    this.runSeedIfNeeded().catch((err) => {
+      this.logger.error(`Unexpected seed error: ${(err as Error).message}`);
+    });
   }
 
   private async runSeedIfNeeded() {
