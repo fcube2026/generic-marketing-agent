@@ -28,7 +28,7 @@ export class PrismaService
   }
 
   /**
-   * Attempt to connect to the database with exponential back-off.
+   * Attempt to connect to the database with exponential backoff.
    *
    * Railway may start the container before the database is fully
    * reachable (especially after a cold start or region failover).
