@@ -172,10 +172,12 @@ model DoctorVerificationLog {
   createdAt          DateTime @default(now())
 
   provider ProviderProfile  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  // SetNull (not Cascade) so audit logs are retained when a license record is deleted
   license  ProviderLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
 
   @@index([providerId])
   @@index([createdAt])
+  @@index([providerId, createdAt])
   @@map("doctor_verification_logs")
 }
 

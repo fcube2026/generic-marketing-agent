@@ -30,6 +30,9 @@ CREATE INDEX "doctor_verification_logs_providerId_idx" ON "doctor_verification_l
 -- CreateIndex
 CREATE INDEX "doctor_verification_logs_createdAt_idx" ON "doctor_verification_logs"("createdAt");
 
+-- CreateIndex: composite index for queries that filter by provider and sort by date
+CREATE INDEX "doctor_verification_logs_providerId_createdAt_idx" ON "doctor_verification_logs"("providerId", "createdAt");
+
 -- AddForeignKey
 ALTER TABLE "doctor_verification_logs" ADD CONSTRAINT "doctor_verification_logs_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "provider_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

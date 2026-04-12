@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
@@ -305,8 +306,8 @@ export class DoctorVerificationService {
         stateCouncil: stateCouncil,
         verificationSource: SOURCE_NMC_API,
         status: logStatus,
-        rawRequest: request as any,
-        rawResponse: (rawResponse ?? null) as any,
+        rawRequest: request as Prisma.InputJsonValue,
+        rawResponse: (rawResponse ?? null) as Prisma.InputJsonValue | null,
         errorCode: errorCode ?? null,
       },
     });

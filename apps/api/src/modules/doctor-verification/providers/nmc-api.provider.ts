@@ -83,14 +83,23 @@ export class NmcApiProvider {
       `[${this.provider}] Verifying NMC registration: ${req.memberId}`,
     );
 
-    const response = await fetch(this.apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+    let response: Response;
+    try {
+      response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const data = (await response.json()) as Record<string, unknown>;
 
@@ -98,7 +107,9 @@ export class NmcApiProvider {
       this.logger.warn(
         `[${this.provider}] Verification API error ${response.status}: ${JSON.stringify(data)}`,
       );
-      throw new Error(`NMC API returned HTTP ${response.status}`);
+      throw new Error(
+        `NMC API (${this.provider}) returned HTTP ${response.status}`,
+      );
     }
 
     return this.normalizeResponse(data, req);
