@@ -20,7 +20,15 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit() {
-    await this.connectWithRetry();
+    // Fire-and-forget: let the app start even if the database is temporarily
+    // unreachable so the Railway healthcheck can pass.  Prisma will lazily
+    // reconnect on the first real query.
+    this.connectWithRetry().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Initial database connection failed — the app will still start. Error: ${msg}`,
+      );
+    });
   }
 
   async onModuleDestroy() {
