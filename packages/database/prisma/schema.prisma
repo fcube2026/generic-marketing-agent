@@ -152,8 +152,8 @@ model ProviderLicense {
   lastAttemptAt         DateTime?
   nextReverificationDue DateTime?
 
-  provider              ProviderProfile         @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  verificationLogs      DoctorVerificationLog[]
+  provider         ProviderProfile         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  verificationLogs DoctorVerificationLog[]
 
   @@map("provider_licenses")
 }
