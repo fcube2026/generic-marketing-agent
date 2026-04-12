@@ -18,6 +18,12 @@ export class BootstrapService implements OnApplicationBootstrap {
   constructor(private prisma: PrismaService) {}
 
   async onApplicationBootstrap() {
+    // Fire-and-forget: do NOT await so the HTTP server can start immediately
+    // and pass the Railway healthcheck while the seed runs in the background.
+    this.runSeedIfNeeded();
+  }
+
+  private async runSeedIfNeeded() {
     try {
       const bookingCount = await this.prisma.booking.count();
       if (bookingCount === 0) {
