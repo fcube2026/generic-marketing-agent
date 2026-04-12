@@ -34,7 +34,6 @@ export default function DashboardPage() {
 
   const fetchData = useCallback((isManual = false) => {
     if (isManual) setRefreshing(true);
-    else if (!stats) setLoading(true);
 
     console.log('[Dashboard] Fetching data from API…', new Date().toISOString());
 
@@ -75,15 +74,14 @@ export default function DashboardPage() {
         setLoading(false);
         setRefreshing(false);
       });
-  }, [stats]);
+  }, []);
 
   // Initial load + auto-refresh every 30 seconds
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(), REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchData]);
 
   // Re-fetch when the browser tab regains focus
   useEffect(() => {
@@ -93,8 +91,7 @@ export default function DashboardPage() {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchData]);
 
   if (loading) {
     return (
