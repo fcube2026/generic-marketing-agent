@@ -4,7 +4,8 @@ dockerfilePath = "apps/api/Dockerfile"
 watchPatterns = ["apps/api/**", "packages/database/**", "packages/types/**"]
 
 [deploy]
-startCommand = "node dist/main"
+# Do NOT set startCommand here — it overrides the Dockerfile ENTRYPOINT+CMD
+# and skips the docker-entrypoint.sh that runs migrations and sets DIRECT_URL.
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

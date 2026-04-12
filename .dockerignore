@@ -56,7 +56,11 @@ docs
 labels
 .github
 
-# Mobile apps (not containerized)
+# Mobile apps (not containerized) — exclude source but keep package.json
+# so that pnpm workspace resolution matches the lockfile during Docker build.
 apps/mobile
+!apps/mobile/package.json
 apps/patient-app
+!apps/patient-app/package.json
 apps/provider-app
+!apps/provider-app/package.json

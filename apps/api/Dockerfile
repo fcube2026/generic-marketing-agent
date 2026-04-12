@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 RUN apk add --no-cache openssl
 
@@ -9,7 +9,16 @@ WORKDIR /app
 # Copy workspace configuration for dependency installation
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY scripts/fix-react-instances.js ./scripts/
+
+# Copy ALL workspace package.json files so that the workspace structure
+# matches pnpm-lock.yaml.  pnpm install --frozen-lockfile fails when the
+# lockfile references workspace packages whose package.json is missing.
 COPY apps/api/package.json ./apps/api/
+COPY apps/admin/package.json ./apps/admin/
+COPY apps/mobile/package.json ./apps/mobile/
+COPY apps/marketing-agent/package.json ./apps/marketing-agent/
+COPY apps/patient-app/package.json ./apps/patient-app/
+COPY apps/provider-app/package.json ./apps/provider-app/
 COPY packages/database/package.json ./packages/database/
 COPY packages/types/package.json ./packages/types/
 
