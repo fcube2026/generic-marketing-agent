@@ -157,43 +157,63 @@ jobs:
       name: production
       url: https://api.curex24.com
     steps:
+      - name: Check if production secrets are configured
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ RAILWAY_TOKEN not configured — skipping production deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: steps.check-secrets.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
+        if: steps.check-secrets.outputs.skip != 'true'
         run: pnpm --filter @curex24/database db:generate
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
       - name: Apply database migrations
+        if: steps.check-secrets.outputs.skip != 'true'
         run: cd packages/database && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
 
       - name: Install Railway CLI
+        if: steps.check-secrets.outputs.skip != 'true'
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
+        if: steps.check-secrets.outputs.skip != 'true'
         run: railway up --service ${{ vars.RAILWAY_PRODUCTION_SERVICE_ID }} --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Wait for deployment
+        if: steps.check-secrets.outputs.skip != 'true'
         run: sleep 30
 
       - name: Verify production API health
+        if: steps.check-secrets.outputs.skip != 'true'
         run: |
           for i in 1 2 3 4 5; do
             if curl -sf https://api.curex24.com/ > /dev/null 2>&1; then
@@ -207,6 +227,7 @@ jobs:
           exit 1
 
       - name: Deployment summary
+        if: steps.check-secrets.outputs.skip != 'true'
         run: |
           echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
