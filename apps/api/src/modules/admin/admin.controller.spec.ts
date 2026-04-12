@@ -97,6 +97,16 @@ describe('AdminController', () => {
               processedAmount: 0,
             }),
             processPayoutRecord: jest.fn().mockResolvedValue({}),
+            getVerificationQueue: jest.fn().mockResolvedValue({
+              data: [],
+              total: 0,
+              page: 1,
+              limit: 20,
+              totalPages: 0,
+            }),
+            retryNmcVerification: jest
+              .fn()
+              .mockResolvedValue({ status: 'SUCCESS' }),
           },
         },
       ],

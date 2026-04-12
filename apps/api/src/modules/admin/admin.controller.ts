@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, Param, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 
@@ -116,5 +116,24 @@ export class AdminController {
   @Put('payouts/:id/process')
   processPayoutRecord(@Param('id') payoutId: string, @CurrentUser() user: any) {
     return this.adminService.processPayoutRecord(payoutId, user.id);
+  }
+
+  @Get('verification/queue')
+  getVerificationQueue(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getVerificationQueue(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+    );
+  }
+
+  @Post('verification/:licenseId/retry')
+  retryNmcVerification(
+    @Param('licenseId') licenseId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.adminService.retryNmcVerification(licenseId, user.id);
   }
 }

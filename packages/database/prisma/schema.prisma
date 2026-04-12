@@ -121,13 +121,14 @@ model ProviderProfile {
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenses          ProviderLicense[]
   providerServices  ProviderService[]
   availabilitySlots AvailabilitySlot[]
   bookings          Booking[]
   doctorKits        DoctorKit[]
   payouts           Payout[]
+  verificationLogs  DoctorVerificationLog[]
 
   @@map("provider_profiles")
 }
@@ -143,9 +144,41 @@ model ProviderLicense {
   verifiedAt      DateTime?
   createdAt       DateTime      @default(now())
 
-  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  nmcRegistrationNumber String?
+  stateCouncil          String?
+  yearOfAdmission       String?
+  verificationSource    String?
+  verificationAttempts  Int       @default(0)
+  lastAttemptAt         DateTime?
+  nextReverificationDue DateTime?
+
+  provider              ProviderProfile         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  verificationLogs      DoctorVerificationLog[]
 
   @@map("provider_licenses")
+}
+
+model DoctorVerificationLog {
+  id                 String   @id @default(cuid())
+  providerId         String
+  licenseId          String?
+  registrationNumber String
+  stateCouncil       String
+  verificationSource String
+  status             String
+  rawRequest         Json?
+  rawResponse        Json?
+  errorCode          String?
+  createdAt          DateTime @default(now())
+
+  provider ProviderProfile  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  // SetNull (not Cascade) so audit logs are retained when a license record is deleted
+  license  ProviderLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+
+  @@index([providerId])
+  @@index([createdAt])
+  @@index([providerId, createdAt])
+  @@map("doctor_verification_logs")
 }
 
 model ServiceCategory {

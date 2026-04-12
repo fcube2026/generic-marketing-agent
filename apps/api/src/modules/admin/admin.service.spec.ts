@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -51,11 +52,20 @@ describe('AdminService', () => {
     },
   };
 
+  const mockVerificationService = {
+    getVerificationQueue: jest.fn(),
+    retryVerification: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: DoctorVerificationService,
+          useValue: mockVerificationService,
+        },
       ],
     }).compile();
 
@@ -573,6 +583,36 @@ describe('AdminService', () => {
           skip: 10,
           take: 10,
         }),
+      );
+    });
+  });
+
+  describe('getVerificationQueue', () => {
+    it('should delegate to verificationService', async () => {
+      const queue = { data: [], total: 0, page: 1, limit: 20, totalPages: 0 };
+      mockVerificationService.getVerificationQueue.mockResolvedValue(queue);
+
+      const result = await service.getVerificationQueue(1, 20);
+
+      expect(result).toEqual(queue);
+      expect(mockVerificationService.getVerificationQueue).toHaveBeenCalledWith(
+        1,
+        20,
+      );
+    });
+  });
+
+  describe('retryNmcVerification', () => {
+    it('should delegate to verificationService', async () => {
+      const retryResult = { status: 'SUCCESS', license: { id: 'license-1' } };
+      mockVerificationService.retryVerification.mockResolvedValue(retryResult);
+
+      const result = await service.retryNmcVerification('license-1', 'admin-1');
+
+      expect(result).toEqual(retryResult);
+      expect(mockVerificationService.retryVerification).toHaveBeenCalledWith(
+        'license-1',
+        'admin-1',
       );
     });
   });
