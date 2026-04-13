@@ -44,8 +44,9 @@ export default function LoginPage() {
           'Invalid credentials.';
       } else if (err?.request) {
         // Request was made but no response received (network / CORS issue)
+        const targetUrl = api.defaults.baseURL || '(unknown)';
         message =
-          'Unable to reach the server. Please try again later.';
+          `Unable to reach the server at ${targetUrl}. Please check that the API is running and CORS is configured.`;
       } else {
         message = 'Login failed. Please try again.';
       }
