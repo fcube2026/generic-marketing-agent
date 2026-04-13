@@ -39,6 +39,7 @@ export default function DashboardPage() {
 
     Promise.all([
       api.get('/admin/dashboard').catch((err) => {
+        if (err?.response?.status === 401) throw err;
         console.error('[Dashboard] /admin/dashboard error:', err?.response?.status, err?.message);
         return {
           data: {
@@ -54,6 +55,7 @@ export default function DashboardPage() {
         };
       }),
       api.get('/admin/dashboard/charts').catch((err) => {
+        if (err?.response?.status === 401) throw err;
         console.error('[Dashboard] /admin/dashboard/charts error:', err?.response?.status, err?.message);
         return {
           data: {
