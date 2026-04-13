@@ -442,6 +442,9 @@ Create two environments: **staging** and **production**.
 | `STAGING_DATABASE_URL` | Supabase staging pooler URL |
 | `STAGING_DIRECT_URL` | Supabase staging direct URL |
 | `RAILWAY_TOKEN` | Railway project token |
+| `VERCEL_TOKEN` | Vercel API token (from https://vercel.com/account/tokens) |
+| `VERCEL_ORG_ID` | Vercel organization/team ID |
+| `VERCEL_ADMIN_PROJECT_ID` | Vercel project ID for the admin dashboard |
 
 **Variables** (visible):
 | Name | Value |
@@ -456,6 +459,9 @@ Create two environments: **staging** and **production**.
 | `PRODUCTION_DATABASE_URL` | Supabase production pooler URL |
 | `PRODUCTION_DIRECT_URL` | Supabase production direct URL |
 | `RAILWAY_TOKEN` | Same Railway project token |
+| `VERCEL_TOKEN` | Same Vercel API token |
+| `VERCEL_ORG_ID` | Same Vercel organization/team ID |
+| `VERCEL_ADMIN_PROJECT_ID` | Same Vercel project ID for the admin dashboard |
 
 **Variables** (visible):
 | Name | Value |
