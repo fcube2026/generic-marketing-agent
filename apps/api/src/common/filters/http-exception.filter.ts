@@ -32,15 +32,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack : String(exception),
     );
 
+    const errorMessage =
+      typeof message === 'string'
+        ? message
+        : (message as any).message || message;
+
     response.status(status).json({
       success: false,
       statusCode: status,
+      message: errorMessage,
       timestamp: new Date().toISOString(),
       path: request.url,
-      error:
-        typeof message === 'string'
-          ? message
-          : (message as any).message || message,
+      error: errorMessage,
     });
   }
 }

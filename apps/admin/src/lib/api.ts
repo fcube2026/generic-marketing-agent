@@ -23,10 +23,17 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (typeof window !== 'undefined' && err.response?.status === 401) {
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_user');
-      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      window.location.href = '/login';
+      // Don't redirect when on the login page or when calling auth endpoints
+      // to let the login form display the specific error message.
+      const isAuthRequest = err.config?.url?.includes('/auth/admin-login');
+      const isLoginPage = window.location.pathname === '/login';
+
+      if (!isAuthRequest && !isLoginPage) {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   }
