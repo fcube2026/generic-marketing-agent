@@ -45,7 +45,7 @@ export default function LoginPage() {
       } else if (err?.request) {
         // Request was made but no response received (network / CORS issue)
         message =
-          'Unable to reach the server. Please check your connection and try again.';
+          'Unable to reach the server. Please try again later.';
       } else {
         message = 'Login failed. Please try again.';
       }
