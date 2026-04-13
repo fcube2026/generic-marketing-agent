@@ -43,21 +43,21 @@ model PatientProfile {
 }
 
 model ProviderProfile {
-  id                         String             @id @default(cuid())
-  userId                     String             @unique
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
   name                       String
   bio                        String?
   specialization             String
-  contactInfo                String             @default("")
-  clinicAddress              String             @default("")
+  contactInfo                String   @default("")
+  clinicAddress              String   @default("")
   licenseNumber              String?
-  isVerified                 Boolean            @default(false)
-  isActive                   Boolean            @default(true)
-  homeVisitEnabled           Boolean            @default(false)
-  doctorPlaceVisitEnabled    Boolean            @default(false)
-  serviceRadius              Float              @default(10)
-  consultationFeeHomeVisit   Float              @default(0)
-  consultationFeeDoctorPlace Float              @default(0)
+  isVerified                 Boolean  @default(false)
+  isActive                   Boolean  @default(true)
+  homeVisitEnabled           Boolean  @default(false)
+  doctorPlaceVisitEnabled    Boolean  @default(false)
+  serviceRadius              Float    @default(10)
+  consultationFeeHomeVisit   Float    @default(0)
+  consultationFeeDoctorPlace Float    @default(0)
   currentLat                 Float?
   currentLng                 Float?
   isAvailable                Boolean  @default(false)
@@ -77,11 +77,11 @@ model ProviderProfile {
 }
 
 model ProviderLicense {
-  id              String          @id @default(cuid())
+  id              String        @id @default(cuid())
   providerId      String
   type            String
   documentUrl     String
-  status          LicenseStatus   @default(PENDING)
+  status          LicenseStatus @default(PENDING)
   rejectionReason String?
   expiresAt       DateTime?
   verifiedAt      DateTime?
