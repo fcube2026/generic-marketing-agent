@@ -37,13 +37,11 @@ export default function LoginPage() {
     } catch (err: any) {
       let message: string;
       if (err?.response?.data) {
-        // API responded with an error — show the server message
         message =
           err.response.data.message ||
           err.response.data.error ||
           'Invalid credentials.';
       } else if (err?.request) {
-        // Request was made but no response received (network / CORS issue)
         const targetUrl = api.defaults.baseURL || '(unknown)';
         message =
           `Unable to reach the server at ${targetUrl}. Please check that the API is running and CORS is configured.`;

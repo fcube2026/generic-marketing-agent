@@ -8,8 +8,6 @@ function getApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  // When deployed (not local dev), fall back to the production API URL so that
-  // Vercel auto-deploys work even when NEXT_PUBLIC_API_URL is not configured.
   if (typeof window !== 'undefined' && !LOCAL_HOSTNAMES.includes(window.location.hostname)) {
     return PRODUCTION_API_URL;
   }
