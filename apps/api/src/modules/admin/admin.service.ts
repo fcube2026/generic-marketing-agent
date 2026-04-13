@@ -269,7 +269,7 @@ export class AdminService {
     ] = await Promise.all([
       this.prisma.booking.count(),
       this.prisma.providerProfile.count({
-        where: { isActive: true, isAvailable: true },
+        where: { isActive: true, isVerified: true },
       }),
       this.prisma.providerProfile.count({
         where: { isVerified: false, isActive: true },

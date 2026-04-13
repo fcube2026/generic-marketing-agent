@@ -15,6 +15,7 @@ describe('AuthService', () => {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
+        upsert: jest.fn(),
       },
       otpVerification: {
         create: jest.fn(),
@@ -51,7 +52,7 @@ describe('AuthService', () => {
     };
 
     it('should return token for valid credentials when admin user exists', async () => {
-      mockPrisma.user.findFirst.mockResolvedValue(mockAdminUser);
+      mockPrisma.user.upsert.mockResolvedValue(mockAdminUser);
 
       const result = await service.adminLogin(validDto);
 
@@ -71,16 +72,14 @@ describe('AuthService', () => {
     });
 
     it('should create admin user if not found and return token', async () => {
-      mockPrisma.user.findFirst.mockResolvedValue(null);
-      mockPrisma.user.create.mockResolvedValue(mockAdminUser);
+      mockPrisma.user.upsert.mockResolvedValue(mockAdminUser);
 
       const result = await service.adminLogin(validDto);
 
-      expect(mockPrisma.user.create).toHaveBeenCalledWith({
-        data: {
-          phone: '+0000000000',
-          role: 'ADMIN',
-        },
+      expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
+        where: { phone: '+0000000000' },
+        create: { phone: '+0000000000', role: 'ADMIN' },
+        update: { role: 'ADMIN' },
       });
       expect(result.token).toBe('mock-jwt-token');
       expect(result.user.role).toBe('ADMIN');
