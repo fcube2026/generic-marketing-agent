@@ -1,15 +1,19 @@
 import axios from 'axios';
 
+const PRODUCTION_API_URL = 'https://api.curex24.com/api/v1';
+const LOCAL_API_URL = 'http://localhost:3000/api/v1';
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
+
 function getApiBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  // When deployed (not localhost), fall back to the production API URL so that
+  // When deployed (not local dev), fall back to the production API URL so that
   // Vercel auto-deploys work even when NEXT_PUBLIC_API_URL is not configured.
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return 'https://api.curex24.com/api/v1';
+  if (typeof window !== 'undefined' && !LOCAL_HOSTNAMES.includes(window.location.hostname)) {
+    return PRODUCTION_API_URL;
   }
-  return 'http://localhost:3000/api/v1';
+  return LOCAL_API_URL;
 }
 
 const api = axios.create({
