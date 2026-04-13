@@ -9,6 +9,444 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id                    String                 @id @default(cuid())
+  phone                 String                 @unique
+  role                  Role                   @default(PATIENT)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  addresses             Address[]
+  adminActions          AdminAction[]          @relation("AdminActions")
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  otpVerifications      OtpVerification[]
+  patientProfile        PatientProfile?
+  providerProfile       ProviderProfile?
+  questionnaireResponse QuestionnaireResponse?
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  name             String
+  dateOfBirth      DateTime?
+  gender           String?
+  emergencyContact String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  bookings         Booking[]
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("patient_profiles")
+}
+
+model ProviderProfile {
+  id                         String             @id @default(cuid())
+  userId                     String             @unique
+  name                       String
+  bio                        String?
+  specialization             String
+  contactInfo                String             @default("")
+  clinicAddress              String             @default("")
+  licenseNumber              String?
+  isVerified                 Boolean            @default(false)
+  isActive                   Boolean            @default(true)
+  homeVisitEnabled           Boolean            @default(false)
+  doctorPlaceVisitEnabled    Boolean            @default(false)
+  serviceRadius              Float              @default(10)
+  consultationFeeHomeVisit   Float              @default(0)
+  consultationFeeDoctorPlace Float              @default(0)
+  currentLat                 Float?
+  currentLng                 Float?
+  isAvailable                Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenses          ProviderLicense[]
+  providerServices  ProviderService[]
+  availabilitySlots AvailabilitySlot[]
+  bookings          Booking[]
+  doctorKits        DoctorKit[]
+  payouts           Payout[]
+  verificationLogs  DoctorVerificationLog[]
+
+  @@map("provider_profiles")
+}
+
+model ProviderLicense {
+  id              String          @id @default(cuid())
+  providerId      String
+  type            String
+  documentUrl     String
+  status          LicenseStatus   @default(PENDING)
+  rejectionReason String?
+  expiresAt       DateTime?
+  verifiedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  nmcRegistrationNumber String?
+  stateCouncil          String?
+  yearOfAdmission       String?
+  verificationSource    String?
+  verificationAttempts  Int       @default(0)
+  lastAttemptAt         DateTime?
+  nextReverificationDue DateTime?
+
+  provider         ProviderProfile         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  verificationLogs DoctorVerificationLog[]
+
+  @@map("provider_licenses")
+}
+
+model DoctorVerificationLog {
+  id                 String   @id @default(cuid())
+  providerId         String
+  licenseId          String?
+  registrationNumber String
+  stateCouncil       String
+  verificationSource String
+  status             String
+  rawRequest         Json?
+  rawResponse        Json?
+  errorCode          String?
+  createdAt          DateTime @default(now())
+
+  provider ProviderProfile  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  // SetNull (not Cascade) so audit logs are retained when a license record is deleted
+  license  ProviderLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+
+  @@index([providerId])
+  @@index([createdAt])
+  @@index([providerId, createdAt])
+  @@map("doctor_verification_logs")
+}
+
+model ServiceCategory {
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  description      String?
+  iconUrl          String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  providerServices ProviderService[]
+
+  @@map("service_categories")
+}
+
+model ProviderService {
+  id                String          @id @default(cuid())
+  providerId        String
+  serviceCategoryId String
+  createdAt         DateTime        @default(now())
+  provider          ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceCategory   ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, serviceCategoryId])
+  @@map("provider_services")
+}
+
+model AvailabilitySlot {
+  id         String          @id @default(cuid())
+  providerId String
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  provider   ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("availability_slots")
+}
+
+model Address {
+  id          String    @id @default(cuid())
+  userId      String
+  label       String
+  addressLine String
+  city        String
+  state       String
+  pincode     String
+  lat         Float?
+  lng         Float?
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+
+  @@map("addresses")
+}
+
+model Booking {
+  id                  String                 @id @default(cuid())
+  patientId           String
+  providerId          String
+  serviceCategoryId   String
+  addressId           String?
+  mode                BookingMode
+  status              BookingStatus          @default(REQUESTED)
+  scheduledAt         DateTime
+  symptoms            String?
+  totalFee            Float
+  paymentStatus       PaymentStatus          @default(PENDING)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  statusHistory       BookingStatusHistory[]
+  address             Address?               @relation(fields: [addressId], references: [id])
+  patient             PatientProfile         @relation(fields: [patientId], references: [id])
+  provider            ProviderProfile        @relation(fields: [providerId], references: [id])
+  serviceCategory     ServiceCategory        @relation(fields: [serviceCategoryId], references: [id])
+  consultationSummary ConsultationSummary?
+  diagnosticRequests  DiagnosticRequest[]
+  payment             Payment?
+  payout              Payout?
+  providerLocations   ProviderLocation[]
+  referrals           Referral[]
+
+  @@index([patientId])
+  @@index([providerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("bookings")
+}
+
+model BookingStatusHistory {
+  id        String        @id @default(cuid())
+  bookingId String
+  status    BookingStatus
+  changedAt DateTime      @default(now())
+  changedBy String
+  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("booking_status_history")
+}
+
+model ConsultationSummary {
+  id                     String         @id @default(cuid())
+  bookingId              String         @unique
+  symptoms               String?
+  observations           String?
+  diagnosis              String?
+  medicinesAdvised       Json?
+  nextSteps              String?
+  followUpRecommendation String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  booking                Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  prescriptions          Prescription[]
+
+  @@map("consultation_summaries")
+}
+
+model Prescription {
+  id                    String              @id @default(cuid())
+  consultationSummaryId String
+  details               String?
+  fileUrl               String?
+  createdAt             DateTime            @default(now())
+  consultationSummary   ConsultationSummary @relation(fields: [consultationSummaryId], references: [id], onDelete: Cascade)
+
+  @@map("prescriptions")
+}
+
+model DiagnosticRequest {
+  id          String           @id @default(cuid())
+  bookingId   String
+  testType    String
+  notes       String?
+  status      DiagnosticStatus @default(REQUESTED)
+  scheduledAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  booking     Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  labResults  LabResult[]
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("diagnostic_requests")
+}
+
+model LabResult {
+  id                  String            @id @default(cuid())
+  diagnosticRequestId String
+  resultFileUrl       String?
+  notes               String?
+  uploadedAt          DateTime          @default(now())
+  diagnosticRequest   DiagnosticRequest @relation(fields: [diagnosticRequestId], references: [id], onDelete: Cascade)
+
+  @@map("lab_results")
+}
+
+model Referral {
+  id             String         @id @default(cuid())
+  bookingId      String
+  specialistType String
+  notes          String?
+  status         ReferralStatus @default(RECOMMENDED)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  booking        Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("referrals")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String        @unique
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Payout {
+  id          String          @id @default(cuid())
+  providerId  String
+  bookingId   String          @unique
+  amount      Float
+  status      PayoutStatus    @default(PENDING)
+  processedAt DateTime?
+  createdAt   DateTime        @default(now())
+  booking     Booking         @relation(fields: [bookingId], references: [id])
+  provider    ProviderProfile @relation(fields: [providerId], references: [id])
+
+  @@index([providerId])
+  @@index([status])
+  @@map("payouts")
+}
+
+model DoctorKit {
+  id          String          @id @default(cuid())
+  providerId  String
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+  items       DoctorKitItem[]
+  provider    ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("doctor_kits")
+}
+
+model DoctorKitItem {
+  id          String    @id @default(cuid())
+  doctorKitId String
+  itemName    String
+  quantity    Int
+  unit        String
+  doctorKit   DoctorKit @relation(fields: [doctorKitId], references: [id], onDelete: Cascade)
+
+  @@map("doctor_kit_items")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model AdminAction {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetId   String
+  targetType String
+  notes      String?
+  createdAt  DateTime @default(now())
+  admin      User     @relation("AdminActions", fields: [adminId], references: [id])
+
+  @@map("admin_actions")
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  userId    String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([phone])
+  @@map("otp_verifications")
+}
+
+model ProviderLocation {
+  id         String   @id @default(cuid())
+  bookingId  String
+  lat        Float
+  lng        Float
+  recordedAt DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, recordedAt(sort: Desc)])
+  @@map("provider_locations")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model QuestionnaireResponse {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  primarySpecialization String?
+  highestQualification  String?
+  licensedToPractice    String?
+  clinicalExperience    String?
+  servicesProvided      String?
+  patientGroups         String?
+  preferredSchedule     String?
+  availableTimes        String?
+  travelDistance        String?
+  mobileAppComfort      String?
+  onlineConsultation    String?
+  medicalEquipment      String?
+  preferredPayment      String?
+  handleEmergency       String?
+  platformExpectations  String?
+  followGuidelines      String?
+  homeVisitComfort      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("questionnaire_responses")
+}
+
 enum Role {
   PATIENT
   PROVIDER
@@ -62,465 +500,4 @@ enum LicenseStatus {
   PENDING
   APPROVED
   REJECTED
-}
-
-model User {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  role      Role     @default(PATIENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  patientProfile        PatientProfile?
-  providerProfile       ProviderProfile?
-  addresses             Address[]
-  auditLogs             AuditLog[]
-  adminActions          AdminAction[]          @relation("AdminActions")
-  otpVerifications      OtpVerification[]
-  notifications         Notification[]
-  questionnaireResponse QuestionnaireResponse?
-
-  @@map("users")
-}
-
-model PatientProfile {
-  id               String    @id @default(cuid())
-  userId           String    @unique
-  name             String
-  dateOfBirth      DateTime?
-  gender           String?
-  emergencyContact String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-
-  @@map("patient_profiles")
-}
-
-model ProviderProfile {
-  id                         String   @id @default(cuid())
-  userId                     String   @unique
-  name                       String
-  bio                        String?
-  specialization             String
-  contactInfo                String   @default("")
-  clinicAddress              String   @default("")
-  licenseNumber              String?
-  isVerified                 Boolean  @default(false)
-  isActive                   Boolean  @default(true)
-  homeVisitEnabled           Boolean  @default(false)
-  doctorPlaceVisitEnabled    Boolean  @default(false)
-  serviceRadius              Float    @default(10)
-  consultationFeeHomeVisit   Float    @default(0)
-  consultationFeeDoctorPlace Float    @default(0)
-  currentLat                 Float?
-  currentLng                 Float?
-  isAvailable                Boolean  @default(false)
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
-
-  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  licenses          ProviderLicense[]
-  providerServices  ProviderService[]
-  availabilitySlots AvailabilitySlot[]
-  bookings          Booking[]
-  doctorKits        DoctorKit[]
-  payouts           Payout[]
-  verificationLogs  DoctorVerificationLog[]
-
-  @@map("provider_profiles")
-}
-
-model ProviderLicense {
-  id              String        @id @default(cuid())
-  providerId      String
-  type            String
-  documentUrl     String
-  status          LicenseStatus @default(PENDING)
-  rejectionReason String?
-  expiresAt       DateTime?
-  verifiedAt      DateTime?
-  createdAt       DateTime      @default(now())
-
-  nmcRegistrationNumber String?
-  stateCouncil          String?
-  yearOfAdmission       String?
-  verificationSource    String?
-  verificationAttempts  Int       @default(0)
-  lastAttemptAt         DateTime?
-  nextReverificationDue DateTime?
-
-  provider         ProviderProfile         @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  verificationLogs DoctorVerificationLog[]
-
-  @@map("provider_licenses")
-}
-
-model DoctorVerificationLog {
-  id                 String   @id @default(cuid())
-  providerId         String
-  licenseId          String?
-  registrationNumber String
-  stateCouncil       String
-  verificationSource String
-  status             String
-  rawRequest         Json?
-  rawResponse        Json?
-  errorCode          String?
-  createdAt          DateTime @default(now())
-
-  provider ProviderProfile  @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  // SetNull (not Cascade) so audit logs are retained when a license record is deleted
-  license  ProviderLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
-
-  @@index([providerId])
-  @@index([createdAt])
-  @@index([providerId, createdAt])
-  @@map("doctor_verification_logs")
-}
-
-model ServiceCategory {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  iconUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  providerServices ProviderService[]
-  bookings         Booking[]
-
-  @@map("service_categories")
-}
-
-model ProviderService {
-  id                String   @id @default(cuid())
-  providerId        String
-  serviceCategoryId String
-  createdAt         DateTime @default(now())
-
-  provider        ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id], onDelete: Cascade)
-
-  @@unique([providerId, serviceCategoryId])
-  @@map("provider_services")
-}
-
-model AvailabilitySlot {
-  id         String   @id @default(cuid())
-  providerId String
-  dayOfWeek  Int
-  startTime  String
-  endTime    String
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@map("availability_slots")
-}
-
-model Address {
-  id          String   @id @default(cuid())
-  userId      String
-  label       String
-  addressLine String
-  city        String
-  state       String
-  pincode     String
-  lat         Float?
-  lng         Float?
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-
-  @@map("addresses")
-}
-
-model Booking {
-  id                String        @id @default(cuid())
-  patientId         String
-  providerId        String
-  serviceCategoryId String
-  addressId         String?
-  mode              BookingMode
-  status            BookingStatus @default(REQUESTED)
-  scheduledAt       DateTime
-  symptoms          String?
-  totalFee          Float
-  paymentStatus     PaymentStatus @default(PENDING)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-
-  patient             PatientProfile         @relation(fields: [patientId], references: [id])
-  provider            ProviderProfile        @relation(fields: [providerId], references: [id])
-  serviceCategory     ServiceCategory        @relation(fields: [serviceCategoryId], references: [id])
-  address             Address?               @relation(fields: [addressId], references: [id])
-  statusHistory       BookingStatusHistory[]
-  consultationSummary ConsultationSummary?
-  diagnosticRequests  DiagnosticRequest[]
-  referrals           Referral[]
-  payment             Payment?
-  payout              Payout?
-  providerLocations   ProviderLocation[]
-
-  @@index([patientId])
-  @@index([providerId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("bookings")
-}
-
-model BookingStatusHistory {
-  id        String        @id @default(cuid())
-  bookingId String
-  status    BookingStatus
-  changedAt DateTime      @default(now())
-  changedBy String
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@map("booking_status_history")
-}
-
-model ConsultationSummary {
-  id                     String   @id @default(cuid())
-  bookingId              String   @unique
-  symptoms               String?
-  observations           String?
-  diagnosis              String?
-  medicinesAdvised       Json?
-  nextSteps              String?
-  followUpRecommendation String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  booking       Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  prescriptions Prescription[]
-
-  @@map("consultation_summaries")
-}
-
-model Prescription {
-  id                    String   @id @default(cuid())
-  consultationSummaryId String
-  details               String?
-  fileUrl               String?
-  createdAt             DateTime @default(now())
-
-  consultationSummary ConsultationSummary @relation(fields: [consultationSummaryId], references: [id], onDelete: Cascade)
-
-  @@map("prescriptions")
-}
-
-model DiagnosticRequest {
-  id          String           @id @default(cuid())
-  bookingId   String
-  testType    String
-  notes       String?
-  status      DiagnosticStatus @default(REQUESTED)
-  scheduledAt DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-
-  booking    Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  labResults LabResult[]
-
-  @@index([bookingId])
-  @@index([status])
-  @@map("diagnostic_requests")
-}
-
-model LabResult {
-  id                  String   @id @default(cuid())
-  diagnosticRequestId String
-  resultFileUrl       String?
-  notes               String?
-  uploadedAt          DateTime @default(now())
-
-  diagnosticRequest DiagnosticRequest @relation(fields: [diagnosticRequestId], references: [id], onDelete: Cascade)
-
-  @@map("lab_results")
-}
-
-model Referral {
-  id             String         @id @default(cuid())
-  bookingId      String
-  specialistType String
-  notes          String?
-  status         ReferralStatus @default(RECOMMENDED)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@map("referrals")
-}
-
-model Payment {
-  id            String        @id @default(cuid())
-  bookingId     String        @unique
-  amount        Float
-  status        PaymentStatus @default(PENDING)
-  transactionId String?
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
-}
-
-model Payout {
-  id          String       @id @default(cuid())
-  providerId  String
-  bookingId   String       @unique
-  amount      Float
-  status      PayoutStatus @default(PENDING)
-  processedAt DateTime?
-  createdAt   DateTime     @default(now())
-
-  provider ProviderProfile @relation(fields: [providerId], references: [id])
-  booking  Booking         @relation(fields: [bookingId], references: [id])
-
-  @@index([providerId])
-  @@index([status])
-  @@map("payouts")
-}
-
-model DoctorKit {
-  id          String   @id @default(cuid())
-  providerId  String
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-
-  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  items    DoctorKitItem[]
-
-  @@map("doctor_kits")
-}
-
-model DoctorKitItem {
-  id          String @id @default(cuid())
-  doctorKitId String
-  itemName    String
-  quantity    Int
-  unit        String
-
-  doctorKit DoctorKit @relation(fields: [doctorKitId], references: [id], onDelete: Cascade)
-
-  @@map("doctor_kit_items")
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  action    String
-  entity    String
-  entityId  String
-  meta      Json?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@map("audit_logs")
-}
-
-model AdminAction {
-  id         String   @id @default(cuid())
-  adminId    String
-  action     String
-  targetId   String
-  targetType String
-  notes      String?
-  createdAt  DateTime @default(now())
-
-  admin User @relation("AdminActions", fields: [adminId], references: [id])
-
-  @@map("admin_actions")
-}
-
-model OtpVerification {
-  id        String   @id @default(cuid())
-  phone     String
-  otp       String
-  expiresAt DateTime
-  verified  Boolean  @default(false)
-  userId    String?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
-
-  @@index([phone])
-  @@map("otp_verifications")
-}
-
-model ProviderLocation {
-  id         String   @id @default(cuid())
-  bookingId  String
-  lat        Float
-  lng        Float
-  recordedAt DateTime @default(now())
-
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId, recordedAt(sort: Desc)])
-  @@map("provider_locations")
-}
-
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  message   String
-  type      String
-  isRead    Boolean  @default(false)
-  metadata  Json? // Contextual data e.g. { providerId, reason } for provider actions
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("notifications")
-}
-
-model QuestionnaireResponse {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  primarySpecialization String?
-  highestQualification  String?
-  licensedToPractice    String?
-  clinicalExperience    String?
-  servicesProvided      String?
-  patientGroups         String?
-  preferredSchedule     String?
-  availableTimes        String?
-  travelDistance        String?
-  mobileAppComfort      String?
-  onlineConsultation    String?
-  medicalEquipment      String?
-  preferredPayment      String?
-  handleEmergency       String?
-  platformExpectations  String?
-  followGuidelines      String?
-  homeVisitComfort      String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("questionnaire_responses")
 }
