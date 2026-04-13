@@ -35,10 +35,20 @@ export default function LoginPage() {
 
       router.push('/dashboard');
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        'Login failed. Please try again.';
+      let message: string;
+      if (err?.response?.data) {
+        // API responded with an error — show the server message
+        message =
+          err.response.data.message ||
+          err.response.data.error ||
+          'Invalid credentials.';
+      } else if (err?.request) {
+        // Request was made but no response received (network / CORS issue)
+        message =
+          'Unable to reach the server. Please check your connection and try again.';
+      } else {
+        message = 'Login failed. Please try again.';
+      }
       setError(message);
     } finally {
       setLoading(false);
