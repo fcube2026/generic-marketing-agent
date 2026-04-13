@@ -19,7 +19,7 @@ COPY apps/admin/ .
 
 # NEXT_PUBLIC_* vars are baked in at build time by Next.js, so they must be
 # passed as build args and exported as ENV before running `pnpm build`.
-ARG NEXT_PUBLIC_API_URL=http://localhost:3000
+ARG NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Build the Next.js app

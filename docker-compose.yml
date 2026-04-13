@@ -56,9 +56,9 @@ services:
       dockerfile: apps/admin/Dockerfile
       args:
         # NEXT_PUBLIC_API_URL is used by the browser (client-side), not by the
-        # container itself, so localhost:3000 is correct — Docker exposes the
-        # API port on the host's localhost.
-        NEXT_PUBLIC_API_URL: http://localhost:3000
+        # container itself. Docker exposes the API on the host's localhost:3000,
+        # and the API serves all routes under the /api/v1 prefix.
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
     container_name: curex24-admin
     restart: unless-stopped
     ports:
