@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Marketing Dashboard', subtitle: 'North star metrics, quick actions, and weekly priorities' },
@@ -17,7 +17,16 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 
 export default function Header() {
   const pathname = usePathname() ?? '/dashboard';
+  const router = useRouter();
   const meta = pageTitles[pathname] ?? { title: 'Marketing Agent', subtitle: '' };
+
+  const handleLogout = () => {
+    localStorage.removeItem('marketing_token');
+    localStorage.removeItem('marketing_user');
+    // Clear the auth cookie
+    document.cookie = 'marketing_token=; path=/; max-age=0; SameSite=Lax';
+    router.push('/login');
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
@@ -30,6 +39,12 @@ export default function Header() {
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
           M
         </div>
+        <button
+          onClick={handleLogout}
+          className="text-sm text-red-500 hover:text-red-700 font-medium transition"
+        >
+          Logout
+        </button>
       </div>
     </header>
   );
