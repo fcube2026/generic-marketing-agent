@@ -1,15 +1,22 @@
 import axios from 'axios';
 
 const PRODUCTION_API_URL = 'https://api.curex24.com/api/v1';
+const STAGING_API_URL = 'https://api.staging.curex24.com/api/v1';
 const LOCAL_API_URL = 'http://localhost:3000/api/v1';
 const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
 
 function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('staging')) {
+      return STAGING_API_URL;
+    }
+    if (!LOCAL_HOSTNAMES.includes(hostname)) {
+      return PRODUCTION_API_URL;
+    }
+  }
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== 'undefined' && !LOCAL_HOSTNAMES.includes(window.location.hostname)) {
-    return PRODUCTION_API_URL;
   }
   return LOCAL_API_URL;
 }
