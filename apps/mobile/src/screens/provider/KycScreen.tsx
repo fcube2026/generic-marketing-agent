@@ -15,6 +15,13 @@ import { providerService, NmcVerificationPayload } from '../../services/provider
 
 type VerificationStatus = 'SUCCESS' | 'NOT_FOUND' | 'ERROR' | 'MANUAL_REVIEW';
 
+interface VerificationLog {
+  id: string;
+  status: VerificationStatus;
+  registrationNumber: string;
+  createdAt: string;
+}
+
 const STATUS_CONFIG: Record<VerificationStatus, { color: string; icon: string; message: string }> = {
   SUCCESS: { color: Colors.success, icon: '✅', message: 'Verified successfully!' },
   NOT_FOUND: { color: Colors.warning, icon: '⚠️', message: 'Registration not found in NMC records.' },
@@ -88,7 +95,7 @@ export const KycScreen: React.FC = () => {
       {bannerCfg && (
         <View style={[styles.statusBanner, { backgroundColor: bannerCfg.color }]}>
           <Text style={styles.statusText}>
-            {bannerCfg.icon} {isVerified && !lastStatus ? '✅ Account Verified' : bannerCfg.message}
+            {isVerified && !lastStatus ? '✅ Account Verified' : `${bannerCfg.icon} ${bannerCfg.message}`}
           </Text>
         </View>
       )}
@@ -148,7 +155,7 @@ export const KycScreen: React.FC = () => {
         ) : logs.length === 0 ? (
           <Text style={styles.noLogsText}>No verification attempts yet.</Text>
         ) : (
-          logs.map((log: any) => {
+          logs.map((log: VerificationLog) => {
             const cfg = STATUS_CONFIG[log.status as VerificationStatus] ?? STATUS_CONFIG.ERROR;
             return (
               <View key={log.id} style={[styles.logItem, { borderLeftColor: cfg.color }]}>
