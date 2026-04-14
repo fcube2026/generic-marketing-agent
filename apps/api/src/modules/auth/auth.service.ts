@@ -104,30 +104,25 @@ export class AuthService {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
-    try {
-      // Find or create the admin user (phone is unique — use upsert to avoid
-      // a unique-constraint crash if the row exists with a different role)
-      const user = await this.prisma.user.upsert({
-        where: { phone: ADMIN_PHONE },
-        create: { phone: ADMIN_PHONE, role: Role.ADMIN },
-        update: { role: Role.ADMIN },
-      });
+    // Find or create the admin user (phone is unique — use upsert to avoid
+    // a unique-constraint crash if the row exists with a different role)
+    const user = await this.prisma.user.upsert({
+      where: { phone: ADMIN_PHONE },
+      create: { phone: ADMIN_PHONE, role: Role.ADMIN },
+      update: { role: Role.ADMIN },
+    });
 
-      const payload = { sub: user.id, phone: user.phone, role: user.role };
-      const token = this.jwtService.sign(payload);
+    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const token = this.jwtService.sign(payload);
 
-      return {
-        token,
-        user: {
-          id: user.id,
-          email: ADMIN_EMAIL,
-          role: user.role,
-        },
-      };
-    } catch (error) {
-      console.error('[AdminLogin] Error:', error.message, error.stack);
-      throw error;
-    }
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: ADMIN_EMAIL,
+        role: user.role,
+      },
+    };
   }
 
   private generateOtp(): string {

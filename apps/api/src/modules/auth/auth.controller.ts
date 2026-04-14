@@ -1,33 +1,13 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { Public } from './decorators/roles.decorator';
-import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private prisma: PrismaService,
-  ) {}
-
-  // Temporary debug endpoint — REMOVE after fixing staging
-  @Public()
-  @Get('db-check')
-  async dbCheck() {
-    try {
-      const count = await this.prisma.user.count();
-      return {
-        status: 'ok',
-        userCount: count,
-        dbUrl: process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':***@'),
-      };
-    } catch (error) {
-      return { status: 'error', message: error.message, code: error.code };
-    }
-  }
+  constructor(private authService: AuthService) {}
 
   @Public()
   @Post('send-otp')
