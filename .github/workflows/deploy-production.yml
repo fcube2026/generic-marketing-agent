@@ -191,12 +191,14 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
 
       - name: Apply database migrations
         if: steps.check-secrets.outputs.skip != 'true'
         run: cd packages/database && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
 
       - name: Install Railway CLI
         if: steps.check-secrets.outputs.skip != 'true'
