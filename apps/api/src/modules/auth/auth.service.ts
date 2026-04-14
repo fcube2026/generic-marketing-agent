@@ -38,16 +38,19 @@ export class AuthService {
     });
 
     // In production, send via SMS provider
-    const isDev = process.env.NODE_ENV !== 'production';
+    // Return OTP in response for dev and staging environments
+    const showOtp =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.APP_ENV === 'staging';
 
-    if (isDev) {
+    if (showOtp) {
       console.log(`OTP for ${dto.phone}: ${otp}`);
     }
 
     return {
       success: true,
       message: 'OTP sent successfully',
-      ...(isDev && { otp }),
+      ...(showOtp && { otp }),
     };
   }
 
