@@ -173,11 +173,13 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
       - name: Apply database migrations
         run: cd packages/database && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
