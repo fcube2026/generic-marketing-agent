@@ -183,7 +183,7 @@ export const KycScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, padding: 20, paddingTop: 60 },
+  header: { backgroundColor: Colors.primary, padding: 20, paddingTop: 24 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.white },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   statusBanner: { margin: 16, borderRadius: 10, padding: 14, alignItems: 'center' },

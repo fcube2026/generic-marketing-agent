@@ -18,6 +18,10 @@ export const ENDPOINTS = {
   PROVIDERS: {
     NEARBY: '/providers/nearby',
   },
+  VERIFICATION: {
+    SUBMIT_NMC: '/providers/me/verification/nmc',
+    LOGS: '/providers/me/verification/logs',
+  },
   SERVICES: '/services',
   BOOKINGS: '/bookings',
   RECOMMENDATION: '/recommendation',

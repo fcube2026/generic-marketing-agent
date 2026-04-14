@@ -1,6 +1,13 @@
 import api from './api';
 import { ENDPOINTS } from '../constants/api';
 
+export interface NmcVerificationPayload {
+  nmcRegistrationNumber: string;
+  stateCouncil: string;
+  yearOfAdmission: string;
+  licenseId?: string;
+}
+
 // Provider management service (used by provider screens)
 
 export interface NmcVerificationPayload {
@@ -35,6 +42,18 @@ export const providerService = {
   },
   submitSummary: async (bookingId: string, data: any) => {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
+    return r.data;
+  },
+
+  /** Submit NMC registration for automated verification. */
+  submitNmcVerification: async (data: NmcVerificationPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
+    return r.data;
+  },
+
+  /** Fetch all past verification log entries for the current provider. */
+  getVerificationLogs: async () => {
+    const r = await api.get(ENDPOINTS.VERIFICATION.LOGS);
     return r.data;
   },
 
