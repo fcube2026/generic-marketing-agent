@@ -6,10 +6,11 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 
-// Hardcoded admin credentials for MVP (override via environment variables)
+// Hardcoded admin/marketing credentials for MVP (override via environment variables)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
+const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
 @Injectable()
 export class AuthService {
@@ -113,6 +114,30 @@ export class AuthService {
       where: { phone: ADMIN_PHONE },
       create: { phone: ADMIN_PHONE, role: Role.ADMIN },
       update: { role: Role.ADMIN },
+    });
+
+    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: ADMIN_EMAIL,
+        role: user.role,
+      },
+    };
+  }
+
+  async marketingLogin(dto: AdminLoginDto) {
+    if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
+      throw new UnauthorizedException('Invalid marketing agent credentials');
+    }
+
+    const user = await this.prisma.user.upsert({
+      where: { phone: MARKETING_PHONE },
+      create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },
+      update: { role: Role.MARKETING_AGENT },
     });
 
     const payload = { sub: user.id, phone: user.phone, role: user.role };

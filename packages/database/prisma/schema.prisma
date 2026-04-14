@@ -451,6 +451,7 @@ enum Role {
   PATIENT
   PROVIDER
   ADMIN
+  MARKETING_AGENT
 }
 
 enum BookingMode {

@@ -17,7 +17,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/admin-login', {
+      const { data } = await api.post('/auth/marketing-login', {
         email,
         password,
       });

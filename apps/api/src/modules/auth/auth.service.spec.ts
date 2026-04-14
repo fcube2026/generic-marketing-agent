@@ -103,4 +103,66 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
   });
+
+  describe('marketingLogin', () => {
+    const validDto = { email: 'admin@curex24.com', password: 'admin123' };
+
+    const mockMarketingUser = {
+      id: 'marketing-user-id',
+      phone: '+0000000001',
+      role: 'MARKETING_AGENT',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should return token for valid credentials', async () => {
+      mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
+
+      const result = await service.marketingLogin(validDto);
+
+      expect(result).toEqual({
+        token: 'mock-jwt-token',
+        user: {
+          id: 'marketing-user-id',
+          email: 'admin@curex24.com',
+          role: 'MARKETING_AGENT',
+        },
+      });
+      expect(mockJwtService.sign).toHaveBeenCalledWith({
+        sub: 'marketing-user-id',
+        phone: '+0000000001',
+        role: 'MARKETING_AGENT',
+      });
+    });
+
+    it('should upsert marketing agent user with MARKETING_AGENT role', async () => {
+      mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
+
+      await service.marketingLogin(validDto);
+
+      expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
+        where: { phone: '+0000000001' },
+        create: { phone: '+0000000001', role: 'MARKETING_AGENT' },
+        update: { role: 'MARKETING_AGENT' },
+      });
+    });
+
+    it('should throw UnauthorizedException for wrong email', async () => {
+      await expect(
+        service.marketingLogin({
+          email: 'wrong@email.com',
+          password: 'admin123',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for wrong password', async () => {
+      await expect(
+        service.marketingLogin({
+          email: 'admin@curex24.com',
+          password: 'wrong',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
 });

@@ -26,4 +26,10 @@ export class AuthController {
   adminLogin(@Body() dto: AdminLoginDto) {
     return this.authService.adminLogin(dto);
   }
+
+  @Public()
+  @Post('marketing-login')
+  marketingLogin(@Body() dto: AdminLoginDto) {
+    return this.authService.marketingLogin(dto);
+  }
 }
