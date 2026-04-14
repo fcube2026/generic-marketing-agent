@@ -43,8 +43,9 @@ export default function LoginPage() {
           error.response.data.error ||
           'Invalid credentials.';
       } else if (error?.request) {
+        const baseURL = api.defaults.baseURL ?? 'unknown';
         message =
-          'Unable to reach the server. Please try again later.';
+          `Unable to reach the server (${baseURL}). Please check your network or contact support.`;
       } else {
         message = 'Login failed. Please try again.';
       }
