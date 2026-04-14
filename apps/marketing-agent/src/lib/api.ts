@@ -42,7 +42,9 @@ api.interceptors.response.use(
     if (typeof window !== 'undefined' && err.response?.status === 401) {
       // Don't redirect when on the login page or when calling auth endpoints
       // to let the login form display the specific error message.
-      const isAuthRequest = err.config?.url?.includes('/auth/admin-login');
+      const isAuthRequest =
+        err.config?.url?.includes('/auth/admin-login') ||
+        err.config?.url?.includes('/auth/marketing-login');
       const isLoginPage = window.location.pathname === '/login';
 
       if (!isAuthRequest && !isLoginPage) {

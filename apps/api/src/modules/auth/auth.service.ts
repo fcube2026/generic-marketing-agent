@@ -11,6 +11,11 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 
+// Marketing agent credentials (override via environment variables)
+const MARKETING_EMAIL = process.env.MARKETING_EMAIL || 'marketing@curex24.com';
+const MARKETING_PASSWORD = process.env.MARKETING_PASSWORD || 'marketing123';
+const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -123,6 +128,30 @@ export class AuthService {
       user: {
         id: user.id,
         email: ADMIN_EMAIL,
+        role: user.role,
+      },
+    };
+  }
+
+  async marketingLogin(dto: AdminLoginDto) {
+    if (dto.email !== MARKETING_EMAIL || dto.password !== MARKETING_PASSWORD) {
+      throw new UnauthorizedException('Invalid marketing agent credentials');
+    }
+
+    const user = await this.prisma.user.upsert({
+      where: { phone: MARKETING_PHONE },
+      create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },
+      update: { role: Role.MARKETING_AGENT },
+    });
+
+    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        email: MARKETING_EMAIL,
         role: user.role,
       },
     };
