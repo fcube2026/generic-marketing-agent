@@ -1,6 +1,9 @@
+import Constants from 'expo-constants';
+
 const rawApiBaseUrl =
-  (typeof process !== 'undefined' &&
-    (process.env?.EXPO_PUBLIC_API_BASE_URL || process.env?.EXPO_PUBLIC_API_URL)) ||
+  process.env.EXPO_PUBLIC_API_URL ||
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  Constants.expoConfig?.extra?.apiUrl ||
   'http://localhost:3000/api/v1';
 
 export const API_BASE_URL = rawApiBaseUrl.replace(/\/$/, '');
