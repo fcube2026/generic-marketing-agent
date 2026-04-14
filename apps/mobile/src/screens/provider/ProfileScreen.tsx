@@ -155,7 +155,7 @@ export const ProfileScreen: React.FC = () => {
           <Text style={styles.actionArrow}>→</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionItem} onPress={() => Alert.alert('Coming Soon', 'KYC management will be available soon.')}>
+        <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('Kyc')}>
           <Text style={styles.actionIcon}>📄</Text>
           <View style={styles.actionContent}>
             <Text style={styles.actionLabel}>KYC & Documents</Text>

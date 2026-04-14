@@ -2,6 +2,13 @@ import api from './api';
 import { ENDPOINTS } from '../constants/api';
 
 // Provider management service (used by provider screens)
+
+export interface NmcVerificationPayload {
+  nmcRegistrationNumber: string;
+  stateCouncil: string;
+  yearOfAdmission: string;
+}
+
 export const providerService = {
   getProfile: async () => {
     const r = await api.get('/providers/me');
@@ -50,6 +57,17 @@ export const providerService = {
     urgency: 'LOW' | 'MEDIUM' | 'HIGH';
   }) => {
     const response = await api.post(ENDPOINTS.RECOMMENDATION, data);
+    return response.data;
+  },
+
+  // Doctor NMC verification
+  submitNmcVerification: async (payload: NmcVerificationPayload) => {
+    const response = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, payload);
+    return response.data;
+  },
+
+  getVerificationLogs: async () => {
+    const response = await api.get(ENDPOINTS.VERIFICATION.LOGS);
     return response.data;
   },
 };
