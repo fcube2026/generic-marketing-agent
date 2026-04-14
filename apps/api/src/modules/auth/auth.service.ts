@@ -9,6 +9,8 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 // Hardcoded admin/marketing credentials for MVP (override via environment variables)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const MARKETING_EMAIL = process.env.MARKETING_EMAIL || 'marketing@curex24.com';
+const MARKETING_PASSWORD = process.env.MARKETING_PASSWORD || 'marketing123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
@@ -130,7 +132,7 @@ export class AuthService {
   }
 
   async marketingLogin(dto: AdminLoginDto) {
-    if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
+    if (dto.email !== MARKETING_EMAIL || dto.password !== MARKETING_PASSWORD) {
       throw new UnauthorizedException('Invalid marketing agent credentials');
     }
 
@@ -147,7 +149,7 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        email: ADMIN_EMAIL,
+        email: MARKETING_EMAIL,
         role: user.role,
       },
     };

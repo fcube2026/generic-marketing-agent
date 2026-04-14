@@ -80,7 +80,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-              placeholder="admin@curex24.com"
+              placeholder="marketing@curex24.com"
             />
           </div>
 

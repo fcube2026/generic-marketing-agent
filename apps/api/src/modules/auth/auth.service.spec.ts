@@ -105,7 +105,10 @@ describe('AuthService', () => {
   });
 
   describe('marketingLogin', () => {
-    const validDto = { email: 'admin@curex24.com', password: 'admin123' };
+    const validDto = {
+      email: 'marketing@curex24.com',
+      password: 'marketing123',
+    };
 
     const mockMarketingUser = {
       id: 'marketing-user-id',
@@ -124,7 +127,7 @@ describe('AuthService', () => {
         token: 'mock-jwt-token',
         user: {
           id: 'marketing-user-id',
-          email: 'admin@curex24.com',
+          email: 'marketing@curex24.com',
           role: 'MARKETING_AGENT',
         },
       });
@@ -151,7 +154,7 @@ describe('AuthService', () => {
       await expect(
         service.marketingLogin({
           email: 'wrong@email.com',
-          password: 'admin123',
+          password: 'marketing123',
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
@@ -159,8 +162,17 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException for wrong password', async () => {
       await expect(
         service.marketingLogin({
-          email: 'admin@curex24.com',
+          email: 'marketing@curex24.com',
           password: 'wrong',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for admin credentials', async () => {
+      await expect(
+        service.marketingLogin({
+          email: 'admin@curex24.com',
+          password: 'admin123',
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
