@@ -200,6 +200,9 @@ importers:
 
   apps/marketing-agent:
     dependencies:
+      axios:
+        specifier: ^1.6.0
+        version: 1.15.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
