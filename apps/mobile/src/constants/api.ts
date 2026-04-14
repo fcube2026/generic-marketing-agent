@@ -27,4 +27,8 @@ export const ENDPOINTS = {
   RECOMMENDATION: '/recommendation',
   CONSULTATION: '/consultation',
   PAYMENTS: '/payments',
+  VERIFICATION: {
+    SUBMIT_NMC: '/providers/me/verification/nmc',
+    LOGS: '/providers/me/verification/logs',
+  },
 };
