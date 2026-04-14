@@ -6,14 +6,10 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 
-// Hardcoded admin credentials for MVP (override via environment variables)
+// Hardcoded admin/marketing credentials for MVP (override via environment variables)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
-
-// Marketing agent credentials (override via environment variables)
-const MARKETING_EMAIL = process.env.MARKETING_EMAIL || 'marketing@curex24.com';
-const MARKETING_PASSWORD = process.env.MARKETING_PASSWORD || 'marketing123';
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
 @Injectable()
@@ -134,7 +130,7 @@ export class AuthService {
   }
 
   async marketingLogin(dto: AdminLoginDto) {
-    if (dto.email !== MARKETING_EMAIL || dto.password !== MARKETING_PASSWORD) {
+    if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
       throw new UnauthorizedException('Invalid marketing agent credentials');
     }
 
@@ -151,7 +147,7 @@ export class AuthService {
       token,
       user: {
         id: user.id,
-        email: MARKETING_EMAIL,
+        email: ADMIN_EMAIL,
         role: user.role,
       },
     };

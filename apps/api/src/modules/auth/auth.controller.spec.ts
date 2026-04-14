@@ -40,12 +40,12 @@ describe('AuthController', () => {
 
   describe('marketingLogin', () => {
     it('should call authService.marketingLogin with the dto', async () => {
-      const dto = { email: 'marketing@curex24.com', password: 'marketing123' };
+      const dto = { email: 'admin@curex24.com', password: 'admin123' };
       const expected = {
         token: 'mock-jwt-token',
         user: {
           id: 'marketing-id',
-          email: 'marketing@curex24.com',
+          email: 'admin@curex24.com',
           role: 'MARKETING_AGENT',
         },
       };

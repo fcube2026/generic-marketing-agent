@@ -105,10 +105,7 @@ describe('AuthService', () => {
   });
 
   describe('marketingLogin', () => {
-    const validDto = {
-      email: 'marketing@curex24.com',
-      password: 'marketing123',
-    };
+    const validDto = { email: 'admin@curex24.com', password: 'admin123' };
 
     const mockMarketingUser = {
       id: 'marketing-user-id',
@@ -118,7 +115,7 @@ describe('AuthService', () => {
       updatedAt: new Date(),
     };
 
-    it('should return token for valid marketing credentials', async () => {
+    it('should return token for valid credentials', async () => {
       mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
 
       const result = await service.marketingLogin(validDto);
@@ -127,7 +124,7 @@ describe('AuthService', () => {
         token: 'mock-jwt-token',
         user: {
           id: 'marketing-user-id',
-          email: 'marketing@curex24.com',
+          email: 'admin@curex24.com',
           role: 'MARKETING_AGENT',
         },
       });
@@ -150,29 +147,20 @@ describe('AuthService', () => {
       });
     });
 
-    it('should throw UnauthorizedException for wrong marketing email', async () => {
+    it('should throw UnauthorizedException for wrong email', async () => {
       await expect(
         service.marketingLogin({
           email: 'wrong@email.com',
-          password: 'marketing123',
+          password: 'admin123',
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException for wrong marketing password', async () => {
-      await expect(
-        service.marketingLogin({
-          email: 'marketing@curex24.com',
-          password: 'wrong',
-        }),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException for admin credentials on marketing endpoint', async () => {
+    it('should throw UnauthorizedException for wrong password', async () => {
       await expect(
         service.marketingLogin({
           email: 'admin@curex24.com',
-          password: 'admin123',
+          password: 'wrong',
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
