@@ -5,7 +5,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 describe('PushNotificationService', () => {
   let service: PushNotificationService;
-  let prismaService: PrismaService;
+  let _prismaService: PrismaService;
 
   const mockPrismaService = {
     deviceToken: {
@@ -32,7 +32,7 @@ describe('PushNotificationService', () => {
     }).compile();
 
     service = module.get<PushNotificationService>(PushNotificationService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    _prismaService = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
   });

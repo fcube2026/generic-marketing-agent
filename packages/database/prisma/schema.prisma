@@ -12,12 +12,12 @@ datasource db {
 model User {
   id                     String                  @id @default(cuid())
   phone                  String                  @unique
-  email                 String?                 @unique
-  passwordHash          String?
-  isActive              Boolean                 @default(true)
+  email                  String?                 @unique
+  passwordHash           String?
+  isActive               Boolean                 @default(true)
   role                   Role                    @default(PATIENT)
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
   addresses              Address[]
   adminActions           AdminAction[]           @relation("AdminActions")
   auditLogs              AuditLog[]
@@ -456,7 +456,7 @@ model DeviceToken {
   id        String   @id @default(cuid())
   userId    String
   token     String   @unique
-  platform  String   // "ios" | "android" | "web"
+  platform  String // "ios" | "android" | "web"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

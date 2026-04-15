@@ -4,11 +4,11 @@ import { SmsService, SMS_TEMPLATES } from './sms.service';
 
 describe('SmsService', () => {
   let service: SmsService;
-  let configService: ConfigService;
+  let _configService: ConfigService;
 
   beforeEach(async () => {
     const mockConfigService = {
-      get: jest.fn().mockImplementation((key: string) => {
+      get: jest.fn().mockImplementation((_key: string) => {
         // Return empty values to simulate disabled SMS
         return undefined;
       }),
@@ -22,7 +22,7 @@ describe('SmsService', () => {
     }).compile();
 
     service = module.get<SmsService>(SmsService);
-    configService = module.get<ConfigService>(ConfigService);
+    _configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {

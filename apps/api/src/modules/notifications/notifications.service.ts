@@ -27,7 +27,7 @@ export interface SendNotificationOptions {
 }
 
 // Notification types that should trigger SMS by default
-const SMS_ENABLED_TYPES = [
+const _SMS_ENABLED_TYPES = [
   'BOOKING_ACCEPTED',
   'BOOKING_DECLINED',
   'BOOKING_CANCELLED',
