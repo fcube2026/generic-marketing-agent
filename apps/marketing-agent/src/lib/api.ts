@@ -1,53 +1,26 @@
 import axios from 'axios';
 
-const PRODUCTION_API_URL = 'https://api.curex24.com/api/v1';
-const LOCAL_API_URL = 'http://localhost:3000/api/v1';
-const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
-
-function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (LOCAL_HOSTNAMES.includes(hostname)) {
-      return LOCAL_API_URL;
-    }
-  }
-  return PRODUCTION_API_URL;
-}
-
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-cache',
-    Pragma: 'no-cache',
-  },
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.curex24.com/api/v1',
+  headers: { 'Content-Type': 'application/json' },
 });
 
+// Attach JWT to every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('marketing_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `******;
   }
   return config;
 });
 
+// Auto-logout on 401
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (typeof window !== 'undefined' && err.response?.status === 401) {
-      // Don't redirect when on the login page or when calling auth endpoints
-      // to let the login form display the specific error message.
-      const isAuthRequest =
-        err.config?.url?.includes('/auth/admin-login') ||
-        err.config?.url?.includes('/auth/marketing-login');
-      const isLoginPage = window.location.pathname === '/login';
-
-      if (!isAuthRequest && !isLoginPage) {
+      const isAuthRequest = err.config?.url?.includes('/auth/marketing-login');
+      if (!isAuthRequest && window.location.pathname !== '/login') {
         localStorage.removeItem('marketing_token');
         localStorage.removeItem('marketing_user');
         document.cookie = 'marketing_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
