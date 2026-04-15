@@ -10,22 +10,28 @@ datasource db {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  phone                 String                 @unique
-  email                 String?                @unique
+model User {
+  id                     String                  @id @default(cuid())
+  phone                  String                  @unique
+  email                 String?                 @unique
   passwordHash          String?
-  isActive              Boolean                @default(true)
-  role                  Role                   @default(PATIENT)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  addresses             Address[]
-  adminActions          AdminAction[]          @relation("AdminActions")
-  auditLogs             AuditLog[]
-  notifications         Notification[]
-  otpVerifications      OtpVerification[]
-  patientProfile        PatientProfile?
-  providerProfile       ProviderProfile?
-  questionnaireResponse QuestionnaireResponse?
+  isActive              Boolean                 @default(true)
+  role                   Role                    @default(PATIENT)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  addresses              Address[]
+  adminActions           AdminAction[]           @relation("AdminActions")
+  auditLogs              AuditLog[]
+  deviceTokens           DeviceToken[]
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  otpVerifications       OtpVerification[]
+  patientProfile         PatientProfile?
+  providerProfile        ProviderProfile?
+  questionnaireResponse  QuestionnaireResponse?
+
+  @@map("users")
+}
 
   @@map("users")
 }
@@ -448,6 +454,36 @@ model QuestionnaireResponse {
 
   @@index([userId])
   @@map("questionnaire_responses")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // "ios" | "android" | "web"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  pushEnabled      Boolean @default(true)
+  smsEnabled       Boolean @default(true)
+  emailEnabled     Boolean @default(false)
+  // Granular preferences for different notification types
+  bookingUpdates   Boolean @default(true)
+  paymentUpdates   Boolean @default(true)
+  reminderEnabled  Boolean @default(true)
+  marketingEnabled Boolean @default(false)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }
 
 enum Role {

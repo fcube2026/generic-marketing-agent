@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -21,11 +22,20 @@ describe('PaymentsService', () => {
     },
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: true,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -147,6 +157,8 @@ describe('PaymentsService', () => {
         id: 'booking-1',
         providerId: 'provider-1',
         totalFee: 1000,
+        patient: { userId: 'patient-user-1' },
+        provider: { userId: 'provider-user-1' },
       };
 
       mockPrisma.payment.findUnique.mockResolvedValueOnce(mockPayment);
@@ -181,6 +193,8 @@ describe('PaymentsService', () => {
         },
         update: { amount: 800 },
       });
+      // Verify notifications sent
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalled();
     });
 
     it('should update booking paymentStatus when status is REFUNDED', async () => {
@@ -191,10 +205,16 @@ describe('PaymentsService', () => {
         status: 'PAID',
       };
       const updatedPayment = { ...mockPayment, status: 'REFUNDED' };
+      const mockBooking = {
+        id: 'booking-1',
+        patient: { userId: 'patient-user-1' },
+        provider: { userId: 'provider-user-1' },
+      };
 
       mockPrisma.payment.findUnique.mockResolvedValue(mockPayment);
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
       mockPrisma.booking.update.mockResolvedValue({});
+      mockPrisma.booking.findUnique.mockResolvedValue(mockBooking);
 
       const result = await service.updatePaymentStatus(
         paymentId,
@@ -224,6 +244,7 @@ describe('PaymentsService', () => {
       mockPrisma.payment.findUnique.mockResolvedValue(mockPayment);
       mockPrisma.payment.update.mockResolvedValue(updatedPayment);
       mockPrisma.booking.update.mockResolvedValue({});
+      mockPrisma.booking.findUnique.mockResolvedValue(null);
 
       const result = await service.updatePaymentStatus(
         paymentId,

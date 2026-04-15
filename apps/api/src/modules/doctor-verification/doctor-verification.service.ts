@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Verification re-check interval in days. */
 const REVERIFICATION_DAYS = 90;
@@ -32,6 +33,7 @@ export class DoctorVerificationService {
   constructor(
     private prisma: PrismaService,
     private nmcProvider: NmcApiProvider,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -250,16 +252,23 @@ export class DoctorVerificationService {
           select: { userId: true },
         });
         if (provider) {
-          await this.prisma.notification.create({
-            data: {
+          await this.notificationsService.sendNotification(
+            {
               userId: provider.userId,
               title: 'Registration Verified',
               message:
                 'Your NMC medical registration has been verified successfully. You can now start accepting bookings.',
-              type: 'PROVIDER_APPROVED',
+              type: 'NMC_VERIFICATION_SUCCESS',
               metadata: { providerId, licenseId, source: SOURCE_NMC_API },
             },
-          });
+            {
+              inApp: true,
+              push: true,
+              sms: true,
+              smsTemplate: 'NMC_VERIFICATION_SUCCESS',
+              smsParams: { registrationNumber: nmcRegistrationNumber },
+            },
+          );
         }
 
         this.logger.log(

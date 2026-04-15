@@ -4,10 +4,14 @@ import {
   CreatePaymentDto,
   UpdatePaymentStatusDto,
 } from './dto/create-payment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async initiatePayment(dto: CreatePaymentDto, _userId: string) {
     const booking = await this.prisma.booking.findUnique({
@@ -58,15 +62,18 @@ export class PaymentsService {
       },
     });
 
+    // Get booking details for notifications
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: payment.bookingId },
+      include: { patient: true, provider: true },
+    });
+
     if (dto.status === 'PAID') {
       await this.prisma.booking.update({
         where: { id: payment.bookingId },
         data: { paymentStatus: 'PAID' },
       });
 
-      const booking = await this.prisma.booking.findUnique({
-        where: { id: payment.bookingId },
-      });
       if (booking) {
         const providerCut = booking.totalFee * 0.8;
         await this.prisma.payout.upsert({
@@ -79,6 +86,40 @@ export class PaymentsService {
           },
           update: { amount: providerCut },
         });
+
+        // Notify patient of successful payment
+        await this.notificationsService.sendNotification(
+          {
+            userId: booking.patient.userId,
+            title: 'Payment Successful',
+            message: `Your payment of ₹${payment.amount} has been received.`,
+            type: 'PAYMENT_SUCCESS',
+            metadata: { bookingId: payment.bookingId, amount: payment.amount },
+          },
+          {
+            inApp: true,
+            push: true,
+            sms: true,
+            smsTemplate: 'PAYMENT_SUCCESS',
+            smsParams: { amount: String(payment.amount) },
+          },
+        );
+
+        // Notify provider of payment received
+        await this.notificationsService.sendNotification(
+          {
+            userId: booking.provider.userId,
+            title: 'Payment Received',
+            message: `Payment of ₹${payment.amount} received for booking.`,
+            type: 'PAYMENT_RECEIVED',
+            metadata: { bookingId: payment.bookingId, amount: payment.amount },
+          },
+          {
+            inApp: true,
+            push: true,
+            sms: false, // Don't spam provider with SMS for each payment
+          },
+        );
       }
     }
 
@@ -87,6 +128,26 @@ export class PaymentsService {
         where: { id: payment.bookingId },
         data: { paymentStatus: dto.status as any },
       });
+
+      if (booking && dto.status === 'REFUNDED') {
+        // Notify patient of refund
+        await this.notificationsService.sendNotification(
+          {
+            userId: booking.patient.userId,
+            title: 'Refund Processed',
+            message: `Your refund of ₹${payment.amount} has been processed.`,
+            type: 'PAYMENT_REFUNDED',
+            metadata: { bookingId: payment.bookingId, amount: payment.amount },
+          },
+          {
+            inApp: true,
+            push: true,
+            sms: true,
+            smsTemplate: 'REFUND_PROCESSED',
+            smsParams: { amount: String(payment.amount) },
+          },
+        );
+      }
     }
 
     return updated;

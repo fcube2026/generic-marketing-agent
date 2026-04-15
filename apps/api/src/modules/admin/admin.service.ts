@@ -5,15 +5,17 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
-import { CreateAdminUserDto } from './dto/create-admin-user.dto';
-import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
-import * as bcrypt from 'bcryptjs';
+import { NotificationsService } from '../notifications/notifications.service';  // From copilot branch
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';  // From main branch
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';  // From main branch
+import * as bcrypt from 'bcryptjs';  // From main branch
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
     private verificationService: DoctorVerificationService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getAllProviders(status?: string) {
@@ -92,8 +94,9 @@ export class AdminService {
       },
     });
 
-    await this.prisma.notification.create({
-      data: {
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
         userId: provider.userId,
         title: 'Account Approved',
         message:
@@ -101,7 +104,14 @@ export class AdminService {
         type: 'PROVIDER_APPROVED',
         metadata: { providerId },
       },
-    });
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_APPROVED',
+        smsParams: {},
+      },
+    );
 
     return updated;
   }
@@ -132,8 +142,9 @@ export class AdminService {
       },
     });
 
-    await this.prisma.notification.create({
-      data: {
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
         userId: provider.userId,
         title: 'Account Rejected',
         message: reason
@@ -142,7 +153,14 @@ export class AdminService {
         type: 'PROVIDER_REJECTED',
         metadata: { providerId, reason },
       },
-    });
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_REJECTED',
+        smsParams: { reason: reason || '' },
+      },
+    );
 
     return updated;
   }
@@ -171,6 +189,26 @@ export class AdminService {
         notes,
       },
     });
+
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
+        userId: provider.userId,
+        title: 'Account Deactivated',
+        message: notes
+          ? `Your provider account has been deactivated. Reason: ${notes}`
+          : 'Your provider account has been deactivated. Please contact support for assistance.',
+        type: 'PROVIDER_DEACTIVATED',
+        metadata: { providerId, reason: notes },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_DEACTIVATED',
+        smsParams: { reason: notes || '' },
+      },
+    );
 
     return updated;
   }
@@ -431,6 +469,7 @@ export class AdminService {
   async processPayoutRecord(payoutId: string, adminId: string) {
     const payout = await this.prisma.payout.findUnique({
       where: { id: payoutId },
+      include: { provider: true },
     });
     if (!payout) throw new NotFoundException('Payout not found');
 
@@ -450,6 +489,24 @@ export class AdminService {
         targetType: 'Payout',
       },
     });
+
+    // Send notification to provider with push and SMS
+    await this.notificationsService.sendNotification(
+      {
+        userId: payout.provider.userId,
+        title: 'Payout Processed',
+        message: `Your payout of ₹${payout.amount} has been processed successfully.`,
+        type: 'PAYOUT_PROCESSED',
+        metadata: { payoutId, amount: payout.amount },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PAYOUT_PROCESSED',
+        smsParams: { amount: String(payout.amount) },
+      },
+    );
 
     return updated;
   }
