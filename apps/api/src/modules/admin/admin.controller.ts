@@ -1,6 +1,8 @@
 import { Controller, Get, Put, Post, Body, Param, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
 @Roles('ADMIN')
 @Controller('admin')
@@ -135,5 +137,56 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     return this.adminService.retryNmcVerification(licenseId, user.id);
+  }
+
+  // ─── User Management ────────────────────────────────────────────
+
+  @Get('users')
+  getAdminUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getAdminUsers(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      search,
+    );
+  }
+
+  @Get('users/all')
+  getAllUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('role') role?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getAllUsers(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      role,
+      search,
+    );
+  }
+
+  @Post('users')
+  createAdminUser(@Body() dto: CreateAdminUserDto) {
+    return this.adminService.createAdminUser(dto);
+  }
+
+  @Put('users/:id')
+  updateAdminUser(
+    @Param('id') userId: string,
+    @Body() dto: UpdateAdminUserDto,
+  ) {
+    return this.adminService.updateAdminUser(userId, dto);
+  }
+
+  @Put('users/:id/reset-password')
+  resetUserPassword(
+    @Param('id') userId: string,
+    @Body('password') password: string,
+  ) {
+    return this.adminService.resetUserPassword(userId, password);
   }
 }

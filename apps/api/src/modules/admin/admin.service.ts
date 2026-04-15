@@ -1,7 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';  // From copilot branch
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';  // From main branch
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';  // From main branch
+import * as bcrypt from 'bcryptjs';  // From main branch
 
 @Injectable()
 export class AdminService {
@@ -510,5 +517,159 @@ export class AdminService {
 
   async retryNmcVerification(licenseId: string, adminId: string) {
     return this.verificationService.retryVerification(licenseId, adminId);
+  }
+
+  // ─── User Management ────────────────────────────────────────────
+
+  async getAdminUsers(page = 1, limit = 20, search?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {
+      role: { in: ['ADMIN', 'MARKETING_AGENT'] },
+    };
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async createAdminUser(dto: CreateAdminUserDto) {
+    const existing = await this.prisma.user.findFirst({
+      where: { email: dto.email },
+    });
+    if (existing)
+      throw new ConflictException('A user with this email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const phone = `+admin${Date.now()}`;
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        phone,
+        role: dto.role || 'ADMIN',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return user;
+  }
+
+  async updateAdminUser(userId: string, dto: UpdateAdminUserDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const data: any = {};
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.role) data.role = dto.role;
+    if (dto.password) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async resetUserPassword(userId: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true, message: 'Password reset successfully' };
+  }
+
+  async getAllUsers(page = 1, limit = 20, role?: string, search?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (role) where.role = role;
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          patientProfile: { select: { name: true } },
+          providerProfile: {
+            select: { name: true, specialization: true, isVerified: true },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
