@@ -168,13 +168,34 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw UnauthorizedException for admin credentials', async () => {
-      await expect(
-        service.marketingLogin({
+    it('should accept admin credentials and return ADMIN role token', async () => {
+      const mockAdminUser = {
+        id: 'admin-user-id',
+        phone: '+0000000000',
+        role: 'ADMIN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      mockPrisma.user.upsert.mockResolvedValue(mockAdminUser);
+
+      const result = await service.marketingLogin({
+        email: 'admin@curex24.com',
+        password: 'admin123',
+      });
+
+      expect(result).toEqual({
+        token: 'mock-jwt-token',
+        user: {
+          id: 'admin-user-id',
           email: 'admin@curex24.com',
-          password: 'admin123',
-        }),
-      ).rejects.toThrow(UnauthorizedException);
+          role: 'ADMIN',
+        },
+      });
+      expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
+        where: { phone: '+0000000000' },
+        create: { phone: '+0000000000', role: 'ADMIN' },
+        update: { role: 'ADMIN' },
+      });
     });
   });
 });

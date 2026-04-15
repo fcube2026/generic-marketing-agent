@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
+import { login } from '../auth.module';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,22 +17,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/marketing-login', {
-        email,
-        password,
-      });
-
-      // Store token in localStorage for API requests
-      localStorage.setItem('marketing_token', data.token);
-      localStorage.setItem(
-        'marketing_user',
-        JSON.stringify({ email: data.user.email, role: data.user.role }),
-      );
-
-      // Store token in cookie for middleware route protection
-      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `marketing_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${secure}`;
-
+      await login({ email, password });
       router.push('/dashboard');
     } catch (err: unknown) {
       let message: string;
@@ -43,9 +28,7 @@ export default function LoginPage() {
           error.response.data.error ||
           'Invalid credentials.';
       } else if (error?.request) {
-        const baseURL = api.defaults.baseURL ?? 'unknown';
-        message =
-          `Unable to reach the server (${baseURL}). Please check your network or contact support.`;
+        message = 'Unable to reach the server. Please check your network or contact support.';
       } else {
         message = 'Login failed. Please try again.';
       }

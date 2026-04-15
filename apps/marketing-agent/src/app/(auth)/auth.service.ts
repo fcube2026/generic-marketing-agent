@@ -1,8 +1,28 @@
+import api from '@/lib/api';
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: {
+    email: string;
+    role: string;
+  };
+}
+
+export async function loginRequest(credentials: LoginCredentials): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/marketing-login', credentials);
+  return data;
+}
+
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from './prisma.service';  // Import Prisma service from your actual file
 import { UnauthorizedException } from '@nestjs/common';
-import { Role } from './role.enum';  // Make sure the Role enum is correctly imported
+import { Role } from './role.enum';  // Ensure the Role enum is correctly imported
 import { AdminLoginDto } from './dto/admin-login.dto';  // Correctly import AdminLoginDto
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
@@ -22,7 +42,7 @@ export class MarketingService {
       throw new UnauthorizedException('Invalid marketing agent credentials');
     }
 
-    // Handle user upsert
+    // Handle user upsert (create or update the marketing agent user)
     const user = await this.prisma.user.upsert({
       where: { phone: MARKETING_PHONE },
       create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },

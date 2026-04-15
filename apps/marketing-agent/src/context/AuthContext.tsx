@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { logout as clearAuth } from '@/app/(auth)/auth.module';
 
 interface AuthUser {
   email: string;
@@ -39,9 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('marketing_token');
-    localStorage.removeItem('marketing_user');
-    document.cookie = 'marketing_token=; path=/; max-age=0; SameSite=Lax';
+    clearAuth();
     setUser(null);
     router.push('/login');
   }, [router]);

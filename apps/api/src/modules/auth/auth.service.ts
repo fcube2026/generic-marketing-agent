@@ -132,8 +132,35 @@ export class AuthService {
   }
 
   async marketingLogin(dto: AdminLoginDto) {
-    if (dto.email !== MARKETING_EMAIL || dto.password !== MARKETING_PASSWORD) {
+    const isMarketingCredentials =
+      dto.email === MARKETING_EMAIL && dto.password === MARKETING_PASSWORD;
+    const isAdminCredentials =
+      dto.email === ADMIN_EMAIL && dto.password === ADMIN_PASSWORD;
+
+    if (!isMarketingCredentials && !isAdminCredentials) {
       throw new UnauthorizedException('Invalid marketing agent credentials');
+    }
+
+    // Admin credentials grant access with the ADMIN role; marketing credentials
+    // grant access with the MARKETING_AGENT role.
+    if (isAdminCredentials) {
+      const user = await this.prisma.user.upsert({
+        where: { phone: ADMIN_PHONE },
+        create: { phone: ADMIN_PHONE, role: Role.ADMIN },
+        update: { role: Role.ADMIN },
+      });
+
+      const payload = { sub: user.id, phone: user.phone, role: user.role };
+      const token = this.jwtService.sign(payload);
+
+      return {
+        token,
+        user: {
+          id: user.id,
+          email: ADMIN_EMAIL,
+          role: user.role,
+        },
+      };
     }
 
     const user = await this.prisma.user.upsert({
