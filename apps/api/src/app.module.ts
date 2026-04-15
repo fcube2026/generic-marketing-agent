@@ -24,6 +24,7 @@ import { SmsModule } from './modules/sms/sms.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { BootstrapService } from './common/bootstrap.service';
+import { HealthModule } from './common/health/health.module';
 
 @Module({
   controllers: [AppController],
@@ -33,6 +34,7 @@ import { BootstrapService } from './common/bootstrap.service';
     }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    HealthModule,
     FeatureFlagsModule,
     QueueModule,
     SmsModule,
