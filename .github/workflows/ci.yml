@@ -53,6 +53,9 @@ jobs:
       - name: Typecheck admin panel
         run: cd apps/admin && npx tsc --noEmit
 
+      - name: Validate admin test coverage
+        run: pnpm --filter @curex24/admin test:coverage-check
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -172,6 +175,95 @@ jobs:
 
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
+
+  admin-smoke-tests:
+    name: Admin Smoke Tests (Dev)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @curex24/admin exec playwright install --with-deps chromium
+
+      - name: Build admin panel
+        run: pnpm --filter @curex24/admin build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
+
+      - name: Start admin panel
+        run: pnpm --filter @curex24/admin start &
+        env:
+          PORT: 3001
+
+      - name: Wait for admin to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3001 > /dev/null 2>&1; then
+              echo "Admin is ready"
+              break
+            fi
+            echo "Waiting for admin to start (attempt $i)..."
+            sleep 3
+          done
+
+      - name: Run smoke tests
+        run: pnpm --filter @curex24/admin test:e2e:smoke -- --project=chromium
+        env:
+          ADMIN_BASE_URL: http://localhost:3001
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-dev-${{ github.run_id }}
+          path: apps/admin/playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-dev-${{ github.run_id }}
+          path: apps/admin/test-results/
+          retention-days: 7
+
+      - name: GitHub Step Summary
+        if: always()
+        run: |
+          echo "## Admin Smoke Tests (Dev)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Dev (http://localhost:3001)" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** PR / push to ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f apps/admin/test-results/results.json ]; then
+            PASSED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('expected', 0))" 2>/dev/null || echo "N/A")
+            FAILED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('unexpected', 0))" 2>/dev/null || echo "N/A")
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | ${PASSED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Report artifact: playwright-report-dev-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
   prisma-validate:
     name: Prisma Validate

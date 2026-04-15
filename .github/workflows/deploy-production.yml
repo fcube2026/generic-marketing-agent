@@ -307,6 +307,144 @@ jobs:
           echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Admin | https://admin.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
 
+  admin-smoke-tests-production:
+    name: Admin Smoke Tests (Production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [deploy-admin, deploy-api]
+    permissions:
+      contents: write
+      issues: write
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @curex24/admin exec playwright install --with-deps chromium
+
+      - name: Wait for production admin to be available
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf https://admin.curex24.com > /dev/null 2>&1; then
+              echo "Production admin is available"
+              break
+            fi
+            echo "Waiting for production deploy to propagate (attempt $i)..."
+            sleep 15
+          done
+
+      - name: Run smoke tests (production)
+        id: smoke
+        continue-on-error: true
+        run: pnpm --filter @curex24/admin test:e2e:smoke -- --project=chromium
+        env:
+          ADMIN_BASE_URL: https://admin.curex24.com
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-production-${{ github.run_id }}
+          path: apps/admin/playwright-report/
+          retention-days: 30
+
+      - name: Upload JSON test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-production-${{ github.run_id }}
+          path: apps/admin/test-results/
+          retention-days: 30
+
+      - name: GitHub Step Summary
+        if: always()
+        run: |
+          echo "## Admin Smoke Tests - Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production (https://admin.curex24.com)" >> $GITHUB_STEP_SUMMARY
+          echo "**Result:** ${{ steps.smoke.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f apps/admin/test-results/results.json ]; then
+            PASSED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('expected', 0))" 2>/dev/null || echo "N/A")
+            FAILED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('unexpected', 0))" 2>/dev/null || echo "N/A")
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | ${PASSED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "Report artifact: playwright-report-production-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create GitHub Issue on smoke test failure
+        if: steps.smoke.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Production Smoke Tests Failed - ${new Date().toISOString().split('T')[0]}`,
+              body: [
+                '## Production Admin Smoke Test Failure',
+                '',
+                `**Environment:** https://admin.curex24.com`,
+                `**Commit:** ${context.sha}`,
+                `**Branch:** ${context.ref}`,
+                `**Workflow Run:** [View details](${runUrl})`,
+                '',
+                '### Action Required',
+                '- Review the Playwright report artifact attached to the workflow run.',
+                '- Identify failing tests and triage whether this is a deployment issue or a regression.',
+                '- If critical, consider rolling back the deployment.',
+              ].join('\n'),
+              labels: ['production-incident', 'automated-test-failure'],
+            });
+            console.log(`Created issue: ${issue.data.html_url}`);
+
+      - name: Notify Slack on production smoke failure
+        if: steps.smoke.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "PRODUCTION Admin Smoke Tests Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PRODUCTION Admin Smoke Tests Failed*\n*URL:* https://admin.curex24.com\n*Commit:* `${{ github.sha }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run> | <${{ github.server_url }}/${{ github.repository }}/issues|View Issues>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Fail job if smoke tests failed
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "Production smoke tests failed."
+          exit 1
+
   # ────────────────────────────────────────────────────────────
   # Deploy Marketing Agent to Vercel (production environment)
   # ────────────────────────────────────────────────────────────

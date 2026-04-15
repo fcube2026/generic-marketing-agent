@@ -18,12 +18,12 @@ export class DiagnosticsPage {
   }
 
   async scheduleFirstRequest(): Promise<void> {
-    await this.page.getByRole('button', { name: /schedule/i }).first().click();
+    await this.page.getByRole('table').getByRole('button', { name: /^schedule$/i }).first().click();
   }
 
   async scheduleRequestForTestType(testType: string): Promise<void> {
     const row = this.page.getByRole('row', { name: new RegExp(testType, 'i') });
-    await row.getByRole('button', { name: /schedule/i }).click();
+    await row.getByRole('button', { name: /^schedule$/i }).click();
   }
 
   async uploadResultForTestType(testType: string, url: string, notes: string): Promise<void> {
@@ -31,14 +31,14 @@ export class DiagnosticsPage {
     await row.getByRole('button', { name: /upload result/i }).click();
     await this.page.getByLabel('Result File URL').fill(url);
     await this.page.getByLabel('Notes').fill(notes);
-    await this.page.getByRole('button', { name: /^upload result$/i }).click();
+    await this.page.locator('div.fixed').getByRole('button', { name: /^upload result$/i }).click();
   }
 
   async uploadResult(url: string, notes: string): Promise<void> {
     await this.page.getByRole('button', { name: /upload result/i }).first().click();
     await this.page.getByLabel('Result File URL').fill(url);
     await this.page.getByLabel('Notes').fill(notes);
-    await this.page.getByRole('button', { name: /^upload result$/i }).click();
+    await this.page.locator('div.fixed').getByRole('button', { name: /^upload result$/i }).click();
   }
 
   async assertLoaded(): Promise<void> {

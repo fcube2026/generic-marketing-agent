@@ -1,26 +1,58 @@
 {
-  "suites": {
-    "smoke": [
-      "e2e/smoke/auth.smoke.spec.ts",
-      "e2e/smoke/dashboard.smoke.spec.ts",
-      "e2e/smoke/bookings.smoke.spec.ts",
-      "e2e/smoke/providers.smoke.spec.ts",
-      "e2e/smoke/verification-queue.smoke.spec.ts",
-      "e2e/smoke/diagnostics.smoke.spec.ts",
-      "e2e/smoke/payouts.smoke.spec.ts",
-      "e2e/smoke/referrals.smoke.spec.ts",
-      "e2e/smoke/support.smoke.spec.ts",
-      "e2e/smoke/navigation.smoke.spec.ts"
-    ],
-    "regression": [
-      "e2e/regression/auth.regression.spec.ts",
-      "e2e/regression/bookings.regression.spec.ts",
-      "e2e/regression/providers.regression.spec.ts",
-      "e2e/regression/operations.regression.spec.ts"
-    ]
-  },
-  "tags": {
-    "smoke": "@smoke",
-    "regression": "@regression"
-  }
+  "routes": [
+    {
+      "route": "/login",
+      "smokeSpec": "e2e/smoke/auth.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/auth.regression.spec.ts",
+      "pomClass": "e2e/pages/LoginPage.ts"
+    },
+    {
+      "route": "/dashboard",
+      "smokeSpec": "e2e/smoke/dashboard.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/dashboard.regression.spec.ts",
+      "pomClass": "e2e/pages/DashboardPage.ts"
+    },
+    {
+      "route": "/bookings",
+      "smokeSpec": "e2e/smoke/bookings.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/bookings.regression.spec.ts",
+      "pomClass": "e2e/pages/BookingsPage.ts"
+    },
+    {
+      "route": "/providers",
+      "smokeSpec": "e2e/smoke/providers.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/providers.regression.spec.ts",
+      "pomClass": "e2e/pages/ProvidersPage.ts"
+    },
+    {
+      "route": "/verification-queue",
+      "smokeSpec": "e2e/smoke/verification-queue.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/verification-queue.regression.spec.ts",
+      "pomClass": "e2e/pages/VerificationQueuePage.ts"
+    },
+    {
+      "route": "/diagnostics",
+      "smokeSpec": "e2e/smoke/diagnostics.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/diagnostics.regression.spec.ts",
+      "pomClass": "e2e/pages/DiagnosticsPage.ts"
+    },
+    {
+      "route": "/payouts",
+      "smokeSpec": "e2e/smoke/payouts.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/payouts.regression.spec.ts",
+      "pomClass": "e2e/pages/PayoutsPage.ts"
+    },
+    {
+      "route": "/referrals",
+      "smokeSpec": "e2e/smoke/referrals.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/referrals.regression.spec.ts",
+      "pomClass": "e2e/pages/ReferralsPage.ts"
+    },
+    {
+      "route": "/support",
+      "smokeSpec": "e2e/smoke/support.smoke.spec.ts",
+      "regressionSpec": "e2e/regression/support.regression.spec.ts",
+      "pomClass": "e2e/pages/SupportPage.ts"
+    }
+  ]
 }

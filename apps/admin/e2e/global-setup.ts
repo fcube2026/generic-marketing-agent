@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import fs from 'fs/promises';
 import path from 'path';
 import type { FullConfig, Route } from '@playwright/test';
@@ -5,7 +7,8 @@ import { chromium, expect } from '@playwright/test';
 import { AUTH_STATE_PATH, getAdminTestCredentials, mockAdminLoginPayload } from './helpers/auth.helper';
 
 async function globalSetup(config: FullConfig): Promise<void> {
-  const baseURL = config.projects[0]?.use?.baseURL as string;
+  const projectWithBaseUrl = config.projects.find((project: FullConfig['projects'][number]) => project.use?.baseURL);
+  const baseURL = (projectWithBaseUrl?.use?.baseURL as string | undefined) ?? 'http://localhost:3001';
   const { email, password } = getAdminTestCredentials();
 
   await fs.mkdir(path.dirname(AUTH_STATE_PATH), { recursive: true });

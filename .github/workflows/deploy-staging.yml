@@ -282,6 +282,126 @@ jobs:
           echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
 
+  admin-ui-tests-staging:
+    name: Admin UI Tests (Staging - Smoke + Regression)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [deploy-admin, deploy-api]
+    permissions:
+      contents: read
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @curex24/admin exec playwright install --with-deps
+
+      - name: Wait for staging admin to be available
+        run: |
+          for i in $(seq 1 10); do
+            if curl -sf https://admin.staging.curex24.com > /dev/null 2>&1; then
+              echo "Staging admin is available"
+              break
+            fi
+            echo "Waiting for staging deploy to propagate (attempt $i)..."
+            sleep 15
+          done
+
+      - name: Run smoke tests (staging)
+        id: smoke
+        continue-on-error: true
+        run: pnpm --filter @curex24/admin test:e2e:smoke -- --project=chromium
+        env:
+          ADMIN_BASE_URL: https://admin.staging.curex24.com
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Run regression tests (staging)
+        id: regression
+        continue-on-error: true
+        run: pnpm --filter @curex24/admin test:e2e:regression -- --project=chromium
+        env:
+          ADMIN_BASE_URL: https://admin.staging.curex24.com
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging-${{ github.run_id }}
+          path: apps/admin/playwright-report/
+          retention-days: 14
+
+      - name: Upload JSON test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-staging-${{ github.run_id }}
+          path: apps/admin/test-results/
+          retention-days: 14
+
+      - name: GitHub Step Summary
+        if: always()
+        run: |
+          echo "## Admin UI Tests - Staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging (https://admin.staging.curex24.com)" >> $GITHUB_STEP_SUMMARY
+          echo "**Smoke tests:** ${{ steps.smoke.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Regression tests:** ${{ steps.regression.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f apps/admin/test-results/results.json ]; then
+            PASSED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('expected', 0))" 2>/dev/null || echo "N/A")
+            FAILED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('unexpected', 0))" 2>/dev/null || echo "N/A")
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | ${PASSED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Report artifact: playwright-report-staging-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Slack on failure
+        if: steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Admin UI Tests Failed - Staging",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Admin UI Tests Failed - Staging*\n*Smoke:* ${{ steps.smoke.outcome }}\n*Regression:* ${{ steps.regression.outcome }}\n*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Check smoke test result
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "Smoke tests failed on staging. Marking job as failed."
+          exit 1
+
   # ────────────────────────────────────────────────────────────
   # Deploy Marketing Agent to Vercel (staging environment)
   # ────────────────────────────────────────────────────────────

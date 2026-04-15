@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import path from 'path';
 
 export const AUTH_STATE_PATH = path.resolve(process.cwd(), '.auth/admin.json');

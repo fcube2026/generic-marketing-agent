@@ -1,0 +1,212 @@
+name: Admin UI Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      test_type:
+        description: Test suite to run
+        required: true
+        type: choice
+        options:
+          - smoke
+          - regression
+          - all
+        default: smoke
+      browser:
+        description: Browser to test with
+        required: false
+        type: choice
+        options:
+          - chromium
+          - firefox
+          - webkit
+          - all
+        default: chromium
+  schedule:
+    - cron: '0 6 * * *'
+
+concurrency:
+  group: admin-ui-tests-${{ github.event.inputs.environment || 'staging' }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  admin-ui-tests:
+    name: Admin UI Tests (${{ github.event.inputs.environment || 'staging' }} - ${{ github.event.inputs.test_type || 'smoke' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: |
+          BROWSER="${{ github.event.inputs.browser || 'chromium' }}"
+          if [ "$BROWSER" = "all" ]; then
+            pnpm --filter @curex24/admin exec playwright install --with-deps
+          else
+            pnpm --filter @curex24/admin exec playwright install --with-deps "$BROWSER"
+          fi
+
+      - name: Resolve target URL
+        id: resolve-url
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+          if [ "$ENVIRONMENT" = "production" ]; then
+            echo "url=https://admin.curex24.com" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://admin.staging.curex24.com" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for target to be available
+        run: |
+          TARGET_URL="${{ steps.resolve-url.outputs.url }}"
+          for i in $(seq 1 10); do
+            if curl -sf "$TARGET_URL" > /dev/null 2>&1; then
+              echo "Target is available: $TARGET_URL"
+              break
+            fi
+            echo "Waiting... (attempt $i)"
+            sleep 10
+          done
+
+      - name: Run smoke tests
+        id: smoke
+        if: github.event.inputs.test_type == 'smoke' || github.event.inputs.test_type == 'all' || github.event_name == 'schedule'
+        continue-on-error: true
+        run: |
+          ARGS=""
+          BROWSER="${{ github.event.inputs.browser || 'chromium' }}"
+          if [ "$BROWSER" != "all" ]; then
+            ARGS="--project=$BROWSER"
+          fi
+          pnpm --filter @curex24/admin test:e2e:smoke -- $ARGS
+        env:
+          ADMIN_BASE_URL: ${{ steps.resolve-url.outputs.url }}
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Run regression tests
+        id: regression
+        if: github.event.inputs.test_type == 'regression' || github.event.inputs.test_type == 'all'
+        continue-on-error: true
+        run: |
+          ARGS=""
+          BROWSER="${{ github.event.inputs.browser || 'chromium' }}"
+          if [ "$BROWSER" != "all" ]; then
+            ARGS="--project=$BROWSER"
+          fi
+          pnpm --filter @curex24/admin test:e2e:regression -- $ARGS
+        env:
+          ADMIN_BASE_URL: ${{ steps.resolve-url.outputs.url }}
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.event.inputs.environment || 'staging' }}-${{ github.run_id }}
+          path: apps/admin/playwright-report/
+          retention-days: 14
+
+      - name: Upload JSON test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.event.inputs.environment || 'staging' }}-${{ github.run_id }}
+          path: apps/admin/test-results/
+          retention-days: 14
+
+      - name: GitHub Step Summary
+        if: always()
+        run: |
+          echo "## Admin UI Tests - Manual / Scheduled Run" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Key | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ github.event.inputs.environment || 'staging' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ steps.resolve-url.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | ${{ github.event.inputs.test_type || 'smoke (scheduled)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser | ${{ github.event.inputs.browser || 'chromium' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke | ${{ steps.smoke.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Regression | ${{ steps.regression.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Report artifact: playwright-report-${{ github.event.inputs.environment || 'staging' }}-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Slack on failure
+        if: steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Admin UI Tests Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Admin UI Tests Failed*\n*Environment:* ${{ github.event.inputs.environment || 'staging (scheduled)' }}\n*Test Type:* ${{ github.event.inputs.test_type || 'smoke' }}\n*Smoke:* ${{ steps.smoke.outcome || 'skipped' }}\n*Regression:* ${{ steps.regression.outcome || 'skipped' }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Create GitHub Issue for production failures
+        if: (steps.smoke.outcome == 'failure') && (github.event.inputs.environment == 'production')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Admin UI Tests Failed - ${context.payload.inputs?.environment || 'production'} - ${new Date().toISOString().split('T')[0]}`,
+              body: [
+                '## Automated Admin UI Test Failure',
+                '',
+                `**Environment:** ${context.payload.inputs?.environment || 'production'}`,
+                `**Test Type:** ${context.payload.inputs?.test_type || 'smoke'}`,
+                `**Run:** [${context.runId}](${runUrl})`,
+                '',
+                '### Action Required',
+                '1. Download and review the Playwright HTML report artifact.',
+                '2. Identify the failing test or tests and root cause.',
+                '3. Fix the regression or create a follow-up issue.',
+              ].join('\n'),
+              labels: ['automated-test-failure'],
+            });
+
+      - name: Fail if tests failed
+        if: steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure'
+        run: exit 1

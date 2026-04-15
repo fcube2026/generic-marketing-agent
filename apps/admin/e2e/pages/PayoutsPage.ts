@@ -31,7 +31,7 @@ export class PayoutsPage {
   async assertLoaded(): Promise<void> {
     await expect(this.heading).toBeVisible();
     const totalPayouts = this.page.getByText('Total Payouts');
-    const providerHeader = this.page.getByRole('columnheader', { name: 'Provider' });
+    const providerHeader = this.page.getByRole('columnheader', { name: 'Provider', exact: true });
     const emptyState = this.page.getByText('No payouts found');
     await expect
       .poll(
