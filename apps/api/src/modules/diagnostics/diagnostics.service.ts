@@ -9,10 +9,14 @@ import {
   UpdateDiagnosticStatusDto,
   UploadLabResultDto,
 } from './dto/create-diagnostic-request.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class DiagnosticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async createRequest(dto: CreateDiagnosticRequestDto, userId: string) {
     const booking = await this.prisma.booking.findUnique({
@@ -81,9 +85,10 @@ export class DiagnosticsService {
       data: { status: 'RESULTED' },
     });
 
+    // Send notification with push and SMS
     try {
-      await this.prisma.notification.create({
-        data: {
+      await this.notificationsService.sendNotification(
+        {
           userId: request.booking.patient.userId,
           title: 'Lab Result Ready',
           message: `Your lab result for "${request.testType}" is now available. Please check your diagnostics section.`,
@@ -94,7 +99,14 @@ export class DiagnosticsService {
             bookingId: request.bookingId,
           },
         },
-      });
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: 'LAB_RESULT_READY',
+          smsParams: { testType: request.testType },
+        },
+      );
     } catch {
       // Notification failure should not block the result upload
     }
