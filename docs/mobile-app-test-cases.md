@@ -1,5 +1,19 @@
 # Curex24 Mobile App Test Cases
 
+## Summary
+
+| Section | Test Cases |
+|---|---|
+| Auth | 11 |
+| Booking | 10 |
+| Payment | 8 |
+| Provider | 12 |
+| Tracking | 8 |
+| Sync | 8 |
+| UX | 8 |
+| Staging Integration Validation | 8 |
+| **Total** | **73** |
+
 ## Auth
 
 | Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
