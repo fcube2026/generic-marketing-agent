@@ -30,26 +30,4 @@ export function logout(): void {
   clearSession();  // Clear stored session data
 }
 
-import { Controller, Post, Body } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AdminLoginDto } from './dto/admin-login.dto';
-import { Public } from './decorators/roles.decorator';
 
-@Controller('auth')
-export class AuthController {
-  constructor(private authService: AuthService) {}
-
-  // Admin login endpoint
-  @Public()
-  @Post('admin-login')
-  adminLogin(@Body() dto: AdminLoginDto) {
-    return this.authService.adminLogin(dto);
-  }
-
-  // Marketing agent login endpoint
-  @Public()
-  @Post('marketing-login')  // Marketing agent login endpoint
-  marketingLogin(@Body() dto: AdminLoginDto) {
-    return this.authService.marketingLogin(dto);  // Calls the service method for marketing agent login
-  }
-}
