@@ -62,7 +62,11 @@ export default function LoginPage() {
           <p className="text-gray-500 mt-1">Admin Panel</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-lg p-8 space-y-5">
+        <form
+          onSubmit={handleLogin}
+          className="bg-white rounded-2xl shadow-lg p-8 space-y-5"
+          data-testid="login-form"
+        >
           <h2 className="text-xl font-bold text-gray-800">Sign In</h2>
 
           {error && (
@@ -72,8 +76,11 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label htmlFor="admin-email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
             <input
+              id="admin-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -84,8 +91,11 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
             <input
+              id="admin-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -98,6 +108,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
+            data-testid="login-submit"
             className="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-semibold transition disabled:opacity-60"
           >
             {loading ? 'Signing in…' : 'Sign In'}

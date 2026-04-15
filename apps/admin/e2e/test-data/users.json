@@ -1,0 +1,12 @@
+{
+  "admin": {
+    "valid": {
+      "email": "admin@curex24.com",
+      "password": "Admin@12345"
+    },
+    "invalid": {
+      "email": "wrong-admin@curex24.com",
+      "password": "WrongPass123"
+    }
+  }
+}
