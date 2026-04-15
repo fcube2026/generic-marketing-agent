@@ -12,6 +12,9 @@ datasource db {
 model User {
   id                    String                 @id @default(cuid())
   phone                 String                 @unique
+  email                 String?                @unique
+  passwordHash          String?
+  isActive              Boolean                @default(true)
   role                  Role                   @default(PATIENT)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt

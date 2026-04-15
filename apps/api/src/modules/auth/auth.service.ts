@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -106,16 +107,42 @@ export class AuthService {
   }
 
   async adminLogin(dto: AdminLoginDto) {
+    // 1. Try DB-stored admin user first
+    const dbUser = await this.prisma.user.findFirst({
+      where: {
+        email: dto.email,
+        role: { in: [Role.ADMIN, Role.MARKETING_AGENT] },
+      },
+    });
+
+    if (dbUser && dbUser.passwordHash) {
+      const valid = await bcrypt.compare(dto.password, dbUser.passwordHash);
+      if (!valid) throw new UnauthorizedException('Invalid admin credentials');
+      if (!dbUser.isActive)
+        throw new UnauthorizedException('Account is deactivated');
+
+      const payload = {
+        sub: dbUser.id,
+        phone: dbUser.phone,
+        role: dbUser.role,
+      };
+      const token = this.jwtService.sign(payload);
+
+      return {
+        token,
+        user: { id: dbUser.id, email: dbUser.email, role: dbUser.role },
+      };
+    }
+
+    // 2. Fall back to hardcoded env var credentials (legacy)
     if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
-    // Find or create the admin user (phone is unique — use upsert to avoid
-    // a unique-constraint crash if the row exists with a different role)
     const user = await this.prisma.user.upsert({
       where: { phone: ADMIN_PHONE },
-      create: { phone: ADMIN_PHONE, role: Role.ADMIN },
-      update: { role: Role.ADMIN },
+      create: { phone: ADMIN_PHONE, role: Role.ADMIN, email: ADMIN_EMAIL },
+      update: { role: Role.ADMIN, email: ADMIN_EMAIL },
     });
 
     const payload = { sub: user.id, phone: user.phone, role: user.role };
@@ -123,11 +150,7 @@ export class AuthService {
 
     return {
       token,
-      user: {
-        id: user.id,
-        email: ADMIN_EMAIL,
-        role: user.role,
-      },
+      user: { id: user.id, email: ADMIN_EMAIL, role: user.role },
     };
   }
 
