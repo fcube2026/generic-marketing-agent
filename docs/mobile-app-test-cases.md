@@ -1,214 +1,125 @@
-# Curex24 — Mobile App Test Suite
+# Curex24 Mobile App Test Cases
 
- 
-**Source files analysed:**
-- `navigation/RootNavigator.tsx`
-- `screens/auth/LoginScreen.tsx`
-- `screens/auth/OtpScreen.tsx`
-- `screens/auth/RoleSelectScreen.tsx`
-- `screens/provider/BookingDetailScreen.tsx`
-- `screens/provider/ConsultationFormScreen.tsx`
-- `screens/patient/PaymentScreen.tsx`
-- `store/authStore.ts`
-- `services/api.ts`
-- `services/authService.ts`
-- `hooks/useProviderLocationTracking.ts`
+## Auth
 
-> All test cases are derived **exclusively** from the reviewed source files. Timings, state behaviour, and navigation flows are exact matches to the implementation. No backend-only, security, or fictional scenarios are included.
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| AUTH-001 | Login screen loads from cold launch | App installed; user logged out | 1. Launch app. 2. Open Auth flow. | Login title, phone field, and Send OTP button are visible; no blank screen or blocking error appears. | Functional | High | Not Run |
+| AUTH-002 | Phone field accepts digits only | Login screen open | 1. Enter `98ab76-54@32`. | Field value becomes `98765432` (all non-digit characters removed). | Edge | High | Not Run |
+| AUTH-003 | Send OTP disabled for incomplete number | Login screen open | 1. Enter fewer than required digits. | Send OTP remains disabled. | Validation | High | Not Run |
+| AUTH-004 | Send OTP enabled for valid number | Login screen open | 1. Enter valid phone number. | Send OTP becomes enabled. | Functional | High | Not Run |
+| AUTH-005 | OTP verification success logs user in | Valid OTP available | 1. Request OTP. 2. Enter correct OTP. 3. Tap Verify. | User is authenticated and routed to correct home screen. | Functional | High | Not Run |
+| AUTH-006 | Wrong OTP shows error and keeps user on OTP screen | OTP screen open | 1. Enter invalid OTP. 2. Tap Verify. | Error message shown; user stays on OTP screen. | Negative | High | Not Run |
+| AUTH-007 | Expired OTP requires resend | OTP screen with expired code | 1. Enter expired OTP. 2. Verify. | Expired OTP error shown with resend option. | Edge | High | Not Run |
+| AUTH-008 | Resend OTP blocked until timer completes | OTP screen open immediately after request | 1. Try tapping Resend before timer ends. | Resend action is unavailable until timer reaches zero. | Validation | Medium | Not Run |
+| AUTH-009 | Resend OTP retry succeeds after transient network failure | OTP screen; unstable network | 1. Disable network and tap Resend. 2. Re-enable network. 3. Tap Resend again. | First attempt fails gracefully; second succeeds without app restart. | Retry | High | Not Run |
+| AUTH-010 | Double tap Verify OTP does not create duplicate requests | OTP entered; Verify enabled | 1. Tap Verify rapidly 2–3 times. | Only one verification attempt is processed; no duplicate toasts/navigation. | Race Condition | High | Not Run |
+| AUTH-011 | Session persists after app relaunch | User already logged in | 1. Force close app. 2. Reopen app. | User remains logged in and lands on authenticated flow. | Persistence | High | Not Run |
+| AUTH-012 | Logout clears session and returns to Auth flow | User logged in | 1. Tap Logout. 2. Relaunch app. | User is logged out and must authenticate again. | Functional | High | Not Run |
 
----
+## Booking
 
-## Table of Contents
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| BOOK-001 | Create new booking with valid inputs | Logged-in patient; serviceable location | 1. Fill booking form. 2. Submit. | Booking is created and confirmation screen appears. | Functional | High | Not Run |
+| BOOK-002 | Required fields validation on booking form | Booking form open | 1. Leave mandatory field empty. 2. Submit. | Inline validation shown; booking not submitted. | Validation | High | Not Run |
+| BOOK-003 | Past date/time is blocked | Booking form open | 1. Select past slot. 2. Submit. | Past slot cannot be submitted. | Edge | High | Not Run |
+| BOOK-004 | Unavailable slot is rejected gracefully | Slot already taken | 1. Select slot. 2. Submit booking. | User sees slot unavailable message and can pick another slot. | Negative | High | Not Run |
+| BOOK-005 | Booking confirmation survives slow network | Slow 3G simulation | 1. Submit booking on slow network. | Loader persists; app does not freeze/crash; result eventually shown. | Network | Medium | Not Run |
+| BOOK-006 | Booking submit failure supports retry | Network disconnected during submit | 1. Submit booking offline. 2. Reconnect. 3. Tap Retry. | First attempt fails with clear message; retry completes booking. | Retry | High | Not Run |
+| BOOK-007 | Double tap Confirm does not create duplicate booking | Valid form ready | 1. Tap Confirm rapidly multiple times. | Single booking created; duplicate prevention works. | Race Condition | High | Not Run |
+| BOOK-008 | Cancel booking from booking detail before provider assignment | Existing upcoming booking | 1. Open booking detail. 2. Tap Cancel. | Status changes to cancelled with timestamp. | Functional | High | Not Run |
+| BOOK-009 | Cancel booking blocked after completion | Completed booking exists | 1. Open completed booking. 2. Attempt cancel. | Cancel action unavailable or blocked with message. | Validation | Medium | Not Run |
+| BOOK-010 | Refresh booking list after creating booking | Booking created successfully | 1. Return to booking list. 2. Pull to refresh. | Newly created booking appears once with correct status. | Sync | High | Not Run |
+| BOOK-011 | Booking list handles empty state | No bookings for account | 1. Open My Bookings. | Empty state illustration/text renders with no blank screen, overlapping components, or stuck loader. | UX | Medium | Not Run |
+| BOOK-012 | Rapid open/close booking details does not show stale data | Multiple bookings present | 1. Open booking A. 2. Quickly go back and open booking B. | Booking B details are accurate; no stale data from booking A. | Race Condition | High | Not Run |
+| BOOK-013 | Booking status badge updates after manual refresh | Booking status changed externally | 1. Pull to refresh in bookings list. | Latest status badge is displayed correctly. | Sync | High | Not Run |
+| BOOK-014 | Offline mode shows actionable message on booking screens | Device offline | 1. Open booking list/detail offline. | Clear offline message and retry action shown; app remains usable. | Network | High | Not Run |
 
-1. [Auth — Role Selection](#1-auth--role-selection)
-2. [Auth — Login Screen](#2-auth--login-screen)
-3. [Auth — OTP Screen](#3-auth--otp-screen)
-4. [Auth — Session & State](#4-auth--session--state)
-5. [Provider — Booking Detail](#5-provider--booking-detail)
-6. [Tracking — Provider Location Hook](#6-tracking--provider-location-hook)
-7. [Provider — Consultation Form](#7-provider--consultation-form)
-8. [Payment](#8-payment)
+## Payment
 
----
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| PAY-001 | Payment screen shows correct payable amount | Booking ready for payment | 1. Open payment screen. | Amount displayed matches booking total. | Functional | High | Not Run |
+| PAY-002 | User can switch payment method | Payment screen open | 1. Select each payment method option. | Selected method updates correctly. | Functional | Medium | Not Run |
+| PAY-003 | Pay action disabled while processing | Valid payment details present | 1. Tap Pay once. | Button enters loading/disabled state until response completes. | UX | High | Not Run |
+| PAY-004 | Successful payment shows confirmation state | Payment gateway success | 1. Complete payment flow. | Success message shown with transaction reference. | Functional | High | Not Run |
+| PAY-005 | Failed payment shows recoverable error | Payment gateway decline | 1. Attempt payment with declined method. | Failure message shown with option to retry or change method. | Negative | High | Not Run |
+| PAY-006 | Payment retry succeeds after temporary gateway timeout | Gateway timeout on first attempt | 1. Tap Pay (timeout). 2. Retry payment. | Retry completes successfully without duplicate charge. | Retry | High | Not Run |
+| PAY-007 | Double tap Pay does not trigger multiple charge requests | Pay button enabled | 1. Tap Pay rapidly several times. 2. Inspect network logs/transaction history. | Only one payment request and one transaction reference are generated. | Race Condition | Critical | Not Run |
+| PAY-008 | User exits and reopens payment screen during processing | Payment in progress | 1. Start payment. 2. Navigate back. 3. Reopen booking/payment. | Final payment state is consistent; no stuck spinner. | Edge | High | Not Run |
+| PAY-009 | Payment success updates booking status in app | Payment successful | 1. Complete payment. 2. Open booking detail/list. | Booking status reflects paid/confirmed state. | Sync | High | Not Run |
+| PAY-010 | Offline payment attempt fails gracefully | Device offline | 1. Open payment screen. 2. Tap Pay. | Offline error shown; no crash; retry available after reconnect. | Network | High | Not Run |
 
-## Code-Specific Quick Reference
+## Provider
 
-| Behaviour | Exact Source Reference | Importance |
-|---|---|---|
-| OTP countdown starts at **60 s** | `OtpScreen.tsx:28` `setCountdown(60)` | AUTH-026, AUTH-028, AUTH-029 |
-| Location push interval is **10 000 ms** | `useProviderLocationTracking.ts:6` | TRACK-002 |
-| Trackable statuses: **ACCEPTED, ON\_THE\_WAY, ARRIVED, IN\_PROGRESS** | hook line 22 | TRACK-020, TRACK-021 |
-| 401 interceptor clears token **only for `/auth/` URLs** | `api.ts:28-30` | AUTH-038, AUTH-039 |
-| `loadStoredAuth` catches errors **internally** — never re-throws | `authStore.ts:43-45` | AUTH-037 |
-| `IN_PROGRESS` transition also navigates to ConsultationForm | `BookingDetailScreen.tsx:53-55` | PROV-013 |
-| Empty-name medicines filtered by `.filter(m => m.name.trim())` | `ConsultationFormScreen.tsx:52` | CONS-015 |
-| "Track Provider" uses `navigation.replace` (not `navigate`) | `PaymentScreen.tsx:54` | PAY-008 |
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| PROV-001 | Provider onboarding form submits with valid data | New provider account | 1. Fill all required onboarding fields. 2. Submit. | Onboarding submission succeeds and next state appears. | Functional | High | Not Run |
+| PROV-002 | Onboarding mandatory field validation | Onboarding screen open | 1. Leave required field empty. 2. Submit. | Inline validation shown; submit blocked. | Validation | High | Not Run |
+| PROV-003 | Invalid document format upload blocked | Document upload step open | 1. Try unsupported file type. | File rejected with clear format guidance. | Negative | Medium | Not Run |
+| PROV-004 | Large document upload failure is recoverable | Upload step; oversized file | 1. Upload oversized file. 2. Retry with valid size. | Oversize error shown; retry with valid file succeeds. | Edge | Medium | Not Run |
+| PROV-005 | Provider can accept new booking request | Provider has pending request | 1. Open request. 2. Tap Accept. | Request moves to accepted state. | Functional | High | Not Run |
+| PROV-006 | Provider can reject request with reason | Pending request exists | 1. Tap Reject. 2. Enter reason. 3. Confirm. | Request marked rejected with reason stored/displayed. | Functional | Medium | Not Run |
+| PROV-007 | Status progression follows allowed order only | Accepted booking exists | 1. Attempt status transitions in app. | Only valid next action is enabled at each step. | Workflow | High | Not Run |
+| PROV-008 | Duplicate status updates prevented on rapid taps | Status action enabled | 1. Tap status button rapidly. | Single status change applied; no duplicate updates. | Race Condition | High | Not Run |
+| PROV-009 | Consultation summary submit handles temporary failure | In-progress consultation | 1. Submit summary with network drop. 2. Reconnect. 3. Retry. | First attempt fails safely; retry succeeds once. | Retry | High | Not Run |
+| PROV-010 | Provider home handles no assigned bookings state | Logged-in provider with no bookings | 1. Open provider dashboard. | Empty state displayed with clear next action guidance. | UX | Medium | Not Run |
+| PROV-011 | Pull-to-refresh updates provider queue | Provider queue open | 1. Pull to refresh. | Latest request list appears without duplicates. | Sync | High | Not Run |
+| PROV-012 | App resumes to latest provider task after backgrounding | Active provider task exists | 1. Send app to background. 2. Return to app. | Current task state is accurate and actionable. | State | High | Not Run |
 
----
+## Tracking
 
-## 1. Auth — Role Selection
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| TRACK-001 | Live tracking starts for active booking | Active provider trip status | 1. Open tracking screen. | Current location marker and route are rendered. | Functional | High | Not Run |
+| TRACK-002 | Tracking updates as provider moves | Live tracking active | 1. Simulate provider location changes. | Marker updates smoothly with latest position. | Functional | High | Not Run |
+| TRACK-003 | GPS permission denied flow is handled | Location permission denied | 1. Open tracking. | Permission prompt/message shown with recovery guidance. | Negative | High | Not Run |
+| TRACK-004 | Temporary GPS signal loss shows fallback state | Tracking active; signal lost | 1. Simulate GPS loss. | Last known location retained with reconnecting indicator. | Edge | Medium | Not Run |
+| TRACK-005 | Network disconnect pauses updates without crash | Tracking active; network off | 1. Disable network during tracking. | Update attempts fail gracefully; UI remains stable. | Network | High | Not Run |
+| TRACK-006 | Tracking recovers automatically after reconnect | Tracking paused due to no network | 1. Re-enable network. | Auto-refresh resumes and latest position syncs. | Retry | High | Not Run |
+| TRACK-007 | Rapid navigation in/out of tracking does not leak stale markers | Multiple quick screen transitions | 1. Enter/exit tracking repeatedly. | Correct booking map state shown; no stale or duplicated markers. | Race Condition | Medium | Not Run |
+| TRACK-008 | Tracking stops after booking completion | Booking moved to completed | 1. Complete booking. 2. Open tracking view. | Live updates stop; completed status shown. | Workflow | High | Not Run |
 
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| AUTH-001 | Auth | RoleSelectScreen renders both role cards | App launched, no active session | 1. Open app cold. 2. Wait for navigation to settle. | "I'm a Patient" and "I'm a Doctor" cards are both visible on screen. | High | Positive | Not Run |
-| AUTH-002 | Auth | Footer warning "role cannot be changed" is visible | RoleSelectScreen open | 1. Scroll to the bottom of the screen. | Text "Your role cannot be changed after registration." is displayed at the bottom. | Medium | Positive | Not Run |
-| AUTH-003 | Auth | Tapping "Continue as Patient" navigates to LoginScreen with PATIENT role | RoleSelectScreen open | 1. Tap "Continue as Patient →" button. | LoginScreen opens. Title reads "Welcome, Patient". | High | Positive | Not Run |
-| AUTH-004 | Auth | Tapping "Continue as Doctor" navigates to LoginScreen with PROVIDER role | RoleSelectScreen open | 1. Tap "Continue as Doctor →" button. | LoginScreen opens. Title reads "Welcome, Doctor". | High | Positive | Not Run |
+## Sync
 
----
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| SYNC-001 | Pull-to-refresh reconciles local list with server | Existing bookings in app | 1. Pull to refresh on bookings list. | List matches latest server state. | Sync | High | Not Run |
+| SYNC-002 | App restart preserves latest known booking states | Existing bookings and statuses | 1. Close app. 2. Reopen app. | Last synced statuses load correctly on startup. | Persistence | High | Not Run |
+| SYNC-003 | Offline changes are queued and retried when online | Offline during mutable action | 1. Perform supported action offline. 2. Reconnect network. | Queued action retries automatically or via retry CTA and syncs once. | Retry | High | Not Run |
+| SYNC-004 | Duplicate records are not created after retry | Prior request timed out client-side | 1. Trigger timeout. 2. Retry same action. | Single final record exists in app state. | Edge | High | Not Run |
+| SYNC-005 | Conflicting status update resolves to latest valid state | Same booking updated from two clients | 1. Trigger status update from another device. 2. Refresh current app. | App reflects latest authoritative status without crash. | Conflict | High | Not Run |
+| SYNC-006 | Background to foreground triggers data revalidation | App backgrounded for several minutes | 1. Return app to foreground. | Critical data auto-refreshes and stale badges clear. | Lifecycle | Medium | Not Run |
+| SYNC-007 | Timeouts show non-blocking sync error banner | Slow backend response | 1. Trigger sync on slow network. | User sees timeout message with retry; app remains interactive. | Network | Medium | Not Run |
+| SYNC-008 | Manual retry after sync failure succeeds | Previous sync failed | 1. Tap Retry from error state. | Sync completes and error banner clears. | Retry | High | Not Run |
+| SYNC-009 | Notification-triggered refresh opens correct booking state | Push notification received for booking update | 1. Tap notification. | Correct booking opens with latest status. | Integration | High | Not Run |
+| SYNC-010 | Fast repeated refresh gestures do not break list state | Booking list open | 1. Pull to refresh repeatedly/quickly. | One coherent refresh cycle; no duplicate loaders/items. | Race Condition | Medium | Not Run |
 
-## 2. Auth — Login Screen
+## UX
 
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| AUTH-005 | Auth | Phone input strips non-numeric characters | LoginScreen open | 1. Type "abc123def456" into the phone field. | Input shows "123456" (digits only, max 10). | High | Positive | Not Run |
-| AUTH-006 | Auth | Phone input is capped at 10 digits | LoginScreen open | 1. Attempt to type 12 consecutive digits. | Input field contains exactly 10 digits; excess characters are ignored. | High | Edge | Not Run |
-| AUTH-007 | Auth | Send OTP button is disabled when phone has fewer than 10 digits | LoginScreen open | 1. Enter 9 digits in the phone field. | "Send OTP" button is disabled and non-tappable. | High | Negative | Not Run |
-| AUTH-008 | Auth | Send OTP button becomes enabled at exactly 10 digits | LoginScreen open | 1. Enter exactly 10 digits. | "Send OTP" button becomes enabled. | High | Positive | Not Run |
-| AUTH-009 | Auth | Typing in phone field clears any existing inline error | LoginScreen with a visible error message | 1. Observe error. 2. Change any digit in the phone field. | Error text is cleared immediately on text change. | Medium | Edge | Not Run |
-| AUTH-010 | Auth | Phone number is prefixed with +91 before the API call | LoginScreen, 10 digits entered | 1. Enter "9876543210". 2. Tap Send OTP. | `authService.sendOtp` is called with "+919876543210". | High | Positive | Not Run |
-| AUTH-011 | Auth | Phone already starting with "+" is not double-prefixed | LoginScreen | 1. Ensure phone value is "+919876543210". 2. Tap Send OTP. | `sendOtp` receives "+919876543210" — no double prefix. | Medium | Edge | Not Run |
-| AUTH-012 | Auth | Successful sendOtp navigates to OtpScreen with correct params | LoginScreen, valid phone, API returns success | 1. Enter 10 digits. 2. Tap Send OTP. | OtpScreen opens. Correct phone is shown. Dev OTP banner appears if `response.otp` is present. | High | Positive | Not Run |
-| AUTH-013 | Auth | API failure on sendOtp shows an Alert | LoginScreen, API returns an error | 1. Enter 10 digits. 2. Tap Send OTP (API fails). | Alert is shown with the API error message or the fallback "Failed to send OTP. Please try again." | High | Negative | Not Run |
-| AUTH-014 | Auth | Button shows loading state during sendOtp call | LoginScreen, valid phone | 1. Tap Send OTP. 2. Observe button before API responds. | Button renders a loading indicator and is non-tappable during the in-flight call. | Medium | UX | Not Run |
-| AUTH-015 | Auth | Loading state clears after sendOtp completes | LoginScreen | 1. Tap Send OTP. 2. Wait for API response (success or failure). | Button returns to its normal state after the call resolves. | Medium | UX | Not Run |
-| AUTH-016 | Auth | Disclaimer text is visible on LoginScreen | LoginScreen open | 1. View the bottom section of the form card. | "By continuing, you agree to our Terms of Service and Privacy Policy" is visible. | Low | Positive | Not Run |
-| AUTH-017 | Auth | KeyboardAvoidingView keeps form accessible on iOS when keyboard opens | iOS device, LoginScreen | 1. Tap the phone input. 2. Observe layout as keyboard opens. | Form remains accessible; the Send OTP button is not hidden behind the keyboard. | Medium | UX | Not Run |
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| UX-001 | Global loading indicators appear for long-running actions | Any action with server latency | 1. Trigger long-running action. | Visible loader indicates progress until completion/failure. | UX | High | Not Run |
+| UX-002 | Error messages are human-readable and actionable | Trigger any known error | 1. Cause failure scenario. | Message avoids technical jargon and provides next step. | Content | Medium | Not Run |
+| UX-003 | Primary CTA stays disabled when form invalid | Any form with required fields | 1. Leave invalid values. | CTA disabled with clear validation hints. | Validation | High | Not Run |
+| UX-004 | Keyboard does not block critical CTAs | Form screen on mobile keyboard | 1. Focus lower input fields. | Screen adjusts so submit CTA remains reachable. | Layout | High | Not Run |
+| UX-005 | Back navigation never lands on broken/blank screen | Multi-step flow active | 1. Navigate through 3+ screens. 2. Use Back repeatedly. | Back stack behaves predictably with valid screen states. | Navigation | High | Not Run |
+| UX-006 | Tap throttling prevents accidental double-submit in critical forms | Submit-ready form | 1. Tap submit rapidly. | Only one submission is processed. | Race Condition | High | Not Run |
+| UX-007 | Offline banner appears and clears correctly | Toggle connectivity while on app | 1. Disable internet. 2. Re-enable internet. | Offline indicator appears when offline and disappears after reconnect. | Network | Medium | Not Run |
+| UX-008 | UI remains responsive under rapid tab switching | Tabbed home available | 1. Switch tabs quickly for 20–30 seconds. | No freeze, no visual corruption, no stuck loaders. | Stress | Medium | Not Run |
 
----
+## Staging Integration Validation
 
-## 3. Auth — OTP Screen
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| AUTH-018 | Auth | OtpScreen displays the phone number passed via route params | OtpScreen opened with phone "+919876543210" | 1. Observe the subtitle text. | "+919876543210" is rendered in bold within the subtitle. | High | Positive | Not Run |
-| AUTH-019 | Auth | Dev OTP banner is shown when devOtp param is present | OtpScreen opened with a non-empty `devOtp` param | 1. Observe the screen below the subtitle. | A yellow banner with "🔧 Dev OTP: XXXXXX" is visible. | Medium | Positive | Not Run |
-| AUTH-020 | Auth | Dev OTP banner is NOT shown when devOtp param is absent/falsy | OtpScreen opened without a `devOtp` param | 1. Observe the screen below the subtitle. | No yellow banner is rendered. | Medium | Edge | Not Run |
-| AUTH-021 | Auth | Verify OTP button is disabled with fewer than 6 digits entered | OtpScreen open | 1. Enter 5 digits into the OTP input. | "Verify OTP" button is disabled. | High | Negative | Not Run |
-| AUTH-022 | Auth | Verify OTP button becomes enabled when exactly 6 digits are entered | OtpScreen open | 1. Enter 6 digits. | "Verify OTP" button becomes enabled. | High | Positive | Not Run |
-| AUTH-023 | Auth | Successful OTP verification calls setAuth and navigates to the correct stack | OtpScreen, valid 6-digit OTP, API returns token + user | 1. Enter the correct 6-digit OTP. 2. Tap Verify OTP. | `setAuth(token, user)` is called; token and user are written to AsyncStorage; `isAuthenticated` becomes true; RootNavigator routes to the correct navigator (Patient or Provider). | High | Positive | Not Run |
-| AUTH-024 | Auth | Failed OTP verification shows an Alert | OtpScreen, wrong OTP, API returns an error | 1. Enter a wrong 6-digit OTP. 2. Tap Verify OTP. | Alert is shown with the API error message or the fallback "Invalid OTP. Please try again." | High | Negative | Not Run |
-| AUTH-025 | Auth | Loading state is shown during OTP verification | OtpScreen, 6 digits entered | 1. Tap Verify OTP. 2. Observe button before API responds. | Button shows a loading indicator and is disabled during the in-flight call. | Medium | UX | Not Run |
-| AUTH-026 | Auth | Countdown timer starts at 60 and decrements every second | OtpScreen just opened | 1. Observe the resend row. 2. Wait 3 seconds. | "Resend OTP in 60s" shown initially; decrements to approximately 57s after 3 seconds. | High | Positive | Not Run |
-| AUTH-027 | Auth | Resend OTP link is not visible while countdown > 0 | OtpScreen, immediately after opening | 1. Observe the resend row. | Only the countdown text is shown; the "Resend OTP" link is not tappable. | High | Negative | Not Run |
-| AUTH-028 | Auth | Resend OTP link appears after countdown reaches 0 | OtpScreen | 1. Wait 60 seconds. | "Resend OTP" tappable link replaces the countdown text. | High | Positive | Not Run |
-| AUTH-029 | Auth | Tapping Resend OTP resets countdown to 60 | Countdown has expired | 1. Tap "Resend OTP". | Countdown resets to 60 immediately and begins decrementing again. | High | Positive | Not Run |
-| AUTH-030 | Auth | Successful OTP resend shows a "Sent" Alert | Countdown expired, API returns success | 1. Tap "Resend OTP". | Alert is shown: title "Sent", message "OTP has been resent successfully". | Medium | Positive | Not Run |
-| AUTH-031 | Auth | Failed OTP resend shows an "Error" Alert | Countdown expired, API returns an error | 1. Tap "Resend OTP" (API fails). | Alert is shown: "Failed to resend OTP". | Medium | Negative | Not Run |
-| AUTH-032 | Auth | Back button on OtpScreen navigates to LoginScreen | OtpScreen open | 1. Tap "← Back". | User returns to LoginScreen. | Medium | Positive | Not Run |
-
----
-
-## 4. Auth — Session & State
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| AUTH-033 | Auth | App shows LoadingSpinner while loadStoredAuth is resolving | App cold-started | 1. Launch app. 2. Observe the UI before storage resolves. | Full-screen `LoadingSpinner` with the message "Loading app…" is shown. | High | Positive | Not Run |
-| AUTH-034 | Auth | Patient with stored session is routed directly to PatientNavigator | `auth_token` + `auth_user` (role = PATIENT) present in AsyncStorage | 1. Restart app. | Loading clears; PatientNavigator stack is rendered; AuthNavigator is not shown. | High | Positive | Not Run |
-| AUTH-035 | Auth | Provider with stored session is routed directly to ProviderNavigator | `auth_token` + `auth_user` (role = PROVIDER) present in AsyncStorage | 1. Restart app. | ProviderNavigator stack is rendered. | High | Positive | Not Run |
-| AUTH-036 | Auth | No stored session shows AuthNavigator (RoleSelect) | AsyncStorage is empty | 1. Launch app. | AuthNavigator (starting at RoleSelect) is rendered. | High | Positive | Not Run |
-| AUTH-037 | Auth | Corrupted auth\_user JSON in AsyncStorage does not crash the app | `auth_token` present, `auth_user` = `"{{invalid"` in AsyncStorage | 1. Launch app. | App loads without crashing; `isLoading` is set to false; user is directed to AuthNavigator. (Error is caught internally by `loadStoredAuth`.) | High | Edge | Not Run |
-| AUTH-038 | Auth | 401 on a /auth/ endpoint removes only the token from AsyncStorage | User logged in; a `/auth/` endpoint returns 401 | 1. Trigger an API call to a `/auth/` endpoint that returns 401. | `auth_token` is removed from AsyncStorage. Zustand in-memory state (`token`, `user`, `isAuthenticated`) is **not** updated — the user remains visually logged in. | High | Edge | Not Run |
-| AUTH-039 | Auth | 401 on a non-auth endpoint does NOT remove the token | User logged in; a non-`/auth/` API returns 401 | 1. Trigger a 401 from any endpoint whose URL does not contain `/auth/`. | `auth_token` is retained in AsyncStorage; the error is propagated to the caller. | High | Edge | Not Run |
-| AUTH-040 | Auth | Full logout clears both AsyncStorage keys and resets Zustand state | User is logged in | 1. Trigger the logout action (e.g. via a logout button). | `auth_token` and `auth_user` are removed from AsyncStorage; `token` and `user` are set to null; `isAuthenticated` becomes false. | High | Positive | Not Run |
-
----
-
-## 5. Provider — Booking Detail
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| PROV-001 | Provider | Loading state is shown while booking is being fetched | BookingDetailScreen navigated to | 1. Open BookingDetailScreen. 2. Observe before the API responds. | "Loading booking…" text is shown centred on screen. | High | Positive | Not Run |
-| PROV-002 | Provider | "Booking not found." shown if API returns null | `bookingService.getBookingById` returns null | 1. Navigate to BookingDetailScreen. | "Booking not found." text is shown centred on screen. | Medium | Negative | Not Run |
-| PROV-003 | Provider | Status card shows the correct human-readable label | Booking with status `ON_THE_WAY` loaded | 1. View the status card at the top. | Status card displays "On the Way". | High | Positive | Not Run |
-| PROV-004 | Provider | Progress timeline dots are filled up to the current status | Booking in `ARRIVED` status | 1. View the Progress card. | Steps REQUESTED, ACCEPTED, ON\_THE\_WAY, ARRIVED show filled dots; IN\_PROGRESS and COMPLETED show pending dots. | High | Positive | Not Run |
-| PROV-005 | Provider | Patient phone number is masked — only last 4 digits shown | Booking loaded with a patient phone number | 1. View the Patient info card. | Phone displayed as "+91 ****XXXX" (only last 4 digits visible). | High | Positive | Not Run |
-| PROV-006 | Provider | Patient address card is shown for HOME\_VISIT bookings | Booking with `mode = HOME_VISIT` and a non-empty address | 1. View the screen. | "Patient Address" card with address text and "🗺 Open in Maps" button is visible. | High | Positive | Not Run |
-| PROV-007 | Provider | Patient address card is NOT shown for non-HOME\_VISIT bookings | Booking with `mode != HOME_VISIT` | 1. View the screen. | No address card is rendered. | High | Positive | Not Run |
-| PROV-008 | Provider | "Open in Maps" triggers Google Maps with the correct encoded URL | HOME\_VISIT booking with an address | 1. Tap "🗺 Open in Maps". | `Linking.openURL` is called with `https://maps.google.com/?q=<URL-encoded-address>`. | Medium | Positive | Not Run |
-| PROV-009 | Provider | ACCEPTED booking shows "🚗 Start Journey" action button | Booking in `ACCEPTED` status | 1. View the action area. | "🚗 Start Journey" button is visible. | High | Positive | Not Run |
-| PROV-010 | Provider | Tapping "Start Journey" updates booking status to ON\_THE\_WAY | Booking in `ACCEPTED` | 1. Tap "🚗 Start Journey". | `updateStatus(bookingId, 'ON_THE_WAY')` is called; status card updates to "On the Way". | High | Positive | Not Run |
-| PROV-011 | Provider | ON\_THE\_WAY booking shows "📍 Mark Arrived" | Booking in `ON_THE_WAY` | 1. View the action area. | "📍 Mark Arrived" button is visible. | High | Positive | Not Run |
-| PROV-012 | Provider | ARRIVED booking shows "🩺 Begin Consultation" | Booking in `ARRIVED` | 1. View the action area. | "🩺 Begin Consultation" button is visible. | High | Positive | Not Run |
-| PROV-013 | Provider | Tapping "Begin Consultation" updates to IN\_PROGRESS AND navigates to ConsultationForm | Booking in `ARRIVED` | 1. Tap "🩺 Begin Consultation". | Status updated to `IN_PROGRESS`; screen navigates to ConsultationFormScreen with the correct `bookingId` param. | High | Positive | Not Run |
-| PROV-014 | Provider | IN\_PROGRESS booking shows "✅ Complete & Write Summary" | Booking in `IN_PROGRESS` | 1. View the action area. | "✅ Complete & Write Summary" button is visible. | High | Positive | Not Run |
-| PROV-015 | Provider | Tapping "Complete" updates status to COMPLETED — no further navigation | Booking in `IN_PROGRESS` | 1. Tap "✅ Complete & Write Summary". | Status updated to `COMPLETED`; screen remains on BookingDetail (no navigation, as `getNextAction` returns null for COMPLETED). | High | Positive | Not Run |
-| PROV-016 | Provider | No action button rendered for REQUESTED status | Booking in `REQUESTED` | 1. View the action area. | No action button is rendered. | High | Positive | Not Run |
-| PROV-017 | Provider | No action button for terminal statuses (COMPLETED, CANCELLED, CLOSED) | Booking in `COMPLETED` | 1. View the action area. | No action button is visible. | Medium | Edge | Not Run |
-| PROV-018 | Provider | Action button shows "Updating…" and is disabled during a status update | Any booking with an available action | 1. Tap the action button. 2. Observe before API responds. | Button shows "Updating…"; opacity is reduced to 0.7; button is disabled. | Medium | UX | Not Run |
-| PROV-019 | Provider | Status update failure shows an Alert | `updateStatus` API returns an error | 1. Tap any action button (API fails). | Alert shown: "Failed to update status." | High | Negative | Not Run |
-| PROV-020 | Provider | Location tracking is active for ACCEPTED/ON\_THE\_WAY/ARRIVED/IN\_PROGRESS | Booking in any of these four statuses | 1. Open BookingDetailScreen. 2. Wait up to 10 seconds. | `useProviderLocationTracking` fires immediately and then every 10 000 ms. | High | Positive | Not Run |
-| PROV-021 | Provider | Location tracking is NOT active for REQUESTED or COMPLETED | Booking in `REQUESTED` or `COMPLETED` | 1. Open BookingDetailScreen. | No location push calls are made (hook's `isTrackable` is false for these statuses). | High | Edge | Not Run |
-
----
-
-## 6. Tracking — Provider Location Hook
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| TRACK-001 | Tracking | First location push fires immediately on mount | BookingDetailScreen opened, booking in `ACCEPTED` status | 1. Open the screen; observe network calls immediately. | `updateProviderLocation` is called once at mount, before the first 10-second interval elapses. | High | Positive | Not Run |
-| TRACK-002 | Tracking | Location is pushed every 10 000 ms (10 seconds) | BookingDetail open, booking in `ACCEPTED` | 1. Wait 30 seconds and count API calls. | `updateProviderLocation` is called approximately 3 additional times (once per 10 s interval). | High | Positive | Not Run |
-| TRACK-003 | Tracking | Location push is paused when app goes to background | Active tracking, app sent to background | 1. Move app to background. | Interval is cleared; no further location calls are made while the app is backgrounded. | High | Edge | Not Run |
-| TRACK-004 | Tracking | Location push resumes immediately when app returns to foreground | App was backgrounded during active tracking | 1. Return app to foreground. | An immediate push fires; the interval is restarted. | High | Edge | Not Run |
-| TRACK-005 | Tracking | Location errors are silently swallowed — no crash or alert | `getCurrentLocation` throws an error (e.g. permission revoked) | 1. Revoke location permission or force an error. 2. Wait for a push cycle. | No crash occurs; no alert is shown; tracking continues silently on the next cycle. | High | Edge | Not Run |
-| TRACK-006 | Tracking | Tracking interval is cleared on BookingDetail unmount | BookingDetailScreen during active tracking | 1. Navigate away from BookingDetailScreen. | Interval is cleared; no further push calls occur after unmount. | High | Edge | Not Run |
-
----
-
-## 7. Provider — Consultation Form
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| CONS-001 | Provider | Submitting with empty symptoms field shows a validation Alert | ConsultationFormScreen open | 1. Leave symptoms blank. 2. Fill in diagnosis. 3. Tap Submit. | Alert shown — title "Required", message "Please fill in symptoms and diagnosis." | High | Negative | Not Run |
-| CONS-002 | Provider | Submitting with empty diagnosis field shows a validation Alert | ConsultationFormScreen open | 1. Fill in symptoms. 2. Leave diagnosis blank. 3. Tap Submit. | Alert shown — "Please fill in symptoms and diagnosis." | High | Negative | Not Run |
-| CONS-003 | Provider | Whitespace-only symptoms triggers the same validation Alert | ConsultationFormScreen | 1. Enter "   " (spaces) in symptoms. 2. Enter valid diagnosis. 3. Tap Submit. | Alert shown — "Please fill in symptoms and diagnosis." (`.trim()` check enforced). | High | Negative | Not Run |
-| CONS-004 | Provider | Valid submission calls the service and shows a success Alert | Both required fields filled | 1. Enter symptoms and diagnosis. 2. Tap Submit. | `submitSummary` API is called; Alert shown — title "Summary Submitted", message "Consultation summary saved successfully." | High | Positive | Not Run |
-| CONS-005 | Provider | Tapping OK on the success Alert navigates to Tabs | Success Alert shown | 1. Tap OK. | Navigation goes to `'Tabs'` (provider tab navigator). | High | Positive | Not Run |
-| CONS-006 | Provider | Submit button is disabled and shows "Submitting…" during the API call | Form with valid data | 1. Tap Submit. 2. Observe button before API responds. | Button shows "Submitting…"; opacity is 0.7; button is disabled. | Medium | UX | Not Run |
-| CONS-007 | Provider | API failure shows "Failed to submit summary." Alert | `submitSummary` API returns an error | 1. Fill required fields. 2. Tap Submit (API fails). | Alert shown — "Failed to submit summary. Please try again." | High | Negative | Not Run |
-| CONS-008 | Provider | Follow-up notes input is hidden when the toggle is off | ConsultationForm, `followUpNeeded = false` | 1. View the Follow-up section. | Follow-up notes TextInput is not rendered. | Medium | Positive | Not Run |
-| CONS-009 | Provider | Follow-up notes input appears when the Follow-up toggle is turned on | ConsultationForm | 1. Toggle "Follow-up Required" ON. | Follow-up notes TextInput becomes visible. | Medium | Positive | Not Run |
-| CONS-010 | Provider | Diagnostic tests input appears when the Diagnostic toggle is turned on | ConsultationForm | 1. Toggle "Diagnostic Tests Required" ON. | Diagnostic tests TextInput becomes visible. | Medium | Positive | Not Run |
-| CONS-011 | Provider | Specialist referral input appears when the Referral toggle is turned on | ConsultationForm | 1. Toggle "Specialist Referral" ON. | Specialist type TextInput becomes visible. | Medium | Positive | Not Run |
-| CONS-012 | Provider | Remove button is absent when only one medicine row exists | ConsultationForm (default state) | 1. View the Medicines section. | No remove (✕) button is shown on the single default row. | Medium | Edge | Not Run |
-| CONS-013 | Provider | Tapping "+ Add Medicine" appends a new empty medicine row | ConsultationForm | 1. Tap "+ Add Medicine". | A new row with a name and dosage input is added; remove button is now visible on both rows. | Medium | Positive | Not Run |
-| CONS-014 | Provider | Tapping ✕ removes the corresponding medicine row | ConsultationForm with ≥ 2 rows | 1. Tap ✕ on a row. | That row is removed; remaining rows are unaffected. | Medium | Positive | Not Run |
-| CONS-015 | Provider | Medicine rows with a blank name are filtered out of the API payload | 2 medicine rows — second name left blank | 1. Add two rows; leave the second name blank. 2. Submit. | API is called with `medicinesAdvised` containing only the row with a non-empty name. | Medium | Edge | Not Run |
-| CONS-016 | Provider | Conditional fields are absent from the API payload when their toggle is off | All three optional toggles left OFF | 1. Submit with all toggles off. | `followUpRecommendation`, `diagnosticTests`, and `specialistReferral` are all `undefined` in the submitted payload. | Medium | Edge | Not Run |
-
----
-
-## 8. Payment
-
-| Test Case ID | Module | Title | Preconditions | Steps to Execute | Expected Result | Priority | Type | Status |
-|---|---|---|---|---|---|---|---|---|
-| PAY-001 | Payment | Amount is displayed via the formatCurrency utility | PaymentScreen opened with `amount = 500` | 1. View the amount card. | A formatted currency string is rendered (e.g. "₹500"). | High | Positive | Not Run |
-| PAY-002 | Payment | "Includes consultation fee + service charges" note is shown | PaymentScreen open | 1. View the amount card. | Note text is visible below the amount. | Low | Positive | Not Run |
-| PAY-003 | Payment | Default selected payment method is UPI | PaymentScreen opens | 1. Observe the method list. | UPI item has selected styling (primary-coloured border/background) and a "✓" checkmark. | High | Positive | Not Run |
-| PAY-004 | Payment | Tapping Card selects it and deselects UPI | PaymentScreen, UPI selected | 1. Tap "Card". | Card shows selected styling and checkmark; UPI loses its selected state. | High | Positive | Not Run |
-| PAY-005 | Payment | All four payment methods render and are individually selectable | PaymentScreen open | 1. Tap each method in turn. | UPI, Card, Net Banking, Cash on Visit — each becomes selected on tap; previously selected is deselected. | Medium | Positive | Not Run |
-| PAY-006 | Payment | Pay button label includes the amount via formatCurrency | PaymentScreen with `amount = 750` | 1. Observe the Pay button label. | Button title shows the formatted amount (e.g. "Pay ₹750"). | Medium | Positive | Not Run |
-| PAY-007 | Payment | Successful payment (both API calls succeed) renders the success view | Valid `bookingId` and `amount`; both POST and PUT succeed | 1. Tap Pay. | `paid` state becomes true; success view renders with ✅, "Payment Successful!", and the subtitle text. | High | Positive | Not Run |
-| PAY-008 | Payment | "Track Provider" button uses navigation.replace to open the Tracking screen | Success view shown | 1. Tap "Track Provider". | `navigation.replace('Tracking', { bookingId })` is called; Tracking screen opens (PaymentScreen is removed from the stack). | High | Positive | Not Run |
-| PAY-009 | Payment | Payment API failure shows a "Payment Failed" Alert | `POST /payments` returns an error | 1. Tap Pay (POST fails). | Alert shown — title "Payment Failed"; message from the API error or the fallback "Payment failed. Please try again." | High | Negative | Not Run |
-| PAY-010 | Payment | Loading state is shown during the payment API call | PaymentScreen | 1. Tap Pay. 2. Observe before API responds. | Button shows a loading indicator during the in-flight call. | Medium | UX | Not Run |
-| PAY-011 | Payment | Loading clears after a payment failure | API returns an error | 1. Tap Pay (API fails). 2. Dismiss the alert. | Button returns to its normal non-loading state. | Medium | UX | Not Run |
-| PAY-012 | Payment | Success view is NOT shown if the status-update PUT call fails | `POST /payments` succeeds; `PUT /payments/:id/status` fails | 1. Tap Pay with the PUT endpoint failing. | Alert is shown; success view is not rendered; user remains on the payment screen. | High | Edge | Not Run |
-
----
-
-## Summary
-
-| Module | Test Cases | High | Medium | Low |
-|---|---|---|---|---|
-| Auth — Role Selection | 4 | 2 | 1 | 1 |
-| Auth — Login Screen | 13 | 6 | 5 | 2 |
-| Auth — OTP Screen | 15 | 7 | 6 | 2 |
-| Auth — Session & State | 8 | 7 | 1 | 0 |
-| Provider — Booking Detail | 21 | 15 | 5 | 1 |
-| Tracking — Location Hook | 6 | 6 | 0 | 0 |
-| Provider — Consultation Form | 16 | 8 | 7 | 1 |
-| Payment | 12 | 7 | 4 | 1 |
-| **Total** | **95** | **58** | **29** | **8** |
-
-> **Status column default:** All test cases are initialised to **Not Run**.
+| Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
+|---|---|---|---|---|---|---|---|
+| STG-001 | Booking created in mobile appears in staging admin dashboard | Staging mobile + staging admin access | 1. Create booking in mobile app. 2. Open admin dashboard bookings. | New booking appears with matching patient, service, and timestamp. | E2E Integration | Critical | Not Run |
+| STG-002 | Booking status updates in mobile sync to admin timeline | Existing staging booking | 1. Progress booking status in mobile flow. 2. Check admin booking detail. | Admin timeline reflects each status change in correct order. | E2E Integration | Critical | Not Run |
+| STG-003 | Provider onboarding submission appears in admin verification queue | New provider submits onboarding in mobile | 1. Complete onboarding from mobile. 2. Open admin verification queue. | Provider record appears with correct submitted details/documents. | E2E Integration | Critical | Not Run |
+| STG-004 | Admin approval/rejection reflects back in provider mobile state | Provider pending review in staging | 1. Approve/reject in admin. 2. Refresh provider mobile app. | Provider app shows updated verification status accurately. | E2E Integration | High | Not Run |
+| STG-005 | Successful mobile payment appears in admin earnings/revenue views | Payable booking in staging | 1. Complete payment in mobile. 2. Open admin earnings/reports. | Payment entry appears with matching amount, booking reference, and status. | E2E Integration | Critical | Not Run |
+| STG-006 | Payment failure in mobile does not create false positive earnings entry | Simulate declined/failed payment | 1. Attempt payment and force failure. 2. Check admin earnings. | No successful earnings entry created for failed payment. | E2E Integration | High | Not Run |
+| STG-007 | Diagnostics requested from mobile consultation appear in admin diagnostics module | Provider creates diagnostics request in mobile | 1. Submit consultation with diagnostics required. 2. Check admin diagnostics list. | Diagnostics request appears with correct patient/booking linkage. | E2E Integration | High | Not Run |
+| STG-008 | Specialist referral created in mobile appears in admin referral module | Provider creates referral in mobile | 1. Submit consultation with referral. 2. Check admin referrals module. | Referral record appears with correct specialty and booking context. | E2E Integration | High | Not Run |
+| STG-009 | Admin-side booking edits sync back to mobile app after refresh | Existing booking visible in both systems | 1. Update booking attribute/status in admin. 2. Pull to refresh in mobile. | Mobile reflects admin-side change without duplication/inconsistency. | E2E Integration | High | Not Run |
+| STG-010 | Cross-system consistency under rapid sequential updates | Booking open in mobile and admin | 1. Apply rapid valid updates from mobile then admin. 2. Refresh both ends. | Both systems show the same final booking state matching the last accepted update in the event timeline. | E2E Integration | Critical | Not Run |
