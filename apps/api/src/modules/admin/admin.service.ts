@@ -5,10 +5,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
-import { NotificationsService } from '../notifications/notifications.service';  // From copilot branch
-import { CreateAdminUserDto } from './dto/create-admin-user.dto';  // From main branch
-import { UpdateAdminUserDto } from './dto/update-admin-user.dto';  // From main branch
-import * as bcrypt from 'bcryptjs';  // From main branch
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminService {

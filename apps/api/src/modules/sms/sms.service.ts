@@ -51,7 +51,7 @@ export const SMS_TEMPLATES: Record<
     `Reminder: You have an appointment with ${p.patientName} at ${p.scheduledTime}. - Curex24`,
 
   // Admin-triggered notifications
-  PROVIDER_APPROVED: (p) =>
+  PROVIDER_APPROVED: (_p) =>
     `Congratulations! Your Curex24 provider account has been approved. You can now accept bookings. - Curex24`,
   PROVIDER_REJECTED: (p) =>
     `Your Curex24 provider verification was not approved${p.reason ? `: ${p.reason}` : ''}. Contact support for help. - Curex24`,
