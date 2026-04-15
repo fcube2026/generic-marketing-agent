@@ -36,6 +36,9 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: getBundleId(),
+    infoPlist: {
+      UIBackgroundModes: ['remote-notification'],
+    },
   },
   android: {
     icon: './assets/icon.png',
@@ -44,6 +47,7 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       backgroundColor: '#0D9488',
     },
     package: getBundleId(),
+    useNextNotificationsApi: true,
   },
   web: {
     favicon: './assets/icon.png',
@@ -54,6 +58,20 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+    eas: {
+      projectId: process.env.EAS_PROJECT_ID || '',
+    },
   },
-  plugins: ['./plugins/withStaticEntryFile'],
+  plugins: [
+    './plugins/withStaticEntryFile',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/icon.png',
+        color: '#0D9488',
+        sounds: [],
+        mode: 'production',
+      },
+    ],
+  ],
 });
