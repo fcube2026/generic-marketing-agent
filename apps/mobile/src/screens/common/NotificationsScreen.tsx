@@ -15,8 +15,9 @@ import {
   getNotifications,
   markAsRead,
   markAllAsRead,
+  getUnreadCount,
 } from '../../services/notifications';
-import { setBadgeCount, getUnreadCount } from '../../services/notifications/pushNotifications';
+import { setBadgeCount } from '../../services/notifications/pushNotifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const formatTimeAgo = (dateString: string): string => {
