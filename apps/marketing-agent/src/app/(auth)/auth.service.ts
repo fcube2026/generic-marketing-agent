@@ -5,6 +5,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
+import api from '@/lib/api'; // Imported for loginRequest in frontend usage
 
 // Hardcoded admin/marketing credentials for MVP (override via environment variables)
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';

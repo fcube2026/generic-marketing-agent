@@ -18,7 +18,10 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
+    <aside
+      className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col"
+      data-testid="sidebar"
+    >
       {/* Brand */}
       <div className="px-6 py-5 border-b border-gray-100">
         <h1 className="text-xl font-extrabold text-primary">Curex24</h1>
@@ -26,7 +29,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1" data-testid="sidebar-nav">
         {navItems.map((item) => {
           const isActive = pathname?.startsWith(item.href);
           return (
