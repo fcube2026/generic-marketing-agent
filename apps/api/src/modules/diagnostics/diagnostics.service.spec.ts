@@ -246,7 +246,7 @@ describe('DiagnosticsService', () => {
         where: { id: 'diag-1' },
         data: { status: 'RESULTED' },
       });
-      // Updated to use notification service instead of direct prisma call
+      // Updated to use notification service with WhatsApp (sms: false, whatsapp: true)
       expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-patient-1',
@@ -256,7 +256,8 @@ describe('DiagnosticsService', () => {
         expect.objectContaining({
           inApp: true,
           push: true,
-          sms: true,
+          whatsapp: true,
+          sms: false,
         }),
       );
     });

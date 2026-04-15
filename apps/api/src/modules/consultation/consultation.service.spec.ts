@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConsultationService } from './consultation.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -10,6 +11,7 @@ import {
 describe('ConsultationService', () => {
   let service: ConsultationService;
   let prisma: PrismaService;
+  let notificationsService: NotificationsService;
 
   const mockBooking = {
     id: 'booking-1',
@@ -31,6 +33,10 @@ describe('ConsultationService', () => {
     updatedAt: new Date(),
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({ success: true }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,6 +54,9 @@ describe('ConsultationService', () => {
               findMany: jest.fn(),
               count: jest.fn(),
             },
+            prescription: {
+              create: jest.fn(),
+            },
             bookingStatusHistory: {
               create: jest.fn(),
             },
@@ -56,11 +65,18 @@ describe('ConsultationService', () => {
             },
           },
         },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
+        },
       ],
     }).compile();
 
     service = module.get<ConsultationService>(ConsultationService);
     prisma = module.get<PrismaService>(PrismaService);
+    notificationsService =
+      module.get<NotificationsService>(NotificationsService);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {

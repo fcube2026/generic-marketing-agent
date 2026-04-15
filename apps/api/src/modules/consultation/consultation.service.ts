@@ -5,11 +5,15 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
 
 @Injectable()
 export class ConsultationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async createSummary(
     bookingId: string,
@@ -114,5 +118,74 @@ export class ConsultationService {
     ]);
 
     return { data: summaries, total, page, limit };
+  }
+
+  /**
+   * Add a prescription to a consultation summary
+   * Sends notification to the patient
+   */
+  async addPrescription(
+    bookingId: string,
+    userId: string,
+    data: { details?: string; fileUrl?: string },
+  ) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        provider: true,
+        patient: { include: { user: true } },
+        consultationSummary: true,
+      },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.provider.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can add prescriptions',
+      );
+    }
+
+    if (!booking.consultationSummary) {
+      throw new BadRequestException(
+        'Consultation summary must be created before adding prescriptions',
+      );
+    }
+
+    const prescription = await this.prisma.prescription.create({
+      data: {
+        consultationSummaryId: booking.consultationSummary.id,
+        details: data.details,
+        fileUrl: data.fileUrl,
+      },
+    });
+
+    // Send notification to patient
+    await this.notificationsService.sendNotification(
+      {
+        userId: booking.patient.userId,
+        title: 'Prescription Available',
+        message: `Dr. ${booking.provider.name} has uploaded your prescription. View it in the app.`,
+        type: 'PRESCRIPTION_UPLOADED',
+        metadata: {
+          bookingId,
+          prescriptionId: prescription.id,
+        },
+      },
+      {
+        inApp: true,
+        push: true,
+        whatsapp: true,
+        sms: false,
+        whatsappTemplate: 'PRESCRIPTION_UPLOADED',
+        smsTemplate: 'PRESCRIPTION_UPLOADED',
+        templateParams: {
+          providerName: booking.provider.name,
+        },
+        idempotencyKey: `prescription_${prescription.id}`,
+      },
+    );
+
+    return prescription;
   }
 }

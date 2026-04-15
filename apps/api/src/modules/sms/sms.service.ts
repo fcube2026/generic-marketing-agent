@@ -39,6 +39,10 @@ export const SMS_TEMPLATES: Record<
     `Refund of ₹${p.amount} has been processed for your cancelled booking. - Curex24`,
   APPOINTMENT_REMINDER: (p) =>
     `Reminder: Your appointment with Dr. ${p.providerName} is scheduled for ${p.scheduledTime}. - Curex24`,
+  PRESCRIPTION_UPLOADED: (p) =>
+    `Your prescription from Dr. ${p.providerName} is now available. View in the Curex24 app. - Curex24`,
+  DIAGNOSTIC_BOOKED: (p) =>
+    `Your ${p.testType} test has been scheduled${p.scheduledTime ? ` for ${p.scheduledTime}` : ''}. Check the Curex24 app. - Curex24`,
 
   // Provider notifications
   NEW_BOOKING_REQUEST: (p) =>

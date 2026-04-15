@@ -23,6 +23,7 @@ model User {
   auditLogs              AuditLog[]
   deviceTokens           DeviceToken[]
   notifications          Notification[]
+  notificationLogs       NotificationLog[]
   notificationPreference NotificationPreference?
   otpVerifications       OtpVerification[]
   patientProfile         PatientProfile?
@@ -471,6 +472,7 @@ model NotificationPreference {
   userId           String  @unique
   pushEnabled      Boolean @default(true)
   smsEnabled       Boolean @default(true)
+  whatsappEnabled  Boolean @default(true)
   emailEnabled     Boolean @default(false)
   // Granular preferences for different notification types
   bookingUpdates   Boolean @default(true)
@@ -480,6 +482,46 @@ model NotificationPreference {
   user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id                String                    @id @default(cuid())
+  userId            String
+  eventType         String
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  providerMessageId String?
+  idempotencyKey    String?
+  metadata          Json?
+  errorMessage      String?
+  retryCount        Int                       @default(0)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([idempotencyKey])
+  @@index([channel, status])
+  @@index([createdAt])
+  @@map("notification_logs")
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  FALLBACK_TRIGGERED
 }
 
 enum Role {
