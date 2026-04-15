@@ -107,31 +107,41 @@ export class AuthService {
   }
 
   async adminLogin(dto: AdminLoginDto) {
-    // 1. Try DB-stored admin user first
-    const dbUser = await this.prisma.user.findFirst({
-      where: {
-        email: dto.email,
-        role: { in: [Role.ADMIN, Role.MARKETING_AGENT] },
-      },
-    });
+    // 1. Try DB-stored admin user first (skip if migration hasn't run yet)
+    try {
+      const dbUser = await this.prisma.user.findFirst({
+        where: {
+          email: dto.email,
+          role: { in: [Role.ADMIN, Role.MARKETING_AGENT] },
+        },
+      });
 
-    if (dbUser && dbUser.passwordHash) {
-      const valid = await bcrypt.compare(dto.password, dbUser.passwordHash);
-      if (!valid) throw new UnauthorizedException('Invalid admin credentials');
-      if (!dbUser.isActive)
-        throw new UnauthorizedException('Account is deactivated');
+      if (dbUser && dbUser.passwordHash) {
+        const valid = await bcrypt.compare(dto.password, dbUser.passwordHash);
+        if (!valid)
+          throw new UnauthorizedException('Invalid admin credentials');
+        if (!dbUser.isActive)
+          throw new UnauthorizedException('Account is deactivated');
 
-      const payload = {
-        sub: dbUser.id,
-        phone: dbUser.phone,
-        role: dbUser.role,
-      };
-      const token = this.jwtService.sign(payload);
+        const payload = {
+          sub: dbUser.id,
+          phone: dbUser.phone,
+          role: dbUser.role,
+        };
+        const token = this.jwtService.sign(payload);
 
-      return {
-        token,
-        user: { id: dbUser.id, email: dbUser.email, role: dbUser.role },
-      };
+        return {
+          token,
+          user: { id: dbUser.id, email: dbUser.email, role: dbUser.role },
+        };
+      }
+    } catch (err) {
+      // If the email column doesn't exist yet (migration pending), fall through
+      if (err instanceof UnauthorizedException) throw err;
+      console.warn(
+        'DB user lookup failed (migration may be pending):',
+        err.message,
+      );
     }
 
     // 2. Fall back to hardcoded env var credentials (legacy)
@@ -141,8 +151,8 @@ export class AuthService {
 
     const user = await this.prisma.user.upsert({
       where: { phone: ADMIN_PHONE },
-      create: { phone: ADMIN_PHONE, role: Role.ADMIN, email: ADMIN_EMAIL },
-      update: { role: Role.ADMIN, email: ADMIN_EMAIL },
+      create: { phone: ADMIN_PHONE, role: Role.ADMIN },
+      update: { role: Role.ADMIN },
     });
 
     const payload = { sub: user.id, phone: user.phone, role: user.role };
