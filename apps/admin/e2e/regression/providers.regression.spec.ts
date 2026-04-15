@@ -26,7 +26,7 @@ test.describe('Providers Regression', () => {
     const providersPage = new ProvidersPage(authenticatedPage);
     await providersPage.goto();
     await providersPage.openTab('Pending');
-    await providersPage.openRejectModalForFirstPending();
+    await providersPage.openRejectModalForProvider('Dr. Priya Sharma');
     await providersPage.rejectWithReason('Incomplete verification docs');
 
     await expect.poll(() => rejectCalls).toBe(1);

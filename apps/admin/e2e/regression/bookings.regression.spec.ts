@@ -34,11 +34,11 @@ test.describe('Bookings Regression', () => {
     await bookingsPage.assertPaginationVisible();
 
     await bookingsPage.filterByStatus('COMPLETED');
-    await expect(authenticatedPage.getByText('Asha Verma')).toBeVisible();
+    await bookingsPage.assertPatientVisible('Asha Verma');
 
     await bookingsPage.filterByStatus('');
     await bookingsPage.goToNextPage();
-    await expect(authenticatedPage.getByText('Asha Verma')).toBeVisible();
+    await bookingsPage.assertPatientVisible('Asha Verma');
   });
 
   test('@regression should render empty state on API error fallback', async ({ authenticatedPage }) => {

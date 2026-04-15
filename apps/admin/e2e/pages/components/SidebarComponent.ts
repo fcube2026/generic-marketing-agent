@@ -10,7 +10,7 @@ export class SidebarComponent {
   }
 
   link(label: string): Locator {
-    return this.page.getByRole('link', { name: new RegExp(label, 'i') });
+    return this.container.getByRole('link', { name: new RegExp(label, 'i') });
   }
 
   async navigateTo(label: string): Promise<void> {

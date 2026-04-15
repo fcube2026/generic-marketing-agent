@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { FullConfig } from '@playwright/test';
+import type { FullConfig, Route } from '@playwright/test';
 import { chromium, expect } from '@playwright/test';
 import { AUTH_STATE_PATH, getAdminTestCredentials, mockAdminLoginPayload } from './helpers/auth.helper';
 
@@ -14,7 +14,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
 
-  await page.route('**/auth/admin-login', async (route) => {
+  const loginRouteHandler = async (route: Route) => {
     const data = route.request().postDataJSON() as { email?: string; password?: string };
     if (data?.email === email && data?.password === password) {
       return route.fulfill({
@@ -29,14 +29,22 @@ async function globalSetup(config: FullConfig): Promise<void> {
       contentType: 'application/json',
       body: JSON.stringify({ message: 'Invalid credentials.' }),
     });
-  });
+  };
+  await page.route('**/auth/admin-login', loginRouteHandler);
+  await page.route('**/api/v1/auth/admin-login', loginRouteHandler);
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
 
-  await expect(page).toHaveURL(/\/dashboard/);
+  await page.waitForTimeout(300);
+  const loginError = page.getByText(/invalid credentials|unable to reach|login failed/i).first();
+  if (await loginError.isVisible()) {
+    throw new Error(`Global setup login failed: ${await loginError.textContent()}`);
+  }
+
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
   await context.storageState({ path: AUTH_STATE_PATH });
 
   await context.close();

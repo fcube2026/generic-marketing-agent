@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
+import { HeaderComponent } from '../pages/components/HeaderComponent';
 import { mockAdminLogin, mockCommonAdminApis } from '../helpers/api-mock.helper';
 import users from '../test-data/users.json';
 
@@ -24,7 +25,7 @@ test.describe('Auth Regression', () => {
     await loginPage.goto();
     await loginPage.login(users.admin.valid.email, users.admin.valid.password);
 
-    await page.getByTestId('logout-button').click();
+    await new HeaderComponent(page).logout();
     await expect(page).toHaveURL(/\/login/);
   });
 });

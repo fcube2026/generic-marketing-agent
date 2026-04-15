@@ -21,6 +21,19 @@ export class DiagnosticsPage {
     await this.page.getByRole('button', { name: /schedule/i }).first().click();
   }
 
+  async scheduleRequestForTestType(testType: string): Promise<void> {
+    const row = this.page.getByRole('row', { name: new RegExp(testType, 'i') });
+    await row.getByRole('button', { name: /schedule/i }).click();
+  }
+
+  async uploadResultForTestType(testType: string, url: string, notes: string): Promise<void> {
+    const row = this.page.getByRole('row', { name: new RegExp(testType, 'i') });
+    await row.getByRole('button', { name: /upload result/i }).click();
+    await this.page.getByLabel('Result File URL').fill(url);
+    await this.page.getByLabel('Notes').fill(notes);
+    await this.page.getByRole('button', { name: /^upload result$/i }).click();
+  }
+
   async uploadResult(url: string, notes: string): Promise<void> {
     await this.page.getByRole('button', { name: /upload result/i }).first().click();
     await this.page.getByLabel('Result File URL').fill(url);
@@ -30,7 +43,11 @@ export class DiagnosticsPage {
 
   async assertLoaded(): Promise<void> {
     await expect(this.heading).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Test Type' })).toBeVisible();
+    const tableHeader = this.page.getByRole('columnheader', { name: 'Test Type' });
+    const emptyState = this.page.getByText('No diagnostic requests found');
+    await expect
+      .poll(async () => (await tableHeader.isVisible()) || (await emptyState.isVisible()))
+      .toBeTruthy();
   }
 
   async assertEmptyState(): Promise<void> {

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
+import { DashboardPage } from '../pages/DashboardPage';
 import { mockAdminLogin, mockCommonAdminApis } from '../helpers/api-mock.helper';
 import users from '../test-data/users.json';
 
@@ -16,6 +17,6 @@ test.describe('Admin Auth Smoke', () => {
     await loginPage.login(users.admin.valid.email, users.admin.valid.password);
 
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await new DashboardPage(page).assertLoaded();
   });
 });

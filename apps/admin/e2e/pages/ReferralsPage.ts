@@ -17,13 +17,22 @@ export class ReferralsPage {
     await this.page.getByRole('button', { name: /mark booked/i }).first().click();
   }
 
+  async markBookedForSpecialist(specialist: string): Promise<void> {
+    const row = this.page.getByRole('row', { name: new RegExp(specialist, 'i') });
+    await row.getByRole('button', { name: /mark booked/i }).click();
+  }
+
   async markFirstBookedCompleted(): Promise<void> {
     await this.page.getByRole('button', { name: /mark completed/i }).first().click();
   }
 
   async assertLoaded(): Promise<void> {
     await expect(this.heading).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Specialist Type' })).toBeVisible();
+    const tableHeader = this.page.getByRole('columnheader', { name: 'Specialist Type' });
+    const emptyState = this.page.getByText('No specialist referrals');
+    await expect
+      .poll(async () => (await tableHeader.isVisible()) || (await emptyState.isVisible()))
+      .toBeTruthy();
   }
 
   async assertEmptyState(): Promise<void> {

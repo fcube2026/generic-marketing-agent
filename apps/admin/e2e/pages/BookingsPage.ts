@@ -50,4 +50,8 @@ export class BookingsPage {
   async assertPaginationVisible(): Promise<void> {
     await expect(this.page.getByText(/page \d+ of \d+/i)).toBeVisible();
   }
+
+  async assertPatientVisible(name: string): Promise<void> {
+    await expect(this.page.getByRole('cell', { name })).toBeVisible();
+  }
 }

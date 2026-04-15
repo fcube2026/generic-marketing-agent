@@ -23,8 +23,9 @@ export class ProvidersPage {
     await this.page.getByRole('button', { name: /approve/i }).first().click();
   }
 
-  async openRejectModalForFirstPending(): Promise<void> {
-    await this.page.getByRole('button', { name: /reject/i }).first().click();
+  async openRejectModalForProvider(name: string): Promise<void> {
+    const row = this.page.getByRole('row', { name: new RegExp(name, 'i') });
+    await row.getByRole('button', { name: /reject/i }).click();
   }
 
   async rejectWithReason(reason: string): Promise<void> {

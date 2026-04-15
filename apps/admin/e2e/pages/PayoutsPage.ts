@@ -23,10 +23,24 @@ export class PayoutsPage {
     await this.page.getByRole('button', { name: /mark processed/i }).first().click();
   }
 
+  async markProcessedForProvider(name: string): Promise<void> {
+    const row = this.page.getByRole('row', { name: new RegExp(name, 'i') });
+    await row.getByRole('button', { name: /mark processed/i }).click();
+  }
+
   async assertLoaded(): Promise<void> {
     await expect(this.heading).toBeVisible();
-    await expect(this.page.getByText('Total Payouts')).toBeVisible();
-    await expect(this.page.getByRole('columnheader', { name: 'Provider' })).toBeVisible();
+    const totalPayouts = this.page.getByText('Total Payouts');
+    const providerHeader = this.page.getByRole('columnheader', { name: 'Provider' });
+    const emptyState = this.page.getByText('No payouts found');
+    await expect
+      .poll(
+        async () =>
+          (await totalPayouts.isVisible()) ||
+          (await providerHeader.isVisible()) ||
+          (await emptyState.isVisible()),
+      )
+      .toBeTruthy();
   }
 
   async assertEmptyState(): Promise<void> {

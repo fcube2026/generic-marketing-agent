@@ -6,7 +6,7 @@ export class SupportPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.heading = page.getByRole('heading', { name: 'Support' });
+    this.heading = page.getByRole('heading', { name: 'Support', exact: true });
   }
 
   async goto(): Promise<void> {

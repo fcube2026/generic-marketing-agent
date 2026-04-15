@@ -7,7 +7,7 @@ export class DashboardPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.heading = page.getByRole('heading', { name: 'Dashboard' });
+    this.heading = page.getByRole('heading', { name: 'Dashboard', exact: true });
     this.refreshButton = page.getByRole('button', { name: /refresh/i });
   }
 
