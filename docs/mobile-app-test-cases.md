@@ -4,8 +4,8 @@
 
 | Test Case ID | Title | Preconditions | Steps | Expected Result | Type | Priority | Status |
 |---|---|---|---|---|---|---|---|
-| AUTH-001 | Login screen loads from cold launch | App installed; user logged out | 1. Launch app. 2. Open Auth flow. | Login UI renders without broken state. | Functional | High | Not Run |
-| AUTH-002 | Phone field accepts digits only | Login screen open | 1. Enter `98ab76-54@32`. | Field keeps numeric digits only. | Edge | High | Not Run |
+| AUTH-001 | Login screen loads from cold launch | App installed; user logged out | 1. Launch app. 2. Open Auth flow. | Login title, phone field, and Send OTP button are visible; no blank screen or blocking error appears. | Functional | High | Not Run |
+| AUTH-002 | Phone field accepts digits only | Login screen open | 1. Enter `98ab76-54@32`. | Field value becomes `98765432` (all non-digit characters removed). | Edge | High | Not Run |
 | AUTH-003 | Send OTP disabled for incomplete number | Login screen open | 1. Enter fewer than required digits. | Send OTP remains disabled. | Validation | High | Not Run |
 | AUTH-004 | Send OTP enabled for valid number | Login screen open | 1. Enter valid phone number. | Send OTP becomes enabled. | Functional | High | Not Run |
 | AUTH-005 | OTP verification success logs user in | Valid OTP available | 1. Request OTP. 2. Enter correct OTP. 3. Tap Verify. | User is authenticated and routed to correct home screen. | Functional | High | Not Run |
@@ -31,7 +31,7 @@
 | BOOK-008 | Cancel booking from booking detail before provider assignment | Existing upcoming booking | 1. Open booking detail. 2. Tap Cancel. | Status changes to cancelled with timestamp. | Functional | High | Not Run |
 | BOOK-009 | Cancel booking blocked after completion | Completed booking exists | 1. Open completed booking. 2. Attempt cancel. | Cancel action unavailable or blocked with message. | Validation | Medium | Not Run |
 | BOOK-010 | Refresh booking list after creating booking | Booking created successfully | 1. Return to booking list. 2. Pull to refresh. | Newly created booking appears once with correct status. | Sync | High | Not Run |
-| BOOK-011 | Booking list handles empty state | No bookings for account | 1. Open My Bookings. | Empty state illustration/text shown with no UI break. | UX | Medium | Not Run |
+| BOOK-011 | Booking list handles empty state | No bookings for account | 1. Open My Bookings. | Empty state illustration/text renders with no blank screen, overlapping components, or stuck loader. | UX | Medium | Not Run |
 | BOOK-012 | Rapid open/close booking details does not show stale data | Multiple bookings present | 1. Open booking A. 2. Quickly go back and open booking B. | Booking B details are accurate; no stale data from booking A. | Race Condition | High | Not Run |
 | BOOK-013 | Booking status badge updates after manual refresh | Booking status changed externally | 1. Pull to refresh in bookings list. | Latest status badge is displayed correctly. | Sync | High | Not Run |
 | BOOK-014 | Offline mode shows actionable message on booking screens | Device offline | 1. Open booking list/detail offline. | Clear offline message and retry action shown; app remains usable. | Network | High | Not Run |
@@ -46,7 +46,7 @@
 | PAY-004 | Successful payment shows confirmation state | Payment gateway success | 1. Complete payment flow. | Success message shown with transaction reference. | Functional | High | Not Run |
 | PAY-005 | Failed payment shows recoverable error | Payment gateway decline | 1. Attempt payment with declined method. | Failure message shown with option to retry or change method. | Negative | High | Not Run |
 | PAY-006 | Payment retry succeeds after temporary gateway timeout | Gateway timeout on first attempt | 1. Tap Pay (timeout). 2. Retry payment. | Retry completes successfully without duplicate charge. | Retry | High | Not Run |
-| PAY-007 | Double tap Pay does not trigger multiple charge requests | Pay button enabled | 1. Tap Pay rapidly several times. | Single transaction request is sent. | Race Condition | Critical | Not Run |
+| PAY-007 | Double tap Pay does not trigger multiple charge requests | Pay button enabled | 1. Tap Pay rapidly several times. 2. Inspect network logs/transaction history. | Only one payment request and one transaction reference are generated. | Race Condition | Critical | Not Run |
 | PAY-008 | User exits and reopens payment screen during processing | Payment in progress | 1. Start payment. 2. Navigate back. 3. Reopen booking/payment. | Final payment state is consistent; no stuck spinner. | Edge | High | Not Run |
 | PAY-009 | Payment success updates booking status in app | Payment successful | 1. Complete payment. 2. Open booking detail/list. | Booking status reflects paid/confirmed state. | Sync | High | Not Run |
 | PAY-010 | Offline payment attempt fails gracefully | Device offline | 1. Open payment screen. 2. Tap Pay. | Offline error shown; no crash; retry available after reconnect. | Network | High | Not Run |
@@ -122,4 +122,4 @@
 | STG-007 | Diagnostics requested from mobile consultation appear in admin diagnostics module | Provider creates diagnostics request in mobile | 1. Submit consultation with diagnostics required. 2. Check admin diagnostics list. | Diagnostics request appears with correct patient/booking linkage. | E2E Integration | High | Not Run |
 | STG-008 | Specialist referral created in mobile appears in admin referral module | Provider creates referral in mobile | 1. Submit consultation with referral. 2. Check admin referrals module. | Referral record appears with correct specialty and booking context. | E2E Integration | High | Not Run |
 | STG-009 | Admin-side booking edits sync back to mobile app after refresh | Existing booking visible in both systems | 1. Update booking attribute/status in admin. 2. Pull to refresh in mobile. | Mobile reflects admin-side change without duplication/inconsistency. | E2E Integration | High | Not Run |
-| STG-010 | Cross-system consistency under rapid sequential updates | Booking open in mobile and admin | 1. Apply rapid valid updates from mobile then admin. 2. Refresh both ends. | Final state converges consistently across mobile and admin. | E2E Integration | Critical | Not Run |
+| STG-010 | Cross-system consistency under rapid sequential updates | Booking open in mobile and admin | 1. Apply rapid valid updates from mobile then admin. 2. Refresh both ends. | Both systems show the same final booking state matching the last accepted update in the event timeline. | E2E Integration | Critical | Not Run |
