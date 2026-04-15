@@ -51,6 +51,7 @@ export class PrismaService
       try {
         await this.$connect();
         this.logger.log('Database connected successfully');
+        await this.ensureUserColumns();
         return;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -66,6 +67,31 @@ export class PrismaService
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2;
       }
+    }
+  }
+
+  /**
+   * Ensure the User table has the email/passwordHash/isActive columns.
+   * If prisma migrate deploy failed (e.g. DIRECT_URL missing or pooler
+   * blocking DDL), the generated Prisma client expects these columns but
+   * they don't exist, crashing ALL User queries. This applies them via
+   * the app's own connection as a safety net.
+   */
+  private async ensureUserColumns(): Promise<void> {
+    try {
+      await this.$executeRawUnsafe(`
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email" TEXT;
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;
+      `);
+      // Index creation is separate (can't be inside a multi-statement batch easily)
+      await this.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "users"("email");
+      `);
+      this.logger.log('User columns verified/applied');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`ensureUserColumns failed (non-fatal): ${msg}`);
     }
   }
 }
