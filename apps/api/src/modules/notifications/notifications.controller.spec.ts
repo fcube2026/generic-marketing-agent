@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { PushNotificationService } from '../push-notifications/push-notification.service';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -17,6 +18,18 @@ describe('NotificationsController', () => {
     createdAt: new Date(),
   };
 
+  const mockPreferences = {
+    id: 'pref-1',
+    userId: 'user-1',
+    pushEnabled: true,
+    smsEnabled: true,
+    emailEnabled: false,
+    bookingUpdates: true,
+    paymentUpdates: true,
+    reminderEnabled: true,
+    marketingEnabled: false,
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationsController],
@@ -30,7 +43,17 @@ describe('NotificationsController', () => {
             markAsRead: jest
               .fn()
               .mockResolvedValue({ ...mockNotification, isRead: true }),
+            markAllAsRead: jest.fn().mockResolvedValue({ success: true }),
             getUnreadCount: jest.fn().mockResolvedValue(3),
+            getUserPreferences: jest.fn().mockResolvedValue(mockPreferences),
+            updateUserPreferences: jest.fn().mockResolvedValue(mockPreferences),
+          },
+        },
+        {
+          provide: PushNotificationService,
+          useValue: {
+            registerDeviceToken: jest.fn().mockResolvedValue(undefined),
+            unregisterDeviceToken: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -74,6 +97,39 @@ describe('NotificationsController', () => {
 
       expect(result).toEqual({ ...mockNotification, isRead: true });
       expect(service.markAsRead).toHaveBeenCalledWith('notif-1', 'user-1');
+    });
+  });
+
+  describe('markAllAsRead', () => {
+    it('should call service.markAllAsRead with user id', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.markAllAsRead(user);
+
+      expect(result).toEqual({ success: true });
+      expect(service.markAllAsRead).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('getPreferences', () => {
+    it('should call service.getUserPreferences with user id', async () => {
+      const user = { id: 'user-1' };
+
+      const result = await controller.getPreferences(user);
+
+      expect(result).toEqual(mockPreferences);
+      expect(service.getUserPreferences).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('updatePreferences', () => {
+    it('should call service.updateUserPreferences with user id and dto', async () => {
+      const user = { id: 'user-1' };
+      const dto = { pushEnabled: false };
+
+      await controller.updatePreferences(user, dto);
+
+      expect(service.updateUserPreferences).toHaveBeenCalledWith('user-1', dto);
     });
   });
 });

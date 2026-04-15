@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DiagnosticsService } from './diagnostics.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('DiagnosticsService', () => {
@@ -34,6 +35,14 @@ describe('DiagnosticsService', () => {
     uploadedAt: new Date(),
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: true,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -62,6 +71,7 @@ describe('DiagnosticsService', () => {
             },
           },
         },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -214,7 +224,6 @@ describe('DiagnosticsService', () => {
         ...mockDiagnosticRequest,
         status: 'RESULTED',
       });
-      (prisma.notification.create as jest.Mock).mockResolvedValue({});
 
       const result = await service.uploadResult(
         'diag-1',
@@ -237,20 +246,19 @@ describe('DiagnosticsService', () => {
         where: { id: 'diag-1' },
         data: { status: 'RESULTED' },
       });
-      expect(prisma.notification.create).toHaveBeenCalledWith({
-        data: {
+      // Updated to use notification service instead of direct prisma call
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
           userId: 'user-patient-1',
           title: 'Lab Result Ready',
-          message:
-            'Your lab result for "Blood Test" is now available. Please check your diagnostics section.',
           type: 'LAB_RESULT_READY',
-          metadata: {
-            diagnosticRequestId: 'diag-1',
-            testType: 'Blood Test',
-            bookingId: 'booking-1',
-          },
-        },
-      });
+        }),
+        expect.objectContaining({
+          inApp: true,
+          push: true,
+          sms: true,
+        }),
+      );
     });
 
     it('should throw NotFoundException when request does not exist', async () => {

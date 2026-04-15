@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('DoctorVerificationService', () => {
   let service: DoctorVerificationService;
@@ -36,6 +37,14 @@ describe('DoctorVerificationService', () => {
     verify: jest.fn(),
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: true,
+    }),
+  };
+
   const mockProfile = { id: 'provider-1', userId: 'user-1' };
   const mockLicense = {
     id: 'license-1',
@@ -58,6 +67,7 @@ describe('DoctorVerificationService', () => {
         DoctorVerificationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NmcApiProvider, useValue: mockNmcProvider },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -157,7 +167,6 @@ describe('DoctorVerificationService', () => {
         ...mockProfile,
         userId: 'user-1',
       });
-      mockPrisma.notification.create.mockResolvedValue({});
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       const result = await service.submitForVerification('user-1', dto);
@@ -169,7 +178,8 @@ describe('DoctorVerificationService', () => {
         stateCouncil: 'Maharashtra Medical Council',
         yearOfAdmission: '2010',
       });
-      expect(mockPrisma.notification.create).toHaveBeenCalled();
+      // Updated to use notification service instead of direct prisma call
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalled();
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'SUCCESS' }),

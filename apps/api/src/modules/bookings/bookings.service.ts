@@ -264,7 +264,8 @@ export class BookingsService {
       include: { patient: true, provider: true },
     });
 
-    if (fullBooking) {
+    if (fullBooking && fullBooking.provider?.name) {
+      const providerName = fullBooking.provider.name;
       const PROVIDER_TRANSITION_CONFIG: Partial<
         Record<
           BookingStatus,
@@ -278,13 +279,13 @@ export class BookingsService {
       > = {
         ON_THE_WAY: {
           title: 'Provider On the Way',
-          message: `Dr. ${fullBooking.provider.name} is on the way to your location.`,
+          message: `Dr. ${providerName} is on the way to your location.`,
           smsTemplate: 'PROVIDER_ON_THE_WAY',
           sendSms: true,
         },
         ARRIVED: {
           title: 'Provider Arrived',
-          message: `Dr. ${fullBooking.provider.name} has arrived.`,
+          message: `Dr. ${providerName} has arrived.`,
           smsTemplate: 'PROVIDER_ARRIVED',
           sendSms: true,
         },
@@ -295,7 +296,7 @@ export class BookingsService {
         },
         COMPLETED: {
           title: 'Consultation Completed',
-          message: `Your consultation with Dr. ${fullBooking.provider.name} has been completed.`,
+          message: `Your consultation with Dr. ${providerName} has been completed.`,
           smsTemplate: 'CONSULTATION_COMPLETED',
           sendSms: true,
         },
@@ -317,7 +318,7 @@ export class BookingsService {
             sms: config.sendSms,
             smsTemplate: config.smsTemplate,
             smsParams: {
-              providerName: fullBooking.provider.name,
+              providerName,
             },
           },
         );

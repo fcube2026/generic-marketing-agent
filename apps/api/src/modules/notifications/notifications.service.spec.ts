@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { PushNotificationService } from '../push-notifications/push-notification.service';
+import { SmsService } from '../sms/sms.service';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -11,9 +13,28 @@ describe('NotificationsService', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       count: jest.fn(),
       create: jest.fn(),
     },
+    notificationPreference: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      upsert: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
+    },
+  };
+
+  const mockPushService = {
+    sendToUser: jest.fn(),
+    getUnreadBadgeCount: jest.fn(),
+  };
+
+  const mockSmsService = {
+    sendTemplatedSms: jest.fn(),
+    sendSms: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -21,11 +42,26 @@ describe('NotificationsService', () => {
       providers: [
         NotificationsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: PushNotificationService, useValue: mockPushService },
+        { provide: SmsService, useValue: mockSmsService },
       ],
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
     jest.clearAllMocks();
+
+    // Default mock for notification preferences
+    mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+      id: 'pref-1',
+      userId: 'user-1',
+      pushEnabled: true,
+      smsEnabled: true,
+      emailEnabled: false,
+      bookingUpdates: true,
+      paymentUpdates: true,
+      reminderEnabled: true,
+      marketingEnabled: false,
+    });
   });
 
   it('should be defined', () => {
@@ -119,6 +155,20 @@ describe('NotificationsService', () => {
     });
   });
 
+  describe('markAllAsRead', () => {
+    it('should mark all notifications as read for a user', async () => {
+      mockPrisma.notification.updateMany.mockResolvedValue({ count: 3 });
+
+      const result = await service.markAllAsRead('user-1');
+
+      expect(result).toEqual({ success: true });
+      expect(mockPrisma.notification.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', isRead: false },
+        data: { isRead: true },
+      });
+    });
+  });
+
   describe('getUnreadCount', () => {
     it('should return the count of unread notifications', async () => {
       mockPrisma.notification.count.mockResolvedValue(5);
@@ -140,13 +190,42 @@ describe('NotificationsService', () => {
     });
   });
 
-  describe('createNotification', () => {
-    it('should create a notification with metadata', async () => {
+  describe('getUserPreferences', () => {
+    it('should return existing preferences', async () => {
+      const mockPrefs = {
+        id: 'pref-1',
+        userId: 'user-1',
+        pushEnabled: true,
+        smsEnabled: true,
+      };
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue(mockPrefs);
+
+      const result = await service.getUserPreferences('user-1');
+
+      expect(result).toEqual(mockPrefs);
+    });
+
+    it('should create default preferences if not exists', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue(null);
+      const newPrefs = { id: 'pref-new', userId: 'user-1', pushEnabled: true };
+      mockPrisma.notificationPreference.create.mockResolvedValue(newPrefs);
+
+      const result = await service.getUserPreferences('user-1');
+
+      expect(result).toEqual(newPrefs);
+      expect(mockPrisma.notificationPreference.create).toHaveBeenCalledWith({
+        data: { userId: 'user-1' },
+      });
+    });
+  });
+
+  describe('createNotification (legacy method)', () => {
+    it('should create an in-app notification and send push', async () => {
       const data = {
         userId: 'user-1',
         title: 'Booking Accepted',
         message: 'Your booking has been accepted',
-        type: 'BOOKING_STATUS_UPDATE',
+        type: 'BOOKING_ACCEPTED',
         metadata: { bookingId: 'booking-1' },
       };
       const createdNotification = {
@@ -157,50 +236,69 @@ describe('NotificationsService', () => {
       };
 
       mockPrisma.notification.create.mockResolvedValue(createdNotification);
+      mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
+      mockPushService.sendToUser.mockResolvedValue({ success: true });
 
       const result = await service.createNotification(data);
 
-      expect(result).toEqual(createdNotification);
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
-          title: 'Booking Accepted',
-          message: 'Your booking has been accepted',
-          type: 'BOOKING_STATUS_UPDATE',
-          metadata: { bookingId: 'booking-1' },
-        },
+      expect(result.inAppId).toBe('notif-1');
+      expect(mockPrisma.notification.create).toHaveBeenCalled();
+      expect(mockPushService.sendToUser).toHaveBeenCalled();
+    });
+  });
+
+  describe('sendNotification', () => {
+    it('should send notification via all channels when enabled', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Test',
+        message: 'Test message',
+        type: 'BOOKING_ACCEPTED',
+      };
+
+      mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+      mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
+      mockPushService.sendToUser.mockResolvedValue({ success: true });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+1234567890' });
+      mockSmsService.sendTemplatedSms.mockResolvedValue({ success: true });
+
+      const result = await service.sendNotification(payload, {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'BOOKING_ACCEPTED',
+        smsParams: { providerName: 'Dr. Test', scheduledTime: '10:00 AM' },
       });
+
+      expect(result.inAppId).toBe('notif-1');
+      expect(result.pushSent).toBe(true);
+      expect(result.smsSent).toBe(true);
     });
 
-    it('should create a notification without metadata', async () => {
-      const data = {
-        userId: 'user-1',
-        title: 'Welcome',
-        message: 'Welcome to Curex24',
-        type: 'WELCOME',
-      };
-      const createdNotification = {
-        id: 'notif-2',
-        ...data,
-        metadata: null,
-        isRead: false,
-        createdAt: new Date(),
-      };
-
-      mockPrisma.notification.create.mockResolvedValue(createdNotification);
-
-      const result = await service.createNotification(data);
-
-      expect(result).toEqual(createdNotification);
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
-          title: 'Welcome',
-          message: 'Welcome to Curex24',
-          type: 'WELCOME',
-          metadata: undefined,
-        },
+    it('should not send push when user has disabled it', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        pushEnabled: false,
+        smsEnabled: true,
+        bookingUpdates: true,
       });
+
+      const payload = {
+        userId: 'user-1',
+        title: 'Test',
+        message: 'Test message',
+        type: 'BOOKING_ACCEPTED',
+      };
+
+      mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+
+      const result = await service.sendNotification(payload, {
+        inApp: true,
+        push: true,
+      });
+
+      expect(result.inAppId).toBe('notif-1');
+      expect(result.pushSent).toBe(false);
+      expect(mockPushService.sendToUser).not.toHaveBeenCalled();
     });
   });
 });
