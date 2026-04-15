@@ -11,8 +11,10 @@ async function bootstrap() {
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : ['*'];
 
+  const isWildcard = allowedOrigins.includes('*');
+
   app.enableCors({
-    origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+    origin: isWildcard ? '*' : allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -20,7 +22,7 @@ async function bootstrap() {
       'Cache-Control',
       'Pragma',
     ],
-    credentials: true,
+    credentials: !isWildcard,
   });
 
   app.useGlobalPipes(

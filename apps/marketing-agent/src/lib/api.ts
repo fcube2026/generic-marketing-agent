@@ -1,34 +1,28 @@
-import axios from 'axios';
+import axios from "axios";
+import { getApiBaseUrl } from "./apiBaseUrl";
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.curex24.com/api/v1',
-  headers: { 'Content-Type': 'application/json' },
+export const api = axios.create({
+  baseURL: getApiBaseUrl(),
+  timeout: 15000,
+  withCredentials: true, // if you use cookie auth; safe even if you use JWT
 });
 
-// Attach JWT to every request
+// Optional: attach token if you store it
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('marketing_token');
-    if (token) config.headers.Authorization = `******;
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Auto-logout on 401
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (typeof window !== 'undefined' && err.response?.status === 401) {
-      const isAuthRequest = err.config?.url?.includes('/auth/marketing-login');
-      if (!isAuthRequest && window.location.pathname !== '/login') {
-        localStorage.removeItem('marketing_token');
-        localStorage.removeItem('marketing_user');
-        document.cookie = 'marketing_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(err);
+// Optional: nicer error message mapping
+export function toUserFriendlyApiError(err: any): string {
+  // axios network error -> no response
+  if (err?.code === "ERR_NETWORK" || !err?.response) {
+    return `Unable to reach the server at ${getApiBaseUrl()}. Please check that the API is running and CORS is configured.`;
   }
-);
-
-export default api;
+  const msg = err?.response?.data?.message;
+  if (typeof msg === "string") return msg;
+  return "Request failed. Please try again.";
+}
