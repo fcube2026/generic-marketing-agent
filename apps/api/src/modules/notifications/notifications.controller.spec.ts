@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { PushNotificationService } from '../push-notifications/push-notification.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -23,6 +24,7 @@ describe('NotificationsController', () => {
     userId: 'user-1',
     pushEnabled: true,
     smsEnabled: true,
+    whatsappEnabled: true,
     emailEnabled: false,
     bookingUpdates: true,
     paymentUpdates: true,
@@ -47,6 +49,8 @@ describe('NotificationsController', () => {
             getUnreadCount: jest.fn().mockResolvedValue(3),
             getUserPreferences: jest.fn().mockResolvedValue(mockPreferences),
             updateUserPreferences: jest.fn().mockResolvedValue(mockPreferences),
+            getNotificationLogs: jest.fn().mockResolvedValue([]),
+            updateDeliveryStatus: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -54,6 +58,12 @@ describe('NotificationsController', () => {
           useValue: {
             registerDeviceToken: jest.fn().mockResolvedValue(undefined),
             unregisterDeviceToken: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: WhatsAppService,
+          useValue: {
+            parseStatusCallback: jest.fn().mockReturnValue(null),
           },
         },
       ],

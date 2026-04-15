@@ -1,9 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PushNotificationService } from '../push-notifications/push-notification.service';
 import { SmsService } from '../sms/sms.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
+import { FeatureFlagService } from '../../common/feature-flags/feature-flags.service';
+import {
+  NOTIFICATION_QUEUE,
+  FALLBACK_QUEUE,
+} from '../../common/queue/queue.module';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -22,6 +29,12 @@ describe('NotificationsService', () => {
       create: jest.fn(),
       upsert: jest.fn(),
     },
+    notificationLog: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
     },
@@ -37,6 +50,26 @@ describe('NotificationsService', () => {
     sendSms: jest.fn(),
   };
 
+  const mockWhatsAppService = {
+    sendTemplatedMessage: jest.fn(),
+    sendMessage: jest.fn(),
+  };
+
+  const mockFeatureFlags = {
+    isPushNotificationsEnabled: jest.fn().mockReturnValue(true),
+    isWhatsappNotificationsEnabled: jest.fn().mockReturnValue(true),
+    isSmsNotificationsEnabled: jest.fn().mockReturnValue(true),
+    isNotificationQueueEnabled: jest.fn().mockReturnValue(false), // Sync mode for tests
+  };
+
+  const mockNotificationQueue = {
+    add: jest.fn(),
+  };
+
+  const mockFallbackQueue = {
+    add: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +77,13 @@ describe('NotificationsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: PushNotificationService, useValue: mockPushService },
         { provide: SmsService, useValue: mockSmsService },
+        { provide: WhatsAppService, useValue: mockWhatsAppService },
+        { provide: FeatureFlagService, useValue: mockFeatureFlags },
+        {
+          provide: getQueueToken(NOTIFICATION_QUEUE),
+          useValue: mockNotificationQueue,
+        },
+        { provide: getQueueToken(FALLBACK_QUEUE), useValue: mockFallbackQueue },
       ],
     }).compile();
 
@@ -56,6 +96,7 @@ describe('NotificationsService', () => {
       userId: 'user-1',
       pushEnabled: true,
       smsEnabled: true,
+      whatsappEnabled: true,
       emailEnabled: false,
       bookingUpdates: true,
       paymentUpdates: true,
@@ -197,6 +238,7 @@ describe('NotificationsService', () => {
         userId: 'user-1',
         pushEnabled: true,
         smsEnabled: true,
+        whatsappEnabled: true,
       };
       mockPrisma.notificationPreference.findUnique.mockResolvedValue(mockPrefs);
 
@@ -220,7 +262,7 @@ describe('NotificationsService', () => {
   });
 
   describe('createNotification (legacy method)', () => {
-    it('should create an in-app notification and send push', async () => {
+    it('should create an in-app notification and send push and WhatsApp', async () => {
       const data = {
         userId: 'user-1',
         title: 'Booking Accepted',
@@ -238,6 +280,12 @@ describe('NotificationsService', () => {
       mockPrisma.notification.create.mockResolvedValue(createdNotification);
       mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
       mockPushService.sendToUser.mockResolvedValue({ success: true });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
+      mockWhatsAppService.sendTemplatedMessage.mockResolvedValue({
+        success: true,
+        messageId: 'WA123',
+      });
+      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log-1' });
 
       const result = await service.createNotification(data);
 
@@ -259,26 +307,30 @@ describe('NotificationsService', () => {
       mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
       mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
       mockPushService.sendToUser.mockResolvedValue({ success: true });
-      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+1234567890' });
-      mockSmsService.sendTemplatedSms.mockResolvedValue({ success: true });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
+      mockWhatsAppService.sendTemplatedMessage.mockResolvedValue({
+        success: true,
+        messageId: 'WA123',
+      });
+      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log-1' });
 
       const result = await service.sendNotification(payload, {
         inApp: true,
         push: true,
-        sms: true,
-        smsTemplate: 'BOOKING_ACCEPTED',
-        smsParams: { providerName: 'Dr. Test', scheduledTime: '10:00 AM' },
+        whatsapp: true,
+        templateParams: { providerName: 'Dr. Test', scheduledTime: '10:00 AM' },
       });
 
       expect(result.inAppId).toBe('notif-1');
       expect(result.pushSent).toBe(true);
-      expect(result.smsSent).toBe(true);
+      expect(result.whatsappSent).toBe(true);
     });
 
     it('should not send push when user has disabled it', async () => {
       mockPrisma.notificationPreference.findUnique.mockResolvedValue({
         pushEnabled: false,
         smsEnabled: true,
+        whatsappEnabled: true,
         bookingUpdates: true,
       });
 
@@ -290,15 +342,205 @@ describe('NotificationsService', () => {
       };
 
       mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
+      mockWhatsAppService.sendTemplatedMessage.mockResolvedValue({
+        success: true,
+        messageId: 'WA123',
+      });
+      mockPrisma.notificationLog.create.mockResolvedValue({ id: 'log-1' });
 
       const result = await service.sendNotification(payload, {
         inApp: true,
         push: true,
+        whatsapp: true,
       });
 
       expect(result.inAppId).toBe('notif-1');
       expect(result.pushSent).toBe(false);
       expect(mockPushService.sendToUser).not.toHaveBeenCalled();
+    });
+
+    it('should not send WhatsApp when user has disabled it', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        pushEnabled: true,
+        smsEnabled: true,
+        whatsappEnabled: false,
+        bookingUpdates: true,
+      });
+
+      const payload = {
+        userId: 'user-1',
+        title: 'Test',
+        message: 'Test message',
+        type: 'BOOKING_ACCEPTED',
+      };
+
+      mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+      mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
+      mockPushService.sendToUser.mockResolvedValue({ success: true });
+
+      const result = await service.sendNotification(payload, {
+        inApp: true,
+        push: true,
+        whatsapp: true,
+      });
+
+      expect(result.inAppId).toBe('notif-1');
+      expect(result.whatsappSent).toBe(false);
+      expect(mockWhatsAppService.sendTemplatedMessage).not.toHaveBeenCalled();
+    });
+
+    it('should not send WhatsApp when feature flag is disabled', async () => {
+      mockFeatureFlags.isWhatsappNotificationsEnabled.mockReturnValue(false);
+
+      const payload = {
+        userId: 'user-1',
+        title: 'Test',
+        message: 'Test message',
+        type: 'BOOKING_ACCEPTED',
+      };
+
+      mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+      mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
+      mockPushService.sendToUser.mockResolvedValue({ success: true });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
+
+      const result = await service.sendNotification(payload, {
+        inApp: true,
+        push: true,
+        whatsapp: true,
+      });
+
+      expect(result.whatsappSent).toBe(false);
+      expect(mockWhatsAppService.sendTemplatedMessage).not.toHaveBeenCalled();
+
+      // Reset for other tests
+      mockFeatureFlags.isWhatsappNotificationsEnabled.mockReturnValue(true);
+    });
+
+    it('should send SMS when WhatsApp fails', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Test',
+        message: 'Test message',
+        type: 'BOOKING_ACCEPTED',
+      };
+
+      mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+      mockPushService.getUnreadBadgeCount.mockResolvedValue(1);
+      mockPushService.sendToUser.mockResolvedValue({ success: true });
+      mockPrisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
+      mockWhatsAppService.sendTemplatedMessage.mockRejectedValue(
+        new Error('WhatsApp API error'),
+      );
+      mockSmsService.sendTemplatedSms.mockResolvedValue({
+        success: true,
+        messageId: 'SMS123',
+      });
+
+      const result = await service.sendNotification(payload, {
+        inApp: true,
+        push: true,
+        whatsapp: true,
+        sms: true,
+        templateParams: { providerName: 'Dr. Test', scheduledTime: '10:00 AM' },
+      });
+
+      expect(result.whatsappSent).toBe(false);
+      expect(result.smsSent).toBe(true);
+    });
+  });
+
+  describe('updateDeliveryStatus', () => {
+    it('should update delivery status to delivered', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValue({
+        id: 'log-1',
+        providerMessageId: 'WA123',
+        status: 'SENT',
+      });
+      mockPrisma.notificationLog.update.mockResolvedValue({});
+
+      await service.updateDeliveryStatus('WA123', 'delivered');
+
+      expect(mockPrisma.notificationLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: expect.objectContaining({
+          status: 'DELIVERED',
+          deliveredAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should update delivery status to failed with error message', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValue({
+        id: 'log-1',
+        providerMessageId: 'WA123',
+        status: 'SENT',
+      });
+      mockPrisma.notificationLog.update.mockResolvedValue({});
+
+      await service.updateDeliveryStatus('WA123', 'failed', 'Unreachable');
+
+      expect(mockPrisma.notificationLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: expect.objectContaining({
+          status: 'FAILED',
+          failedAt: expect.any(Date),
+          errorMessage: 'Unreachable',
+        }),
+      });
+    });
+
+    it('should handle read status as delivered', async () => {
+      mockPrisma.notificationLog.findFirst.mockResolvedValue({
+        id: 'log-1',
+        providerMessageId: 'WA123',
+        status: 'SENT',
+        deliveredAt: null,
+      });
+      mockPrisma.notificationLog.update.mockResolvedValue({});
+
+      await service.updateDeliveryStatus('WA123', 'read');
+
+      expect(mockPrisma.notificationLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: expect.objectContaining({
+          status: 'DELIVERED',
+        }),
+      });
+    });
+  });
+
+  describe('getNotificationLogs', () => {
+    it('should return notification logs for a user', async () => {
+      const mockLogs = [
+        { id: 'log-1', userId: 'user-1', channel: 'WHATSAPP', status: 'SENT' },
+        { id: 'log-2', userId: 'user-1', channel: 'SMS', status: 'DELIVERED' },
+      ];
+      mockPrisma.notificationLog.findMany.mockResolvedValue(mockLogs);
+
+      const result = await service.getNotificationLogs('user-1');
+
+      expect(result).toEqual(mockLogs);
+      expect(mockPrisma.notificationLog.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', channel: undefined },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+    });
+
+    it('should filter by channel when specified', async () => {
+      mockPrisma.notificationLog.findMany.mockResolvedValue([]);
+
+      await service.getNotificationLogs('user-1', {
+        channel: 'WHATSAPP' as any,
+      });
+
+      expect(mockPrisma.notificationLog.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', channel: 'WHATSAPP' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
     });
   });
 });
