@@ -258,9 +258,9 @@ jobs:
       - name: Check if Vercel secrets are configured
         id: check-secrets
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ADMIN_PROJECT_ID }}" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "⚠️ VERCEL_TOKEN not configured — skipping admin deploy"
+            echo "⚠️ VERCEL_TOKEN or VERCEL_ADMIN_PROJECT_ID not configured — skipping admin deploy"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
@@ -276,7 +276,6 @@ jobs:
       - name: Pull Vercel environment
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
@@ -284,7 +283,6 @@ jobs:
       - name: Build with Vercel
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
@@ -293,7 +291,6 @@ jobs:
       - name: Deploy to Vercel (production)
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
@@ -324,9 +321,9 @@ jobs:
       - name: Check if Vercel secrets are configured
         id: check-secrets
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "⚠️ VERCEL_TOKEN not configured — skipping marketing-agent deploy"
+            echo "⚠️ VERCEL_TOKEN or VERCEL_MARKETING_AGENT_PROJECT_ID not configured — skipping marketing-agent deploy"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
@@ -342,7 +339,6 @@ jobs:
       - name: Pull Vercel environment
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/marketing-agent
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
@@ -350,7 +346,6 @@ jobs:
       - name: Build with Vercel
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/marketing-agent
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
@@ -368,7 +363,6 @@ jobs:
           fi
           echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
           echo "✅ Deployed to: $DEPLOY_URL"
-        working-directory: apps/marketing-agent
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
@@ -376,7 +370,6 @@ jobs:
       - name: Alias to production domain
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel alias set ${{ steps.deploy-marketing-agent.outputs.deploy_url }} growth.curex24.com --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }}
-        working-directory: apps/marketing-agent
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
