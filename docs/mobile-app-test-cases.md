@@ -1,8 +1,6 @@
 # Curex24 — Mobile App Test Suite
 
-**Version:** 1.0  
-**Generated:** 2026-04-15  
-**Engineer role:** Senior Mobile QA  
+ 
 **Source files analysed:**
 - `navigation/RootNavigator.tsx`
 - `screens/auth/LoginScreen.tsx`
