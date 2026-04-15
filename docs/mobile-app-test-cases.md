@@ -4,15 +4,15 @@
 
 | Section | Test Cases |
 |---|---|
-| Auth | 11 |
-| Booking | 10 |
-| Payment | 8 |
-| Provider | 12 |
-| Tracking | 8 |
-| Sync | 8 |
+| Auth | 15 |
+| Booking | 13 |
+| Payment | 11 |
+| Provider | 15 |
+| Tracking | 11 |
+| Sync | 11 |
 | UX | 8 |
-| Staging Integration Validation | 8 |
-| **Total** | **73** |
+| Staging Integration Validation | 11 |
+| **Total** | **95** |
 
 ## Auth
 
@@ -29,6 +29,10 @@
 | AUTH-009 | Rapid taps on Verify OTP do not cause duplicate submissions | OTP entered; Verify OTP enabled | 1. Tap Verify OTP rapidly multiple times. | Single verification flow is processed (no duplicate navigation or repeated success state). | Race Condition | High | Not Run |
 | AUTH-010 | Session persists across app relaunch when auth data is valid | User already logged in | 1. Force close app. 2. Relaunch app. | User returns to authenticated flow without re-login. | Persistence | High | Not Run |
 | AUTH-011 | Explicit sign out clears session and returns to auth flow | User logged in (patient or provider) | 1. Open profile. 2. Tap Sign Out/Logout and confirm (if prompted). | User is returned to auth flow and protected screens are no longer accessible. | Functional | High | Not Run |
+| AUTH-012 | Expired OTP is rejected and requires requesting a new OTP | OTP was requested and allowed to expire | 1. Wait until OTP validity window ends. 2. Enter expired OTP. 3. Tap Verify OTP. | OTP verification fails with recoverable error and user can request/resend a new OTP. | Security | High | Not Run |
+| AUTH-013 | Previously used OTP cannot be reused after successful verification | First OTP verification already succeeded once | 1. Return to OTP verification state for same phone/session context. 2. Re-enter the previously used OTP. 3. Tap Verify OTP. | Reused OTP is rejected and no duplicate authenticated transition occurs. | Security | Critical | Not Run |
+| AUTH-014 | Switching role mid-auth does not leak OTP/auth state across roles | User started OTP flow for one role | 1. Start OTP flow as Patient (request OTP). 2. Navigate back to role selection. 3. Switch to Doctor and continue auth. | Role context resets cleanly; OTP/session state from prior role is not applied to the new role flow. | Workflow | High | Not Run |
+| AUTH-015 | Network drop during OTP verification is recoverable without restart | OTP entered; unstable network | 1. Tap Verify OTP. 2. Disable network before response returns. 3. Re-enable network and retry verification. | Failed attempt is handled safely; user can retry verification successfully after reconnect. | Network | High | Not Run |
 
 ## Booking
 
@@ -44,6 +48,9 @@
 | BOOK-008 | Booking creation failure is recoverable from in-screen error state | Force booking create API failure | 1. Submit booking. 2. Dismiss shown error. 3. Retry submit. | Error is visible and dismissible; user can retry without restarting app. | Retry | High | Not Run |
 | BOOK-009 | Rapid taps on booking confirm do not create duplicate bookings | Confirm button enabled | 1. Tap Confirm action rapidly multiple times. | Only one booking is created for the attempt. | Race Condition | Critical | Not Run |
 | BOOK-010 | Booking cancellation is available only for cancellable states | Existing booking in REQUESTED or ACCEPTED | 1. Open tracking screen. 2. Tap Cancel Booking and confirm. | Cancellation succeeds for allowed states and state refreshes correctly. | Workflow | High | Not Run |
+| BOOK-011 | Provider unavailability after selection blocks stale booking confirmation | Provider selected on confirmation screen | 1. Keep confirmation screen open. 2. Simulate provider becoming unavailable. 3. Tap Confirm & Proceed to Payment. | Booking creation is prevented with clear recoverable error and user can select another provider. | Edge | High | Not Run |
+| BOOK-012 | Duplicate booking is prevented across rapid actions and second device/session | Same patient account logged in on two devices/sessions | 1. Submit same booking intent near-simultaneously from both sessions (or rapid repeated confirms). | System results in a single active booking intent; duplicate creation is blocked or deduplicated safely. | Race Condition | Critical | Not Run |
+| BOOK-013 | Interrupted booking submission resumes to consistent state after app recovery | Booking submission in progress | 1. Tap Confirm & Proceed to Payment. 2. Immediately background/kill app before response completes. 3. Reopen app and check booking history/status. | App restores consistent booking state (created or not created) without duplicate/ghost bookings. | Recovery | High | Not Run |
 
 ## Payment
 
@@ -57,6 +64,9 @@
 | PAY-006 | Payment retry after transient failure completes without duplicate success records | First attempt fails transiently | 1. Trigger a temporary failure. 2. Retry payment after recovery. | Retry succeeds and app reaches a single consistent payment success state. | Retry | High | Not Run |
 | PAY-007 | Offline payment attempt fails gracefully and supports retry after reconnect | Device offline | 1. Attempt payment offline. 2. Reconnect network. 3. Retry payment. | Offline attempt fails safely; retry after reconnect can succeed. | Network | High | Not Run |
 | PAY-008 | Rapid taps on Pay do not trigger duplicate charge attempts | Pay enabled | 1. Tap Pay rapidly multiple times. | Single payment flow is processed by the app UI. | Race Condition | Critical | Not Run |
+| PAY-009 | App closed or crashed during payment recovers to correct payment state on reopen | Payment initiated for existing booking | 1. Start payment flow. 2. Close/kill app before callback/response completes. 3. Reopen app and inspect booking/payment status. | App reconciles payment state correctly on reopen and avoids duplicate charge attempts. | Recovery | Critical | Not Run |
+| PAY-010 | Payment success with delayed UI refresh self-heals from backend truth | Backend marks payment successful but client UI remains pending temporarily | 1. Complete payment. 2. Simulate stale client state where success UI does not update immediately. 3. Trigger refresh/reopen booking. | UI reconciles to successful paid state from backend without requiring manual data correction. | Sync | High | Not Run |
+| PAY-011 | Delayed payment callback keeps flow safe and resolves consistently when callback arrives | Payment provider callback delayed | 1. Initiate payment. 2. Hold callback/confirmation for extended period. 3. Resume normal callback delivery. | App maintains non-duplicate pending state and transitions correctly once callback is received. | Edge | High | Not Run |
 
 ## Provider
 
@@ -74,6 +84,9 @@
 | PROV-010 | Consultation summary blocks submit when required fields are missing | Consultation form open | 1. Leave symptoms/diagnosis empty. 2. Tap submit. | Validation alert appears and summary is not submitted. | Validation | High | Not Run |
 | PROV-011 | Consultation summary submit failure is recoverable by retry | Consultation form filled; unstable network | 1. Submit during network/API failure. 2. Retry after recovery. | Failure alert appears; retry can complete submission. | Retry | High | Not Run |
 | PROV-012 | KYC form validates year and shows verification attempt history updates | Provider opens KYC screen | 1. Enter invalid year. 2. Submit valid details. 3. Reopen/refresh logs. | Invalid year is blocked; valid request submits; verification history updates. | Functional | High | Not Run |
+| PROV-013 | Concurrent provider acceptance race resolves to single booking owner | Same incoming booking visible to two providers | 1. Both providers attempt Accept at nearly same time. | Only one provider successfully acquires booking; other provider sees conflict-safe failure/update. | Race Condition | Critical | Not Run |
+| PROV-014 | Network loss during provider status update preserves consistent recoverable state | Active provider booking with next status action available | 1. Tap status transition action. 2. Drop network before response returns. 3. Reconnect and refresh/retry. | App does not show false transition; status remains consistent and recoverable after reconnect. | Network | High | Not Run |
+| PROV-015 | Failed status transition supports retry without invalid intermediate lifecycle state | Backend rejects one status transition attempt | 1. Trigger status transition failure. 2. Retry transition from booking detail. | Retry path works and booking lifecycle remains valid without skipped/duplicated statuses. | Retry | High | Not Run |
 
 ## Tracking
 
@@ -87,6 +100,9 @@
 | TRACK-006 | Rapid open/close of tracking for different bookings does not leak stale data | Multiple bookings available | 1. Open tracking for booking A. 2. Go back. 3. Open tracking for booking B quickly. | Booking B data is shown correctly without stale markers/details from booking A. | Race Condition | High | Not Run |
 | TRACK-007 | Cancel booking action from tracking requires confirmation | Booking in cancellable state | 1. Tap Cancel Booking. 2. Dismiss prompt. 3. Repeat and confirm. | Prompt appears; cancel runs only after confirmation. | Workflow | High | Not Run |
 | TRACK-008 | Completed consultation exposes summary view entry point | Booking status is COMPLETED or SUMMARY_SUBMITTED | 1. Open tracking screen. 2. Tap View Consultation Summary. | Consultation summary screen opens for that booking. | Functional | Medium | Not Run |
+| TRACK-009 | Revoking GPS permission during active tracking is handled without crash | Active trackable booking with previously granted location permission | 1. Open tracking screen. 2. Revoke location permission from OS settings while app is active. 3. Return to app. | Tracking UI remains stable, shows recoverable location-permission state, and does not crash. | Edge | High | Not Run |
+| TRACK-010 | Temporary backend location feed gap keeps tracking screen usable | Active tracked booking with intermittent backend location updates | 1. Pause backend location updates temporarily. 2. Observe tracking screen. 3. Resume updates. | UI remains stable during gap and resumes fresh location updates when feed recovers. | Resilience | Medium | Not Run |
+| TRACK-011 | Rapid switching among multiple booking tracking views isolates each booking state | User has multiple active/recent bookings | 1. Alternate quickly between tracking views for booking A/B/C. | Each view shows correct booking-specific map/timeline without cross-booking data bleed. | Race Condition | High | Not Run |
 
 ## Sync
 
@@ -100,6 +116,9 @@
 | SYNC-006 | Non-auth endpoint 401 does not force immediate full logout | Logged-in user; simulate 401 on non-auth API call | 1. Trigger protected non-auth request returning 401. | App does not perform full logout flow automatically. | Edge | High | Not Run |
 | SYNC-007 | Auth endpoint 401 clears token only; re-auth is required after relaunch | Auth call can be forced to return 401 with stored session | 1. Trigger auth-endpoint 401 scenario. 2. Relaunch app. | Session is not treated as fully valid on relaunch because token is cleared; user must authenticate again. | Security | High | Not Run |
 | SYNC-008 | Failed network actions can be retried from the same UI flow | Trigger failure on booking/payment/consultation submission | 1. Submit action during outage. 2. Restore network. 3. Retry in same screen. | Action can be retried successfully without app restart or data corruption. | Retry | High | Not Run |
+| SYNC-009 | App resume after long inactivity refreshes stale state before critical actions | Logged-in user with app backgrounded for extended period | 1. Background app for long duration. 2. Reopen app. 3. Navigate to booking/payment screens. | Stale cached state is refreshed and critical actions use current backend data. | Sync | High | Not Run |
+| SYNC-010 | Background-to-foreground transition triggers safe data synchronization | Logged-in user with data changes happening while app is backgrounded | 1. Send app to background. 2. Change related data externally. 3. Bring app to foreground. | Relevant lists/details reconcile with backend without duplicate entries or stale statuses. | Sync | High | Not Run |
+| SYNC-011 | Multiple rapid refresh triggers converge to one consistent final dataset | Any refreshable screen | 1. Trigger refresh repeatedly via gesture/button/navigation in quick succession. | Concurrent refreshes are handled safely and final visible state is consistent and non-duplicated. | Race Condition | Medium | Not Run |
 
 ## UX
 
@@ -126,3 +145,6 @@
 | STG-006 | Failed mobile payment does not create false successful earnings entries | Staging payment failure scenario available | 1. Trigger payment failure in mobile. 2. Inspect staging admin financial records. | No successful earning/payout entry is created for failed payment. | E2E Integration | High | Not Run |
 | STG-007 | Consultation diagnostics from mobile summary propagate to admin diagnostics data | Provider can submit consultation summary in staging | 1. Submit summary with diagnostic tests enabled in mobile. 2. Check staging admin diagnostics records. | Diagnostic request record appears with correct booking/provider linkage. | E2E Integration | High | Not Run |
 | STG-008 | Specialist referral from mobile consultation propagates to admin referral data | Provider can submit referral in staging | 1. Submit summary with specialist referral in mobile. 2. Check staging admin referral records. | Referral record appears with expected patient/booking/specialist details. | E2E Integration | High | Not Run |
+| STG-009 | Partial sync failure is detectable when booking exists but payment record is missing | Staging environment with ability to simulate partial pipeline failure | 1. Create booking and complete payment flow from mobile. 2. Validate booking and payment records in backend and admin portal. | Inconsistency (booking present but payment missing) is surfaced clearly and can be traced for reconciliation. | E2E Integration | Critical | Not Run |
+| STG-010 | Delayed propagation between mobile, backend, and admin eventually converges without data loss | Staging systems connected with observable timestamps | 1. Trigger booking/status/payment update in mobile. 2. Check backend immediately. 3. Check admin portal over delayed intervals. | Data propagates with delay but converges to matching final state across mobile, backend, and admin portal. | E2E Integration | High | Not Run |
+| STG-011 | Cross-system ID/timestamp/status consistency is validated end-to-end for same transaction | Staging mobile and admin access available | 1. Perform booking → payment → status progression in mobile. 2. Capture corresponding backend and admin records. 3. Compare booking/payment IDs, timestamps, and statuses across systems. | Mobile-origin transaction maps to consistent backend and admin records with no mismatched IDs, timestamps, or lifecycle status. | E2E Integration | Critical | Not Run |
