@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -57,6 +58,14 @@ describe('AdminService', () => {
     retryVerification: jest.fn(),
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: true,
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,6 +75,7 @@ describe('AdminService', () => {
           provide: DoctorVerificationService,
           useValue: mockVerificationService,
         },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -209,7 +219,6 @@ describe('AdminService', () => {
       mockPrisma.providerLicense.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
       mockPrisma.adminAction.create.mockResolvedValue({});
-      mockPrisma.notification.create.mockResolvedValue({});
 
       const result = await service.verifyProvider(
         providerId,
@@ -235,13 +244,15 @@ describe('AdminService', () => {
           notes: 'Looks good',
         }),
       });
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      // Updated to use notification service instead of direct prisma call
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
           userId: 'user-1',
           title: 'Account Approved',
           type: 'PROVIDER_APPROVED',
         }),
-      });
+        expect.anything(),
+      );
     });
 
     it('should throw NotFoundException if provider does not exist', async () => {
@@ -265,7 +276,6 @@ describe('AdminService', () => {
       mockPrisma.providerLicense.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
       mockPrisma.adminAction.create.mockResolvedValue({});
-      mockPrisma.notification.create.mockResolvedValue({});
 
       const result = await service.rejectProvider(
         providerId,
@@ -290,13 +300,15 @@ describe('AdminService', () => {
           notes: 'Incomplete documents',
         }),
       });
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      // Updated to use notification service instead of direct prisma call
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
           userId: 'user-1',
           title: 'Account Rejected',
           type: 'PROVIDER_REJECTED',
         }),
-      });
+        expect.anything(),
+      );
     });
 
     it('should reject provider without reason', async () => {
@@ -307,7 +319,6 @@ describe('AdminService', () => {
       mockPrisma.providerLicense.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
       mockPrisma.adminAction.create.mockResolvedValue({});
-      mockPrisma.notification.create.mockResolvedValue({});
 
       const result = await service.rejectProvider(providerId, adminId);
 

@@ -17,6 +17,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { DoctorVerificationModule } from './modules/doctor-verification/doctor-verification.module';
+import { SmsModule } from './modules/sms/sms.module';
+import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { BootstrapService } from './common/bootstrap.service';
 
 @Module({
@@ -26,6 +28,8 @@ import { BootstrapService } from './common/bootstrap.service';
       isGlobal: true,
     }),
     PrismaModule,
+    SmsModule,
+    PushNotificationModule,
     AuthModule,
     PatientsModule,
     ProvidersModule,
