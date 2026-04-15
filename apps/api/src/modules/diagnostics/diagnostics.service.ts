@@ -21,7 +21,7 @@ export class DiagnosticsService {
   async createRequest(dto: CreateDiagnosticRequestDto, userId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: dto.bookingId },
-      include: { provider: true },
+      include: { provider: true, patient: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
 
@@ -31,7 +31,7 @@ export class DiagnosticsService {
       );
     }
 
-    return this.prisma.diagnosticRequest.create({
+    const diagnosticRequest = await this.prisma.diagnosticRequest.create({
       data: {
         bookingId: dto.bookingId,
         testType: dto.testType,
@@ -40,6 +40,48 @@ export class DiagnosticsService {
         status: 'REQUESTED',
       },
     });
+
+    // Send notification to patient about the diagnostic test
+    try {
+      const scheduledTime = dto.scheduledAt
+        ? new Date(dto.scheduledAt).toLocaleString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : undefined;
+
+      await this.notificationsService.sendNotification(
+        {
+          userId: booking.patient.userId,
+          title: 'Diagnostic Test Booked',
+          message: `Dr. ${booking.provider.name} has requested a "${dto.testType}" test${scheduledTime ? ` scheduled for ${scheduledTime}` : ''}.`,
+          type: 'DIAGNOSTIC_BOOKED',
+          metadata: {
+            diagnosticRequestId: diagnosticRequest.id,
+            testType: dto.testType,
+            bookingId: dto.bookingId,
+          },
+        },
+        {
+          inApp: true,
+          push: true,
+          whatsapp: true,
+          sms: false, // WhatsApp will fallback to SMS if needed
+          whatsappTemplate: 'DIAGNOSTIC_BOOKED',
+          templateParams: {
+            testType: dto.testType,
+            scheduledTime: scheduledTime || 'To be scheduled',
+          },
+          idempotencyKey: `diagnostic_${diagnosticRequest.id}`,
+        },
+      );
+    } catch {
+      // Notification failure should not block the diagnostic request
+    }
+
+    return diagnosticRequest;
   }
 
   async updateStatus(
@@ -85,7 +127,7 @@ export class DiagnosticsService {
       data: { status: 'RESULTED' },
     });
 
-    // Send notification with push and SMS
+    // Send notification with push and WhatsApp (SMS fallback)
     try {
       await this.notificationsService.sendNotification(
         {
@@ -102,9 +144,12 @@ export class DiagnosticsService {
         {
           inApp: true,
           push: true,
-          sms: true,
+          whatsapp: true,
+          sms: false, // WhatsApp will fallback to SMS if needed
+          whatsappTemplate: 'LAB_RESULT_READY',
           smsTemplate: 'LAB_RESULT_READY',
-          smsParams: { testType: request.testType },
+          templateParams: { testType: request.testType },
+          idempotencyKey: `lab_result_${result.id}`,
         },
       );
     } catch {
