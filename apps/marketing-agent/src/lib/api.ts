@@ -1,28 +1,34 @@
-import axios from "axios";
-import { getApiBaseUrl } from "./apiBaseUrl";
+import axios from 'axios';
 
-export const api = axios.create({
-  baseURL: getApiBaseUrl(),
-  timeout: 15000,
-  withCredentials: true, // if you use cookie auth; safe even if you use JWT
+const api = axios.create({
+  baseURL: '/api/backend',
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Optional: attach token if you store it
+// Attach JWT to every request
 api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("token");
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('marketing_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Optional: nicer error message mapping
-export function toUserFriendlyApiError(err: any): string {
-  // axios network error -> no response
-  if (err?.code === "ERR_NETWORK" || !err?.response) {
-    return `Unable to reach the server at ${getApiBaseUrl()}. Please check that the API is running and CORS is configured.`;
+// Auto-logout on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (typeof window !== 'undefined' && err.response?.status === 401) {
+      const isAuthRequest = err.config?.url?.includes('/auth/marketing-login');
+      if (!isAuthRequest && window.location.pathname !== '/login') {
+        localStorage.removeItem('marketing_token');
+        localStorage.removeItem('marketing_user');
+        document.cookie = 'marketing_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(err);
   }
-  const msg = err?.response?.data?.message;
-  if (typeof msg === "string") return msg;
-  return "Request failed. Please try again.";
-}
+);
+
+export default api;
