@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "id": "booking-1",
+      "mode": "HOME_VISIT",
+      "status": "REQUESTED",
+      "totalFee": 4000,
+      "createdAt": "2026-04-10T10:00:00.000Z",
+      "patient": { "name": "Ravi Kumar" },
+      "provider": { "name": "Dr. Priya Sharma" },
+      "serviceCategory": { "name": "General Physician" },
+      "payment": { "status": "PAID" }
+    },
+    {
+      "id": "booking-2",
+      "mode": "DOCTOR_PLACE",
+      "status": "COMPLETED",
+      "totalFee": 2500,
+      "createdAt": "2026-04-11T10:00:00.000Z",
+      "patient": { "name": "Asha Verma" },
+      "provider": { "name": "Dr. Karan Mehta" },
+      "serviceCategory": { "name": "Dermatology" },
+      "payment": { "status": "PAID" }
+    }
+  ]
+}

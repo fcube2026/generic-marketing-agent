@@ -300,8 +300,11 @@ export default function DiagnosticsPage() {
             <h2 className="text-lg font-bold text-gray-900 mb-4">Upload Lab Result</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Result File URL</label>
+                <label htmlFor="result-file-url" className="block text-sm font-medium text-gray-700 mb-1">
+                  Result File URL
+                </label>
                 <input
+                  id="result-file-url"
                   type="text"
                   value={resultFileUrl}
                   onChange={(e) => setResultFileUrl(e.target.value)}
@@ -310,8 +313,11 @@ export default function DiagnosticsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <label htmlFor="result-notes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
                 <textarea
+                  id="result-notes"
                   value={resultNotes}
                   onChange={(e) => setResultNotes(e.target.value)}
                   placeholder="Add any notes about the result..."
