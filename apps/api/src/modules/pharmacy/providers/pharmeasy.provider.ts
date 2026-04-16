@@ -38,7 +38,10 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     }
 
     const url = `${this.apiUrl}/medicines/search?q=${encodeURIComponent(query)}`;
-    const data = await this.get<{ medicines?: PharmEasyMedicine[] }>(url);
+    const data = await this.get<{ medicines?: PharmEasyMedicine[] }>(
+      url,
+      this.apiKey,
+    );
     return (data.medicines ?? []).map(this.normalizeMedicine);
   }
 
@@ -67,6 +70,7 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     const data = await this.post<PharmEasyOrderResponse>(
       `${this.apiUrl}/orders`,
       payload,
+      this.apiKey,
     );
 
     return {
@@ -86,6 +90,7 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
 
     const data = await this.get<PharmEasyStatusResponse>(
       `${this.apiUrl}/orders/${partnerOrderId}`,
+      this.apiKey,
     );
 
     return {
@@ -95,14 +100,14 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     };
   }
 
-  private async get<T>(url: string): Promise<T> {
+  private async get<T>(url: string, apiKey: string): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'GET',
-        headers: this.authHeaders(),
+        headers: this.authHeaders(apiKey),
         signal: controller.signal,
       });
     } finally {
@@ -111,14 +116,21 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     return this.handleResponse<T>(response);
   }
 
-  private async post<T>(url: string, body: unknown): Promise<T> {
+  private async post<T>(
+    url: string,
+    body: unknown,
+    apiKey: string,
+  ): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.authHeaders(apiKey),
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -128,12 +140,19 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     return this.handleResponse<T>(response);
   }
 
-  private authHeaders(): Record<string, string> {
-    return { 'X-Api-Key': this.apiKey! };
+  private authHeaders(apiKey: string): Record<string, string> {
+    return { 'X-Api-Key': apiKey };
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
-    const data = (await response.json()) as T;
+    let data: T;
+    try {
+      data = (await response.json()) as T;
+    } catch {
+      throw new Error(
+        `PharmEasy API returned HTTP ${response.status} with non-JSON body`,
+      );
+    }
     if (!response.ok) {
       this.logger.warn(
         `[pharmeasy] API error ${response.status}: ${JSON.stringify(data)}`,

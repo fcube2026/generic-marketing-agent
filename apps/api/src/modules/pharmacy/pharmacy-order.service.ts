@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { PharmacyOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
@@ -125,7 +126,7 @@ export class PharmacyOrderService {
     if (partnerStatus !== order.status) {
       const updated = await this.prisma.pharmacyOrder.update({
         where: { id: orderId },
-        data: { status: partnerStatus as any },
+        data: { status: partnerStatus as PharmacyOrderStatus },
         include: { items: true },
       });
       return updated as PharmacyOrderResponseDto;
