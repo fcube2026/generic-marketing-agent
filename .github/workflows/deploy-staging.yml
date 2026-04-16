@@ -2,7 +2,11 @@ name: Deploy Staging
 
 on:
   push:
-    branches: [develop]
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'labels/**'
   workflow_dispatch:
 
 concurrency:
