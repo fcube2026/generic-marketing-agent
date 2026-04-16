@@ -1,0 +1,487 @@
+{
+  "info": {
+    "_postman_id": "notification-system-collection",
+    "name": "Curex24 Notification System",
+    "description": "API collection for testing the Curex24 notification system including WhatsApp, SMS, Push notifications, and webhooks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000/api/v1"
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919876543210\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-otp"]
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919876543210\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-otp"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "unread-count"]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/:notificationId/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", ":notificationId", "read"],
+              "variable": [
+                {
+                  "key": "notificationId",
+                  "value": "notification-id-here"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "read-all"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notification Preferences",
+      "item": [
+        {
+          "name": "Get Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "Update Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushEnabled\": true,\n  \"smsEnabled\": true,\n  \"whatsappEnabled\": true,\n  \"emailEnabled\": false,\n  \"bookingUpdates\": true,\n  \"paymentUpdates\": true,\n  \"reminderEnabled\": true,\n  \"marketingEnabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "Disable WhatsApp",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"whatsappEnabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "preferences"]
+            }
+          }
+        },
+        {
+          "name": "Disable All Notifications",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushEnabled\": false,\n  \"smsEnabled\": false,\n  \"whatsappEnabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Device Tokens",
+      "item": [
+        {
+          "name": "Register Device Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxx]\",\n  \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/device-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "device-token"]
+            }
+          }
+        },
+        {
+          "name": "Unregister Device Token",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxx]\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/device-token/unregister",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "device-token", "unregister"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notification Logs",
+      "item": [
+        {
+          "name": "Get My Notification Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/me/logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "me", "logs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Simulate Twilio Delivered Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "SM1234567890abcdef",
+                  "type": "text"
+                },
+                {
+                  "key": "MessageStatus",
+                  "value": "delivered",
+                  "type": "text"
+                },
+                {
+                  "key": "To",
+                  "value": "whatsapp:+919876543210",
+                  "type": "text"
+                },
+                {
+                  "key": "From",
+                  "value": "whatsapp:+14155238886",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/webhook/twilio",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "webhook", "twilio"]
+            },
+            "description": "Simulates a Twilio status callback for a delivered WhatsApp message"
+          }
+        },
+        {
+          "name": "Simulate Twilio Failed Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "SM1234567890abcdef",
+                  "type": "text"
+                },
+                {
+                  "key": "MessageStatus",
+                  "value": "failed",
+                  "type": "text"
+                },
+                {
+                  "key": "ErrorCode",
+                  "value": "30003",
+                  "type": "text"
+                },
+                {
+                  "key": "ErrorMessage",
+                  "value": "Unreachable destination handset",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/webhook/twilio",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "webhook", "twilio"]
+            },
+            "description": "Simulates a Twilio status callback for a failed message"
+          }
+        },
+        {
+          "name": "Simulate Twilio Read Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "MessageSid",
+                  "value": "SM1234567890abcdef",
+                  "type": "text"
+                },
+                {
+                  "key": "MessageStatus",
+                  "value": "read",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/webhook/twilio",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "webhook", "twilio"]
+            },
+            "description": "Simulates a Twilio status callback for a read WhatsApp message"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Notification Triggers",
+      "item": [
+        {
+          "name": "Create Booking (triggers notification)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"provider-id-here\",\n  \"serviceCategoryId\": \"service-category-id\",\n  \"mode\": \"HOME_VISIT\",\n  \"scheduledAt\": \"2024-12-25T10:00:00.000Z\",\n  \"addressId\": \"address-id-here\",\n  \"paymentMethod\": \"CARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings"]
+            },
+            "description": "Creating a booking triggers notification to provider"
+          }
+        },
+        {
+          "name": "Accept Booking (triggers notification)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings/:bookingId/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", ":bookingId", "status"],
+              "variable": [
+                {
+                  "key": "bookingId",
+                  "value": "booking-id-here"
+                }
+              ]
+            },
+            "description": "Accepting a booking triggers notification to patient"
+          }
+        },
+        {
+          "name": "Upload Lab Result (triggers notification)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resultFileUrl\": \"https://storage.example.com/results/lab-result.pdf\",\n  \"notes\": \"All values within normal range\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/diagnostics/:diagnosticId/result",
+              "host": ["{{baseUrl}}"],
+              "path": ["diagnostics", ":diagnosticId", "result"],
+              "variable": [
+                {
+                  "key": "diagnosticId",
+                  "value": "diagnostic-id-here"
+                }
+              ]
+            },
+            "description": "Uploading lab result triggers notification to patient"
+          }
+        }
+      ]
+    }
+  ]
+}

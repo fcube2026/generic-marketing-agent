@@ -17,7 +17,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('marketing_token')?.value;
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/login' || pathname.startsWith('/_next') || pathname.startsWith('/favicon')) {
+  // Skip auth check for public paths and all API proxy calls
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/favicon')
+  ) {
     if (pathname === '/login' && token && isValidJwtStructure(token)) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }

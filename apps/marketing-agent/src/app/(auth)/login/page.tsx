@@ -21,17 +21,26 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: unknown) {
       let message: string;
-      const error = err as { response?: { data?: { message?: string; error?: string } }; request?: unknown };
-      if (error?.response?.data) {
+      const axiosError = err as {
+        response?: { status?: number; data?: { message?: string; error?: string } };
+        request?: unknown;
+      };
+
+      if (axiosError?.response?.status === 401) {
+        message = 'Invalid credentials.';
+      } else if (axiosError?.response?.data?.message || axiosError?.response?.data?.error) {
         message =
-          error.response.data.message ||
-          error.response.data.error ||
-          'Invalid credentials.';
-      } else if (error?.request) {
+          axiosError.response!.data!.message ||
+          axiosError.response!.data!.error ||
+          'Login failed. Please try again.';
+      } else if (axiosError?.response?.status) {
+        message = 'Server error. Please try again later.';
+      } else if (axiosError?.request) {
         message = 'Unable to reach the server. Please check your network or contact support.';
       } else {
         message = 'Login failed. Please try again.';
       }
+
       setError(message);
     } finally {
       setLoading(false);

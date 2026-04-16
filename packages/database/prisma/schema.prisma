@@ -10,34 +10,41 @@ datasource db {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  phone                 String                 @unique
-  role                  Role                   @default(PATIENT)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  addresses             Address[]
-  adminActions          AdminAction[]          @relation("AdminActions")
-  auditLogs             AuditLog[]
-  notifications         Notification[]
-  otpVerifications      OtpVerification[]
-  patientProfile        PatientProfile?
-  providerProfile       ProviderProfile?
-  questionnaireResponse QuestionnaireResponse?
+  id                     String                  @id @default(cuid())
+  phone                  String                  @unique
+  email                  String?                 @unique
+  passwordHash           String?
+  isActive               Boolean                 @default(true)
+  role                   Role                    @default(PATIENT)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  addresses              Address[]
+  adminActions           AdminAction[]           @relation("AdminActions")
+  auditLogs              AuditLog[]
+  deviceTokens           DeviceToken[]
+  notifications          Notification[]
+  notificationLogs       NotificationLog[]
+  notificationPreference NotificationPreference?
+  otpVerifications       OtpVerification[]
+  patientProfile         PatientProfile?
+  providerProfile        ProviderProfile?
+  questionnaireResponse  QuestionnaireResponse?
 
   @@map("users")
 }
 
 model PatientProfile {
-  id               String    @id @default(cuid())
-  userId           String    @unique
+  id               String          @id @default(cuid())
+  userId           String          @unique
   name             String
   dateOfBirth      DateTime?
   gender           String?
   emergencyContact String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   bookings         Booking[]
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacyOrders   PharmacyOrder[]
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("patient_profiles")
 }
@@ -208,6 +215,7 @@ model Booking {
   payout              Payout?
   providerLocations   ProviderLocation[]
   referrals           Referral[]
+  pharmacyOrders      PharmacyOrder[]
 
   @@index([patientId])
   @@index([providerId])
@@ -252,6 +260,7 @@ model Prescription {
   fileUrl               String?
   createdAt             DateTime            @default(now())
   consultationSummary   ConsultationSummary @relation(fields: [consultationSummaryId], references: [id], onDelete: Cascade)
+  pharmacyOrders        PharmacyOrder[]
 
   @@map("prescriptions")
 }
@@ -447,6 +456,77 @@ model QuestionnaireResponse {
   @@map("questionnaire_responses")
 }
 
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String // "ios" | "android" | "web"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  pushEnabled      Boolean @default(true)
+  smsEnabled       Boolean @default(true)
+  whatsappEnabled  Boolean @default(true)
+  emailEnabled     Boolean @default(false)
+  // Granular preferences for different notification types
+  bookingUpdates   Boolean @default(true)
+  paymentUpdates   Boolean @default(true)
+  reminderEnabled  Boolean @default(true)
+  marketingEnabled Boolean @default(false)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id                String                     @id @default(cuid())
+  userId            String
+  eventType         String
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  providerMessageId String?
+  idempotencyKey    String?
+  metadata          Json?
+  errorMessage      String?
+  retryCount        Int                        @default(0)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([idempotencyKey])
+  @@index([channel, status])
+  @@index([createdAt])
+  @@map("notification_logs")
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  FALLBACK_TRIGGERED
+}
+
 enum Role {
   PATIENT
   PROVIDER
@@ -501,4 +581,65 @@ enum LicenseStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model PharmacyPartner {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  displayName String
+  isActive    Boolean         @default(true)
+  apiBaseUrl  String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  orders      PharmacyOrder[]
+
+  @@map("pharmacy_partners")
+}
+
+model PharmacyOrder {
+  id              String              @id @default(cuid())
+  patientId       String
+  bookingId       String?
+  prescriptionId  String?
+  partnerId       String
+  partnerOrderId  String?
+  status          PharmacyOrderStatus @default(PLACED)
+  deliveryAddress String
+  totalAmount     Float
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           PharmacyOrderItem[]
+  patient         PatientProfile      @relation(fields: [patientId], references: [id])
+  booking         Booking?            @relation(fields: [bookingId], references: [id])
+  prescription    Prescription?       @relation(fields: [prescriptionId], references: [id])
+  partner         PharmacyPartner     @relation(fields: [partnerId], references: [id])
+
+  @@index([patientId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("pharmacy_orders")
+}
+
+model PharmacyOrderItem {
+  id           String        @id @default(cuid())
+  orderId      String
+  medicineId   String
+  medicineName String
+  quantity     Int
+  unitPrice    Float
+  totalPrice   Float
+  order        PharmacyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("pharmacy_order_items")
+}
+
+enum PharmacyOrderStatus {
+  PLACED
+  CONFIRMED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
 }
