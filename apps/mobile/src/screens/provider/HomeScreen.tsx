@@ -117,6 +117,7 @@ export const HomeScreen: React.FC = () => {
               onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
             >
               <Text style={styles.bookingAlertText}>
+                {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
                 {booking.patient?.name || 'Patient'} — {booking.serviceCategory?.name}
               </Text>
               <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
@@ -135,7 +136,10 @@ export const HomeScreen: React.FC = () => {
               onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
             >
               <View style={styles.bookingItemLeft}>
-                <Text style={styles.bookingPatient}>{booking.patient?.name || 'Patient'}</Text>
+                <Text style={styles.bookingPatient}>
+                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
+                  {booking.patient?.name || 'Patient'}
+                </Text>
                 <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
               </View>
               <BookingStatusBadge status={booking.status as BookingStatus} />

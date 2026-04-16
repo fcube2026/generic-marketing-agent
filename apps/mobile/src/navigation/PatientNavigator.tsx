@@ -10,6 +10,7 @@ import { BookingConfirmScreen } from '../screens/patient/BookingConfirmScreen';
 import { PaymentScreen } from '../screens/patient/PaymentScreen';
 import { TrackingScreen } from '../screens/patient/TrackingScreen';
 import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummaryScreen';
+import { VideoConsultationScreen } from '../screens/patient/VideoConsultationScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { Colors } from '../constants/colors';
@@ -20,10 +21,11 @@ export type PatientStackParamList = {
   SelectService: { category: ServiceCategory };
   ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
   Recommendation: { categorySlug: string; lat: number; lng: number };
-  BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE'; fee: number };
+  BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION'; fee: number };
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
+  VideoConsultation: { bookingId: string };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -62,5 +64,6 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
   </Stack.Navigator>
 );

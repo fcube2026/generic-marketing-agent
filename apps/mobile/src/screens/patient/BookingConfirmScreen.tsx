@@ -15,6 +15,14 @@ type Props = {
   route: RouteProp<PatientStackParamList, 'BookingConfirm'>;
 };
 
+const MODE_LABELS: Record<string, string> = {
+  HOME_VISIT: '🏠 Home Visit',
+  DOCTOR_PLACE: '🏥 Clinic Visit',
+  VIDEO_CONSULTATION: '📹 Video Consultation',
+};
+
+const getModeLabel = (mode: string) => MODE_LABELS[mode] ?? mode;
+
 export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => {
   const { providerId, mode, fee } = route.params;
   const { selectedProvider, selectedService, selectedAddress, symptoms, setLastBookingId } = useBookingStore();
@@ -104,7 +112,7 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Mode</Text>
-          <Text style={styles.value}>{mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.value}>{getModeLabel(mode)}</Text>
         </View>
         {mode === 'HOME_VISIT' && selectedAddress && (
           <View style={styles.row}>
