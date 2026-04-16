@@ -8,7 +8,9 @@
 --   pharmacy_orders        (from 20260416000000_add_pharmacy_models)
 --   pharmacy_order_items   (from 20260416000000_add_pharmacy_models)
 --   video_sessions         (from 20260416110000_add_video_consultation)
---   _prisma_migrations     (internal Prisma table)
+--
+-- Note: _prisma_migrations is intentionally excluded because Prisma's
+-- migration engine needs unrestricted access to this internal table.
 
 ALTER TABLE "device_tokens" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "notification_preferences" ENABLE ROW LEVEL SECURITY;
@@ -17,7 +19,6 @@ ALTER TABLE "pharmacy_partners" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "pharmacy_orders" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "pharmacy_order_items" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "video_sessions" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "_prisma_migrations" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "device_tokens" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "notification_preferences" FORCE ROW LEVEL SECURITY;
@@ -26,4 +27,3 @@ ALTER TABLE "pharmacy_partners" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "pharmacy_orders" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "pharmacy_order_items" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "video_sessions" FORCE ROW LEVEL SECURITY;
-ALTER TABLE "_prisma_migrations" FORCE ROW LEVEL SECURITY;
