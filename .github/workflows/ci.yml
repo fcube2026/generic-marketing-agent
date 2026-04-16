@@ -50,6 +50,9 @@ jobs:
       - name: Lint admin panel
         run: pnpm --filter @curex24/admin lint
 
+      - name: Lint doctor portal
+        run: pnpm --filter @curex24/doctor-portal lint
+
       - name: Typecheck admin panel
         run: cd apps/admin && npx tsc --noEmit
 
@@ -101,6 +104,9 @@ jobs:
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
 
+      - name: Build doctor portal
+        run: pnpm --filter @curex24/doctor-portal build
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -145,7 +151,7 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
 
       - name: Push schema to test DB
-        run: cd packages/database && npx prisma db push --skip-generate
+        run: cd packages/database && pnpm exec prisma db push --skip-generate
 
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
@@ -288,7 +294,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Validate Prisma schema
-        run: cd packages/database && npx prisma validate
+        run: cd packages/database && pnpm exec prisma validate
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/dummy"
           DIRECT_URL: "postgresql://user:pass@localhost:5432/dummy"
