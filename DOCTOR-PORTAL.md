@@ -1,6 +1,6 @@
 # Doctor Portal (`@curex24/doctor-portal`)
 
-The **Doctor Portal** is a Next.js 14 web application that allows healthcare providers (doctors) to manage their consultations, track earnings, and view their professional profile — all from a single dashboard.
+The **Doctor Portal** is a Next.js 15 web application that allows healthcare providers (doctors) to manage their consultations, track earnings, and view their professional profile — all from a single dashboard.
 
 ---
 
