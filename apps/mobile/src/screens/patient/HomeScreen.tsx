@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
@@ -15,6 +16,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
+import { Booking } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -38,7 +40,7 @@ export const HomeScreen: React.FC = () => {
     },
   });
 
-  const { data: recentBookings } = useQuery({
+  const { data: recentBookings } = useQuery<Booking[]>({
     queryKey: ['patient-bookings'],
     queryFn: async () => {
       const res = await api.get('/patients/me/bookings');
@@ -48,6 +50,23 @@ export const HomeScreen: React.FC = () => {
 
   const handleServicePress = (category: ServiceCategory) => {
     navigation.navigate('SelectService', { category });
+  };
+
+  const activeVideoBookings = (recentBookings || []).filter(
+    (b: Booking) =>
+      b.mode === 'VIDEO_CONSULTATION' &&
+      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
+  );
+
+  const handleVideoConsultationPress = () => {
+    if (activeVideoBookings.length > 0) {
+      navigation.navigate('VideoConsultation', { bookingId: activeVideoBookings[0].id });
+    } else {
+      Alert.alert(
+        'Video Consultation',
+        'You have no active video sessions. Book a video consultation from the Services section.',
+      );
+    }
   };
 
   return (
@@ -88,6 +107,20 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* Video Consultation Quick Access */}
+      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
+        <Text style={styles.videoCardIcon}>📹</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Video Consultation</Text>
+          <Text style={styles.videoCardSub}>
+            {activeVideoBookings.length > 0
+              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
+              : 'Consult doctors from the comfort of home'}
+          </Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
 
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
@@ -183,4 +216,26 @@ const styles = StyleSheet.create({
   bookingProvider: { fontWeight: '600', color: Colors.text, marginBottom: 2 },
   bookingService: { fontSize: 13, color: Colors.textMuted },
   bookingStatus: { fontWeight: '600', fontSize: 13 },
+  videoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  videoCardIcon: { fontSize: 28, marginRight: 14 },
+  videoCardContent: { flex: 1 },
+  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
 });
