@@ -33,20 +33,27 @@ export class AuthService {
     const otp = this.generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Invalidate old OTPs for this phone
-    await this.prisma.otpVerification.updateMany({
-      where: { phone: dto.phone, verified: false },
-      data: { verified: true },
-    });
+    try {
+      // Invalidate old OTPs for this phone
+      await this.prisma.otpVerification.updateMany({
+        where: { phone: dto.phone, verified: false },
+        data: { verified: true },
+      });
 
-    await this.prisma.otpVerification.create({
-      data: {
-        phone: dto.phone,
-        otp,
-        expiresAt,
-        verified: false,
-      },
-    });
+      await this.prisma.otpVerification.create({
+        data: {
+          phone: dto.phone,
+          otp,
+          expiresAt,
+          verified: false,
+        },
+      });
+    } catch (err) {
+      this.logger.error(`Failed to create OTP for phone=${dto.phone}`, err);
+      throw new ServiceUnavailableException(
+        'OTP service temporarily unavailable. Please try again shortly.',
+      );
+    }
 
     // In production, send via SMS provider
     // Return OTP in response for dev and staging environments
@@ -66,51 +73,67 @@ export class AuthService {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const otpRecord = await this.prisma.otpVerification.findFirst({
-      where: {
-        phone: dto.phone,
-        otp: dto.otp,
-        verified: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let otpRecord;
+    try {
+      otpRecord = await this.prisma.otpVerification.findFirst({
+        where: {
+          phone: dto.phone,
+          otp: dto.otp,
+          verified: false,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (err) {
+      this.logger.error(`OTP lookup failed for phone=${dto.phone}`, err);
+      throw new ServiceUnavailableException(
+        'Verification service temporarily unavailable. Please try again shortly.',
+      );
+    }
 
     if (!otpRecord) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    // Mark OTP as verified
-    await this.prisma.otpVerification.update({
-      where: { id: otpRecord.id },
-      data: { verified: true },
-    });
-
-    // Find or create user
-    let user = await this.prisma.user.findUnique({
-      where: { phone: dto.phone },
-    });
-
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          phone: dto.phone,
-          role: (dto.role as Role) ?? Role.PATIENT,
-        },
+    try {
+      // Mark OTP as verified
+      await this.prisma.otpVerification.update({
+        where: { id: otpRecord.id },
+        data: { verified: true },
       });
+
+      // Find or create user
+      let user = await this.prisma.user.findUnique({
+        where: { phone: dto.phone },
+      });
+
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            phone: dto.phone,
+            role: (dto.role as Role) ?? Role.PATIENT,
+          },
+        });
+      }
+
+      const payload = { sub: user.id, phone: user.phone, role: user.role };
+      const token = this.jwtService.sign(payload);
+
+      return {
+        token,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          role: user.role,
+        },
+      };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.error(`OTP verification failed for phone=${dto.phone}`, err);
+      throw new ServiceUnavailableException(
+        'Verification service temporarily unavailable. Please try again shortly.',
+      );
     }
-
-    const payload = { sub: user.id, phone: user.phone, role: user.role };
-    const token = this.jwtService.sign(payload);
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        role: user.role,
-      },
-    };
   }
 
   async adminLogin(dto: AdminLoginDto) {
