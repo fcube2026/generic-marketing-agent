@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PharmacyOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
@@ -55,7 +56,7 @@ export class PharmacyOrderService {
 
     const order = await this.prisma.pharmacyOrder.create({
       data: {
-        orderNumber: `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        orderNumber: `ORD-${randomUUID()}`,
         patientProfileId: patient.id,
         bookingId: dto.bookingId ?? undefined,
         prescriptionId: dto.prescriptionId ?? undefined,
