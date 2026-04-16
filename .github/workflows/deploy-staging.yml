@@ -53,6 +53,9 @@ jobs:
       - name: Lint admin panel
         run: pnpm --filter @curex24/admin lint
 
+      - name: Lint doctor portal
+        run: pnpm --filter @curex24/doctor-portal lint
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -89,6 +92,11 @@ jobs:
 
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+
+      - name: Build doctor portal
+        run: pnpm --filter @curex24/doctor-portal build
         env:
           NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
 
@@ -136,7 +144,7 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
 
       - name: Push schema to test DB
-        run: cd packages/database && npx prisma db push --skip-generate
+        run: cd packages/database && pnpm exec prisma db push --skip-generate
 
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
@@ -173,6 +181,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Secrets required (set in GitHub repo → Settings → Secrets):
+      #   STAGING_DATABASE_URL  – pooled Supabase connection string
+      #     e.g. postgresql://postgres.XXXX:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+      #   STAGING_DIRECT_URL    – direct (non-pooled) Supabase connection string
+      #     e.g. postgresql://postgres:PASSWORD@db.XXXX.supabase.co:5432/postgres
+      - name: Validate database secrets
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::STAGING_DATABASE_URL secret is not set. Configure it in GitHub repo settings."
+            exit 1
+          fi
+          if [ -z "$DIRECT_URL" ]; then
+            echo "::error::STAGING_DIRECT_URL secret is not set. Configure it in GitHub repo settings."
+            exit 1
+          fi
+          echo "✅ Database secrets are configured"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
       - name: Generate Prisma client
         run: pnpm --filter @curex24/database db:generate
         env:
@@ -180,10 +208,22 @@ jobs:
           DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
       - name: Apply database migrations
-        run: cd packages/database && npx prisma migrate deploy
+        id: migrate
+        continue-on-error: true
+        run: cd packages/database && pnpm exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
           DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Report migration result
+        if: steps.migrate.outcome == 'failure'
+        run: |
+          echo "::warning::Database migration failed. The API will still deploy — migrations will be retried automatically when the Railway container starts (see apps/api/docker-entrypoint.sh)."
+          echo "Common causes: invalid DATABASE_URL / DIRECT_URL (check port number, special characters), or DB not reachable from GitHub Actions runner."
+          echo "## ⚠️ Migration Warning" >> $GITHUB_STEP_SUMMARY
+          echo "Database migration failed during CI. The API container will retry migrations on startup via \`apps/api/docker-entrypoint.sh\`." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action required:** Verify \`STAGING_DIRECT_URL\` secret is a valid PostgreSQL connection string (e.g. \`postgresql://postgres:PASSWORD@db.XXX.supabase.co:5432/postgres\`)." >> $GITHUB_STEP_SUMMARY
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
@@ -504,3 +544,77 @@ jobs:
           echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Marketing Agent | https://growth.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────
+  # Deploy Doctor Portal to Vercel (staging environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-doctor-portal:
+    name: Deploy Doctor Portal → Vercel (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test]
+    permissions:
+      contents: read
+    environment:
+      name: staging
+      url: https://doctor.staging.curex24.com
+    steps:
+      - name: Check if Vercel secrets are configured
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ VERCEL_TOKEN or VERCEL_DOCTOR_PORTAL_PROJECT_ID not configured — skipping doctor-portal deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: npm install -g vercel
+
+      - name: Pull Vercel environment
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
+
+      - name: Build with Vercel
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+
+      - name: Deploy to Vercel (staging)
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
+
+      - name: Doctor portal staging deploy summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## ✅ Doctor Portal Deployed (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Doctor Portal | https://doctor.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
