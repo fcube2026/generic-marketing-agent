@@ -1,9 +1,3 @@
--- Extend PharmacyOrderStatus without removing the existing PLACED value.
-ALTER TYPE "PharmacyOrderStatus" ADD VALUE IF NOT EXISTS 'PENDING';
-ALTER TYPE "PharmacyOrderStatus" ADD VALUE IF NOT EXISTS 'PRESCRIPTION_REVIEW';
-ALTER TYPE "PharmacyOrderStatus" ADD VALUE IF NOT EXISTS 'OUT_FOR_DELIVERY';
-ALTER TYPE "PharmacyOrderStatus" ADD VALUE IF NOT EXISTS 'REFUNDED';
-
 -- Bring pharmacy_partners in line with the richer partner contract.
 ALTER TABLE "pharmacy_partners"
 ADD COLUMN IF NOT EXISTS "code" TEXT,
