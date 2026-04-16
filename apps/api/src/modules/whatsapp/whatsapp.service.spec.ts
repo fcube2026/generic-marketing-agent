@@ -7,7 +7,7 @@ describe('WhatsAppService', () => {
 
   beforeEach(async () => {
     const mockConfigService = {
-      get: jest.fn().mockImplementation((key: string) => {
+      get: jest.fn().mockImplementation((_key: string) => {
         // Return empty values to simulate disabled WhatsApp
         return undefined;
       }),

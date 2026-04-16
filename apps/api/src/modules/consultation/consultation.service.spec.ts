@@ -11,7 +11,7 @@ import {
 describe('ConsultationService', () => {
   let service: ConsultationService;
   let prisma: PrismaService;
-  let notificationsService: NotificationsService;
+  let _notificationsService: NotificationsService;
 
   const mockBooking = {
     id: 'booking-1',
@@ -74,7 +74,7 @@ describe('ConsultationService', () => {
 
     service = module.get<ConsultationService>(ConsultationService);
     prisma = module.get<PrismaService>(PrismaService);
-    notificationsService =
+    _notificationsService =
       module.get<NotificationsService>(NotificationsService);
     jest.clearAllMocks();
   });

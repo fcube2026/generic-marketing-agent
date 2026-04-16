@@ -34,17 +34,17 @@ model User {
 }
 
 model PatientProfile {
-  id               String           @id @default(cuid())
-  userId           String           @unique
+  id               String          @id @default(cuid())
+  userId           String          @unique
   name             String
   dateOfBirth      DateTime?
   gender           String?
   emergencyContact String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   bookings         Booking[]
   pharmacyOrders   PharmacyOrder[]
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("patient_profiles")
 }
@@ -488,7 +488,7 @@ model NotificationPreference {
 }
 
 model NotificationLog {
-  id                String                    @id @default(cuid())
+  id                String                     @id @default(cuid())
   userId            String
   eventType         String
   channel           NotificationChannel
@@ -497,13 +497,13 @@ model NotificationLog {
   idempotencyKey    String?
   metadata          Json?
   errorMessage      String?
-  retryCount        Int                       @default(0)
+  retryCount        Int                        @default(0)
   sentAt            DateTime?
   deliveredAt       DateTime?
   failedAt          DateTime?
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([idempotencyKey])
@@ -597,23 +597,23 @@ model PharmacyPartner {
 }
 
 model PharmacyOrder {
-  id              String               @id @default(cuid())
+  id              String              @id @default(cuid())
   patientId       String
   bookingId       String?
   prescriptionId  String?
   partnerId       String
   partnerOrderId  String?
-  status          PharmacyOrderStatus  @default(PLACED)
+  status          PharmacyOrderStatus @default(PLACED)
   deliveryAddress String
   totalAmount     Float
   notes           String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
   items           PharmacyOrderItem[]
-  patient         PatientProfile       @relation(fields: [patientId], references: [id])
-  booking         Booking?             @relation(fields: [bookingId], references: [id])
-  prescription    Prescription?        @relation(fields: [prescriptionId], references: [id])
-  partner         PharmacyPartner      @relation(fields: [partnerId], references: [id])
+  patient         PatientProfile      @relation(fields: [patientId], references: [id])
+  booking         Booking?            @relation(fields: [bookingId], references: [id])
+  prescription    Prescription?       @relation(fields: [prescriptionId], references: [id])
+  partner         PharmacyPartner     @relation(fields: [partnerId], references: [id])
 
   @@index([patientId])
   @@index([status])
