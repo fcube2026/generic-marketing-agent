@@ -224,7 +224,7 @@ jobs:
           done
 
       - name: Run smoke tests
-        run: pnpm --filter @curex24/admin test:e2e:smoke -- --project=chromium
+        run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @smoke --project=chromium
         env:
           ADMIN_BASE_URL: http://localhost:3001
           ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}

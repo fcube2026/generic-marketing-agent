@@ -332,7 +332,7 @@ jobs:
       - name: Run smoke tests (staging)
         id: smoke
         continue-on-error: true
-        run: pnpm --filter @curex24/admin test:e2e:smoke -- --project=chromium
+        run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @smoke --project=chromium
         env:
           ADMIN_BASE_URL: https://admin.staging.curex24.com
           ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
@@ -341,7 +341,7 @@ jobs:
       - name: Run regression tests (staging)
         id: regression
         continue-on-error: true
-        run: pnpm --filter @curex24/admin test:e2e:regression -- --project=chromium
+        run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @regression --project=chromium
         env:
           ADMIN_BASE_URL: https://admin.staging.curex24.com
           ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
@@ -384,7 +384,7 @@ jobs:
           echo "Report artifact: playwright-report-staging-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify Slack on failure
-        if: steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure'
+        if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -486,6 +486,7 @@ jobs:
 
       - name: Alias to staging domain
         if: steps.check-secrets.outputs.skip != 'true'
+        continue-on-error: true
         run: vercel alias set ${{ steps.deploy-marketing-agent.outputs.deploy_url }} growth.staging.curex24.com --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

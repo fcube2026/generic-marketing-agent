@@ -107,7 +107,7 @@ jobs:
           if [ "$BROWSER" != "all" ]; then
             ARGS="--project=$BROWSER"
           fi
-          pnpm --filter @curex24/admin test:e2e:smoke -- $ARGS
+          pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @smoke $ARGS
         env:
           ADMIN_BASE_URL: ${{ steps.resolve-url.outputs.url }}
           ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
@@ -123,7 +123,7 @@ jobs:
           if [ "$BROWSER" != "all" ]; then
             ARGS="--project=$BROWSER"
           fi
-          pnpm --filter @curex24/admin test:e2e:regression -- $ARGS
+          pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @regression $ARGS
         env:
           ADMIN_BASE_URL: ${{ steps.resolve-url.outputs.url }}
           ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
@@ -162,7 +162,7 @@ jobs:
           echo "Report artifact: playwright-report-${{ github.event.inputs.environment || 'staging' }}-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify Slack on failure
-        if: steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure'
+        if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
