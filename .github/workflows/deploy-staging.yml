@@ -218,10 +218,12 @@ jobs:
       - name: Report migration result
         if: steps.migrate.outcome == 'failure'
         run: |
-          echo "::warning::Database migration failed. The API will still deploy — migrations will be retried by docker-entrypoint.sh at container startup."
+          echo "::warning::Database migration failed. The API will still deploy — migrations will be retried automatically when the Railway container starts (see apps/api/docker-entrypoint.sh)."
           echo "Common causes: invalid DATABASE_URL / DIRECT_URL (check port number, special characters), or DB not reachable from GitHub Actions runner."
           echo "## ⚠️ Migration Warning" >> $GITHUB_STEP_SUMMARY
-          echo "Database migration failed during CI. The API container will retry migrations on startup." >> $GITHUB_STEP_SUMMARY
+          echo "Database migration failed during CI. The API container will retry migrations on startup via \`apps/api/docker-entrypoint.sh\`." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action required:** Verify \`STAGING_DIRECT_URL\` secret is a valid PostgreSQL connection string (e.g. \`postgresql://postgres:PASSWORD@db.XXX.supabase.co:5432/postgres\`)." >> $GITHUB_STEP_SUMMARY
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
