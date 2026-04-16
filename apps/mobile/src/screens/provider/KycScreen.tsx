@@ -292,7 +292,7 @@ export const KycScreen: React.FC = () => {
                 )}
                 {score != null && (
                   <View style={styles.scoreBar}>
-                    <View style={[styles.scoreBarFill, { width: `${score}%` as any, backgroundColor: score >= 90 ? Colors.success : score >= 50 ? Colors.warning : Colors.error }]} />
+                    <View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: score >= 90 ? Colors.success : score >= 50 ? Colors.warning : Colors.error }]} />
                     <Text style={styles.scoreBarText}>{score}% confidence</Text>
                   </View>
                 )}

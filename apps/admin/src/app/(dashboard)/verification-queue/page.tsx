@@ -79,6 +79,17 @@ const ISSUE_CODE_COLORS: Record<number, string> = {
   700: 'bg-gray-100 text-gray-600',
 };
 
+const LOG_STATUS_CLASSES: Record<string, string> = {
+  SUCCESS: 'bg-green-100 text-green-700',
+  MANUAL_REVIEW: 'bg-indigo-100 text-indigo-700',
+  NOT_FOUND: 'bg-red-100 text-red-700',
+  ERROR: 'bg-red-100 text-red-700',
+};
+
+function logStatusClass(status: string): string {
+  return LOG_STATUS_CLASSES[status] ?? 'bg-gray-100 text-gray-700';
+}
+
 export default function VerificationQueuePage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -539,7 +550,7 @@ export default function VerificationQueuePage() {
                               {verificationDetails[provider.id].map((log) => (
                                 <div key={log.id} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">
                                   <span className="font-medium">{log.verificationSource}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-xs ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-700' : log.status === 'MANUAL_REVIEW' ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-700'}`}>
+                                  <span className={`px-1.5 py-0.5 rounded text-xs ${logStatusClass(log.status)}`}>
                                     {log.status}
                                   </span>
                                   <span className="text-gray-400">

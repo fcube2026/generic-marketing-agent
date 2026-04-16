@@ -635,7 +635,10 @@ export class DoctorVerificationService {
     const normalise = (s: string) =>
       s
         .toLowerCase()
-        .replace(/\b(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?)\b/g, '')
+        .replace(
+          /\b(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?|shri\.?|smt\.?|kumari\.?|km\.?)\b/g,
+          '',
+        )
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -644,9 +647,19 @@ export class DoctorVerificationService {
 
     if (a === b) return true;
 
-    // Check if at least 2 tokens overlap (handles middle-name variations)
     const tokensA = new Set(a.split(' ').filter(Boolean));
     const tokensB = b.split(' ').filter(Boolean);
+
+    // Single-word names: match if the one token is present in both
+    if (tokensA.size === 1 || tokensB.length === 1) {
+      const singleA = [...tokensA][0];
+      const singleB = tokensB[0];
+      return (
+        singleA === singleB || tokensB.includes(singleA) || tokensA.has(singleB)
+      );
+    }
+
+    // Multi-word names: require at least 2 tokens to overlap (handles middle-name variations)
     const overlap = tokensB.filter((t) => tokensA.has(t)).length;
     return overlap >= 2;
   }
