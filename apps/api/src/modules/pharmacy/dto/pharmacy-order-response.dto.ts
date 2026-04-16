@@ -1,7 +1,7 @@
 export class PharmacyOrderItemResponseDto {
   id: string;
-  medicineId: string;
   medicineName: string;
+  medicineCode?: string | null;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -9,13 +9,14 @@ export class PharmacyOrderItemResponseDto {
 
 export class PharmacyOrderResponseDto {
   id: string;
-  patientId: string;
+  orderNumber: string;
+  patientProfileId: string;
   bookingId?: string | null;
   prescriptionId?: string | null;
-  partnerId: string;
+  pharmacyPartnerId: string;
   partnerOrderId?: string | null;
   status: string;
-  deliveryAddress: string;
+  deliveryAddressId: string;
   totalAmount: number;
   notes?: string | null;
   createdAt: Date;

@@ -39,7 +39,7 @@ export class CreatePharmacyOrderDto {
   partnerId: string;
 
   @IsString()
-  deliveryAddress: string;
+  deliveryAddressId: string;
 
   @IsOptional()
   @IsString()

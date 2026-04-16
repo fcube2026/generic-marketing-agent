@@ -45,23 +45,29 @@ export class PharmacyOrderService {
         quantity: i.quantity,
         unitPrice: i.unitPrice,
       })),
-      dto.deliveryAddress,
+      dto.deliveryAddressId,
+    );
+
+    const subtotal = dto.items.reduce(
+      (sum, i) => sum + i.unitPrice * i.quantity,
+      0,
     );
 
     const order = await this.prisma.pharmacyOrder.create({
       data: {
-        patientId: patient.id,
-        bookingId: dto.bookingId ?? null,
-        prescriptionId: dto.prescriptionId ?? null,
-        partnerId: partner.id,
+        orderNumber: `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        patientProfileId: patient.id,
+        bookingId: dto.bookingId ?? undefined,
+        prescriptionId: dto.prescriptionId ?? undefined,
+        pharmacyPartnerId: partner.id,
         partnerOrderId: partnerResult.partnerOrderId,
         status: 'PLACED',
-        deliveryAddress: dto.deliveryAddress,
+        deliveryAddressId: dto.deliveryAddressId,
+        subtotal,
         totalAmount: partnerResult.totalAmount,
-        notes: dto.notes ?? null,
+        notes: dto.notes ?? undefined,
         items: {
           create: dto.items.map((i) => ({
-            medicineId: i.medicineId,
             medicineName: i.medicineName,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
@@ -72,7 +78,7 @@ export class PharmacyOrderService {
       include: { items: true },
     });
 
-    return order as PharmacyOrderResponseDto;
+    return order as unknown as PharmacyOrderResponseDto;
   }
 
   async getOrder(
@@ -85,12 +91,12 @@ export class PharmacyOrderService {
     if (!patient) throw new NotFoundException('Patient profile not found');
 
     const order = await this.prisma.pharmacyOrder.findFirst({
-      where: { id: orderId, patientId: patient.id },
+      where: { id: orderId, patientProfileId: patient.id },
       include: { items: true },
     });
     if (!order) throw new NotFoundException('Pharmacy order not found');
 
-    return order as PharmacyOrderResponseDto;
+    return order as unknown as PharmacyOrderResponseDto;
   }
 
   async refreshOrderStatus(
@@ -103,15 +109,15 @@ export class PharmacyOrderService {
     if (!patient) throw new NotFoundException('Patient profile not found');
 
     const order = await this.prisma.pharmacyOrder.findFirst({
-      where: { id: orderId, patientId: patient.id },
-      include: { items: true, partner: true },
+      where: { id: orderId, patientProfileId: patient.id },
+      include: { items: true, pharmacyPartner: true },
     });
     if (!order) throw new NotFoundException('Pharmacy order not found');
     if (!order.partnerOrderId) {
-      return order as PharmacyOrderResponseDto;
+      return order as unknown as PharmacyOrderResponseDto;
     }
 
-    const provider = this.resolveProvider(order.partner.name);
+    const provider = this.resolveProvider(order.pharmacyPartner.name);
 
     let partnerStatus: string = order.status;
     try {
@@ -129,10 +135,10 @@ export class PharmacyOrderService {
         data: { status: partnerStatus as PharmacyOrderStatus },
         include: { items: true },
       });
-      return updated as PharmacyOrderResponseDto;
+      return updated as unknown as PharmacyOrderResponseDto;
     }
 
-    return order as PharmacyOrderResponseDto;
+    return order as unknown as PharmacyOrderResponseDto;
   }
 
   async listPatientOrders(
@@ -150,7 +156,7 @@ export class PharmacyOrderService {
     });
     if (!patient) return { data: [], total: 0, page, limit };
 
-    const where = { patientId: patient.id };
+    const where = { patientProfileId: patient.id };
     const [orders, total] = await Promise.all([
       this.prisma.pharmacyOrder.findMany({
         where,
@@ -162,7 +168,12 @@ export class PharmacyOrderService {
       this.prisma.pharmacyOrder.count({ where }),
     ]);
 
-    return { data: orders as PharmacyOrderResponseDto[], total, page, limit };
+    return {
+      data: orders as unknown as PharmacyOrderResponseDto[],
+      total,
+      page,
+      limit,
+    };
   }
 
   private resolveProvider(partnerName: string): PharmacyPartnerProvider {

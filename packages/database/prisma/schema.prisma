@@ -50,28 +50,28 @@ model PatientProfile {
 }
 
 model ProviderProfile {
-  id                         String   @id @default(cuid())
-  userId                     String   @unique
-  name                       String
-  bio                        String?
-  specialization             String
-  contactInfo                String   @default("")
-  clinicAddress              String   @default("")
-  licenseNumber              String?
-  isVerified                 Boolean  @default(false)
-  isActive                   Boolean  @default(true)
-  homeVisitEnabled           Boolean  @default(false)
-  doctorPlaceVisitEnabled    Boolean  @default(false)
-  serviceRadius              Float    @default(10)
-  consultationFeeHomeVisit   Float    @default(0)
-  consultationFeeDoctorPlace Float    @default(0)
-  currentLat                 Float?
-  currentLng                 Float?
-  isAvailable                Boolean  @default(false)
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
-  videoConsultationEnabled    Boolean  @default(false)   // ✅ restore
-  consultationFeeVideoConsultation Float @default(0) 
+  id                               String   @id @default(cuid())
+  userId                           String   @unique
+  name                             String
+  bio                              String?
+  specialization                   String
+  contactInfo                      String   @default("")
+  clinicAddress                    String   @default("")
+  licenseNumber                    String?
+  isVerified                       Boolean  @default(false)
+  isActive                         Boolean  @default(true)
+  homeVisitEnabled                 Boolean  @default(false)
+  doctorPlaceVisitEnabled          Boolean  @default(false)
+  serviceRadius                    Float    @default(10)
+  consultationFeeHomeVisit         Float    @default(0)
+  consultationFeeDoctorPlace       Float    @default(0)
+  currentLat                       Float?
+  currentLng                       Float?
+  isAvailable                      Boolean  @default(false)
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+  videoConsultationEnabled         Boolean  @default(false) // ✅ restore
+  consultationFeeVideoConsultation Float    @default(0)
 
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenses          ProviderLicense[]
@@ -174,7 +174,7 @@ model AvailabilitySlot {
 }
 
 model Address {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
   label       String
   addressLine String
@@ -183,13 +183,13 @@ model Address {
   pincode     String
   lat         Float?
   lng         Float?
-  isDefault   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings         Booking[]
-  pharmacyOrders   PharmacyOrder[]   // ✅ ADD THIS LINE
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  pharmacyOrders PharmacyOrder[] // ✅ ADD THIS LINE
 
   @@map("addresses")
 }
@@ -542,7 +542,7 @@ enum Role {
 enum BookingMode {
   HOME_VISIT
   DOCTOR_PLACE
-  VIDEO_CONSULTATION   // ✅ restore (prevents deletion)
+  VIDEO_CONSULTATION // ✅ restore (prevents deletion)
 }
 
 enum BookingStatus {
@@ -589,9 +589,6 @@ enum LicenseStatus {
   REJECTED
 }
 
-
-
-
 // =======================
 // PHARMACY MODELS (UPDATED)
 // =======================
@@ -634,29 +631,28 @@ model PharmacyOrder {
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
-  items            PharmacyOrderItem[]
-  booking          Booking?         @relation(fields: [bookingId], references: [id])
-  deliveryAddress  Address          @relation(fields: [deliveryAddressId], references: [id])
-  patientProfile   PatientProfile   @relation(fields: [patientProfileId], references: [id])
-  pharmacyPartner  PharmacyPartner  @relation(fields: [pharmacyPartnerId], references: [id])
-  prescription     Prescription?    @relation(fields: [prescriptionId], references: [id])
+  items           PharmacyOrderItem[]
+  booking         Booking?            @relation(fields: [bookingId], references: [id])
+  deliveryAddress Address             @relation(fields: [deliveryAddressId], references: [id])
+  patientProfile  PatientProfile      @relation(fields: [patientProfileId], references: [id])
+  pharmacyPartner PharmacyPartner     @relation(fields: [pharmacyPartnerId], references: [id])
+  prescription    Prescription?       @relation(fields: [prescriptionId], references: [id])
 
   @@index([patientProfileId])
   @@index([pharmacyPartnerId])
   @@index([status])
   @@index([createdAt])
-
   @@map("pharmacy_orders")
 }
 
 model PharmacyOrderItem {
-  id              String         @id @default(cuid())
+  id              String  @id @default(cuid())
   pharmacyOrderId String
   medicineName    String
   medicineCode    String?
   dosage          String?
   instructions    String?
-  isSubstitute    Boolean        @default(false)
+  isSubstitute    Boolean @default(false)
   quantity        Int
   unitPrice       Float
   totalPrice      Float
@@ -665,6 +661,7 @@ model PharmacyOrderItem {
 
   @@map("pharmacy_order_items")
 }
+
 // =======================
 // UPDATED ENUM
 // =======================
@@ -688,28 +685,28 @@ enum PharmacyOrderStatus {
 // =======================
 
 model doctor_onboarding_questionnaire {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at            DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
 
-  specialization        String?
-  qualification         String?
-  experience            String?
-  hospital              String?
-  bio                   String?
-  home_visits           String?
+  specialization String?
+  qualification  String?
+  experience     String?
+  hospital       String?
+  bio            String?
+  home_visits    String?
 
-  services              String[]
-  patient_groups        String[]
-  medical_equipment     String[]
+  services          String[]
+  patient_groups    String[]
+  medical_equipment String[]
 
-  emergency_cases       String?
-  working_schedule      String?
-  time_slots            String[]
+  emergency_cases  String?
+  working_schedule String?
+  time_slots       String[]
 
-  travel_distance       String?
-  payment_preference    String?
-  app_comfort           String?
-  online_consultations  String?
+  travel_distance      String?
+  payment_preference   String?
+  app_comfort          String?
+  online_consultations String?
 
   platform_expectations String[]
   guidelines_agreement  String?
@@ -743,4 +740,3 @@ model VideoSession {
   @@index([status])
   @@map("video_sessions")
 }
-
