@@ -1,16 +1,47 @@
--- Add VIDEO_CONSULTATION to BookingMode enum
-ALTER TYPE "BookingMode" ADD VALUE 'VIDEO_CONSULTATION';
+-- CreateEnum
+ALTER TYPE "BookingMode" ADD VALUE IF NOT EXISTS 'VIDEO_CONSULTATION';
 
--- Add video consultation fields to provider_profiles
+-- CreateEnum
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'VideoSessionStatus') THEN
+        CREATE TYPE "VideoSessionStatus" AS ENUM ('CREATED', 'WAITING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'EXPIRED');
+    END IF;
+END $$;
+
+-- AlterTable
 ALTER TABLE "provider_profiles"
-  ADD COLUMN "videoConsultationEnabled" BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN "consultationFeeVideoConsultation" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ADD COLUMN IF NOT EXISTS "videoConsultationEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS "consultationFeeVideoConsultation" DOUBLE PRECISION NOT NULL DEFAULT 0;
 
--- Create VideoSessionStatus enum
-CREATE TYPE "VideoSessionStatus" AS ENUM ('CREATED', 'WAITING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'EXPIRED');
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "doctor_onboarding_questionnaire" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT timezone('utc'::text, now()),
+    "specialization" TEXT,
+    "qualification" TEXT,
+    "experience" TEXT,
+    "hospital" TEXT,
+    "bio" TEXT,
+    "home_visits" TEXT,
+    "services" TEXT[] NOT NULL,
+    "patient_groups" TEXT[] NOT NULL,
+    "medical_equipment" TEXT[] NOT NULL,
+    "emergency_cases" TEXT,
+    "working_schedule" TEXT,
+    "time_slots" TEXT[] NOT NULL,
+    "travel_distance" TEXT,
+    "payment_preference" TEXT,
+    "app_comfort" TEXT,
+    "online_consultations" TEXT,
+    "platform_expectations" TEXT[] NOT NULL,
+    "guidelines_agreement" TEXT,
 
--- Create video_sessions table
-CREATE TABLE "video_sessions" (
+    CONSTRAINT "doctor_onboarding_questionnaire_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "video_sessions" (
     "id" TEXT NOT NULL,
     "bookingId" TEXT NOT NULL,
     "roomId" TEXT NOT NULL,
@@ -25,13 +56,28 @@ CREATE TABLE "video_sessions" (
     CONSTRAINT "video_sessions_pkey" PRIMARY KEY ("id")
 );
 
--- Create unique and index constraints on video_sessions
-CREATE UNIQUE INDEX "video_sessions_bookingId_key" ON "video_sessions"("bookingId");
-CREATE UNIQUE INDEX "video_sessions_roomId_key" ON "video_sessions"("roomId");
-CREATE INDEX "video_sessions_bookingId_idx" ON "video_sessions"("bookingId");
-CREATE INDEX "video_sessions_status_idx" ON "video_sessions"("status");
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "video_sessions_bookingId_key" ON "video_sessions"("bookingId");
 
--- Add foreign key for video_sessions → bookings
-ALTER TABLE "video_sessions"
-  ADD CONSTRAINT "video_sessions_bookingId_fkey"
-  FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "video_sessions_roomId_key" ON "video_sessions"("roomId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "video_sessions_bookingId_idx" ON "video_sessions"("bookingId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "video_sessions_status_idx" ON "video_sessions"("status");
+
+-- AddForeignKey
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'video_sessions_bookingId_fkey'
+    ) THEN
+        ALTER TABLE "video_sessions"
+        ADD CONSTRAINT "video_sessions_bookingId_fkey"
+        FOREIGN KEY ("bookingId") REFERENCES "bookings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
