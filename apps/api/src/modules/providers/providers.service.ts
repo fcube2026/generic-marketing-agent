@@ -203,6 +203,104 @@ export class ProvidersService {
     });
   }
 
+  async getDashboard(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [todayConsultations, upcoming, completed, earnings] =
+      await Promise.all([
+        this.prisma.booking.count({
+          where: {
+            providerId: profile.id,
+            scheduledAt: { gte: today, lt: tomorrow },
+          },
+        }),
+        this.prisma.booking.count({
+          where: {
+            providerId: profile.id,
+            status: { in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED'] },
+            scheduledAt: { gte: today },
+          },
+        }),
+        this.prisma.booking.count({
+          where: {
+            providerId: profile.id,
+            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+          },
+        }),
+        this.prisma.booking.aggregate({
+          where: {
+            providerId: profile.id,
+            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+          },
+          _sum: { totalFee: true },
+        }),
+      ]);
+
+    return {
+      todayConsultations,
+      upcoming,
+      completed,
+      totalEarnings: earnings._sum.totalFee || 0,
+    };
+  }
+
+  async getConsultations(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    return this.prisma.booking.findMany({
+      where: { providerId: profile.id },
+      include: {
+        patient: { include: { user: true } },
+        serviceCategory: true,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+  }
+
+  async getEarnings(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const [totalAgg, pendingAgg, lastPayout] = await Promise.all([
+      this.prisma.booking.aggregate({
+        where: {
+          providerId: profile.id,
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+        _sum: { totalFee: true },
+      }),
+      this.prisma.payout.aggregate({
+        where: { providerId: profile.id, status: 'PENDING' },
+        _sum: { amount: true },
+      }),
+      this.prisma.payout.findFirst({
+        where: { providerId: profile.id, status: 'PROCESSED' },
+        orderBy: { processedAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      totalEarnings: totalAgg._sum.totalFee || 0,
+      pendingPayout: pendingAgg._sum.amount || 0,
+      lastPayout: lastPayout
+        ? { amount: lastPayout.amount, date: lastPayout.processedAt }
+        : null,
+    };
+  }
+
   async getIncomingRequests(userId: string) {
     const profile = await this.prisma.providerProfile.findUnique({
       where: { userId },
