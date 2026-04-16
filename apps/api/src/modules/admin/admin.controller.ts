@@ -139,24 +139,6 @@ export class AdminController {
     return this.adminService.retryNmcVerification(licenseId, user.id);
   }
 
-  @Get('video-sessions')
-  getVideoSessions(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.adminService.getVideoSessions(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
-      status,
-    );
-  }
-
-  @Get('video-sessions/:id')
-  getVideoSessionById(@Param('id') sessionId: string) {
-    return this.adminService.getVideoSessionById(sessionId);
-  }
-
   // ─── User Management ────────────────────────────────────────────
 
   @Get('users')
