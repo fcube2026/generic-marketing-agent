@@ -48,6 +48,10 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('SelectService', { category });
   };
 
+  const handlePharmacyPress = () => {
+    navigation.navigate('PharmacyOrders');
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -68,6 +72,15 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.searchBannerSubtitle}>
           Book a doctor, nurse, or therapist at home or clinic
         </Text>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity style={styles.quickAction} onPress={handlePharmacyPress}>
+            <Text style={styles.quickActionIcon}>💊</Text>
+            <Text style={styles.quickActionLabel}>Pharmacy</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -201,4 +214,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quickAction: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 2,
+  },
+  quickActionIcon: { fontSize: 28, marginBottom: 6 },
+  quickActionLabel: { fontSize: 12, fontWeight: '600', color: Colors.text },
 });
