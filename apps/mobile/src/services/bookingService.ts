@@ -75,4 +75,9 @@ export const bookingService = {
     const r = await api.get(`/tracking/${bookingId}/location`);
     return r.data;
   },
+
+  getVideoSession: async (bookingId: string) => {
+    const r = await api.get(`/video-sessions/${bookingId}`);
+    return r.data;
+  },
 };

@@ -92,23 +92,32 @@ export const HomeScreen: React.FC = () => {
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
-          {recentBookings.slice(0, 3).map((booking: any) => (
-            <TouchableOpacity
-              key={booking.id}
-              style={styles.bookingItem}
-              onPress={() => navigation.navigate('Tracking', { bookingId: booking.id })}
-            >
-              <View>
-                <Text style={styles.bookingProvider}>{booking.provider?.name || 'Provider'}</Text>
-                <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
-              </View>
-              <View>
-                <Text style={[styles.bookingStatus, { color: Colors.primary }]}>
-                  {booking.status}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {recentBookings.slice(0, 3).map((booking: any) => {
+            const isVideo = booking.mode === 'VIDEO_CONSULTATION';
+            return (
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.bookingItem}
+                onPress={() =>
+                  isVideo
+                    ? navigation.navigate('VideoConsultation', { bookingId: booking.id })
+                    : navigation.navigate('Tracking', { bookingId: booking.id })
+                }
+              >
+                <View>
+                  <Text style={styles.bookingProvider}>
+                    {isVideo ? '📹 ' : ''}{booking.provider?.name || 'Provider'}
+                  </Text>
+                  <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
+                </View>
+                <View>
+                  <Text style={[styles.bookingStatus, { color: Colors.primary }]}>
+                    {booking.status}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 

@@ -1,5 +1,5 @@
 export type Role = 'PATIENT' | 'PROVIDER' | 'ADMIN';
-export type BookingMode = 'HOME_VISIT' | 'DOCTOR_PLACE';
+export type BookingMode = 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION';
 export type BookingStatus =
   | 'REQUESTED'
   | 'ACCEPTED'
@@ -12,6 +12,7 @@ export type BookingStatus =
   | 'CLOSED'
   | 'CANCELLED';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED';
+export type VideoSessionStatus = 'CREATED' | 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 
 export interface User {
   id: string;
@@ -38,8 +39,10 @@ export interface ProviderProfile {
   isAvailable: boolean;
   homeVisitEnabled: boolean;
   doctorPlaceVisitEnabled: boolean;
+  videoConsultationEnabled: boolean;
   consultationFeeHomeVisit: number;
   consultationFeeDoctorPlace: number;
+  consultationFeeVideoConsultation: number;
   currentLat?: number;
   currentLng?: number;
   serviceRadius: number;
@@ -81,6 +84,20 @@ export interface Booking {
   provider?: ProviderProfile;
   serviceCategory?: ServiceCategory;
   address?: Address;
+  videoSession?: VideoSession;
+}
+
+export interface VideoSession {
+  id: string;
+  bookingId: string;
+  roomId: string;
+  sessionToken?: string;
+  status: VideoSessionStatus;
+  startedAt?: string;
+  endedAt?: string;
+  duration?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProviderWithDistance extends ProviderProfile {
@@ -98,6 +115,7 @@ export interface RecommendationOption {
 export interface RecommendationResponse {
   homeVisit?: RecommendationOption;
   doctorPlace?: RecommendationOption;
+  videoConsultation?: RecommendationOption;
   recommended: BookingMode;
   reason: string;
 }

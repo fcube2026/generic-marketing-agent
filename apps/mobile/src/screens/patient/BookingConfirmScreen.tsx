@@ -104,7 +104,9 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Mode</Text>
-          <Text style={styles.value}>{mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.value}>
+            {mode === 'HOME_VISIT' ? '🏠 Home Visit' : mode === 'VIDEO_CONSULTATION' ? '📹 Video Consultation' : '🏥 Clinic Visit'}
+          </Text>
         </View>
         {mode === 'HOME_VISIT' && selectedAddress && (
           <View style={styles.row}>
