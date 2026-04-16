@@ -139,6 +139,20 @@ export class AdminController {
     return this.adminService.retryNmcVerification(licenseId, user.id);
   }
 
+  @Get('verification/providers/:providerId')
+  getProviderVerificationDetail(@Param('providerId') providerId: string) {
+    return this.adminService.getProviderVerificationDetail(providerId);
+  }
+
+  @Post('verification/providers/:providerId/request-info')
+  requestMoreInfo(
+    @Param('providerId') providerId: string,
+    @CurrentUser() user: any,
+    @Body('message') message?: string,
+  ) {
+    return this.adminService.requestMoreInfo(providerId, user.id, message);
+  }
+
   // ─── User Management ────────────────────────────────────────────
 
   @Get('users')

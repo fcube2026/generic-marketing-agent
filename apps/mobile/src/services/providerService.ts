@@ -2,19 +2,20 @@ import api from './api';
 import { ENDPOINTS } from '../constants/api';
 
 export interface NmcVerificationPayload {
+  fullName: string;
+  fatherName?: string;
   nmcRegistrationNumber: string;
   stateCouncil: string;
   yearOfAdmission: string;
   licenseId?: string;
 }
 
-// Provider management service (used by provider screens)
-
-export interface NmcVerificationPayload {
-  nmcRegistrationNumber: string;
-  stateCouncil: string;
-  yearOfAdmission: string;
+export interface FaceVerificationPayload {
+  liveFaceData: string;
+  referenceImageData?: string;
 }
+
+// Provider management service (used by provider screens)
 
 export const providerService = {
   getProfile: async () => {
@@ -45,9 +46,15 @@ export const providerService = {
     return r.data;
   },
 
-  /** Submit NMC registration for automated verification. */
+  /** Submit NMC registration for automated multi-step verification. */
   submitNmcVerification: async (data: NmcVerificationPayload) => {
     const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
+    return r.data;
+  },
+
+  /** Submit face verification data. */
+  submitFaceVerification: async (data: FaceVerificationPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_FACE, data);
     return r.data;
   },
 
@@ -76,17 +83,6 @@ export const providerService = {
     urgency: 'LOW' | 'MEDIUM' | 'HIGH';
   }) => {
     const response = await api.post(ENDPOINTS.RECOMMENDATION, data);
-    return response.data;
-  },
-
-  // Doctor NMC verification
-  submitNmcVerification: async (payload: NmcVerificationPayload) => {
-    const response = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, payload);
-    return response.data;
-  },
-
-  getVerificationLogs: async () => {
-    const response = await api.get(ENDPOINTS.VERIFICATION.LOGS);
     return response.data;
   },
 };

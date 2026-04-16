@@ -519,6 +519,46 @@ export class AdminService {
     return this.verificationService.retryVerification(licenseId, adminId);
   }
 
+  async getProviderVerificationDetail(providerId: string) {
+    return this.verificationService.getProviderVerificationDetail(providerId);
+  }
+
+  async requestMoreInfo(providerId: string, adminId: string, message?: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    await this.prisma.adminAction.create({
+      data: {
+        adminId,
+        action: 'REQUEST_MORE_INFO',
+        targetId: providerId,
+        targetType: 'ProviderProfile',
+        notes: message,
+      },
+    });
+
+    await this.notificationsService.sendNotification(
+      {
+        userId: provider.userId,
+        title: 'Additional Information Required',
+        message: message
+          ? `Our team needs more information to complete your verification: ${message}`
+          : 'Our team needs additional information to complete your verification. Please check the app for details.',
+        type: 'VERIFICATION_MORE_INFO',
+        metadata: { providerId },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: false,
+      },
+    );
+
+    return { success: true, message: 'Request sent to provider successfully.' };
+  }
+
   // ─── User Management ────────────────────────────────────────────
 
   async getAdminUsers(page = 1, limit = 20, search?: string) {
