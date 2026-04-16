@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   },
   VERIFICATION: {
     SUBMIT_NMC: '/providers/me/verification/nmc',
+    SUBMIT_FACE: '/providers/me/verification/face',
     LOGS: '/providers/me/verification/logs',
   },
   SERVICES: '/services',
@@ -30,8 +31,4 @@ export const ENDPOINTS = {
   RECOMMENDATION: '/recommendation',
   CONSULTATION: '/consultation',
   PAYMENTS: '/payments',
-  VERIFICATION: {
-    SUBMIT_NMC: '/providers/me/verification/nmc',
-    LOGS: '/providers/me/verification/logs',
-  },
 };

@@ -20,6 +20,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { DoctorVerificationModule } from './modules/doctor-verification/doctor-verification.module';
+import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
 import { SmsModule } from './modules/sms/sms.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
@@ -55,6 +56,7 @@ import { HealthModule } from './common/health/health.module';
     ReferralsModule,
     TrackingModule,
     DoctorVerificationModule,
+    PharmacyModule,
   ],
   providers: [BootstrapService],
 })
