@@ -143,7 +143,7 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
 
       - name: Push schema to test DB
-        run: cd packages/database && npx prisma db push --skip-generate
+        run: cd packages/database && pnpm exec prisma db push --skip-generate
 
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
@@ -203,7 +203,7 @@ jobs:
 
       - name: Apply database migrations
         if: steps.check-secrets.outputs.skip != 'true'
-        run: cd packages/database && npx prisma migrate deploy
+        run: cd packages/database && pnpm exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
           DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
