@@ -631,6 +631,47 @@ export class AdminService {
     return { success: true, message: 'Password reset successfully' };
   }
 
+  async getVideoSessions(page = 1, limit = 20, status?: string) {
+    const skip = (page - 1) * limit;
+    const where = status ? { status: status as any } : {};
+
+    const [data, total] = await Promise.all([
+      this.prisma.videoSession.findMany({
+        where,
+        include: {
+          booking: {
+            include: { patient: true, provider: true },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.videoSession.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getVideoSessionById(sessionId: string) {
+    const session = await this.prisma.videoSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        booking: {
+          include: { patient: true, provider: true, serviceCategory: true },
+        },
+      },
+    });
+    if (!session) throw new NotFoundException('Video session not found');
+    return session;
+  }
+
   async getAllUsers(page = 1, limit = 20, role?: string, search?: string) {
     const skip = (page - 1) * limit;
     const where: any = {};
