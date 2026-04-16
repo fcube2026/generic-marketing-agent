@@ -16,6 +16,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
+import { Booking } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -39,7 +40,7 @@ export const HomeScreen: React.FC = () => {
     },
   });
 
-  const { data: recentBookings } = useQuery({
+  const { data: recentBookings } = useQuery<Booking[]>({
     queryKey: ['patient-bookings'],
     queryFn: async () => {
       const res = await api.get('/patients/me/bookings');
@@ -52,7 +53,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const activeVideoBookings = (recentBookings || []).filter(
-    (b: any) =>
+    (b: Booking) =>
       b.mode === 'VIDEO_CONSULTATION' &&
       ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
   );
