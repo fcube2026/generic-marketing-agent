@@ -170,7 +170,10 @@ export class AuthService {
         user: { id: user.id, email: ADMIN_EMAIL, role: user.role },
       };
     } catch (err) {
-      this.logger.error('Admin login DB upsert failed', err);
+      this.logger.error(
+        `Admin login failed: DB upsert for phone=${ADMIN_PHONE}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Login service temporarily unavailable. Please try again shortly.',
       );
@@ -228,7 +231,10 @@ export class AuthService {
         },
       };
     } catch (err) {
-      this.logger.error('Marketing login DB upsert failed', err);
+      this.logger.error(
+        `Marketing login failed: DB upsert for ${isAdminCredentials ? 'admin' : 'marketing'} user`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Login service temporarily unavailable. Please try again shortly.',
       );
