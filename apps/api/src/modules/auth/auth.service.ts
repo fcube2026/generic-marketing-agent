@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -17,6 +22,8 @@ const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent 
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -138,9 +145,8 @@ export class AuthService {
     } catch (err) {
       // If the email column doesn't exist yet (migration pending), fall through
       if (err instanceof UnauthorizedException) throw err;
-      console.warn(
-        'DB user lookup failed (migration may be pending):',
-        err.message,
+      this.logger.warn(
+        `DB user lookup failed (migration may be pending): ${err.message}`,
       );
     }
 
@@ -149,19 +155,29 @@ export class AuthService {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
-    const user = await this.prisma.user.upsert({
-      where: { phone: ADMIN_PHONE },
-      create: { phone: ADMIN_PHONE, role: Role.ADMIN },
-      update: { role: Role.ADMIN },
-    });
+    try {
+      const user = await this.prisma.user.upsert({
+        where: { phone: ADMIN_PHONE },
+        create: { phone: ADMIN_PHONE, role: Role.ADMIN },
+        update: { role: Role.ADMIN },
+      });
 
-    const payload = { sub: user.id, phone: user.phone, role: user.role };
-    const token = this.jwtService.sign(payload);
+      const payload = { sub: user.id, phone: user.phone, role: user.role };
+      const token = this.jwtService.sign(payload);
 
-    return {
-      token,
-      user: { id: user.id, email: ADMIN_EMAIL, role: user.role },
-    };
+      return {
+        token,
+        user: { id: user.id, email: ADMIN_EMAIL, role: user.role },
+      };
+    } catch (err) {
+      this.logger.error(
+        `Admin login failed: DB upsert for phone=${ADMIN_PHONE}`,
+        err,
+      );
+      throw new ServiceUnavailableException(
+        'Login service temporarily unavailable. Please try again shortly.',
+      );
+    }
   }
 
   async marketingLogin(dto: AdminLoginDto) {
@@ -174,13 +190,33 @@ export class AuthService {
       throw new UnauthorizedException('Invalid marketing agent credentials');
     }
 
-    // Admin credentials grant access with the ADMIN role; marketing credentials
-    // grant access with the MARKETING_AGENT role.
-    if (isAdminCredentials) {
+    try {
+      // Admin credentials grant access with the ADMIN role; marketing credentials
+      // grant access with the MARKETING_AGENT role.
+      if (isAdminCredentials) {
+        const user = await this.prisma.user.upsert({
+          where: { phone: ADMIN_PHONE },
+          create: { phone: ADMIN_PHONE, role: Role.ADMIN },
+          update: { role: Role.ADMIN },
+        });
+
+        const payload = { sub: user.id, phone: user.phone, role: user.role };
+        const token = this.jwtService.sign(payload);
+
+        return {
+          token,
+          user: {
+            id: user.id,
+            email: ADMIN_EMAIL,
+            role: user.role,
+          },
+        };
+      }
+
       const user = await this.prisma.user.upsert({
-        where: { phone: ADMIN_PHONE },
-        create: { phone: ADMIN_PHONE, role: Role.ADMIN },
-        update: { role: Role.ADMIN },
+        where: { phone: MARKETING_PHONE },
+        create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },
+        update: { role: Role.MARKETING_AGENT },
       });
 
       const payload = { sub: user.id, phone: user.phone, role: user.role };
@@ -190,29 +226,19 @@ export class AuthService {
         token,
         user: {
           id: user.id,
-          email: ADMIN_EMAIL,
+          email: MARKETING_EMAIL,
           role: user.role,
         },
       };
+    } catch (err) {
+      this.logger.error(
+        `Marketing login failed: DB upsert for ${isAdminCredentials ? 'admin' : 'marketing'} user`,
+        err,
+      );
+      throw new ServiceUnavailableException(
+        'Login service temporarily unavailable. Please try again shortly.',
+      );
     }
-
-    const user = await this.prisma.user.upsert({
-      where: { phone: MARKETING_PHONE },
-      create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },
-      update: { role: Role.MARKETING_AGENT },
-    });
-
-    const payload = { sub: user.id, phone: user.phone, role: user.role };
-    const token = this.jwtService.sign(payload);
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        email: MARKETING_EMAIL,
-        role: user.role,
-      },
-    };
   }
 
   private generateOtp(): string {

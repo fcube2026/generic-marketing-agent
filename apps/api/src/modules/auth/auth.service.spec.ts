@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -102,6 +105,26 @@ describe('AuthService', () => {
         service.adminLogin({ email: 'wrong@email.com', password: 'wrong' }),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('should throw ServiceUnavailableException when DB upsert fails', async () => {
+      mockPrisma.user.upsert.mockRejectedValue(new Error('DB connection lost'));
+
+      await expect(service.adminLogin(validDto)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('should still fall back to hardcoded creds when DB lookup fails', async () => {
+      mockPrisma.user.findFirst.mockRejectedValue(
+        new Error('column "email" does not exist'),
+      );
+      mockPrisma.user.upsert.mockResolvedValue(mockAdminUser);
+
+      const result = await service.adminLogin(validDto);
+
+      expect(result.token).toBe('mock-jwt-token');
+      expect(result.user.role).toBe('ADMIN');
+    });
   });
 
   describe('marketingLogin', () => {
@@ -196,6 +219,14 @@ describe('AuthService', () => {
         create: { phone: '+0000000000', role: 'ADMIN' },
         update: { role: 'ADMIN' },
       });
+    });
+
+    it('should throw ServiceUnavailableException when DB upsert fails', async () => {
+      mockPrisma.user.upsert.mockRejectedValue(new Error('DB connection lost'));
+
+      await expect(service.marketingLogin(validDto)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
     });
   });
 });
