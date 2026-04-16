@@ -7,8 +7,17 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
+import { SmcScraperProvider } from './providers/smc-scraper.provider';
+import { FaceVerificationProvider } from './providers/face-verification.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
+import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ISSUE_CODES,
+  IssueCode,
+  ISSUE_CODE_LABELS,
+  CONFIDENCE_WEIGHTS,
+} from './constants/issue-codes';
 
 /** Verification re-check interval in days. */
 const REVERIFICATION_DAYS = 90;
@@ -16,15 +25,35 @@ const REVERIFICATION_DAYS = 90;
 /** Maximum automatic retry attempts before routing to manual review. */
 const MAX_AUTO_ATTEMPTS = 3;
 
-/** Source tag stored in ProviderLicense.verificationSource. */
+/** Source tags stored in ProviderLicense.verificationSource. */
 const SOURCE_NMC_API = 'NMC_API';
+const SOURCE_SMC_PORTAL = 'SMC_PORTAL';
 const SOURCE_MANUAL = 'MANUAL';
+const SOURCE_FACE = 'FACE';
 
 export type VerificationLogStatus =
   | 'SUCCESS'
   | 'NOT_FOUND'
   | 'ERROR'
   | 'MANUAL_REVIEW';
+
+export interface PipelineStepResult {
+  source: string;
+  found: boolean;
+  score: number;
+  details: Record<string, unknown>;
+  error?: string;
+}
+
+export interface VerificationPipelineResult {
+  issueCode: IssueCode;
+  issueLabel: string;
+  confidenceScore: number;
+  overallStatus: VerificationLogStatus;
+  steps: PipelineStepResult[];
+  faceMatch?: boolean;
+  faceSimilarity?: number;
+}
 
 @Injectable()
 export class DoctorVerificationService {
@@ -33,19 +62,37 @@ export class DoctorVerificationService {
   constructor(
     private prisma: PrismaService,
     private nmcProvider: NmcApiProvider,
+    private smcProvider: SmcScraperProvider,
+    private faceProvider: FaceVerificationProvider,
     private notificationsService: NotificationsService,
   ) {}
 
   /**
    * Doctor submits their NMC registration details for automated verification.
-   * Idempotent: if the same registration number is already approved and within
-   * the re-verification window, returns the cached result immediately.
+   * Runs a multi-step pipeline: NMC API -> SMC portal -> confidence scoring.
+   * Idempotent: if already approved and within re-verification window, returns cached result.
    */
   async submitForVerification(userId: string, dto: SubmitNmcVerificationDto) {
     const profile = await this.prisma.providerProfile.findUnique({
       where: { userId },
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
+
+    // Validate completeness
+    if (
+      !dto.nmcRegistrationNumber?.trim() ||
+      !dto.stateCouncil?.trim() ||
+      !dto.yearOfAdmission?.trim() ||
+      !dto.fullName?.trim()
+    ) {
+      return {
+        status: 'INCOMPLETE',
+        cached: false,
+        issueCode: ISSUE_CODES.INCOMPLETE_SUBMISSION,
+        issueLabel: ISSUE_CODE_LABELS[ISSUE_CODES.INCOMPLETE_SUBMISSION],
+        confidenceScore: 0,
+      };
+    }
 
     let license = dto.licenseId
       ? await this.prisma.providerLicense.findFirst({
@@ -82,11 +129,73 @@ export class DoctorVerificationService {
       license.nextReverificationDue &&
       license.nextReverificationDue > new Date()
     ) {
-      return { status: 'APPROVED', license, cached: true };
+      return {
+        status: 'APPROVED',
+        license,
+        cached: true,
+        issueCode: ISSUE_CODES.FULLY_VERIFIED,
+        issueLabel: ISSUE_CODE_LABELS[ISSUE_CODES.FULLY_VERIFIED],
+        confidenceScore: 100,
+      };
     }
 
-    const result = await this.attemptNmcVerification(profile.id, license);
+    const result = await this.runVerificationPipeline(profile.id, license, dto);
     return { ...result, cached: false };
+  }
+
+  /**
+   * Submit face verification data for the current provider.
+   */
+  async submitFaceVerification(userId: string, dto: SubmitFaceVerificationDto) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    let faceResult;
+    try {
+      faceResult = await this.faceProvider.verify({
+        liveFaceData: dto.liveFaceData,
+        referenceImageData: dto.referenceImageData,
+        providerId: profile.id,
+      });
+    } catch (err) {
+      this.logger.error(`Face verification error: ${String(err)}`);
+      faceResult = {
+        match: false,
+        similarityScore: 0,
+        confidence: 'LOW' as const,
+        rawResponse: { error: String(err) },
+      };
+    }
+
+    await this.prisma.doctorVerificationLog.create({
+      data: {
+        providerId: profile.id,
+        licenseId: null,
+        registrationNumber: 'FACE_CHECK',
+        stateCouncil: 'N/A',
+        verificationSource: SOURCE_FACE,
+        status: faceResult.match ? 'SUCCESS' : 'NOT_FOUND',
+        rawRequest: {
+          providerId: profile.id,
+        } as unknown as Prisma.InputJsonValue,
+        rawResponse: faceResult.rawResponse as unknown as Prisma.InputJsonValue,
+        errorCode: faceResult.match ? null : 'FACE_MISMATCH',
+      },
+    });
+
+    return {
+      match: faceResult.match,
+      similarityScore: faceResult.similarityScore,
+      confidence: faceResult.confidence,
+      issueCode: faceResult.match
+        ? ISSUE_CODES.PENDING_ADMIN_APPROVAL
+        : ISSUE_CODES.FACE_MISMATCH,
+      issueLabel: faceResult.match
+        ? ISSUE_CODE_LABELS[ISSUE_CODES.PENDING_ADMIN_APPROVAL]
+        : ISSUE_CODE_LABELS[ISSUE_CODES.FACE_MISMATCH],
+    };
   }
 
   /**
@@ -113,12 +222,18 @@ export class DoctorVerificationService {
       },
     });
 
-    return this.attemptNmcVerification(license.providerId, license);
+    const dto: SubmitNmcVerificationDto = {
+      fullName: '',
+      nmcRegistrationNumber: license.nmcRegistrationNumber,
+      stateCouncil: license.stateCouncil,
+      yearOfAdmission: license.yearOfAdmission ?? '',
+    };
+
+    return this.runVerificationPipeline(license.providerId, license, dto);
   }
 
   /**
-   * Returns the paginated list of licenses waiting for manual review
-   * (NOT_FOUND or exceeded auto-retry attempts).
+   * Returns the paginated list of licenses waiting for manual review.
    */
   async getVerificationQueue(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -174,9 +289,42 @@ export class DoctorVerificationService {
     });
   }
 
-  // ─── Internal helpers ──────────────────────────────────────────────────────
+  /**
+   * Returns the full verification detail for a specific provider (for admin view).
+   */
+  async getProviderVerificationDetail(providerId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+      include: {
+        user: true,
+        licenses: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!profile) throw new NotFoundException('Provider not found');
 
-  private async attemptNmcVerification(
+    const logs = await this.prisma.doctorVerificationLog.findMany({
+      where: { providerId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const latestPipelineResult = this.deriveLatestPipelineResult(logs);
+
+    return {
+      provider: profile,
+      logs,
+      ...latestPipelineResult,
+    };
+  }
+
+  // ---- Internal helpers -------------------------------------------------------
+
+  /**
+   * Runs the multi-step verification pipeline:
+   * 1. NMC API (Surepass / Decentro / IDfy)
+   * 2. SMC portal scraper
+   * Then computes confidence score and issue code.
+   */
+  private async runVerificationPipeline(
     providerId: string,
     license: {
       id: string;
@@ -185,7 +333,13 @@ export class DoctorVerificationService {
       yearOfAdmission: string | null;
       verificationAttempts: number;
     },
-  ) {
+    dto: SubmitNmcVerificationDto,
+  ): Promise<
+    VerificationPipelineResult & {
+      status: VerificationLogStatus;
+      license: unknown;
+    }
+  > {
     const {
       id: licenseId,
       nmcRegistrationNumber,
@@ -201,7 +355,6 @@ export class DoctorVerificationService {
     }
 
     const updatedAttempts = verificationAttempts + 1;
-
     await this.prisma.providerLicense.update({
       where: { id: licenseId },
       data: {
@@ -210,117 +363,320 @@ export class DoctorVerificationService {
       },
     });
 
-    const request = {
+    const steps: PipelineStepResult[] = [];
+
+    // Step 1: NMC API
+    let nmcFound = false;
+    let nmcNameMatch = false;
+    const nmcRequest = {
       memberId: nmcRegistrationNumber,
-      stateCouncil: stateCouncil,
+      stateCouncil,
       yearOfAdmission: yearOfAdmission ?? '',
     };
 
-    let logStatus: VerificationLogStatus;
-    let rawResponse: Record<string, unknown> | undefined;
-    let errorCode: string | undefined;
-    let updatedLicense: unknown;
-
     try {
-      const result = await this.nmcProvider.verify(request);
-      rawResponse = result.rawResponse;
+      const nmcResult = await this.nmcProvider.verify(nmcRequest);
+      nmcFound = nmcResult.found;
 
-      if (result.found) {
-        logStatus = 'SUCCESS';
-        const nextReverification = new Date();
-        nextReverification.setDate(
-          nextReverification.getDate() + REVERIFICATION_DAYS,
-        );
-
-        updatedLicense = await this.prisma.providerLicense.update({
-          where: { id: licenseId },
-          data: {
-            status: 'APPROVED',
-            verifiedAt: new Date(),
-            verificationSource: SOURCE_NMC_API,
-            nextReverificationDue: nextReverification,
-          },
-        });
-
-        await this.prisma.providerProfile.update({
-          where: { id: providerId },
-          data: { isVerified: true, isActive: true },
-        });
-
-        const provider = await this.prisma.providerProfile.findUnique({
-          where: { id: providerId },
-          select: { userId: true },
-        });
-        if (provider) {
-          await this.notificationsService.sendNotification(
-            {
-              userId: provider.userId,
-              title: 'Registration Verified',
-              message:
-                'Your NMC medical registration has been verified successfully. You can now start accepting bookings.',
-              type: 'NMC_VERIFICATION_SUCCESS',
-              metadata: { providerId, licenseId, source: SOURCE_NMC_API },
-            },
-            {
-              inApp: true,
-              push: true,
-              sms: true,
-              smsTemplate: 'NMC_VERIFICATION_SUCCESS',
-              smsParams: { registrationNumber: nmcRegistrationNumber },
-            },
-          );
-        }
-
-        this.logger.log(
-          `NMC verification SUCCESS: ${nmcRegistrationNumber} (provider ${providerId})`,
-        );
-      } else {
-        // Not found in NMC records
-        logStatus =
-          updatedAttempts >= MAX_AUTO_ATTEMPTS ? 'MANUAL_REVIEW' : 'NOT_FOUND';
-        errorCode = 'DOCTOR_NOT_FOUND';
-
-        updatedLicense = await this.prisma.providerLicense.update({
-          where: { id: licenseId },
-          data: {
-            status: 'PENDING',
-            verificationSource:
-              logStatus === 'MANUAL_REVIEW' ? SOURCE_MANUAL : null,
-          },
-        });
-
-        this.logger.warn(
-          `NMC verification NOT_FOUND: ${nmcRegistrationNumber} (attempt ${updatedAttempts}/${MAX_AUTO_ATTEMPTS})`,
-        );
+      if (nmcFound && dto.fullName && nmcResult.name) {
+        nmcNameMatch = this.namesMatch(dto.fullName, nmcResult.name);
+      } else if (nmcFound) {
+        nmcNameMatch = true;
       }
-    } catch (err) {
-      logStatus = 'ERROR';
-      errorCode = 'API_ERROR';
-      rawResponse = { error: String(err) };
 
-      updatedLicense = await this.prisma.providerLicense.findUnique({
-        where: { id: licenseId },
+      const nmcScore =
+        nmcFound && nmcNameMatch
+          ? CONFIDENCE_WEIGHTS.NMC_API
+          : nmcFound
+            ? Math.floor(CONFIDENCE_WEIGHTS.NMC_API * 0.7)
+            : 0;
+
+      steps.push({
+        source: SOURCE_NMC_API,
+        found: nmcFound,
+        score: nmcScore,
+        details: {
+          registrationNumber: nmcResult.registrationNumber,
+          name: nmcResult.name,
+          qualifications: nmcResult.qualifications,
+          registrationStatus: nmcResult.registrationStatus,
+          nameMatch: nmcNameMatch,
+        },
       });
 
-      this.logger.error(
-        `NMC verification ERROR: ${nmcRegistrationNumber} — ${String(err)}`,
+      this.logger.log(
+        `NMC check: ${nmcFound ? 'FOUND' : 'NOT_FOUND'} — ${nmcRegistrationNumber}`,
+      );
+    } catch (err) {
+      steps.push({
+        source: SOURCE_NMC_API,
+        found: false,
+        score: 0,
+        details: {},
+        error: String(err),
+      });
+      this.logger.warn(`NMC API error: ${String(err)}`);
+    }
+
+    // Step 2: SMC Portal
+    let smcFound = false;
+    let smcNameMatch = false;
+
+    try {
+      const smcResult = await this.smcProvider.verify({
+        registrationNumber: nmcRegistrationNumber,
+        fullName: dto.fullName ?? '',
+        stateCouncil,
+      });
+      smcFound = smcResult.found;
+
+      if (smcFound && dto.fullName && smcResult.name) {
+        smcNameMatch = this.namesMatch(dto.fullName, smcResult.name);
+      } else if (smcFound) {
+        smcNameMatch = true;
+      }
+
+      const smcScore =
+        smcFound && smcNameMatch
+          ? CONFIDENCE_WEIGHTS.SMC_PORTAL
+          : smcFound
+            ? Math.floor(CONFIDENCE_WEIGHTS.SMC_PORTAL * 0.7)
+            : 0;
+
+      steps.push({
+        source: SOURCE_SMC_PORTAL,
+        found: smcFound,
+        score: smcScore,
+        details: {
+          name: smcResult.name,
+          registrationNumber: smcResult.registrationNumber,
+          status: smcResult.status,
+          councilName: smcResult.councilName,
+          screenshotUrl: smcResult.screenshotUrl,
+          nameMatch: smcNameMatch,
+        },
+      });
+
+      this.logger.log(
+        `SMC check: ${smcFound ? 'FOUND' : 'NOT_FOUND'} — ${nmcRegistrationNumber} / ${stateCouncil}`,
+      );
+    } catch (err) {
+      steps.push({
+        source: SOURCE_SMC_PORTAL,
+        found: false,
+        score: 0,
+        details: {},
+        error: String(err),
+      });
+      this.logger.warn(`SMC portal error: ${String(err)}`);
+    }
+
+    // Confidence Score
+    const confidenceScore = steps.reduce((sum, s) => sum + s.score, 0);
+
+    // Issue Code Determination
+    const dataMismatch =
+      (steps.some((s) => s.source === SOURCE_NMC_API && s.found) &&
+        !nmcNameMatch) ||
+      (steps.some((s) => s.source === SOURCE_SMC_PORTAL && s.found) &&
+        !smcNameMatch);
+
+    const issueCode = this.computeIssueCode({
+      nmcFound,
+      smcFound,
+      confidenceScore,
+      dataMismatch,
+    });
+
+    // Update DB
+    let overallStatus: VerificationLogStatus;
+    let updatedLicense: unknown;
+
+    if (
+      issueCode === ISSUE_CODES.FULLY_VERIFIED ||
+      issueCode === ISSUE_CODES.VERIFIED_VIA_DOCUMENTS
+    ) {
+      overallStatus = 'SUCCESS';
+      const nextReverification = new Date();
+      nextReverification.setDate(
+        nextReverification.getDate() + REVERIFICATION_DAYS,
+      );
+
+      updatedLicense = await this.prisma.providerLicense.update({
+        where: { id: licenseId },
+        data: {
+          status: 'APPROVED',
+          verifiedAt: new Date(),
+          verificationSource: nmcFound ? SOURCE_NMC_API : SOURCE_SMC_PORTAL,
+          nextReverificationDue: nextReverification,
+        },
+      });
+
+      await this.prisma.providerProfile.update({
+        where: { id: providerId },
+        data: { isVerified: true, isActive: true },
+      });
+
+      const provider = await this.prisma.providerProfile.findUnique({
+        where: { id: providerId },
+        select: { userId: true },
+      });
+      if (provider) {
+        await this.notificationsService.sendNotification(
+          {
+            userId: provider.userId,
+            title: 'Registration Verified',
+            message:
+              'Your medical registration has been verified successfully. You can now start accepting bookings.',
+            type: 'NMC_VERIFICATION_SUCCESS',
+            metadata: { providerId, licenseId, issueCode, confidenceScore },
+          },
+          {
+            inApp: true,
+            push: true,
+            sms: true,
+            smsTemplate: 'NMC_VERIFICATION_SUCCESS',
+            smsParams: { registrationNumber: nmcRegistrationNumber },
+          },
+        );
+      }
+
+      this.logger.log(
+        `Verification SUCCESS (code ${issueCode}, score ${confidenceScore}): ${nmcRegistrationNumber}`,
+      );
+    } else {
+      overallStatus =
+        updatedAttempts >= MAX_AUTO_ATTEMPTS ? 'MANUAL_REVIEW' : 'NOT_FOUND';
+
+      if (issueCode === ISSUE_CODES.DATA_MISMATCH) {
+        overallStatus = 'NOT_FOUND';
+      }
+
+      updatedLicense = await this.prisma.providerLicense.update({
+        where: { id: licenseId },
+        data: {
+          status: 'PENDING',
+          verificationSource:
+            overallStatus === 'MANUAL_REVIEW' ? SOURCE_MANUAL : null,
+        },
+      });
+
+      this.logger.warn(
+        `Verification ${overallStatus} (code ${issueCode}, score ${confidenceScore}): ${nmcRegistrationNumber}`,
       );
     }
+
+    // Persist Log
+    const errorCode =
+      issueCode === ISSUE_CODES.DATA_MISMATCH
+        ? 'DATA_MISMATCH'
+        : issueCode === ISSUE_CODES.NOT_FOUND_NEEDS_SMC_EMAIL
+          ? 'DOCTOR_NOT_FOUND'
+          : null;
 
     await this.prisma.doctorVerificationLog.create({
       data: {
         providerId,
         licenseId,
         registrationNumber: nmcRegistrationNumber,
-        stateCouncil: stateCouncil,
-        verificationSource: SOURCE_NMC_API,
-        status: logStatus,
-        rawRequest: request as Prisma.InputJsonValue,
-        rawResponse: (rawResponse ?? null) as Prisma.InputJsonValue | null,
-        errorCode: errorCode ?? null,
+        stateCouncil,
+        verificationSource: 'PIPELINE',
+        status: overallStatus,
+        rawRequest: {
+          ...nmcRequest,
+          fullName: dto.fullName,
+          fatherName: dto.fatherName,
+        } as unknown as Prisma.InputJsonValue,
+        rawResponse: {
+          issueCode,
+          issueLabel: ISSUE_CODE_LABELS[issueCode],
+          confidenceScore,
+          steps,
+        } as unknown as Prisma.InputJsonValue,
+        errorCode,
       },
     });
 
-    return { status: logStatus, license: updatedLicense };
+    return {
+      status: overallStatus,
+      license: updatedLicense,
+      issueCode,
+      issueLabel: ISSUE_CODE_LABELS[issueCode],
+      confidenceScore,
+      overallStatus,
+      steps,
+    };
+  }
+
+  /**
+   * Compute the issue code based on pipeline results.
+   */
+  private computeIssueCode(opts: {
+    nmcFound: boolean;
+    smcFound: boolean;
+    confidenceScore: number;
+    dataMismatch: boolean;
+  }): IssueCode {
+    const { nmcFound, smcFound, confidenceScore, dataMismatch } = opts;
+
+    if (dataMismatch) return ISSUE_CODES.DATA_MISMATCH;
+    if (!nmcFound && !smcFound) return ISSUE_CODES.NOT_FOUND_NEEDS_SMC_EMAIL;
+    // Both sources confirmed → fully verified
+    if (confidenceScore >= 65) return ISSUE_CODES.FULLY_VERIFIED;
+    // At least one authoritative source confirmed → verified via that source
+    if (nmcFound || smcFound) return ISSUE_CODES.VERIFIED_VIA_DOCUMENTS;
+    return ISSUE_CODES.PENDING_ADMIN_APPROVAL;
+  }
+
+  /**
+   * Fuzzy name matching — normalises and checks for partial overlap.
+   */
+  private namesMatch(inputName: string, portalName: string): boolean {
+    const normalise = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/\b(dr\.?|prof\.?|mr\.?|mrs\.?|ms\.?)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const a = normalise(inputName);
+    const b = normalise(portalName);
+
+    if (a === b) return true;
+
+    // Check if at least 2 tokens overlap (handles middle-name variations)
+    const tokensA = new Set(a.split(' ').filter(Boolean));
+    const tokensB = b.split(' ').filter(Boolean);
+    const overlap = tokensB.filter((t) => tokensA.has(t)).length;
+    return overlap >= 2;
+  }
+
+  /**
+   * Derive the latest confidence score and issue code from stored logs.
+   */
+  private deriveLatestPipelineResult(
+    logs: Array<{
+      verificationSource: string;
+      rawResponse: Prisma.JsonValue;
+      status: string;
+    }>,
+  ) {
+    const pipelineLog = logs.find((l) => l.verificationSource === 'PIPELINE');
+    if (!pipelineLog?.rawResponse) {
+      return {
+        confidenceScore: 0,
+        issueCode: null,
+        issueLabel: null,
+        steps: [],
+      };
+    }
+
+    const resp = pipelineLog.rawResponse as Record<string, unknown>;
+    return {
+      confidenceScore: (resp.confidenceScore as number) ?? 0,
+      issueCode: (resp.issueCode as number) ?? null,
+      issueLabel: (resp.issueLabel as string) ?? null,
+      steps: (resp.steps as PipelineStepResult[]) ?? [],
+    };
   }
 }
