@@ -17,8 +17,12 @@ import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { AddressListScreen } from '../screens/patient/AddressListScreen';
 import { AddEditAddressScreen } from '../screens/patient/AddEditAddressScreen';
 import { ProfileSetupScreen } from '../screens/auth/ProfileSetupScreen';
+import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
+import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
+import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
+import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { Colors } from '../constants/colors';
-import { ServiceCategory } from '../types';
+import { ServiceCategory, SelectedMedicine } from '../types';
 
 interface AddressParam {
   id: string;
@@ -46,6 +50,10 @@ export type PatientStackParamList = {
   ProfileSetup: undefined;
   AddressList: undefined;
   AddEditAddress: { address?: AddressParam };
+  MedicineSearch: undefined;
+  PharmacyCheckout: { selectedMedicines: SelectedMedicine[] };
+  PharmacyOrders: undefined;
+  PharmacyOrderDetail: { orderId: string };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -89,5 +97,9 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ title: 'Edit Profile' }} />
     <Stack.Screen name="AddressList" component={AddressListScreen} options={{ title: 'My Addresses' }} />
     <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} options={({ route }) => ({ title: route.params?.address ? 'Edit Address' : 'Add Address' })} />
+    <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
+    <Stack.Screen name="PharmacyCheckout" component={PharmacyCheckoutScreen} options={{ title: 'Pharmacy Checkout' }} />
+    <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Pharmacy Orders' }} />
+    <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
   </Stack.Navigator>
 );

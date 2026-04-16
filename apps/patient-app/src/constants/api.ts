@@ -21,4 +21,10 @@ export const ENDPOINTS = {
   CONSULTATION_PATIENT_SUMMARIES: '/consultation/patient/summaries',
   REFERRALS_PATIENT: '/referrals/patient/me',
   PAYMENTS: '/payments',
+  PHARMACY: {
+    MEDICINES_SEARCH: '/pharmacy/medicines/search',
+    PROVIDERS: '/pharmacy/providers',
+    ORDERS: '/pharmacy/orders',
+    MY_ORDERS: '/pharmacy/orders/me',
+  },
 };
