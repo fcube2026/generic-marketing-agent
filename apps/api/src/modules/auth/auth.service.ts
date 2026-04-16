@@ -12,17 +12,26 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 
-// Hardcoded admin/marketing credentials for MVP (override via environment variables)
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@curex24.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const MARKETING_EMAIL = process.env.MARKETING_EMAIL || 'marketing@curex24.com';
-const MARKETING_PASSWORD = process.env.MARKETING_PASSWORD || 'marketing123';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+
+  /** Read credentials lazily so Railway env vars are guaranteed to be present */
+  private get adminEmail() {
+    return process.env.ADMIN_EMAIL || 'admin@curex24.com';
+  }
+  private get adminPassword() {
+    return process.env.ADMIN_PASSWORD || 'admin123';
+  }
+  private get marketingEmail() {
+    return process.env.MARKETING_EMAIL || 'marketing@curex24.com';
+  }
+  private get marketingPassword() {
+    return process.env.MARKETING_PASSWORD || 'marketing123';
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -174,7 +183,10 @@ export class AuthService {
     }
 
     // 2. Fall back to hardcoded env var credentials (legacy)
-    if (dto.email !== ADMIN_EMAIL || dto.password !== ADMIN_PASSWORD) {
+    this.logger.debug(
+      `Admin login fallback: email match=${dto.email === this.adminEmail}, pw length=${this.adminPassword.length}, env set=${!!process.env.ADMIN_PASSWORD}`,
+    );
+    if (dto.email !== this.adminEmail || dto.password !== this.adminPassword) {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
@@ -190,7 +202,7 @@ export class AuthService {
 
       return {
         token,
-        user: { id: user.id, email: ADMIN_EMAIL, role: user.role },
+        user: { id: user.id, email: this.adminEmail, role: user.role },
       };
     } catch (err) {
       this.logger.error(
@@ -205,9 +217,10 @@ export class AuthService {
 
   async marketingLogin(dto: AdminLoginDto) {
     const isMarketingCredentials =
-      dto.email === MARKETING_EMAIL && dto.password === MARKETING_PASSWORD;
+      dto.email === this.marketingEmail &&
+      dto.password === this.marketingPassword;
     const isAdminCredentials =
-      dto.email === ADMIN_EMAIL && dto.password === ADMIN_PASSWORD;
+      dto.email === this.adminEmail && dto.password === this.adminPassword;
 
     if (!isMarketingCredentials && !isAdminCredentials) {
       throw new UnauthorizedException('Invalid marketing agent credentials');
@@ -230,7 +243,7 @@ export class AuthService {
           token,
           user: {
             id: user.id,
-            email: ADMIN_EMAIL,
+            email: this.adminEmail,
             role: user.role,
           },
         };
@@ -249,7 +262,7 @@ export class AuthService {
         token,
         user: {
           id: user.id,
-          email: MARKETING_EMAIL,
+          email: this.marketingEmail,
           role: user.role,
         },
       };
