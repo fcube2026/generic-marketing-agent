@@ -1,11 +1,6 @@
 # Pharmacy Feature Legal & Compliance Guide (India)
 
-**Document Version:** 1.0  
-**Effective Date:** April 2026  
-**Applicable Jurisdiction:** India  
-**Prepared for:** Curex24 — Development, Legal, and Founding Teams
 
----
 
 ## Table of Contents
 
