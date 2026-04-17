@@ -6,6 +6,16 @@ import { CurrentUser } from '../auth/decorators/roles.decorator';
 export class VideoSessionsController {
   constructor(private videoSessionsService: VideoSessionsService) {}
 
+  @Get('my')
+  listMySessions(@CurrentUser() user: any) {
+    return this.videoSessionsService.listMySessions(user.id);
+  }
+
+  @Post('instant')
+  createInstantSession(@CurrentUser() user: any) {
+    return this.videoSessionsService.createInstantSession(user.id);
+  }
+
   @Get(':bookingId')
   getSession(@Param('bookingId') bookingId: string) {
     return this.videoSessionsService.getSession(bookingId);

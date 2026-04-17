@@ -724,19 +724,21 @@ enum VideoSessionStatus {
 }
 
 model VideoSession {
-  id           String             @id @default(cuid())
-  bookingId    String             @unique
-  roomId       String             @unique
-  sessionToken String?
-  status       VideoSessionStatus @default(CREATED)
-  startedAt    DateTime?
-  endedAt      DateTime?
-  duration     Int?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  booking      Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id            String             @id @default(cuid())
+  bookingId     String?            @unique
+  roomId        String             @unique
+  sessionToken  String?
+  status        VideoSessionStatus @default(CREATED)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  duration      Int?
+  creatorUserId String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  booking       Booking?           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@index([bookingId])
   @@index([status])
+  @@index([creatorUserId])
   @@map("video_sessions")
 }

@@ -89,13 +89,14 @@ export interface Booking {
 
 export interface VideoSession {
   id: string;
-  bookingId: string;
+  bookingId?: string;
   roomId: string;
   sessionToken?: string;
   status: VideoSessionStatus;
   startedAt?: string;
   endedAt?: string;
   duration?: number;
+  creatorUserId?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -29,6 +29,47 @@ export class VideoSessionsService {
     );
   }
 
+  async createInstantSession(userId: string) {
+    const ts = Date.now();
+    const roomId = `curex24-instant-${ts}`;
+    const bookingId = `instant-${ts}`;
+    return this.prisma.videoSession.create({
+      data: {
+        bookingId,
+        roomId,
+        status: 'IN_PROGRESS',
+        startedAt: new Date(),
+        creatorUserId: userId,
+      },
+    });
+  }
+
+  async listMySessions(userId: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const conditions: object[] = [{ creatorUserId: userId }];
+    if (provider) {
+      conditions.push({ booking: { provider: { userId } } });
+    }
+
+    return this.prisma.videoSession.findMany({
+      where: { OR: conditions },
+      include: {
+        booking: {
+          include: {
+            patient: { select: { name: true } },
+            serviceCategory: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+  }
+
   private async upsertActiveSession(
     bookingId: string,
     userId: string,
@@ -75,7 +116,7 @@ export class VideoSessionsService {
     if (!session) throw new NotFoundException('Video session not found');
 
     const booking = await this.prisma.booking.findUnique({
-      where: { id: session.bookingId },
+      where: { id: session.bookingId! },
       include: { provider: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
