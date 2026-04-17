@@ -12,6 +12,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { Colors } from '../../constants/colors';
 import { providerService, NmcVerificationPayload } from '../../services/providerService';
 import { INDIAN_STATE_COUNCILS } from '../../constants/stateCouncils';
@@ -96,8 +97,7 @@ export const KycScreen: React.FC = () => {
     },
     onError: (error: unknown) => {
       setLastStatus('ERROR');
-      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
-      const httpStatus = axiosError.response?.status;
+      const httpStatus = axios.isAxiosError(error) ? error.response?.status : undefined;
       if (httpStatus === 404) {
         Alert.alert('❌ Profile Not Found', 'Please complete your provider profile before submitting for verification.');
       } else if (httpStatus === 401) {
