@@ -19,7 +19,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       const res = await authService.sendOtp(full);
       navigation.navigate('Otp', { phone: full, devOtp: res.otp });
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.error || 'Failed to send OTP');
+      Alert.alert('Error', e?.response?.data?.message || e?.response?.data?.error || 'Failed to send OTP. Please try again.');
     } finally { setLoading(false); }
   };
   return (
