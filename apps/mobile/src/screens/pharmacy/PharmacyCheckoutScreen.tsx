@@ -201,7 +201,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
 
       <View style={styles.placeOrderArea}>
         <Button
-          title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order · ${formatCurrency(subtotal)}`}
+          title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order - ${formatCurrency(subtotal)}`}
           onPress={handlePlaceOrder}
           loading={placeOrderMutation.isPending}
           disabled={!selectedPartnerId || !selectedAddressId}

@@ -8,8 +8,8 @@ import {
 } from '../types';
 
 export const pharmacyService = {
-  searchMedicines: async (q: string, pincode?: string): Promise<MedicineResult[]> => {
-    const params: Record<string, string> = { query: q };
+  searchMedicines: async (query: string, pincode?: string): Promise<MedicineResult[]> => {
+    const params: Record<string, string> = { query };
     if (pincode) {
       params.pincode = pincode;
     }
