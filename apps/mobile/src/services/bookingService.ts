@@ -80,4 +80,19 @@ export const bookingService = {
     const r = await api.get(`/video-sessions/${bookingId}`);
     return r.data;
   },
+
+  startVideoSession: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/start`);
+    return r.data;
+  },
+
+  startInstantSession: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/instant`);
+    return r.data;
+  },
+
+  endVideoSession: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/end`);
+    return r.data;
+  },
 };
