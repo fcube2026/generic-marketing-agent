@@ -31,4 +31,9 @@ export const ENDPOINTS = {
   RECOMMENDATION: '/recommendation',
   CONSULTATION: '/consultation',
   PAYMENTS: '/payments',
+  PHARMACY: {
+    MEDICINES_SEARCH: '/pharmacy/medicines/search',
+    PARTNERS: '/pharmacy/partners',
+    ORDERS: '/pharmacy/orders',
+  },
 };
