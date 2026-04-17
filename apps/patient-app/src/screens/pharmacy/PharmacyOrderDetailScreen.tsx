@@ -33,7 +33,8 @@ const STATUS_COLORS: Record<string, string> = {
   RETURNED: '#6B7280',
 };
 
-const CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
+// All statuses for which the backend allows cancellation
+const CANCELLABLE_STATUSES = ['PENDING', 'PRESCRIPTION_REVIEW', 'PLACED', 'CONFIRMED', 'PACKED'];
 
 export const PharmacyOrderDetailScreen: React.FC<Props> = ({ route }) => {
   const { orderId } = route.params;
@@ -57,6 +58,17 @@ export const PharmacyOrderDetailScreen: React.FC<Props> = ({ route }) => {
     },
     onError: (err: any) => {
       Alert.alert('Error', err?.response?.data?.message || 'Failed to refresh status.');
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => pharmacyService.cancelOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
+    },
+    onError: (err: any) => {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to cancel order.');
     },
   });
 
@@ -153,10 +165,18 @@ export const PharmacyOrderDetailScreen: React.FC<Props> = ({ route }) => {
             onPress={() =>
               Alert.alert(
                 'Cancel Order',
-                'Cancellation is managed by the pharmacy partner. Please contact support to cancel this order.',
-                [{ text: 'OK' }],
+                'Are you sure you want to cancel this order?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: () => cancelMutation.mutate(),
+                  },
+                ],
               )
             }
+            loading={cancelMutation.isPending}
             style={styles.actionButton}
           />
         )}

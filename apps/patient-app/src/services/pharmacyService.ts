@@ -4,6 +4,7 @@ import {
   MedicineResult,
   PharmacyOrder,
   PharmacyOrdersResponse,
+  PharmacyPartner,
   CreatePharmacyOrderPayload,
 } from '../types';
 
@@ -15,7 +16,8 @@ export const pharmacyService = {
     return response.data;
   },
 
-  getProviders: async (): Promise<string[]> => {
+  // Backend returns an array of partner objects, not plain strings
+  getProviders: async (): Promise<PharmacyPartner[]> => {
     const response = await api.get(ENDPOINTS.PHARMACY.PROVIDERS);
     return response.data;
   },
@@ -39,6 +41,12 @@ export const pharmacyService = {
 
   refreshOrderStatus: async (id: string): Promise<PharmacyOrder> => {
     const response = await api.patch(`${ENDPOINTS.PHARMACY.ORDERS}/${id}/status`);
+    return response.data;
+  },
+
+  // Cancel order — backend: POST /pharmacy/orders/:id/cancel
+  cancelOrder: async (id: string): Promise<PharmacyOrder> => {
+    const response = await api.post(`${ENDPOINTS.PHARMACY.ORDERS}/${id}/cancel`);
     return response.data;
   },
 };

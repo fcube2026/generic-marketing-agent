@@ -18,7 +18,7 @@ import { Button } from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { pharmacyService } from '../../services/pharmacyService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
-import { Address, SelectedMedicine } from '../../types';
+import { Address, PharmacyPartner, SelectedMedicine } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import api from '../../services/api';
 
@@ -30,13 +30,13 @@ type Props = {
 export const PharmacyCheckoutScreen: React.FC<Props> = ({ navigation, route }) => {
   const { selectedMedicines } = route.params;
 
-  const [selectedPartner, setSelectedPartner] = useState<string | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<PharmacyPartner | null>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [notes, setNotes] = useState('');
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [showPartnerPicker, setShowPartnerPicker] = useState(false);
 
-  const { data: providers, isLoading: loadingProviders } = useQuery<string[]>({
+  const { data: providers, isLoading: loadingProviders } = useQuery<PharmacyPartner[]>({
     queryKey: ['pharmacy-providers'],
     queryFn: pharmacyService.getProviders,
   });
@@ -81,13 +81,14 @@ export const PharmacyCheckoutScreen: React.FC<Props> = ({ navigation, route }) =
       return;
     }
 
-    const deliveryAddress = `${selectedAddress.addressLine}, ${selectedAddress.city}, ${selectedAddress.state} - ${selectedAddress.pincode}`;
-
     placeOrderMutation.mutate({
-      partnerId: selectedPartner,
-      deliveryAddress,
+      // Use partner.id (DB record ID) as required by the backend DTO
+      partnerId: selectedPartner.id,
+      // Backend requires the address record ID, not a free-text string
+      deliveryAddressId: selectedAddress.id,
       items: selectedMedicines.map((m) => ({
-        medicineId: m.id,
+        // Backend requires medicineCode (the medicine's partner-specific identifier)
+        medicineCode: m.id,
         medicineName: m.name,
         quantity: m.quantity,
         unitPrice: m.price,
@@ -130,7 +131,7 @@ export const PharmacyCheckoutScreen: React.FC<Props> = ({ navigation, route }) =
           >
             <Text style={selectedPartner ? styles.selectorText : styles.selectorPlaceholder}>
               {selectedPartner
-                ? selectedPartner.charAt(0).toUpperCase() + selectedPartner.slice(1)
+                ? (selectedPartner.displayName || selectedPartner.name)
                 : 'Select pharmacy partner'}
             </Text>
             <Text style={styles.selectorChevron}>›</Text>
@@ -209,12 +210,12 @@ export const PharmacyCheckoutScreen: React.FC<Props> = ({ navigation, route }) =
             ) : (
               <FlatList
                 data={providers}
-                keyExtractor={(item) => item}
+                keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[
                       styles.modalItem,
-                      selectedPartner === item && styles.modalItemSelected,
+                      selectedPartner?.id === item.id && styles.modalItemSelected,
                     ]}
                     onPress={() => {
                       setSelectedPartner(item);
@@ -222,9 +223,9 @@ export const PharmacyCheckoutScreen: React.FC<Props> = ({ navigation, route }) =
                     }}
                   >
                     <Text style={styles.modalItemText}>
-                      {item.charAt(0).toUpperCase() + item.slice(1)}
+                      {item.displayName || item.name}
                     </Text>
-                    {selectedPartner === item && (
+                    {selectedPartner?.id === item.id && (
                       <Text style={styles.modalItemCheck}>✓</Text>
                     )}
                   </TouchableOpacity>
