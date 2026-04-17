@@ -139,7 +139,7 @@ export const HomeScreen: React.FC = () => {
               key={session.id}
               style={styles.instantCard}
               onPress={() => {
-                const url = `https://meet.jit.si/${session.roomId}`;
+                const url = `https://meet.jit.si/${encodeURIComponent(session.roomId)}`;
                 Linking.openURL(url).catch(() =>
                   Alert.alert('Error', 'Could not open the video call link.'),
                 );
