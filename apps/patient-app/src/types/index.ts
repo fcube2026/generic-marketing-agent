@@ -161,3 +161,75 @@ export interface ReferralsResponse {
   page: number;
   limit: number;
 }
+
+// ========================
+// PHARMACY TYPES
+// ========================
+
+export interface MedicineResult {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  price: number;
+  unit?: string;
+  requiresPrescription?: boolean;
+}
+
+export interface PharmacyOrderItem {
+  id: string;
+  medicineId: string;
+  medicineName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export type PharmacyOrderStatus =
+  | 'PLACED'
+  | 'CONFIRMED'
+  | 'PACKED'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'RETURNED';
+
+export interface PharmacyOrder {
+  id: string;
+  patientId: string;
+  bookingId?: string | null;
+  prescriptionId?: string | null;
+  partnerId: string;
+  partnerOrderId?: string | null;
+  status: PharmacyOrderStatus | string;
+  deliveryAddress: string;
+  totalAmount: number;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PharmacyOrderItem[];
+}
+
+export interface PharmacyOrdersResponse {
+  data: PharmacyOrder[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreatePharmacyOrderPayload {
+  partnerId: string;
+  deliveryAddress: string;
+  items: {
+    medicineId: string;
+    medicineName: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+  bookingId?: string;
+  prescriptionId?: string;
+  notes?: string;
+}
+
+export interface SelectedMedicine extends MedicineResult {
+  quantity: number;
+}

@@ -1,7 +1,7 @@
 export class PharmacyOrderItemResponseDto {
   id: string;
-  medicineCode?: string | null;
   medicineName: string;
+  medicineCode?: string | null;
   dosage?: string | null;
   instructions?: string | null;
   isSubstitute: boolean;

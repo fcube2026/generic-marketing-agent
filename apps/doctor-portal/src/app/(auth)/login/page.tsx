@@ -18,7 +18,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await api.post('/auth/send-otp', { phone });
+      const { data } = await api.post('/auth/send-otp', { phone });
+      // In staging/dev, the API returns the OTP in the response — auto-fill it
+      if (data.otp) {
+        setOtp(data.otp);
+      }
       setStep('otp');
     } catch (err: any) {
       const message =
