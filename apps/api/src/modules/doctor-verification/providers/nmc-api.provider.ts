@@ -56,10 +56,12 @@ export class NmcApiProvider {
     this.logger.log(
       `[mock] Verifying NMC registration: ${req.memberId} / ${req.stateCouncil}`,
     );
+    // Do not return a name from mock — the service treats a missing name as a
+    // confirmed match, avoiding spurious DATA_MISMATCH (issue code 400) when
+    // any real name is submitted against this mock.
     return {
       found: true,
       registrationNumber: req.memberId,
-      name: 'Mock Doctor',
       qualifications: ['MBBS'],
       stateCouncil: req.stateCouncil,
       registrationDate: `${req.yearOfAdmission}-01-01`,

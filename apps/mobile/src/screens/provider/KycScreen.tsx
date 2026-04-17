@@ -12,11 +12,12 @@ import {
   FlatList,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { Colors } from '../../constants/colors';
 import { providerService, NmcVerificationPayload } from '../../services/providerService';
 import { INDIAN_STATE_COUNCILS } from '../../constants/stateCouncils';
 
-type VerificationStatus = 'SUCCESS' | 'NOT_FOUND' | 'ERROR' | 'MANUAL_REVIEW' | 'INCOMPLETE';
+type VerificationStatus = 'SUCCESS' | 'APPROVED' | 'NOT_FOUND' | 'ERROR' | 'MANUAL_REVIEW' | 'INCOMPLETE';
 
 interface VerificationLog {
   id: string;
@@ -38,6 +39,7 @@ interface VerificationLog {
 
 const STATUS_CONFIG: Record<VerificationStatus, { color: string; icon: string; message: string }> = {
   SUCCESS: { color: Colors.success, icon: '✅', message: 'Verified successfully!' },
+  APPROVED: { color: Colors.success, icon: '✅', message: 'Already verified. Your registration is active.' },
   NOT_FOUND: { color: Colors.warning, icon: '⚠️', message: 'Registration not found in records.' },
   ERROR: { color: Colors.error, icon: '❌', message: 'Verification service error. Please try again.' },
   MANUAL_REVIEW: { color: '#6366F1', icon: '🔍', message: 'Sent for manual review by our team.' },
@@ -93,9 +95,16 @@ export const KycScreen: React.FC = () => {
       const scoreMsg = data?.confidenceScore != null ? `\nConfidence: ${data.confidenceScore}%` : '';
       Alert.alert(`${cfg.icon} Verification Result`, `${cfg.message}${issueLabel}${scoreMsg}`);
     },
-    onError: () => {
+    onError: (error: unknown) => {
       setLastStatus('ERROR');
-      Alert.alert('❌ Error', 'Failed to submit verification request. Please try again.');
+      const httpStatus = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (httpStatus === 404) {
+        Alert.alert('❌ Profile Not Found', 'Please complete your provider profile before submitting for verification.');
+      } else if (httpStatus === 401) {
+        Alert.alert('❌ Session Expired', 'Your session has expired. Please log in again.');
+      } else {
+        Alert.alert('❌ Error', 'Failed to submit verification request. Please try again.');
+      }
     },
   });
 
