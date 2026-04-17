@@ -15,6 +15,7 @@ model User {
   password  String   // User's password
   createdAt DateTime @default(now())  // Timestamp when the user was created
   updatedAt DateTime @updatedAt  // Timestamp when the user was last updated
+  posts     Post[]   // Relation to Post model
 }
 
 model Post {
