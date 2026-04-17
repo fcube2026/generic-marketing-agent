@@ -58,7 +58,9 @@ export const InstantMeetingScreen: React.FC = () => {
 
   const handleJoin = (roomId: string) => {
     const url = `https://meet.jit.si/${roomId}`;
-    Linking.openURL(url).catch(() => {});
+    Linking.openURL(url).catch(() =>
+      Alert.alert('Error', 'Could not open the video call link.'),
+    );
   };
 
   const activeSession = sessions.find((s) => s.status === 'IN_PROGRESS');

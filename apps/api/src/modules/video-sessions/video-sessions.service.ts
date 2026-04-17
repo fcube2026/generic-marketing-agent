@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -30,12 +31,9 @@ export class VideoSessionsService {
   }
 
   async createInstantSession(userId: string) {
-    const ts = Date.now();
-    const roomId = `curex24-instant-${ts}`;
-    const bookingId = `instant-${ts}`;
+    const roomId = `curex24-instant-${Date.now()}`;
     return this.prisma.videoSession.create({
       data: {
-        bookingId,
         roomId,
         status: 'IN_PROGRESS',
         startedAt: new Date(),
@@ -50,7 +48,9 @@ export class VideoSessionsService {
       select: { id: true },
     });
 
-    const conditions: object[] = [{ creatorUserId: userId }];
+    const conditions: Prisma.VideoSessionWhereInput[] = [
+      { creatorUserId: userId },
+    ];
     if (provider) {
       conditions.push({ booking: { provider: { userId } } });
     }
