@@ -91,6 +91,16 @@ export const bookingService = {
     return r.data;
   },
 
+  startStandaloneInstantSession: async () => {
+    const r = await api.post('/video-sessions/instant');
+    return r.data;
+  },
+
+  getMyVideoSessions: async () => {
+    const r = await api.get('/video-sessions/my');
+    return r.data;
+  },
+
   endVideoSession: async (bookingId: string) => {
     const r = await api.post(`/video-sessions/${bookingId}/end`);
     return r.data;

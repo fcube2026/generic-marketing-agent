@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -27,6 +28,46 @@ export class VideoSessionsService {
       userId,
       `curex24-instant-${bookingId}-${Date.now()}`,
     );
+  }
+
+  async createInstantSession(userId: string) {
+    const roomId = `curex24-instant-${Date.now()}`;
+    return this.prisma.videoSession.create({
+      data: {
+        roomId,
+        status: 'IN_PROGRESS',
+        startedAt: new Date(),
+        creatorUserId: userId,
+      },
+    });
+  }
+
+  async listMySessions(userId: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const conditions: Prisma.VideoSessionWhereInput[] = [
+      { creatorUserId: userId },
+    ];
+    if (provider) {
+      conditions.push({ booking: { provider: { userId } } });
+    }
+
+    return this.prisma.videoSession.findMany({
+      where: { OR: conditions },
+      include: {
+        booking: {
+          include: {
+            patient: { select: { name: true } },
+            serviceCategory: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
   }
 
   private async upsertActiveSession(
@@ -75,7 +116,7 @@ export class VideoSessionsService {
     if (!session) throw new NotFoundException('Video session not found');
 
     const booking = await this.prisma.booking.findUnique({
-      where: { id: session.bookingId },
+      where: { id: session.bookingId! },
       include: { provider: true },
     });
     if (!booking) throw new NotFoundException('Booking not found');
