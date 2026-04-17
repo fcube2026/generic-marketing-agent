@@ -58,43 +58,45 @@ export const VideoConsultationScreen: React.FC = () => {
     retry: false,
   });
 
-  const statusMutation = useMutation({
-    mutationFn: (status: string) => bookingService.updateStatus(bookingId, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
-      queryClient.invalidateQueries({ queryKey: ['video-session', bookingId] });
-    },
-    onError: () => Alert.alert('Error', 'Failed to update booking status.'),
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+    queryClient.invalidateQueries({ queryKey: ['video-session', bookingId] });
+  };
+
+  const startMutation = useMutation({
+    mutationFn: () => bookingService.startVideoSession(bookingId),
+    onSuccess: invalidate,
+    onError: () => Alert.alert('Error', 'Failed to start video session.'),
+  });
+
+  const instantMutation = useMutation({
+    mutationFn: () => bookingService.startInstantSession(bookingId),
+    onSuccess: invalidate,
+    onError: () => Alert.alert('Error', 'Failed to start instant session.'),
+  });
+
+  const endMutation = useMutation({
+    mutationFn: () => bookingService.endVideoSession(bookingId),
+    onSuccess: invalidate,
+    onError: () => Alert.alert('Error', 'Failed to end video session.'),
   });
 
   if (bookingLoading || sessionLoading) {
     return <LoadingSpinner fullScreen message="Loading video session..." />;
   }
 
-  const canJoin =
-    session &&
-    (session.status === 'WAITING' || session.status === 'IN_PROGRESS') &&
-    session.sessionToken;
+  const isLive = session?.status === 'IN_PROGRESS';
+  const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
 
   const handleJoin = () => {
-    if (session?.sessionToken) {
-      const url = `https://meet.curex24.com/room/${session.roomId}?token=${session.sessionToken}`;
+    if (session?.roomId) {
+      const url = `https://meet.jit.si/${session.roomId}`;
       Linking.openURL(url).catch(() => {});
     }
   };
 
-  const getNextAction = () => {
-    switch (booking?.status) {
-      case 'ACCEPTED':
-        return { label: '▶️ Start Consultation', next: 'IN_PROGRESS' };
-      case 'IN_PROGRESS':
-        return { label: '✅ Complete Consultation', next: 'COMPLETED' };
-      default:
-        return null;
-    }
-  };
-
-  const nextAction = getNextAction();
+  const isMutating =
+    startMutation.isPending || instantMutation.isPending || endMutation.isPending;
 
   return (
     <ScrollView style={styles.container}>
@@ -132,7 +134,7 @@ export const VideoConsultationScreen: React.FC = () => {
           <View style={styles.noSession}>
             <Text style={styles.noSessionIcon}>🎥</Text>
             <Text style={styles.noSessionText}>
-              The video session will be available once the booking is accepted.
+              No video session started yet. Click "Start Consultation" to begin.
             </Text>
           </View>
         ) : (
@@ -148,6 +150,12 @@ export const VideoConsultationScreen: React.FC = () => {
                 {SESSION_STATUS_LABEL[session.status as VideoSessionStatus] || session.status}
               </Text>
             </View>
+            {session.roomId ? (
+              <View style={styles.row}>
+                <Text style={styles.label}>Room</Text>
+                <Text style={[styles.value, { fontSize: 12 }]}>{session.roomId}</Text>
+              </View>
+            ) : null}
             {session.startedAt && (
               <View style={styles.row}>
                 <Text style={styles.label}>Started</Text>
@@ -172,24 +180,45 @@ export const VideoConsultationScreen: React.FC = () => {
         )}
       </Card>
 
-      {/* Join button */}
-      {canJoin && (
-        <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-          <Text style={styles.joinButtonText}>🎥 Join Video Call</Text>
+      {/* Action buttons */}
+      {canStart && (
+        <TouchableOpacity
+          style={[styles.startButton, isMutating && { opacity: 0.7 }]}
+          onPress={() => startMutation.mutate()}
+          disabled={isMutating}
+        >
+          <Text style={styles.startButtonText}>
+            {startMutation.isPending ? 'Starting…' : '▶️ Start Consultation'}
+          </Text>
         </TouchableOpacity>
       )}
 
-      {/* Status action */}
-      {nextAction && (
-        <TouchableOpacity
-          style={[styles.actionButton, statusMutation.isPending && { opacity: 0.7 }]}
-          onPress={() => statusMutation.mutate(nextAction.next)}
-          disabled={statusMutation.isPending}
-        >
-          <Text style={styles.actionButtonText}>
-            {statusMutation.isPending ? 'Updating…' : nextAction.label}
-          </Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.instantButton, isMutating && { opacity: 0.7 }]}
+        onPress={() => instantMutation.mutate()}
+        disabled={isMutating}
+      >
+        <Text style={styles.instantButtonText}>
+          {instantMutation.isPending ? 'Starting…' : '⚡ Start Instant Meeting'}
+        </Text>
+      </TouchableOpacity>
+
+      {isLive && (
+        <>
+          <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
+            <Text style={styles.joinButtonText}>🎥 Join Video Call (Jitsi)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.endButton, isMutating && { opacity: 0.7 }]}
+            onPress={() => endMutation.mutate()}
+            disabled={isMutating}
+          >
+            <Text style={styles.endButtonText}>
+              {endMutation.isPending ? 'Ending…' : '✅ End Consultation'}
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -228,7 +257,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  joinButton: {
+  startButton: {
     margin: 16,
     marginTop: 20,
     backgroundColor: Colors.primary,
@@ -236,8 +265,26 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  startButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  instantButton: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#7C3AED',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  instantButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  joinButton: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
   joinButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  actionButton: {
+  endButton: {
     marginHorizontal: 16,
     marginTop: 12,
     backgroundColor: Colors.success,
@@ -245,7 +292,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  actionButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  endButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   backButton: {
     marginHorizontal: 16,
     marginTop: 12,

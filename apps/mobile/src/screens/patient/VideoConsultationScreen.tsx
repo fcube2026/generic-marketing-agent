@@ -55,14 +55,11 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
 
   const canJoin =
     session &&
-    (session.status === 'WAITING' || session.status === 'IN_PROGRESS') &&
-    session.sessionToken;
+    session.status === 'IN_PROGRESS';
 
   const handleJoin = () => {
-    if (session?.sessionToken) {
-      // In a real implementation this would open the video SDK / WebRTC room.
-      // For now we open the room link in the browser as a placeholder.
-      const url = `https://meet.curex24.com/room/${session.roomId}?token=${session.sessionToken}`;
+    if (session?.roomId) {
+      const url = `https://meet.jit.si/${session.roomId}`;
       Linking.openURL(url).catch(() => {});
     }
   };

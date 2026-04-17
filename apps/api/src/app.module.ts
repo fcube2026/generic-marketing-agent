@@ -22,6 +22,7 @@ import { TrackingModule } from './modules/tracking/tracking.module';
 import { DoctorVerificationModule } from './modules/doctor-verification/doctor-verification.module';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
 import { SmsModule } from './modules/sms/sms.module';
+import { VideoSessionsModule } from './modules/video-sessions/video-sessions.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { BootstrapService } from './common/bootstrap.service';
@@ -57,6 +58,7 @@ import { HealthModule } from './common/health/health.module';
     TrackingModule,
     DoctorVerificationModule,
     PharmacyModule,
+    VideoSessionsModule,
   ],
   providers: [BootstrapService],
 })

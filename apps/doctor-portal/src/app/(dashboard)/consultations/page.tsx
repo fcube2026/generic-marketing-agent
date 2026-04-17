@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import api from '@/lib/api';
+
+interface VideoSession {
+  id: string;
+  status: string;
+  roomId: string;
+}
 
 interface Consultation {
   id: string;
@@ -9,6 +16,7 @@ interface Consultation {
   scheduledAt: string;
   status: string;
   type: string;
+  videoSession?: VideoSession;
 }
 
 export default function ConsultationsPage() {
@@ -42,6 +50,15 @@ export default function ConsultationsPage() {
     cancelled: 'bg-red-100 text-red-700',
   };
 
+  const sessionStatusColor: Record<string, string> = {
+    CREATED: 'bg-gray-100 text-gray-600',
+    WAITING: 'bg-yellow-100 text-yellow-700',
+    IN_PROGRESS: 'bg-red-100 text-red-700',
+    COMPLETED: 'bg-green-100 text-green-700',
+    FAILED: 'bg-red-100 text-red-700',
+    EXPIRED: 'bg-gray-100 text-gray-500',
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -63,13 +80,14 @@ export default function ConsultationsPage() {
                 <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Scheduled</th>
                 <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Video</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {consultations.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{c.patientName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 capitalize">{c.type}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 capitalize">{c.type?.replace('_', ' ') || '—'}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {new Date(c.scheduledAt).toLocaleString()}
                   </td>
@@ -81,6 +99,29 @@ export default function ConsultationsPage() {
                     >
                       {c.status.replace('_', ' ')}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {c.type === 'VIDEO_CONSULTATION' ? (
+                      <div className="flex items-center gap-2">
+                        {c.videoSession && (
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                              sessionStatusColor[c.videoSession.status] ?? 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {c.videoSession.status.replace('_', ' ')}
+                          </span>
+                        )}
+                        <Link
+                          href={`/video-consultations/${c.id}`}
+                          className="inline-block px-3 py-1 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition"
+                        >
+                          🎥 Open
+                        </Link>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
