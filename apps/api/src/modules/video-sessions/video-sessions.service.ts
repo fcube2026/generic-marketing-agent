@@ -18,37 +18,22 @@ export class VideoSessionsService {
   }
 
   async startSession(bookingId: string, userId: string) {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: { provider: true },
-    });
-    if (!booking) throw new NotFoundException('Booking not found');
-
-    if (booking.provider.userId !== userId) {
-      throw new ForbiddenException(
-        'Only the assigned provider can start a video session',
-      );
-    }
-
-    const roomId = `curex24-${bookingId}`;
-
-    return this.prisma.videoSession.upsert({
-      where: { bookingId },
-      create: {
-        bookingId,
-        roomId,
-        status: 'IN_PROGRESS',
-        startedAt: new Date(),
-      },
-      update: {
-        roomId,
-        status: 'IN_PROGRESS',
-        startedAt: new Date(),
-      },
-    });
+    return this.upsertActiveSession(bookingId, userId, `curex24-${bookingId}`);
   }
 
   async startInstantSession(bookingId: string, userId: string) {
+    return this.upsertActiveSession(
+      bookingId,
+      userId,
+      `curex24-instant-${bookingId}-${Date.now()}`,
+    );
+  }
+
+  private async upsertActiveSession(
+    bookingId: string,
+    userId: string,
+    roomId: string,
+  ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
       include: { provider: true },
@@ -60,8 +45,6 @@ export class VideoSessionsService {
         'Only the assigned provider can start a video session',
       );
     }
-
-    const roomId = `curex24-instant-${bookingId}-${Date.now()}`;
 
     return this.prisma.videoSession.upsert({
       where: { bookingId },
