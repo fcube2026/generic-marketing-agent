@@ -119,3 +119,84 @@ export interface RecommendationResponse {
   recommended: BookingMode;
   reason: string;
 }
+
+export type PharmacyOrderStatus =
+  | 'PENDING'
+  | 'PRESCRIPTION_REVIEW'
+  | 'CONFIRMED'
+  | 'PACKED'
+  | 'DISPATCHED'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'FAILED';
+
+export interface MedicineResult {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  price: number;
+  unit?: string;
+  requiresPrescription?: boolean;
+}
+
+export interface PharmacyPartner {
+  id: string;
+  code: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  logoUrl?: string;
+  priority: number;
+  providerKey: string;
+  registered: boolean;
+}
+
+export interface PharmacyOrderItem {
+  id: string;
+  medicineName: string;
+  medicineCode?: string | null;
+  dosage?: string | null;
+  instructions?: string | null;
+  isSubstitute: boolean;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface PharmacyOrder {
+  id: string;
+  orderNumber: string;
+  patientProfileId: string;
+  bookingId?: string | null;
+  prescriptionId?: string | null;
+  pharmacyPartnerId: string;
+  partnerCode: string;
+  partnerName: string;
+  partnerOrderId?: string | null;
+  status: PharmacyOrderStatus;
+  deliveryAddressId: string;
+  deliveryAddress: string;
+  prescriptionImageUrl?: string | null;
+  subtotal: number;
+  deliveryFee: number;
+  discount: number;
+  totalAmount: number;
+  estimatedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PharmacyOrderItem[];
+}
+
+export interface CreatePharmacyOrderPayload {
+  partnerId: string;
+  deliveryAddressId: string;
+  notes?: string;
+  items: {
+    medicineCode: string;
+    medicineName: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+}

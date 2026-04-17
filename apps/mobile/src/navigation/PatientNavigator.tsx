@@ -13,8 +13,12 @@ import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummar
 import { VideoConsultationScreen } from '../screens/patient/VideoConsultationScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
+import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
+import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
+import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
+import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { Colors } from '../constants/colors';
-import { ServiceCategory } from '../types';
+import { ServiceCategory, MedicineResult } from '../types';
 
 export type PatientStackParamList = {
   Tabs: undefined;
@@ -26,6 +30,10 @@ export type PatientStackParamList = {
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
   VideoConsultation: { bookingId: string };
+  MedicineSearch: undefined;
+  PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
+  PharmacyOrders: undefined;
+  PharmacyOrderDetail: { orderId: string };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -65,5 +73,9 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
+    <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
+    <Stack.Screen name="PharmacyCheckout" component={PharmacyCheckoutScreen} options={{ title: 'Checkout' }} />
+    <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Orders' }} />
+    <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
   </Stack.Navigator>
 );
