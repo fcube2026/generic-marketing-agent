@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
@@ -15,8 +16,9 @@ import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
-import { ServiceCategory } from '../../types';
+import { ServiceCategory, VideoSession } from '../../types';
 import { Booking } from '../../types';
+import { bookingService } from '../../services/bookingService';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -46,6 +48,12 @@ export const HomeScreen: React.FC = () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
     },
+  });
+
+  const { data: instantSessions = [] } = useQuery<VideoSession[]>({
+    queryKey: ['patient-instant-sessions'],
+    queryFn: bookingService.getInstantSessionsForPatient,
+    refetchInterval: 15000,
   });
 
   const handleServicePress = (category: ServiceCategory) => {
@@ -121,6 +129,31 @@ export const HomeScreen: React.FC = () => {
         </View>
         <Text style={styles.videoCardArrow}>→</Text>
       </TouchableOpacity>
+
+      {/* Active Instant Sessions from providers */}
+      {instantSessions.length > 0 && (
+        <View style={styles.instantSection}>
+          <Text style={styles.instantTitle}>⚡ Live Sessions Available</Text>
+          {instantSessions.map((session) => (
+            <TouchableOpacity
+              key={session.id}
+              style={styles.instantCard}
+              onPress={() => {
+                const url = `https://meet.jit.si/${encodeURIComponent(session.roomId)}`;
+                Linking.openURL(url).catch(() =>
+                  Alert.alert('Error', 'Could not open the video call link.'),
+                );
+              }}
+            >
+              <View style={styles.instantCardLeft}>
+                <Text style={styles.instantLiveBadge}>🔴 LIVE</Text>
+                <Text style={styles.instantRoomId}>{session.roomId}</Text>
+              </View>
+              <Text style={styles.instantJoinText}>Join →</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* Order Medicines Quick Access */}
       <TouchableOpacity style={styles.pharmacyCard} onPress={() => navigation.navigate('MedicineSearch')}>
@@ -265,4 +298,35 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: Colors.success,
   },
+  instantSection: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  instantTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.error,
+    marginBottom: 8,
+  },
+  instantCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.error,
+  },
+  instantCardLeft: { flex: 1 },
+  instantLiveBadge: { fontSize: 11, fontWeight: '700', color: Colors.error, marginBottom: 2 },
+  instantRoomId: { fontSize: 12, color: Colors.textMuted },
+  instantJoinText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
 });

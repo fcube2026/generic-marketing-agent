@@ -42,6 +42,34 @@ export class VideoSessionsService {
     });
   }
 
+  async getSessionsForPatient(userId: string) {
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!patientProfile) return [];
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { patientId: patientProfile.id },
+      select: { provider: { select: { userId: true } } },
+      distinct: ['providerId'],
+    });
+
+    const providerUserIds = bookings.map((b) => b.provider.userId);
+    if (providerUserIds.length === 0) return [];
+
+    return this.prisma.videoSession.findMany({
+      where: {
+        status: 'IN_PROGRESS',
+        bookingId: null,
+        creatorUserId: { in: providerUserIds },
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 5,
+    });
+  }
+
   async listMySessions(userId: string) {
     const provider = await this.prisma.providerProfile.findUnique({
       where: { userId },
