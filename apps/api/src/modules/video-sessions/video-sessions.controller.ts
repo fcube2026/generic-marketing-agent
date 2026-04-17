@@ -6,6 +6,11 @@ import { CurrentUser } from '../auth/decorators/roles.decorator';
 export class VideoSessionsController {
   constructor(private videoSessionsService: VideoSessionsService) {}
 
+  @Get('for-patient')
+  getSessionsForPatient(@CurrentUser() user: any) {
+    return this.videoSessionsService.getSessionsForPatient(user.id);
+  }
+
   @Get('my')
   listMySessions(@CurrentUser() user: any) {
     return this.videoSessionsService.listMySessions(user.id);

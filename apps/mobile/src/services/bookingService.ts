@@ -101,6 +101,11 @@ export const bookingService = {
     return r.data;
   },
 
+  getInstantSessionsForPatient: async () => {
+    const r = await api.get('/video-sessions/for-patient');
+    return r.data;
+  },
+
   endVideoSession: async (bookingId: string) => {
     const r = await api.post(`/video-sessions/${bookingId}/end`);
     return r.data;
