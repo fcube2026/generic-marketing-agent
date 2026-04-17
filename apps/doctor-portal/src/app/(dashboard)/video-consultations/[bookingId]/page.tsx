@@ -130,8 +130,10 @@ export default function VideoConsultationDetailPage() {
   const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
 
   const formatDuration = (seconds: number) => {
+    if (seconds === 0) return '0s';
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
+    if (m === 0) return `${s}s`;
     return s === 0 ? `${m}m` : `${m}m ${s}s`;
   };
 

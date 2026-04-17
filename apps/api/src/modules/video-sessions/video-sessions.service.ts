@@ -46,6 +46,11 @@ export class VideoSessionsService {
       );
     }
 
+    const existing = await this.prisma.videoSession.findUnique({
+      where: { bookingId },
+      select: { startedAt: true },
+    });
+
     return this.prisma.videoSession.upsert({
       where: { bookingId },
       create: {
@@ -57,7 +62,8 @@ export class VideoSessionsService {
       update: {
         roomId,
         status: 'IN_PROGRESS',
-        startedAt: new Date(),
+        // Preserve original startedAt so duration calculation stays accurate
+        startedAt: existing?.startedAt ?? new Date(),
       },
     });
   }

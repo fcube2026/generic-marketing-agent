@@ -7,7 +7,7 @@ export class VideoSessionsController {
   constructor(private videoSessionsService: VideoSessionsService) {}
 
   @Get(':bookingId')
-  getSession(@CurrentUser() user: any, @Param('bookingId') bookingId: string) {
+  getSession(@Param('bookingId') bookingId: string) {
     return this.videoSessionsService.getSession(bookingId);
   }
 
