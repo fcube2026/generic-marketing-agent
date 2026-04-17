@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AvailabilityResult,
+  CancelResponse,
+  CreatePartnerOrder,
   MedicineResult,
-  OrderItemInput,
   PartnerOrderResult,
   PartnerOrderStatus,
   PharmacyPartnerProvider,
@@ -45,11 +47,36 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     return (data.medicines ?? []).map(this.normalizeMedicine);
   }
 
-  async createOrder(
-    patientId: string,
-    items: OrderItemInput[],
-    deliveryAddress: string,
-  ): Promise<PartnerOrderResult> {
+  async checkAvailability(
+    medicineCode: string,
+    pincode: string,
+  ): Promise<AvailabilityResult> {
+    if (!this.apiUrl || !this.apiKey) {
+      this.logger.warn(
+        '[pharmeasy] PHARMEASY_API_URL or PHARMEASY_API_KEY not set — marking medicine unavailable',
+      );
+      return {
+        medicineCode,
+        pincode,
+        available: false,
+        reason: 'PharmEasy credentials are not configured',
+      };
+    }
+
+    const data = await this.get<{ available: boolean; reason?: string }>(
+      `${this.apiUrl}/medicines/${encodeURIComponent(medicineCode)}/availability?pincode=${encodeURIComponent(pincode)}`,
+      this.apiKey,
+    );
+
+    return {
+      medicineCode,
+      pincode,
+      available: data.available,
+      reason: data.reason,
+    };
+  }
+
+  async createOrder(order: CreatePartnerOrder): Promise<PartnerOrderResult> {
     if (!this.apiUrl || !this.apiKey) {
       throw new Error(
         'PHARMEASY_API_URL and PHARMEASY_API_KEY must be set to place live orders',
@@ -57,10 +84,10 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
     }
 
     const payload = {
-      patient_id: patientId,
-      delivery_address: deliveryAddress,
-      items: items.map((i) => ({
-        medicine_id: i.medicineId,
+      patient_id: order.patientId,
+      delivery_address: order.deliveryAddress,
+      items: order.items.map((i) => ({
+        medicine_id: i.medicineCode,
         medicine_name: i.medicineName,
         quantity: i.quantity,
         unit_price: i.unitPrice,
@@ -77,7 +104,7 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
       partnerOrderId: data.order_id,
       status: data.status,
       totalAmount: data.total_amount,
-      items,
+      items: order.items,
     };
   }
 
@@ -97,6 +124,26 @@ export class PharmEasyProvider implements PharmacyPartnerProvider {
       partnerOrderId,
       status: data.status,
       updatedAt: data.updated_at,
+    };
+  }
+
+  async cancelOrder(partnerOrderId: string): Promise<CancelResponse> {
+    if (!this.apiUrl || !this.apiKey) {
+      throw new Error(
+        'PHARMEASY_API_URL and PHARMEASY_API_KEY must be set to cancel live orders',
+      );
+    }
+
+    const data = await this.post<PharmEasyCancelResponse>(
+      `${this.apiUrl}/orders/${partnerOrderId}/cancel`,
+      {},
+      this.apiKey,
+    );
+
+    return {
+      partnerOrderId,
+      status: data.status,
+      cancelled: data.cancelled,
     };
   }
 
@@ -197,4 +244,9 @@ interface PharmEasyOrderResponse {
 interface PharmEasyStatusResponse {
   status: string;
   updated_at?: string;
+}
+
+interface PharmEasyCancelResponse {
+  status: string;
+  cancelled: boolean;
 }

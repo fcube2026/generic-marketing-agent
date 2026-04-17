@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  AvailabilityResult,
+  CancelResponse,
+  CreatePartnerOrder,
   MedicineResult,
-  OrderItemInput,
   PartnerOrderResult,
   PartnerOrderStatus,
   PharmacyPartnerProvider,
@@ -33,15 +35,25 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
     ];
   }
 
-  async createOrder(
-    patientId: string,
-    items: OrderItemInput[],
-    deliveryAddress: string,
-  ): Promise<PartnerOrderResult> {
+  async checkAvailability(
+    medicineCode: string,
+    pincode: string,
+  ): Promise<AvailabilityResult> {
     this.logger.log(
-      `[mock] Creating order for patient ${patientId} to address "${deliveryAddress}"`,
+      `[mock] Checking availability for medicine ${medicineCode} at ${pincode}`,
     );
-    const totalAmount = items.reduce(
+    return {
+      medicineCode,
+      pincode,
+      available: true,
+    };
+  }
+
+  async createOrder(order: CreatePartnerOrder): Promise<PartnerOrderResult> {
+    this.logger.log(
+      `[mock] Creating order for patient ${order.patientId} to address "${order.deliveryAddress}"`,
+    );
+    const totalAmount = order.items.reduce(
       (sum, item) => sum + item.unitPrice * item.quantity,
       0,
     );
@@ -49,7 +61,7 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
       partnerOrderId: `MOCK-ORD-${Date.now()}`,
       status: 'PLACED',
       totalAmount,
-      items,
+      items: order.items,
     };
   }
 
@@ -59,6 +71,15 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
       partnerOrderId,
       status: 'CONFIRMED',
       updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async cancelOrder(partnerOrderId: string): Promise<CancelResponse> {
+    this.logger.log(`[mock] Cancelling order ${partnerOrderId}`);
+    return {
+      partnerOrderId,
+      status: 'CANCELLED',
+      cancelled: true,
     };
   }
 }

@@ -12,7 +12,7 @@ import { Type } from 'class-transformer';
 
 export class OrderItemDto {
   @IsString()
-  medicineId: string;
+  medicineCode: string;
 
   @IsString()
   medicineName: string;
@@ -39,7 +39,7 @@ export class CreatePharmacyOrderDto {
   partnerId: string;
 
   @IsString()
-  deliveryAddress: string;
+  deliveryAddressId: string;
 
   @IsOptional()
   @IsString()

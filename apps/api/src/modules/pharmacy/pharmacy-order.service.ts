@@ -4,11 +4,20 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PharmacyOrderStatus } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { PharmacyOrderStatus, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
+
+type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
+  include: {
+    items: true;
+    deliveryAddress: true;
+    pharmacyPartner: true;
+  };
+}>;
 
 @Injectable()
 export class PharmacyOrderService {
@@ -23,97 +32,119 @@ export class PharmacyOrderService {
     userId: string,
     dto: CreatePharmacyOrderDto,
   ): Promise<PharmacyOrderResponseDto> {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
+    const patient = await this.getPatientProfile(userId);
+    const partner = await this.prisma.pharmacyPartner.findFirst({
+      where: { id: dto.partnerId, isActive: true },
     });
-    if (!patient) throw new NotFoundException('Patient profile not found');
-
-    const partner = await this.prisma.pharmacyPartner.findUnique({
-      where: { id: dto.partnerId },
-    });
-    if (!partner || !partner.isActive) {
+    if (!partner) {
       throw new BadRequestException('Pharmacy partner not found or inactive');
     }
 
-    const provider = this.resolveProvider(partner.name);
+    const address = await this.prisma.address.findFirst({
+      where: { id: dto.deliveryAddressId, userId },
+    });
+    if (!address) {
+      throw new NotFoundException('Delivery address not found');
+    }
 
-    const partnerResult = await provider.createOrder(
-      patient.id,
-      dto.items.map((i) => ({
-        medicineId: i.medicineId,
-        medicineName: i.medicineName,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-      })),
-      dto.deliveryAddress,
+    const provider = this.resolveProvider(partner.code, partner.name);
+    const partnerItems = dto.items.map((item) => ({
+      medicineCode: item.medicineCode,
+      medicineName: item.medicineName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    }));
+
+    const partnerResult = await provider.createOrder({
+      patientId: patient.id,
+      items: partnerItems,
+      deliveryAddress: this.formatAddress(address),
+    });
+
+    const subtotal = dto.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
     );
 
     const order = await this.prisma.pharmacyOrder.create({
       data: {
-        patientId: patient.id,
+        orderNumber: this.generateOrderNumber(),
+        patientProfileId: patient.id,
         bookingId: dto.bookingId ?? null,
         prescriptionId: dto.prescriptionId ?? null,
-        partnerId: partner.id,
+        pharmacyPartnerId: partner.id,
         partnerOrderId: partnerResult.partnerOrderId,
-        status: 'PLACED',
-        deliveryAddress: dto.deliveryAddress,
+        deliveryAddressId: address.id,
+        subtotal,
+        deliveryFee: 0,
+        discount: 0,
         totalAmount: partnerResult.totalAmount,
+        status: this.mapPartnerStatus(partnerResult.status),
         notes: dto.notes ?? null,
         items: {
-          create: dto.items.map((i) => ({
-            medicineId: i.medicineId,
-            medicineName: i.medicineName,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            totalPrice: i.unitPrice * i.quantity,
+          create: dto.items.map((item) => ({
+            medicineCode: item.medicineCode,
+            medicineName: item.medicineName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.unitPrice * item.quantity,
           })),
         },
       },
-      include: { items: true },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
     });
 
-    return order as PharmacyOrderResponseDto;
+    return this.toResponseDto(order);
   }
 
   async getOrder(
     orderId: string,
     userId: string,
   ): Promise<PharmacyOrderResponseDto> {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-    });
-    if (!patient) throw new NotFoundException('Patient profile not found');
+    const patient = await this.getPatientProfile(userId);
 
     const order = await this.prisma.pharmacyOrder.findFirst({
-      where: { id: orderId, patientId: patient.id },
-      include: { items: true },
+      where: { id: orderId, patientProfileId: patient.id },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
     });
     if (!order) throw new NotFoundException('Pharmacy order not found');
 
-    return order as PharmacyOrderResponseDto;
+    return this.toResponseDto(order);
   }
 
   async refreshOrderStatus(
     orderId: string,
     userId: string,
   ): Promise<PharmacyOrderResponseDto> {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-    });
-    if (!patient) throw new NotFoundException('Patient profile not found');
+    const patient = await this.getPatientProfile(userId);
 
     const order = await this.prisma.pharmacyOrder.findFirst({
-      where: { id: orderId, patientId: patient.id },
-      include: { items: true, partner: true },
+      where: { id: orderId, patientProfileId: patient.id },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
     });
     if (!order) throw new NotFoundException('Pharmacy order not found');
     if (!order.partnerOrderId) {
-      return order as PharmacyOrderResponseDto;
+      return this.toResponseDto(order);
     }
 
-    const provider = this.resolveProvider(order.partner.name);
+    const provider = this.resolveProvider(
+      order.pharmacyPartner.code,
+      order.pharmacyPartner.name,
+    );
 
-    let partnerStatus: string = order.status;
+    let partnerStatus = order.status;
     try {
       const result = await provider.getOrderStatus(order.partnerOrderId);
       partnerStatus = this.mapPartnerStatus(result.status);
@@ -126,13 +157,61 @@ export class PharmacyOrderService {
     if (partnerStatus !== order.status) {
       const updated = await this.prisma.pharmacyOrder.update({
         where: { id: orderId },
-        data: { status: partnerStatus as PharmacyOrderStatus },
-        include: { items: true },
+        data: { status: partnerStatus },
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+        },
       });
-      return updated as PharmacyOrderResponseDto;
+      return this.toResponseDto(updated);
     }
 
-    return order as PharmacyOrderResponseDto;
+    return this.toResponseDto(order);
+  }
+
+  async cancelOrder(
+    orderId: string,
+    userId: string,
+  ): Promise<PharmacyOrderResponseDto> {
+    const patient = await this.getPatientProfile(userId);
+
+    const order = await this.prisma.pharmacyOrder.findFirst({
+      where: { id: orderId, patientProfileId: patient.id },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if (!this.canCancel(order.status)) {
+      throw new BadRequestException('This order can no longer be cancelled');
+    }
+
+    let nextStatus: PharmacyOrderStatus = PharmacyOrderStatus.CANCELLED;
+    if (order.partnerOrderId) {
+      const provider = this.resolveProvider(
+        order.pharmacyPartner.code,
+        order.pharmacyPartner.name,
+      );
+      const result = await provider.cancelOrder(order.partnerOrderId);
+      nextStatus = this.mapPartnerStatus(result.status);
+    }
+
+    const updated = await this.prisma.pharmacyOrder.update({
+      where: { id: order.id },
+      data: { status: nextStatus },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+
+    return this.toResponseDto(updated);
   }
 
   async listPatientOrders(
@@ -145,16 +224,19 @@ export class PharmacyOrderService {
     page: number;
     limit: number;
   }> {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-    });
-    if (!patient) return { data: [], total: 0, page, limit };
+    const patient = await this.getPatientProfile(userId);
 
-    const where = { patientId: patient.id };
+    const where: Prisma.PharmacyOrderWhereInput = {
+      patientProfileId: patient.id,
+    };
     const [orders, total] = await Promise.all([
       this.prisma.pharmacyOrder.findMany({
         where,
-        include: { items: true },
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -162,42 +244,146 @@ export class PharmacyOrderService {
       this.prisma.pharmacyOrder.count({ where }),
     ]);
 
-    return { data: orders as PharmacyOrderResponseDto[], total, page, limit };
+    return {
+      data: orders.map((order) => this.toResponseDto(order)),
+      total,
+      page,
+      limit,
+    };
   }
 
-  private resolveProvider(partnerName: string): PharmacyPartnerProvider {
-    const provider = this.partnerProviders.get(partnerName.toLowerCase());
-    if (!provider) {
+  private async getPatientProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user || user.role !== Role.PATIENT) {
+      throw new BadRequestException('Patient account required');
+    }
+
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (!patient) {
+      throw new NotFoundException('Patient profile not found');
+    }
+    return patient;
+  }
+
+  private resolveProvider(
+    partnerCode: string,
+    partnerName: string,
+  ): PharmacyPartnerProvider {
+    const provider = this.partnerProviders.get(partnerCode.toLowerCase());
+    if (provider) {
+      return provider;
+    }
+
+    const fallback = this.partnerProviders.get(partnerName.toLowerCase());
+    if (fallback) {
+      return fallback;
+    }
+
+    const mock = this.partnerProviders.get('mock');
+    if (mock) {
       this.logger.warn(
-        `No provider registered for partner "${partnerName}", falling back to mock`,
+        `No provider registered for partner "${partnerCode}" / "${partnerName}", falling back to mock`,
       );
-      const mock = this.partnerProviders.get('mock');
-      if (!mock) {
-        throw new BadRequestException(
-          `No pharmacy provider available for partner: ${partnerName}`,
-        );
-      }
       return mock;
     }
-    return provider;
+
+    throw new BadRequestException(
+      `No pharmacy provider available for partner: ${partnerCode}`,
+    );
   }
 
-  private mapPartnerStatus(partnerStatus: string): string {
-    const statusMap: Record<string, string> = {
-      PLACED: 'PLACED',
-      CONFIRMED: 'CONFIRMED',
-      PACKED: 'PACKED',
-      SHIPPED: 'SHIPPED',
-      DELIVERED: 'DELIVERED',
-      CANCELLED: 'CANCELLED',
-      RETURNED: 'RETURNED',
-      // PharmEasy-specific aliases
-      pending: 'PLACED',
-      confirmed: 'CONFIRMED',
-      shipped: 'SHIPPED',
-      delivered: 'DELIVERED',
-      cancelled: 'CANCELLED',
+  private mapPartnerStatus(partnerStatus: string): PharmacyOrderStatus {
+    const normalized = partnerStatus.toUpperCase();
+    const statusMap: Record<string, PharmacyOrderStatus> = {
+      PLACED: PharmacyOrderStatus.PLACED,
+      PENDING: PharmacyOrderStatus.PENDING,
+      PRESCRIPTION_REVIEW: PharmacyOrderStatus.PRESCRIPTION_REVIEW,
+      CONFIRMED: PharmacyOrderStatus.CONFIRMED,
+      PACKED: PharmacyOrderStatus.PACKED,
+      SHIPPED: PharmacyOrderStatus.SHIPPED,
+      OUT_FOR_DELIVERY: PharmacyOrderStatus.OUT_FOR_DELIVERY,
+      DELIVERED: PharmacyOrderStatus.DELIVERED,
+      CANCELLED: PharmacyOrderStatus.CANCELLED,
+      RETURNED: PharmacyOrderStatus.RETURNED,
+      REFUNDED: PharmacyOrderStatus.REFUNDED,
     };
-    return statusMap[partnerStatus] ?? partnerStatus.toUpperCase();
+
+    return statusMap[normalized] ?? PharmacyOrderStatus.PENDING;
+  }
+
+  private generateOrderNumber(): string {
+    return `PHARM-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+  }
+
+  private formatAddress(address: {
+    addressLine: string;
+    city: string;
+    state: string;
+    pincode: string;
+  }): string {
+    return [
+      address.addressLine,
+      address.city,
+      address.state,
+      address.pincode,
+    ].join(', ');
+  }
+
+  private canCancel(status: PharmacyOrderStatus): boolean {
+    const cancellableStatuses: PharmacyOrderStatus[] = [
+      PharmacyOrderStatus.PLACED,
+      PharmacyOrderStatus.PENDING,
+      PharmacyOrderStatus.PRESCRIPTION_REVIEW,
+      PharmacyOrderStatus.CONFIRMED,
+      PharmacyOrderStatus.PACKED,
+    ];
+
+    return cancellableStatuses.includes(status);
+  }
+
+  private toResponseDto(
+    order: PharmacyOrderWithRelations,
+  ): PharmacyOrderResponseDto {
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      patientProfileId: order.patientProfileId,
+      bookingId: order.bookingId,
+      prescriptionId: order.prescriptionId,
+      pharmacyPartnerId: order.pharmacyPartnerId,
+      partnerCode: order.pharmacyPartner.code,
+      partnerName:
+        order.pharmacyPartner.displayName || order.pharmacyPartner.name,
+      partnerOrderId: order.partnerOrderId,
+      status: order.status,
+      deliveryAddressId: order.deliveryAddressId,
+      deliveryAddress: this.formatAddress(order.deliveryAddress),
+      prescriptionImageUrl: order.prescriptionImageUrl,
+      subtotal: order.subtotal,
+      deliveryFee: order.deliveryFee,
+      discount: order.discount,
+      totalAmount: order.totalAmount,
+      estimatedDeliveryAt: order.estimatedDeliveryAt,
+      deliveredAt: order.deliveredAt,
+      notes: order.notes,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      items: order.items.map((item) => ({
+        id: item.id,
+        medicineCode: item.medicineCode,
+        medicineName: item.medicineName,
+        dosage: item.dosage,
+        instructions: item.instructions,
+        isSubstitute: item.isSubstitute,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+      })),
+    };
   }
 }

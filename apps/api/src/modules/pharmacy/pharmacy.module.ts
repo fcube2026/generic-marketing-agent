@@ -30,9 +30,10 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
     {
       provide: PharmacyService,
       useFactory: (
+        prisma: PrismaService,
         providers: Map<string, PharmacyPartnerProvider>,
-      ): PharmacyService => new PharmacyService(providers),
-      inject: [PHARMACY_PROVIDERS_MAP],
+      ): PharmacyService => new PharmacyService(prisma, providers),
+      inject: [PrismaService, PHARMACY_PROVIDERS_MAP],
     },
     {
       provide: PharmacyOrderService,
