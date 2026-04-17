@@ -54,22 +54,19 @@ export default function VideoConsultationDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [bookingRes, sessionRes] = await Promise.allSettled([
-        api.get(`/bookings/${bookingId}`),
-        api.get(`/video-sessions/${bookingId}`),
-      ]);
-      if (bookingRes.status === 'fulfilled') {
-        setBooking(bookingRes.value.data);
-      }
-      if (sessionRes.status === 'fulfilled') {
-        setSession(sessionRes.value.data);
-      }
-    } catch {
-      // handled individually above
-    } finally {
-      setLoading(false);
+    const [bookingRes, sessionRes] = await Promise.allSettled([
+      api.get(`/bookings/${bookingId}`),
+      api.get(`/video-sessions/${bookingId}`),
+    ]);
+    if (bookingRes.status === 'fulfilled') {
+      setBooking(bookingRes.value.data);
+    } else {
+      setError('Failed to load appointment details.');
     }
+    if (sessionRes.status === 'fulfilled') {
+      setSession(sessionRes.value.data);
+    }
+    setLoading(false);
   }, [bookingId]);
 
   useEffect(() => {
@@ -132,8 +129,11 @@ export default function VideoConsultationDetailPage() {
   const isLive = session?.status === 'IN_PROGRESS';
   const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
 
-  const formatDuration = (seconds: number) =>
-    `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const formatDuration = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
