@@ -11,6 +11,7 @@ import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
+import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   ISSUE_CODES,
@@ -19,16 +20,12 @@ import {
   CONFIDENCE_WEIGHTS,
 } from './constants/issue-codes';
 
-/** Verification re-check interval in days. */
-const REVERIFICATION_DAYS = 90;
-
 /** Maximum automatic retry attempts before routing to manual review. */
 const MAX_AUTO_ATTEMPTS = 3;
 
 /** Source tags stored in ProviderLicense.verificationSource. */
 const SOURCE_NMC_API = 'NMC_API';
 const SOURCE_SMC_PORTAL = 'SMC_PORTAL';
-const SOURCE_MANUAL = 'MANUAL';
 const SOURCE_FACE = 'FACE';
 
 export type VerificationLogStatus =
@@ -195,6 +192,134 @@ export class DoctorVerificationService {
       issueLabel: faceResult.match
         ? ISSUE_CODE_LABELS[ISSUE_CODES.PENDING_ADMIN_APPROVAL]
         : ISSUE_CODE_LABELS[ISSUE_CODES.FACE_MISMATCH],
+    };
+  }
+
+  /**
+   * Doctor uploads Aadhaar + medical certificate documents.
+   * Stores the URLs in the ProviderLicense and creates an audit log entry.
+   */
+  async submitVerificationDocuments(
+    userId: string,
+    dto: SubmitVerificationDocumentsDto,
+  ) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    let license = dto.licenseId
+      ? await this.prisma.providerLicense.findFirst({
+          where: { id: dto.licenseId, providerId: profile.id },
+        })
+      : await this.prisma.providerLicense.findFirst({
+          where: {
+            providerId: profile.id,
+            type: 'MEDICAL_REGISTRATION',
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+    const documentUrls = JSON.stringify({
+      aadhaar: dto.aadhaarDocumentUrl,
+      medicalCertificate: dto.medicalCertificateUrl,
+    });
+
+    if (license) {
+      license = await this.prisma.providerLicense.update({
+        where: { id: license.id },
+        data: { documentUrl: documentUrls },
+      });
+    } else {
+      license = await this.prisma.providerLicense.create({
+        data: {
+          providerId: profile.id,
+          type: 'MEDICAL_REGISTRATION',
+          documentUrl: documentUrls,
+          status: 'PENDING',
+        },
+      });
+    }
+
+    await this.prisma.doctorVerificationLog.create({
+      data: {
+        providerId: profile.id,
+        licenseId: license.id,
+        registrationNumber: license.nmcRegistrationNumber ?? 'PENDING',
+        stateCouncil: license.stateCouncil ?? 'N/A',
+        verificationSource: 'DOCUMENT_UPLOAD',
+        status: 'NOT_FOUND',
+        rawRequest: {
+          providerId: profile.id,
+        } as unknown as Prisma.InputJsonValue,
+        rawResponse: {
+          aadhaarDocumentUrl: dto.aadhaarDocumentUrl,
+          medicalCertificateUrl: dto.medicalCertificateUrl,
+        } as unknown as Prisma.InputJsonValue,
+        errorCode: null,
+      },
+    });
+
+    this.logger.log(`Documents uploaded for provider: ${profile.id}`);
+
+    return {
+      licenseId: license.id,
+      documentsReceived: true,
+      message:
+        'Documents uploaded successfully. Proceed to DigiLocker consent.',
+    };
+  }
+
+  /**
+   * Records the doctor's consent to fetch documents from DigiLocker.
+   * Actual DigiLocker OAuth requires credentials configured separately.
+   */
+  async recordDigilockerConsent(userId: string, licenseId?: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const resolvedLicenseId =
+      licenseId ??
+      (
+        await this.prisma.providerLicense.findFirst({
+          where: {
+            providerId: profile.id,
+            type: 'MEDICAL_REGISTRATION',
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+      )?.id ??
+      null;
+
+    await this.prisma.doctorVerificationLog.create({
+      data: {
+        providerId: profile.id,
+        licenseId: resolvedLicenseId,
+        registrationNumber: 'DIGILOCKER_CONSENT',
+        stateCouncil: 'N/A',
+        verificationSource: 'DIGILOCKER_CONSENT',
+        status: 'NOT_FOUND',
+        rawRequest: {
+          providerId: profile.id,
+          consentGiven: true,
+          consentAt: new Date().toISOString(),
+        } as unknown as Prisma.InputJsonValue,
+        rawResponse: {
+          message: 'User consented to DigiLocker document fetch',
+        } as unknown as Prisma.InputJsonValue,
+        errorCode: null,
+      },
+    });
+
+    this.logger.log(`DigiLocker consent recorded for provider: ${profile.id}`);
+
+    return {
+      consentRecorded: true,
+      message:
+        'DigiLocker consent recorded. Your documents will be fetched securely during review.',
     };
   }
 
@@ -488,83 +613,51 @@ export class DoctorVerificationService {
       dataMismatch,
     });
 
-    // Update DB
+    // Update DB — pipeline never auto-approves; always routes to admin review
     let overallStatus: VerificationLogStatus;
     let updatedLicense: unknown;
 
-    if (
-      issueCode === ISSUE_CODES.FULLY_VERIFIED ||
-      issueCode === ISSUE_CODES.VERIFIED_VIA_DOCUMENTS
-    ) {
-      overallStatus = 'SUCCESS';
-      const nextReverification = new Date();
-      nextReverification.setDate(
-        nextReverification.getDate() + REVERIFICATION_DAYS,
-      );
+    overallStatus =
+      updatedAttempts >= MAX_AUTO_ATTEMPTS ? 'MANUAL_REVIEW' : 'NOT_FOUND';
 
-      updatedLicense = await this.prisma.providerLicense.update({
-        where: { id: licenseId },
-        data: {
-          status: 'APPROVED',
-          verifiedAt: new Date(),
-          verificationSource: nmcFound ? SOURCE_NMC_API : SOURCE_SMC_PORTAL,
-          nextReverificationDue: nextReverification,
+    if (issueCode === ISSUE_CODES.DATA_MISMATCH) {
+      overallStatus = 'NOT_FOUND';
+    }
+
+    updatedLicense = await this.prisma.providerLicense.update({
+      where: { id: licenseId },
+      data: {
+        status: 'PENDING',
+        verificationSource: 'PIPELINE',
+      },
+    });
+
+    // Notify doctor that submission was received and is pending review
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+      select: { userId: true },
+    });
+    if (provider) {
+      await this.notificationsService.sendNotification(
+        {
+          userId: provider.userId,
+          title: 'Verification Submitted',
+          message:
+            'Your verification details have been received and are pending admin review. You will be notified once approved.',
+          type: 'NMC_VERIFICATION_SUBMITTED',
+          metadata: { providerId, licenseId, issueCode, confidenceScore },
         },
-      });
-
-      await this.prisma.providerProfile.update({
-        where: { id: providerId },
-        data: { isVerified: true, isActive: true },
-      });
-
-      const provider = await this.prisma.providerProfile.findUnique({
-        where: { id: providerId },
-        select: { userId: true },
-      });
-      if (provider) {
-        await this.notificationsService.sendNotification(
-          {
-            userId: provider.userId,
-            title: 'Registration Verified',
-            message:
-              'Your medical registration has been verified successfully. You can now start accepting bookings.',
-            type: 'NMC_VERIFICATION_SUCCESS',
-            metadata: { providerId, licenseId, issueCode, confidenceScore },
-          },
-          {
-            inApp: true,
-            push: true,
-            sms: true,
-            smsTemplate: 'NMC_VERIFICATION_SUCCESS',
-            smsParams: { registrationNumber: nmcRegistrationNumber },
-          },
-        );
-      }
-
-      this.logger.log(
-        `Verification SUCCESS (code ${issueCode}, score ${confidenceScore}): ${nmcRegistrationNumber}`,
-      );
-    } else {
-      overallStatus =
-        updatedAttempts >= MAX_AUTO_ATTEMPTS ? 'MANUAL_REVIEW' : 'NOT_FOUND';
-
-      if (issueCode === ISSUE_CODES.DATA_MISMATCH) {
-        overallStatus = 'NOT_FOUND';
-      }
-
-      updatedLicense = await this.prisma.providerLicense.update({
-        where: { id: licenseId },
-        data: {
-          status: 'PENDING',
-          verificationSource:
-            overallStatus === 'MANUAL_REVIEW' ? SOURCE_MANUAL : null,
+        {
+          inApp: true,
+          push: true,
+          sms: false,
         },
-      });
-
-      this.logger.warn(
-        `Verification ${overallStatus} (code ${issueCode}, score ${confidenceScore}): ${nmcRegistrationNumber}`,
       );
     }
+
+    this.logger.log(
+      `Verification ${overallStatus} (code ${issueCode}, score ${confidenceScore}): ${nmcRegistrationNumber} — awaiting admin approval`,
+    );
 
     // Persist Log
     const errorCode =
@@ -585,7 +678,6 @@ export class DoctorVerificationService {
         rawRequest: {
           ...nmcRequest,
           fullName: dto.fullName,
-          fatherName: dto.fatherName,
         } as unknown as Prisma.InputJsonValue,
         rawResponse: {
           issueCode,
@@ -610,6 +702,8 @@ export class DoctorVerificationService {
 
   /**
    * Compute the issue code based on pipeline results.
+   * The pipeline never auto-approves; both FULLY_VERIFIED and VERIFIED_VIA_DOCUMENTS
+   * are replaced with PENDING_ADMIN_APPROVAL so every submission requires admin review.
    */
   private computeIssueCode(opts: {
     nmcFound: boolean;
@@ -617,14 +711,11 @@ export class DoctorVerificationService {
     confidenceScore: number;
     dataMismatch: boolean;
   }): IssueCode {
-    const { nmcFound, smcFound, confidenceScore, dataMismatch } = opts;
+    const { nmcFound, smcFound, dataMismatch } = opts;
 
     if (dataMismatch) return ISSUE_CODES.DATA_MISMATCH;
     if (!nmcFound && !smcFound) return ISSUE_CODES.NOT_FOUND_NEEDS_SMC_EMAIL;
-    // Both sources confirmed → fully verified
-    if (confidenceScore >= 65) return ISSUE_CODES.FULLY_VERIFIED;
-    // At least one authoritative source confirmed → verified via that source
-    if (nmcFound || smcFound) return ISSUE_CODES.VERIFIED_VIA_DOCUMENTS;
+    // At least one source confirmed the registration → route to admin approval
     return ISSUE_CODES.PENDING_ADMIN_APPROVAL;
   }
 

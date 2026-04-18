@@ -5,10 +5,6 @@ export class SubmitNmcVerificationDto {
   @IsNotEmpty({ message: 'Full name is required' })
   fullName: string;
 
-  @IsOptional()
-  @IsString()
-  fatherName?: string;
-
   @IsString()
   @IsNotEmpty({ message: 'NMC registration number is required' })
   nmcRegistrationNumber: string;
