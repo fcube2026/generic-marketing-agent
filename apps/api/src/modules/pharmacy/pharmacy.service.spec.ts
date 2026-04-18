@@ -4,6 +4,7 @@ import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface'
 describe('PharmacyService', () => {
   const mockPrisma = {
     pharmacyPartner: {
+      findFirst: jest.fn(),
       findMany: jest.fn(),
     },
   } as any;
@@ -31,16 +32,25 @@ describe('PharmacyService', () => {
   beforeEach(() => {
     service = new PharmacyService(
       mockPrisma,
-      new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+      new Map<string, PharmacyPartnerProvider>([
+        ['testprovider', mockProvider],
+      ]),
     );
     jest.clearAllMocks();
   });
 
   it('searches a targeted provider and enriches availability', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'testprovider',
+      name: 'testprovider',
+      isActive: true,
+    });
+
     const results = await service.searchMedicines(
       'paracetamol',
       '560001',
-      'mock',
+      'testprovider',
     );
 
     expect(mockProvider.searchMedicines).toHaveBeenCalledWith('paracetamol');
@@ -56,9 +66,9 @@ describe('PharmacyService', () => {
     mockPrisma.pharmacyPartner.findMany.mockResolvedValue([
       {
         id: 'partner-1',
-        code: 'mock',
-        name: 'Mock',
-        displayName: 'Mock Partner',
+        code: 'testprovider',
+        name: 'testprovider',
+        displayName: 'Test Provider',
         description: null,
         logoUrl: null,
         priority: 0,
@@ -69,7 +79,7 @@ describe('PharmacyService', () => {
 
     expect(partners).toEqual([
       expect.objectContaining({
-        code: 'mock',
+        code: 'testprovider',
         registered: true,
       }),
     ]);
