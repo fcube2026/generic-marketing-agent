@@ -1,33 +1,54 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
-import api from '../../services/api';
+import { patientService } from '../../services/patientService';
+import { Address, PatientProfile } from '../../types';
+import { PatientStackParamList } from '../../navigation/PatientNavigator';
+
+type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const { user, logout } = useAuthStore();
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading } = useQuery<PatientProfile | null>({
     queryKey: ['patient-profile'],
-    queryFn: async () => {
-      const res = await api.get('/patients/me');
-      return res.data;
-    },
+    queryFn: patientService.getProfile,
   });
 
-  const { data: addresses } = useQuery({
+  const { data: addresses = [] } = useQuery<Address[]>({
     queryKey: ['patient-addresses'],
-    queryFn: async () => {
-      const res = await api.get('/patients/me/addresses');
-      return res.data;
-    },
+    queryFn: patientService.getAddresses,
   });
 
   if (isLoading) return <LoadingSpinner fullScreen />;
+
+  const isProfileComplete = Boolean(profile);
+
+  if (!isProfileComplete) {
+    return (
+      <View style={styles.emptyStateContainer}>
+        <Text style={styles.emptyStateIcon}>🧾</Text>
+        <Text style={styles.emptyStateTitle}>Complete Your Profile</Text>
+        <Text style={styles.emptyStateText}>
+          Add your personal details to finish setting up your patient account.
+        </Text>
+        <TouchableOpacity style={styles.completeBtn} onPress={() => navigation.navigate('Onboarding')}>
+          <Text style={styles.completeBtnText}>Complete Now →</Text>
+        </TouchableOpacity>
+        <View style={styles.footer}>
+          <Button title="Sign Out" onPress={logout} variant="outline" />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -72,7 +93,7 @@ export const ProfileScreen: React.FC = () => {
       {addresses && addresses.length > 0 && (
         <Card style={styles.card}>
           <Text style={styles.sectionTitle}>Saved Addresses</Text>
-          {addresses.map((addr: any) => (
+          {addresses.map((addr) => (
             <View key={addr.id} style={styles.addressItem}>
               <Text style={styles.addressLabel}>{addr.label}</Text>
               <Text style={styles.addressText}>{addr.addressLine}, {addr.city}</Text>
@@ -83,6 +104,10 @@ export const ProfileScreen: React.FC = () => {
       )}
 
       <View style={styles.footer}>
+        <Button title="Edit Profile" onPress={() => navigation.navigate('Onboarding')} />
+      </View>
+
+      <View style={styles.footer}>
         <Button title="Sign Out" onPress={logout} variant="outline" />
       </View>
     </ScrollView>
@@ -91,6 +116,30 @@ export const ProfileScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  emptyStateContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  emptyStateIcon: { fontSize: 64, marginBottom: 16 },
+  emptyStateTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  emptyStateText: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  completeBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  completeBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   header: {
     backgroundColor: Colors.primary,
     alignItems: 'center',

@@ -47,6 +47,25 @@ export class PharmacyOrderService {
       throw new NotFoundException('Delivery address not found');
     }
 
+    if (dto.prescriptionId) {
+      const prescription = await this.prisma.prescription.findFirst({
+        where: {
+          id: dto.prescriptionId,
+          consultationSummary: {
+            booking: {
+              patientId: patient.id,
+            },
+          },
+        },
+      });
+
+      if (!prescription) {
+        throw new BadRequestException(
+          'Prescription not found for this patient',
+        );
+      }
+    }
+
     const provider = this.resolveProvider(partner.code, partner.name);
     const partnerItems = dto.items.map((item) => ({
       medicineCode: item.medicineCode,

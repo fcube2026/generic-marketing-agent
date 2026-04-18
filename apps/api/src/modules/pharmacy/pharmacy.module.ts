@@ -23,6 +23,7 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
         const map = new Map<string, PharmacyPartnerProvider>();
         map.set('mock', mockProvider);
         map.set('pharmeasy', pharmEasyProvider);
+        map.set('pharmeasy-express', pharmEasyProvider);
         return map;
       },
       inject: [MockPharmacyProvider, PharmEasyProvider],

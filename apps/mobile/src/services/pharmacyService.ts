@@ -9,7 +9,7 @@ import {
 
 export const pharmacyService = {
   searchMedicines: async (query: string, pincode?: string): Promise<MedicineResult[]> => {
-    const params: Record<string, string> = { query };
+    const params: Record<string, string> = { q: query };
     if (pincode) {
       params.pincode = pincode;
     }

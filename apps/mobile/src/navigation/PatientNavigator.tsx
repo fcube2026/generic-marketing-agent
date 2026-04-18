@@ -13,6 +13,7 @@ import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummar
 import { VideoConsultationScreen } from '../screens/patient/VideoConsultationScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
+import { OnboardingScreen } from '../screens/patient/OnboardingScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
 import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
@@ -22,6 +23,7 @@ import { ServiceCategory, MedicineResult } from '../types';
 
 export type PatientStackParamList = {
   Tabs: undefined;
+  Onboarding: undefined;
   SelectService: { category: ServiceCategory };
   ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
   Recommendation: { categorySlug: string; lat: number; lng: number };
@@ -65,6 +67,7 @@ const TabNavigator = () => (
 export const PatientNavigator: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerBackTitle: 'Back' }}>
     <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
+    <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Complete Profile' }} />
     <Stack.Screen name="SelectService" component={SelectServiceScreen} options={{ title: 'Book Service' }} />
     <Stack.Screen name="ProviderList" component={ProviderListScreen} options={{ title: 'Nearby Providers' }} />
     <Stack.Screen name="Recommendation" component={RecommendationScreen} options={{ title: 'Recommendation' }} />

@@ -1,10 +1,23 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from '../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PUSH_TOKEN_KEY = 'push_notification_token';
+
+function getExpoProjectId(): string | null {
+  const easProjectId =
+    Constants.easConfig?.projectId ||
+    Constants.expoConfig?.extra?.eas?.projectId;
+
+  if (typeof easProjectId === 'string' && easProjectId.trim().length > 0) {
+    return easProjectId;
+  }
+
+  return null;
+}
 
 // Configure how notifications should be handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -48,10 +61,16 @@ export async function registerForPushNotifications(): Promise<string | null> {
     return null;
   }
 
+  const projectId = getExpoProjectId();
+  if (!projectId) {
+    console.log('Skipping Expo push token registration: EAS projectId is not configured');
+    return null;
+  }
+
   try {
     // Get Expo push token
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: undefined, // Uses project ID from app.json/app.config.ts
+      projectId,
     });
 
     const token = tokenData.data;

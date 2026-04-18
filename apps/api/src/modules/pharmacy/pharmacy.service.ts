@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { PharmacyPartner } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   PharmacyPartnerProvider,
@@ -18,19 +19,41 @@ export class PharmacyService {
     partner?: string,
   ): Promise<MedicineResult[]> {
     if (partner) {
-      const provider = this.partnerProviders.get(partner.toLowerCase());
-      if (!provider) {
+      const activePartner = await this.prisma.pharmacyPartner.findFirst({
+        where: {
+          isActive: true,
+          OR: [
+            { code: partner },
+            { code: partner.toLowerCase() },
+            { name: partner },
+          ],
+        },
+      });
+
+      if (!activePartner) {
         throw new BadRequestException(
           `Unknown pharmacy partner provider: ${partner}`,
         );
       }
 
+      const provider = this.resolveProvider(activePartner);
+
       return this.searchProvider(provider, query, pincode);
     }
 
+    const activePartners = await this.prisma.pharmacyPartner.findMany({
+      where: { isActive: true },
+      orderBy: [{ priority: 'asc' }, { displayName: 'asc' }],
+    });
+
+    const providers = this.resolveProviders(activePartners);
+    if (providers.length === 0) {
+      return [];
+    }
+
     const results = await Promise.allSettled(
-      Array.from(this.partnerProviders.values()).map((p) =>
-        this.searchProvider(p, query, pincode),
+      providers.map((provider) =>
+        this.searchProvider(provider, query, pincode),
       ),
     );
 
@@ -62,6 +85,35 @@ export class PharmacyService {
         registered: this.partnerProviders.has(providerKey),
       };
     });
+  }
+
+  private resolveProviders(
+    partners: PharmacyPartner[],
+  ): PharmacyPartnerProvider[] {
+    const uniqueProviders = new Set<PharmacyPartnerProvider>();
+
+    for (const partner of partners) {
+      try {
+        uniqueProviders.add(this.resolveProvider(partner));
+      } catch {
+        // Skip unregistered DB partners so search only queries configured providers.
+      }
+    }
+
+    return Array.from(uniqueProviders);
+  }
+
+  private resolveProvider(partner: Pick<PharmacyPartner, 'code' | 'name'>) {
+    const providerKey = this.resolveProviderKey(partner.code, partner.name);
+    const provider = this.partnerProviders.get(providerKey);
+
+    if (!provider || providerKey === 'mock') {
+      throw new BadRequestException(
+        `No live pharmacy provider configured for partner: ${partner.code}`,
+      );
+    }
+
+    return provider;
   }
 
   private async searchProvider(

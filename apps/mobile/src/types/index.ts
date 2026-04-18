@@ -122,14 +122,25 @@ export interface RecommendationResponse {
 }
 
 export type PharmacyOrderStatus =
+  | 'PLACED'
   | 'PENDING'
   | 'PRESCRIPTION_REVIEW'
   | 'CONFIRMED'
   | 'PACKED'
-  | 'DISPATCHED'
+  | 'SHIPPED'
+  | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'FAILED';
+  | 'FAILED'
+  | 'RETURNED'
+  | 'REFUNDED';
+
+export interface AvailabilityResult {
+  medicineCode: string;
+  pincode: string;
+  available: boolean;
+  reason?: string;
+}
 
 export interface MedicineResult {
   id: string;
@@ -138,6 +149,7 @@ export interface MedicineResult {
   price: number;
   unit?: string;
   requiresPrescription?: boolean;
+  availability?: AvailabilityResult;
 }
 
 export interface PharmacyPartner {
@@ -174,7 +186,7 @@ export interface PharmacyOrder {
   partnerCode: string;
   partnerName: string;
   partnerOrderId?: string | null;
-  status: PharmacyOrderStatus;
+  status: string;
   deliveryAddressId: string;
   deliveryAddress: string;
   prescriptionImageUrl?: string | null;
@@ -191,6 +203,8 @@ export interface PharmacyOrder {
 }
 
 export interface CreatePharmacyOrderPayload {
+  bookingId?: string;
+  prescriptionId?: string;
   partnerId: string;
   deliveryAddressId: string;
   notes?: string;

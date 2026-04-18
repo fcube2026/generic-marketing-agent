@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,6 +19,7 @@ import { pharmacyService } from '../../services/pharmacyService';
 import { MedicineResult } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
+import { requiresPrescriptionForMedicine } from '../../utils/pharmacy';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
@@ -30,11 +32,22 @@ export const MedicineSearchScreen: React.FC = () => {
     new Map(),
   );
 
-  const { data: medicines, isLoading, refetch } = useQuery<MedicineResult[]>({
-    queryKey: ['pharmacy-medicines', searchTerm],
+  const {
+    data: medicines,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<MedicineResult[]>({
+    queryKey: ['pharmacy-medicines', searchTerm, pincode.trim()],
     queryFn: () => pharmacyService.searchMedicines(searchTerm, pincode || undefined),
     enabled: searchTerm.length >= 2,
+    retry: false,
   });
+
+  const errorMessage = axios.isAxiosError(error) && error.response?.status === 401
+    ? 'Session expired. Please login again.'
+    : 'Something went wrong. Please try again.';
 
   const handleSearch = () => {
     if (query.trim().length < 2) {
@@ -107,7 +120,20 @@ export const MedicineSearchScreen: React.FC = () => {
 
       {isLoading && <LoadingSpinner message="Searching medicines..." />}
 
-      {!isLoading && searchTerm.length >= 2 && (!medicines || medicines.length === 0) && (
+      {!isLoading && isError && searchTerm.length >= 2 && (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>{errorMessage}</Text>
+          <Button
+            title="Retry"
+            onPress={() => refetch()}
+            style={styles.retryBtn}
+            fullWidth={false}
+          />
+        </View>
+      )}
+
+      {!isLoading && !isError && searchTerm.length >= 2 && (!medicines || medicines.length === 0) && (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>💊</Text>
           <Text style={styles.emptyTitle}>No medicines found</Text>
@@ -139,7 +165,7 @@ export const MedicineSearchScreen: React.FC = () => {
                 <View style={styles.medicineMetaRow}>
                   <Text style={styles.medicinePrice}>{formatCurrency(item.price)}</Text>
                   {item.unit && <Text style={styles.medicineUnit}> / {item.unit}</Text>}
-                  {item.requiresPrescription && (
+                  {requiresPrescriptionForMedicine(item) && (
                     <Text style={styles.rxBadge}>Rx</Text>
                   )}
                 </View>
@@ -261,6 +287,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },
+  retryBtn: { marginTop: 12 },
   cartBar: {
     position: 'absolute',
     bottom: 0,

@@ -6,9 +6,10 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Only watch the mobile app and the root node_modules (for hoisted deps).
+// Keep Metro watching the app itself only. Watching the monorepo-level
+// node_modules tree on Windows/OneDrive causes transform worker OOM.
 config.watchFolders = [
-  path.resolve(monorepoRoot, 'node_modules'),
+  projectRoot,
 ];
 
 // Ensure node_modules resolve from both the app and monorepo root

@@ -13,28 +13,26 @@ import { Colors } from '../../constants/colors';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Button } from '../../components/common/Button';
 import { pharmacyService } from '../../services/pharmacyService';
-import { PharmacyOrder, PharmacyOrderStatus } from '../../types';
+import { PharmacyOrder } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
+import { canCancelPharmacyOrder } from '../../utils/pharmacy';
 
 type Route = RouteProp<PatientStackParamList, 'PharmacyOrderDetail'>;
 
-const CANCELLABLE_STATUSES: PharmacyOrderStatus[] = [
-  'PENDING',
-  'PRESCRIPTION_REVIEW',
-  'CONFIRMED',
-  'PACKED',
-];
-
 const STATUS_COLORS: Record<string, string> = {
+  PLACED: Colors.warning,
   PENDING: Colors.warning,
   PRESCRIPTION_REVIEW: Colors.warning,
   CONFIRMED: Colors.secondary,
   PACKED: Colors.secondary,
-  DISPATCHED: Colors.primary,
+  SHIPPED: Colors.primary,
+  OUT_FOR_DELIVERY: Colors.primary,
   DELIVERED: Colors.success,
   CANCELLED: Colors.error,
   FAILED: Colors.error,
+  RETURNED: Colors.error,
+  REFUNDED: Colors.success,
 };
 
 export const PharmacyOrderDetailScreen: React.FC = () => {
@@ -85,7 +83,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
   if (isLoading) return <LoadingSpinner fullScreen message="Loading order..." />;
   if (!order) return null;
 
-  const canCancel = CANCELLABLE_STATUSES.includes(order.status);
+  const canCancel = canCancelPharmacyOrder(order.status);
   const statusColor = STATUS_COLORS[order.status] ?? Colors.textMuted;
 
   return (

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
   Alert,
@@ -22,12 +21,21 @@ import { bookingService } from '../../services/bookingService';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
+import { patientService } from '../../services/patientService';
+import { PatientProfile } from '../../types';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
+  const { data: profile, isLoading: profileLoading } = useQuery<PatientProfile | null>({
+    queryKey: ['patient-profile'],
+    queryFn: patientService.getProfile,
+  });
+
+  const isProfileComplete = Boolean(profile);
+  const canUsePatientApp = isProfileComplete;
 
   const {
     data: services,
@@ -36,6 +44,7 @@ export const HomeScreen: React.FC = () => {
     isRefetching,
   } = useQuery<ServiceCategory[]>({
     queryKey: ['services'],
+    enabled: canUsePatientApp,
     queryFn: async () => {
       const res = await api.get('/services');
       return res.data;
@@ -44,6 +53,7 @@ export const HomeScreen: React.FC = () => {
 
   const { data: recentBookings } = useQuery<Booking[]>({
     queryKey: ['patient-bookings'],
+    enabled: isProfileComplete,
     queryFn: async () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
@@ -76,6 +86,25 @@ export const HomeScreen: React.FC = () => {
       );
     }
   };
+
+  if (profileLoading || (canUsePatientApp && isLoading)) {
+    return <LoadingSpinner fullScreen />;
+  }
+
+  if (!canUsePatientApp) {
+    return (
+      <View style={styles.onboardingPrompt}>
+        <Text style={styles.onboardingIcon}>🩺</Text>
+        <Text style={styles.onboardingTitle}>Complete Your Profile</Text>
+        <Text style={styles.onboardingSub}>
+          Add your personal details before booking services.
+        </Text>
+        <TouchableOpacity style={styles.onboardingBtn} onPress={() => navigation.navigate('Onboarding')}>
+          <Text style={styles.onboardingBtnText}>Get Started →</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -204,6 +233,29 @@ export const HomeScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  onboardingPrompt: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: Colors.background,
+  },
+  onboardingIcon: { fontSize: 72, marginBottom: 20 },
+  onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  onboardingSub: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 22,
+  },
+  onboardingBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
