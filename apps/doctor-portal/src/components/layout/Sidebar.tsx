@@ -8,6 +8,7 @@ const navItems = [
   { href: '/consultations', label: 'Consultations', icon: '📋' },
   { href: '/video-consultations', label: 'Video Calls', icon: '🎥' },
   { href: '/earnings', label: 'Earnings', icon: '💰' },
+  { href: '/verification', label: 'Verification', icon: '🛡️' },
   { href: '/profile', label: 'My Profile', icon: '👤' },
 ];
 

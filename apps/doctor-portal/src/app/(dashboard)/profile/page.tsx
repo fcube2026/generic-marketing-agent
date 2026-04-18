@@ -37,9 +37,25 @@ export default function ProfilePage() {
   }
 
   const statusColor: Record<string, string> = {
+    APPROVED: 'bg-green-100 text-green-700',
     verified: 'bg-green-100 text-green-700',
+    PENDING: 'bg-yellow-100 text-yellow-700',
     pending: 'bg-yellow-100 text-yellow-700',
+    PENDING_ADMIN_APPROVAL: 'bg-yellow-100 text-yellow-700',
+    pending_admin_approval: 'bg-yellow-100 text-yellow-700',
+    REJECTED: 'bg-red-100 text-red-700',
     rejected: 'bg-red-100 text-red-700',
+  };
+
+  const statusLabel: Record<string, string> = {
+    APPROVED: 'Verified',
+    verified: 'Verified',
+    PENDING: 'Waiting for Admin Approval',
+    pending: 'Waiting for Admin Approval',
+    PENDING_ADMIN_APPROVAL: 'Waiting for Admin Approval',
+    pending_admin_approval: 'Waiting for Admin Approval',
+    REJECTED: 'Rejected',
+    rejected: 'Rejected',
   };
 
   return (
@@ -78,7 +94,7 @@ export default function ProfilePage() {
                 statusColor[profile?.verificationStatus ?? ''] ?? 'bg-gray-100 text-gray-700'
               }`}
             >
-              {profile?.verificationStatus ?? 'unknown'}
+              {statusLabel[profile?.verificationStatus ?? ''] ?? profile?.verificationStatus ?? 'Unknown'}
             </span>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
+import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 
 @Controller('providers/me/verification')
@@ -11,6 +12,7 @@ export class DoctorVerificationController {
   /**
    * Doctor submits NMC registration details for automated multi-step verification.
    * Runs: NMC API -> SMC portal -> confidence scoring -> issue code assignment.
+   * Always routes to admin approval; never auto-approves.
    * POST /providers/me/verification/nmc
    */
   @Post('nmc')
@@ -19,6 +21,33 @@ export class DoctorVerificationController {
     @Body() dto: SubmitNmcVerificationDto,
   ) {
     return this.verificationService.submitForVerification(user.id, dto);
+  }
+
+  /**
+   * Doctor uploads Aadhaar card and medical certificate documents.
+   * POST /providers/me/verification/documents
+   */
+  @Post('documents')
+  submitVerificationDocuments(
+    @CurrentUser() user: any,
+    @Body() dto: SubmitVerificationDocumentsDto,
+  ) {
+    return this.verificationService.submitVerificationDocuments(user.id, dto);
+  }
+
+  /**
+   * Records the doctor's consent to fetch documents from DigiLocker.
+   * POST /providers/me/verification/digilocker-consent
+   */
+  @Post('digilocker-consent')
+  recordDigilockerConsent(
+    @CurrentUser() user: any,
+    @Body() body: { licenseId?: string },
+  ) {
+    return this.verificationService.recordDigilockerConsent(
+      user.id,
+      body?.licenseId,
+    );
   }
 
   /**

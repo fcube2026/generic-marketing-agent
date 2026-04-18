@@ -142,19 +142,14 @@ describe('DoctorVerificationService', () => {
       expect(mockNmcProvider.verify).not.toHaveBeenCalled();
     });
 
-    it('should call NMC API and auto-approve on success', async () => {
+    it('should call NMC API, find doctor, and route to admin approval', async () => {
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
       mockPrisma.providerLicense.create.mockResolvedValue(mockLicense);
-      mockPrisma.providerLicense.update.mockResolvedValue({
-        ...mockLicense,
-        verificationAttempts: 1,
-        lastAttemptAt: new Date(),
-      });
 
-      const approvedLicense = {
+      const pendingLicense = {
         ...mockLicense,
-        status: 'APPROVED',
-        verificationSource: 'NMC_API',
+        status: 'PENDING',
+        verificationSource: 'PIPELINE',
       };
       mockPrisma.providerLicense.update
         .mockResolvedValueOnce({
@@ -162,8 +157,7 @@ describe('DoctorVerificationService', () => {
           verificationAttempts: 1,
           lastAttemptAt: new Date(),
         })
-        .mockResolvedValueOnce(approvedLicense)
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce(pendingLicense);
 
       mockNmcProvider.verify.mockResolvedValue({
         found: true,
@@ -184,18 +178,25 @@ describe('DoctorVerificationService', () => {
 
       const result = await service.submitForVerification('user-1', dto);
 
-      expect(result.status).toBe('SUCCESS');
+      // Pipeline should NOT auto-approve — status stays NOT_FOUND (pending admin)
+      expect(result.status).toBe('NOT_FOUND');
+      expect(result.issueCode).toBe(500); // PENDING_ADMIN_APPROVAL
       expect(result.cached).toBe(false);
       expect(mockNmcProvider.verify).toHaveBeenCalledWith({
         memberId: 'MH-12345',
         stateCouncil: 'Maharashtra Medical Council',
         yearOfAdmission: '2010',
       });
-      // Updated to use notification service instead of direct prisma call
-      expect(mockNotificationsService.sendNotification).toHaveBeenCalled();
+      // Doctor's profile should NOT be auto-approved
+      expect(mockPrisma.providerProfile.update).not.toHaveBeenCalled();
+      // Submission-received notification should fire
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'NMC_VERIFICATION_SUBMITTED' }),
+        expect.objectContaining({ inApp: true }),
+      );
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'SUCCESS' }),
+          data: expect.objectContaining({ status: 'NOT_FOUND' }),
         }),
       );
     });
@@ -306,21 +307,25 @@ describe('DoctorVerificationService', () => {
     it('should create admin action and retry verification', async () => {
       mockPrisma.providerLicense.findUnique.mockResolvedValue(mockLicense);
       mockPrisma.adminAction.create.mockResolvedValue({});
-      mockPrisma.providerLicense.update.mockResolvedValue({
-        ...mockLicense,
-        verificationAttempts: 1,
-      });
+      mockPrisma.providerLicense.update
+        .mockResolvedValueOnce({
+          ...mockLicense,
+          verificationAttempts: 1,
+        })
+        .mockResolvedValueOnce({
+          ...mockLicense,
+          status: 'PENDING',
+          verificationSource: 'PIPELINE',
+        });
 
       mockNmcProvider.verify.mockResolvedValue({
         found: true,
         rawResponse: {},
       });
-      mockPrisma.providerProfile.update.mockResolvedValue({});
       mockPrisma.providerProfile.findUnique.mockResolvedValue({
         ...mockProfile,
         userId: 'user-1',
       });
-      mockPrisma.notification.create.mockResolvedValue({});
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       await service.retryVerification('license-1', 'admin-1');
@@ -335,6 +340,8 @@ describe('DoctorVerificationService', () => {
         }),
       );
       expect(mockNmcProvider.verify).toHaveBeenCalled();
+      // Pipeline still should NOT auto-approve
+      expect(mockPrisma.providerProfile.update).not.toHaveBeenCalled();
     });
   });
 
