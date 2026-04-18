@@ -220,6 +220,8 @@ export class DoctorVerificationService {
           orderBy: { createdAt: 'desc' },
         });
 
+    // Persist both URLs as a JSON string in the single documentUrl column.
+    // A future schema migration can split these into aadhaarUrl / medicalCertUrl fields.
     const documentUrls = JSON.stringify({
       aadhaar: dto.aadhaarDocumentUrl,
       medicalCertificate: dto.medicalCertificateUrl,
@@ -245,7 +247,8 @@ export class DoctorVerificationService {
       data: {
         providerId: profile.id,
         licenseId: license.id,
-        registrationNumber: license.nmcRegistrationNumber ?? 'PENDING',
+        registrationNumber:
+          license.nmcRegistrationNumber ?? 'DOCUMENT_UPLOAD_STAGE',
         stateCouncil: license.stateCouncil ?? 'N/A',
         verificationSource: 'DOCUMENT_UPLOAD',
         status: 'NOT_FOUND',
