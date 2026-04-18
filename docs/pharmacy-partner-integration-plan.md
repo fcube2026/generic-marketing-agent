@@ -1,6 +1,6 @@
 # Pharmacy Partner Integration Plan (Curex24)
 
-**Platform:** Curex24 | **Document Type:** Execution-Ready Outreach & Integration Plan | **Audience:** Non-technical + Technical Team | **Status:** Active | **Last Updated:** 2026-04-18
+**Platform:** Curex24 | **Document Type:** Execution-Ready Outreach & Integration Plan | **Audience:** Non-technical + Technical Team | **Status:** Active | **Last Updated:** 2026-04-18 (v2 — expanded with API Discovery, Contact Discovery, Onboarding Flows, Business Model Analysis)
 
 ---
 
@@ -41,32 +41,141 @@ This means Curex24 focuses on the patient experience and clinical layer, while t
 
 ---
 
-## 3. Deep Dive per Partner
+## 3. API Discovery
+
+> **Rule:** Do NOT assume APIs exist — the tables below reflect publicly confirmed B2B programs as of April 2026. Verify status via direct outreach.
+
+### 3.1 API Availability Summary
+
+| Partner | Public API Docs? | Developer Portal? | Sandbox Available? | Confirmed Integration Type |
+|---|---|---|---|---|
+| **PharmEasy** | ❌ No public docs | ✅ B2B portal at `pharmeasy.in/business` | ⚠️ Post-agreement only | REST API (private, post-NDA) |
+| **Tata 1mg** | ❌ No public docs | ✅ Partner form at `1mg.com/partners` | ⚠️ Post-agreement only | REST API (enterprise) + Affiliate fallback |
+| **Apollo Pharmacy** | ❌ No public docs | ⚠️ BD contact via `apollopharmacy.in/contact-us` | ⚠️ Post-agreement only | REST API (private, post-NDA) |
+| **Netmeds** | ❌ No public docs | ⚠️ Form at `netmeds.com/partner-with-us` | ❌ Unknown | Likely affiliate/redirect; API unconfirmed |
+
+### 3.2 Technical Capabilities (per partner)
+
+#### PharmEasy
+
+| Capability | Availability | Notes |
+|---|---|---|
+| Medicine search API | ✅ Confirmed (post-agreement) | Catalog search by name, salt, category |
+| Order creation API | ✅ Confirmed (post-agreement) | Supports prescription reference |
+| Prescription upload | ✅ Confirmed | Image/PDF upload endpoint |
+| Order tracking/status API | ✅ Confirmed | Webhook callbacks supported |
+| Cancellation/refund API | ⚠️ To confirm | Ask explicitly during scoping call |
+
+#### Tata 1mg
+
+| Capability | Availability | Notes |
+|---|---|---|
+| Medicine search API | ✅ Confirmed (enterprise post-agreement) | Rich catalog including generics |
+| Order creation API | ✅ Confirmed (enterprise post-agreement) | Requires prescription for Rx drugs |
+| Prescription upload | ✅ Confirmed | Pharmacist verification included |
+| Order tracking/status API | ✅ Confirmed | Real-time status via webhook |
+| Lab test booking API | ✅ Bonus feature | Lab test orders possible (added revenue) |
+| Cancellation/refund API | ⚠️ To confirm | Covered under enterprise agreement |
+
+#### Apollo Pharmacy
+
+| Capability | Availability | Notes |
+|---|---|---|
+| Medicine search API | ✅ Confirmed (post-agreement) | Online + store inventory search |
+| Order creation API | ✅ Confirmed (post-agreement) | Home delivery + store pickup options |
+| Prescription upload | ✅ Confirmed | Apollo pharmacist review |
+| Order tracking/status API | ✅ Confirmed | Supports both delivery and pickup |
+| Cancellation/refund API | ⚠️ To confirm | Ask during BD call |
+
+#### Netmeds (Reliance)
+
+| Capability | Availability | Notes |
+|---|---|---|
+| Medicine search API | ❌ Not confirmed | Affiliate redirect only until confirmed |
+| Order creation API | ❌ Not confirmed | Must ask directly |
+| Prescription upload | ❌ Not confirmed | Must ask directly |
+| Order tracking/status API | ❌ Not confirmed | Affiliate model has no tracking |
+| Affiliate deep-link | ✅ Available | Fallback option; low revenue share |
+
+### 3.3 Integration Type Comparison
+
+| Partner | API-Based | Affiliate/Deep Link | Manual Onboarding Only |
+|---|---|---|---|
+| PharmEasy | ✅ (post-NDA) | ⚠️ Fallback | ❌ |
+| Tata 1mg | ✅ (enterprise, post-NDA) | ✅ Available now via `affiliate.1mg.com` | ❌ |
+| Apollo Pharmacy | ✅ (post-NDA) | ❌ Not confirmed | ❌ |
+| Netmeds | ⚠️ Unconfirmed | ✅ Available | ⚠️ Possible |
 
 ---
 
-### 3.1 PharmEasy
+## 4. Contact Discovery
 
-#### 3.1.1 Company Overview
+### 4.1 Official Contact Channels
+
+| Partner | Partnership/BD Email | API/Integration Email | Contact Page |
+|---|---|---|---|
+| PharmEasy | business@pharmeasy.in | b2b@pharmeasy.in | pharmeasy.in/contact-us |
+| Tata 1mg | partnerships@1mg.com | partner.tech@1mg.com | 1mg.com/partners |
+| Apollo Pharmacy | pharmacy@apollohospitals.com | enterprise@apollopharmacy.in | apollopharmacy.in/contact-us |
+| Netmeds | partner@netmeds.com | support@netmeds.com (ask to route to B2B) | netmeds.com/partner-with-us |
+
+> **Note:** Email addresses above are the best publicly known contacts. Always confirm the right BD contact during your first exchange.
+
+### 4.2 Phone Numbers
+
+| Partner | Customer/Business Phone | Notes |
+|---|---|---|
+| PharmEasy | 1800-120-1808 (toll-free) | Ask for Business Development / B2B team |
+| Tata 1mg | 0124-4166666 | Ask for Enterprise Partnerships; be prepared to wait |
+| Apollo Pharmacy | 1860-500-0101 | Ask for Apollo Health & Lifestyle BD team |
+| Netmeds | 044-61610000 | Ask for Partner Relations / B2B |
+
+> **Calling tip:** Always call between 10:00–12:00 AM or 2:00–4:00 PM IST for best chance of reaching BD staff directly.
+
+### 4.3 LinkedIn Search Queries (Copy-Paste Ready)
+
+| Partner | LinkedIn Search Query | Target Role |
+|---|---|---|
+| PharmEasy | `"Business Development" "PharmEasy"` | BD Manager / Sr. BD Manager |
+| PharmEasy | `"Partnerships Manager" "PharmEasy"` | Partnerships Manager |
+| PharmEasy | `"VP Partnerships" "PharmEasy" OR "API Holdings"` | VP / Head of Partnerships |
+| Tata 1mg | `"Business Development" "Tata 1mg"` | BD Manager |
+| Tata 1mg | `"Partnership Manager" "1mg"` | Partnerships Manager |
+| Tata 1mg | `"Head of Partnerships" "1mg" OR "Tata Digital Health"` | Head / VP Partnerships |
+| Apollo Pharmacy | `"Business Development" "Apollo Pharmacy"` | BD Manager |
+| Apollo Pharmacy | `"Partnerships" "Apollo Health" OR "AHLL"` | Apollo Health & Lifestyle BD |
+| Netmeds | `"Partnerships" "Netmeds" OR "Reliance Retail Health"` | BD / Reliance Retail BD |
+
+**Send 5–8 connection requests per company** across different seniority levels (Manager → VP → Head level).
+
+---
+
+## 5. Deep Dive per Partner
+
+---
+
+### 5.1 PharmEasy
+
+#### 5.1.1 Company Overview
 
 PharmEasy (API Holdings Ltd.) is India's largest e-pharmacy platform by GMV. It operates pan-India across 1,000+ cities, offering prescription medicines, OTC products, and diagnostics. PharmEasy has a dedicated B2B vertical (`pharmeasy.in/business`) and has integrated with multiple healthtech platforms, making it the most accessible partner for a startup like Curex24.
 
 **Market position:** #1 e-pharmacy by volume in India, backed by major investors, publicly known B2B partnerships.
 
-#### 3.1.2 Integration Possibility
+#### 5.1.2 Integration Possibility
 
 - **API available:** Yes — private/partner-only. Not publicly documented but confirmed to exist through B2B program.
 - **Type:** REST API (post-partnership). Deep-link redirect available as a no-API fallback.
 - **Evidence:** `pharmeasy.in/business` B2B portal; published healthtech partnerships in industry press.
 
-#### 3.1.3 Business Model
+#### 5.1.3 Business Model
 
 - Commission or revenue share per fulfilled order (estimated 5–15% to Curex24 — to be negotiated)
 - PharmEasy handles: inventory, prescription validation, packaging, delivery, customer service for orders
 - Curex24 handles: patient UI, consultation, prescription generation, API integration layer
 - Customer relationship: Curex24 retains the patient; PharmEasy fulfils in the background
 
-#### 3.1.4 Expected Requirements
+#### 5.1.4 Expected Requirements
 
 **Legal:**
 - NDA before any API or sandbox access is shared
@@ -82,7 +191,7 @@ PharmEasy (API Holdings Ltd.) is India's largest e-pharmacy platform by GMV. It 
 - Company registration or GST number may be required (as a startup, a simple intro deck with your registered entity details is sufficient to start)
 - Projected monthly order volume (provide a reasonable pilot estimate)
 
-#### 3.1.5 Challenges
+#### 5.1.5 Challenges
 
 | Challenge | Severity | Note |
 |---|---|---|
@@ -95,21 +204,21 @@ PharmEasy (API Holdings Ltd.) is India's largest e-pharmacy platform by GMV. It 
 
 ---
 
-### 3.2 Tata 1mg
+### 5.2 Tata 1mg
 
-#### 3.2.1 Company Overview
+#### 5.2.1 Company Overview
 
 Tata 1mg is part of the Tata Health ecosystem and is India's most trusted health platform combining e-pharmacy, lab tests, and teleconsultation. It has strong brand equity in urban markets and a large certified user base. As a Tata Group company, it follows enterprise procurement and compliance processes.
 
 **Market position:** Premium health brand; #1 in consumer trust for online pharmacy in urban India.
 
-#### 3.2.2 Integration Possibility
+#### 5.2.2 Integration Possibility
 
 - **API available:** Yes — private/enterprise only. Affiliate redirect program (`affiliate.1mg.com`) is publicly accessible but does not provide order API access.
 - **Type:** Enterprise REST API (post-partnership). Affiliate deep-link as an interim fallback.
 - **Evidence:** `1mg.com/partners` partner inquiry form; affiliate program confirmed at `affiliate.1mg.com`.
 
-#### 3.2.3 Business Model
+#### 5.2.3 Business Model
 
 - Commission per fulfilled order (estimated 5–12% — to be negotiated)
 - Tata Group enterprise deals may include quarterly volume commitments
@@ -117,7 +226,7 @@ Tata 1mg is part of the Tata Health ecosystem and is India's most trusted health
 - Tata 1mg handles: inventory, pharmacist validation, delivery, post-sale support
 - Curex24 handles: patient journey, consultation, prescription
 
-#### 3.2.4 Expected Requirements
+#### 5.2.4 Expected Requirements
 
 **Legal:**
 - Full Tata enterprise NDA and procurement process
@@ -133,7 +242,7 @@ Tata 1mg is part of the Tata Health ecosystem and is India's most trusted health
 - Volume commitment discussion (may require minimum monthly order projection)
 - Executive-level sign-off likely required on both sides
 
-#### 3.2.5 Challenges
+#### 5.2.5 Challenges
 
 | Challenge | Severity | Note |
 |---|---|---|
@@ -146,15 +255,15 @@ Tata 1mg is part of the Tata Health ecosystem and is India's most trusted health
 
 ---
 
-### 3.3 Netmeds (Reliance Retail Health)
+### 5.3 Netmeds (Reliance Retail Health)
 
-#### 3.3.1 Company Overview
+#### 5.3.1 Company Overview
 
 Netmeds was acquired by Reliance Retail in 2020. It has strong Tier-2 and Tier-3 city penetration powered by Reliance's distribution network. However, it is operationally embedded in Reliance Retail, meaning partnership and procurement processes are slow and less startup-friendly than PharmEasy.
 
 **Market position:** Tier-2/3 coverage strength; backed by India's largest retailer.
 
-#### 3.3.2 Integration Possibility
+#### 5.3.2 Integration Possibility
 
 - **API available:** ⚠️ Unknown — to be confirmed via direct outreach.
 - **Type:** Likely affiliate/redirect-based publicly; enterprise REST API may exist for Reliance Retail B2B partners.
@@ -162,14 +271,14 @@ Netmeds was acquired by Reliance Retail in 2020. It has strong Tier-2 and Tier-3
 
 > **Requires direct confirmation via outreach.**
 
-#### 3.3.3 Business Model
+#### 5.3.3 Business Model
 
 - Affiliate commission (1–5% for affiliate/redirect model)
 - Enterprise partnership terms for API access (negotiated; likely lower margin due to Reliance pricing control)
 - Reliance handles: inventory, fulfilment, delivery
 - Curex24 handles: patient UI, consultation, referral
 
-#### 3.3.4 Expected Requirements
+#### 5.3.4 Expected Requirements
 
 **Legal:**
 - Reliance Retail vendor onboarding documentation
@@ -182,7 +291,7 @@ Netmeds was acquired by Reliance Retail in 2020. It has strong Tier-2 and Tier-3
 **Business:**
 - Reliance Retail B2B team review (slow — 2–4 week response time expected)
 
-#### 3.3.5 Challenges
+#### 5.3.5 Challenges
 
 | Challenge | Severity | Note |
 |---|---|---|
@@ -195,21 +304,21 @@ Netmeds was acquired by Reliance Retail in 2020. It has strong Tier-2 and Tier-3
 
 ---
 
-### 3.4 Apollo Pharmacy
+### 5.4 Apollo Pharmacy
 
-#### 3.4.1 Company Overview
+#### 5.4.1 Company Overview
 
 Apollo Pharmacy is operated by Apollo Health & Lifestyle Ltd. (AHLL), part of Apollo Hospitals Group — India's most recognised healthcare brand. Apollo Pharmacy has 5,500+ physical stores plus an online platform. It is the most healthcare-aligned brand among the four partners, which makes partnership conversations more natural and faster with a healthcare platform like Curex24.
 
 **Market position:** Healthcare brand leader; pan-India presence including hybrid online + offline delivery.
 
-#### 3.4.2 Integration Possibility
+#### 5.4.2 Integration Possibility
 
 - **API available:** Yes — private/partner only. No public developer portal.
 - **Type:** Enterprise REST API (post-partnership). Physical store pickup is an additional unique integration opportunity.
 - **Evidence:** `apollopharmacy.in` enterprise BD contacts; Apollo Health & Lifestyle partner programs.
 
-#### 3.4.3 Business Model
+#### 5.4.3 Business Model
 
 - Commission per fulfilled order (estimated 5–12% — to be negotiated)
 - Potential co-branding: "Fulfilled by Apollo Pharmacy" within Curex24
@@ -217,7 +326,7 @@ Apollo Pharmacy is operated by Apollo Health & Lifestyle Ltd. (AHLL), part of Ap
 - Apollo handles: inventory (online + offline stores), prescription validation, home delivery + store pickup
 - Curex24 handles: patient UI, consultation, prescription
 
-#### 3.4.4 Expected Requirements
+#### 5.4.4 Expected Requirements
 
 **Legal:**
 - NDA + Apollo Health & Lifestyle partnership agreement
@@ -233,7 +342,7 @@ Apollo Pharmacy is operated by Apollo Health & Lifestyle Ltd. (AHLL), part of Ap
 - Curex24 product demo likely requested
 - Healthcare platform credibility is an advantage here
 
-#### 3.4.5 Challenges
+#### 5.4.5 Challenges
 
 | Challenge | Severity | Note |
 |---|---|---|
@@ -246,37 +355,13 @@ Apollo Pharmacy is operated by Apollo Health & Lifestyle Ltd. (AHLL), part of Ap
 
 ---
 
-## 4. Outreach Strategy
+## 6. Outreach Strategy
 
-### 4.1 Step-by-Step Outreach Plan
+### 6.1 Step-by-Step Outreach Plan
 
 #### Step 1 — Identify Contact Points
 
-**Official website contacts:**
-
-| Partner | Contact Page | Partnership/Business Email |
-|---|---|---|
-| PharmEasy | pharmeasy.in/contact-us | business@pharmeasy.in |
-| Tata 1mg | 1mg.com/partners | partnerships@1mg.com |
-| Netmeds | netmeds.com/partner-with-us | support@netmeds.com (ask to route to B2B) |
-| Apollo Pharmacy | apollopharmacy.in/contact-us | pharmacy@apollohospitals.com |
-
-**LinkedIn search queries (copy and use exactly):**
-
-| Provider | Search Query |
-|---|---|
-| PharmEasy | `"Business Development" "PharmEasy"` |
-| PharmEasy | `"Partnerships" "PharmEasy"` |
-| PharmEasy | `"API" "PharmEasy" "B2B"` |
-| Tata 1mg | `"Business Development" "Tata 1mg"` |
-| Tata 1mg | `"Partnership Manager" "1mg"` |
-| Netmeds | `"Partnerships" "Netmeds"` |
-| Apollo Pharmacy | `"Business Development" "Apollo Pharmacy"` |
-| Apollo Pharmacy | `"Partnerships" "Apollo Health"` |
-
-Target roles: Business Development Manager, Sr. BD Manager, Partnerships Manager, VP Partnerships, Head of Integrations.
-
-Send **5–8 connection requests per company** across different seniority levels.
+See Section 4 (Contact Discovery) for complete contact details, phone numbers, and LinkedIn search queries.
 
 #### Step 2 — Prepare Outreach Assets
 
@@ -288,23 +373,23 @@ Before sending any email or LinkedIn message, make sure Curex24 has the followin
 | 2–3 sentence product description | Must prepare | Write once, reuse everywhere |
 | Use case description | Must prepare | "Patient consults doctor → receives prescription → orders medicine" |
 | Company name + founder name | ✅ Known | Use in email signature |
-| Contact email | See Section 9 | Use professional Gmail if no domain email |
+| Contact email | See Section 13 | Use professional Gmail if no domain email |
 
 #### Step 3 — Email Outreach
 
-Send initial email to partnership/business email address. Use Template 1 (short) for first contact. See Section 5 for full templates.
+Send initial email to partnership/business email address. Use Template 1 (short) for first contact. See Section 7 for full templates.
 
 #### Step 4 — LinkedIn Outreach
 
-Send connection request with a personalised message on the same day as the email. See Section 6 for LinkedIn templates.
+Send connection request with a personalised message on the same day as the email. See Section 8 for LinkedIn templates.
 
 #### Step 5 — Phone Follow-Up
 
-If no response after Day 7, call the company's main customer service or business number and ask to be routed to the Business Development or Partnerships team. Use the call script in Section 7.
+If no response after Day 7, call the company's main customer service or business number and ask to be routed to the Business Development or Partnerships team. Use the call script in Section 9.
 
 ---
 
-## 5. Email Templates
+## 7. Email Templates
 
 ### Template 1 — Short API Inquiry (Use for First Contact)
 
@@ -371,7 +456,61 @@ If no response after Day 7, call the company's main customer service or business
 
 ---
 
-## 6. LinkedIn Outreach Templates
+### Template 3 — Follow-Up Email (Send on Day 3 if No Reply)
+
+> **Subject:** Re: API Integration & Partnership Inquiry — Curex24 Healthcare Platform
+>
+> Hi [First Name / Team],
+>
+> I wanted to follow up on my email from [date — e.g., "Monday, 14 April"]. I completely understand you receive a high volume of enquiries; I just want to make sure this didn't get buried.
+>
+> To quickly recap: I'm [Your Name] from **Curex24**, a digital healthcare platform where patients consult doctors online and receive prescriptions. We're looking to integrate a trusted pharmacy partner so patients can order medicines within the same app — and [Partner Name] is our top choice.
+>
+> I'd be grateful for any of the following:
+> - Confirmation that this reached the right person, or the name/email of who I should contact instead
+> - A quick "yes/no" on whether [Partner Name] has a B2B API program for healthtech platforms
+> - A time for a 15-minute call if you're open to exploring this
+>
+> Our product: [URL]
+>
+> Thank you for your time — I appreciate it.
+>
+> Best regards,
+> [Your Name]
+> Co-founder / [Title], Curex24
+> [Email] | [Phone]
+> [Website/Landing page URL]
+
+---
+
+### Template 4 — Final Escalation Email (Send on Day 10 if No Reply)
+
+> **Subject:** Final Attempt — Curex24 × [Partner Name] Pharmacy API Partnership
+>
+> Hi [First Name / Team],
+>
+> I've sent a couple of messages about exploring a pharmacy API partnership between Curex24 and [Partner Name] — this is my final attempt before I explore other channels.
+>
+> I don't want to be persistent for persistence's sake. I'm reaching out one last time because I genuinely believe this is a strong mutual opportunity:
+> - Curex24 brings a captive patient base at the point of prescription — the highest-intent moment to order medicines
+> - [Partner Name] provides the fulfilment infrastructure we need
+> - Zero overlap: we handle care; you handle fulfilment
+>
+> If [Partner Name] is not the right fit at this stage, I completely understand — and I'd truly appreciate a one-line reply to that effect so I can redirect my efforts.
+>
+> If there is interest, I'm ready to move forward immediately — NDA, scoping call, whatever the next step requires.
+>
+> Thank you sincerely for your time.
+>
+> Warm regards,
+> [Your Name]
+> Co-founder / [Title], Curex24
+> [Email] | [Phone]
+> [Website/Landing page URL]
+
+---
+
+## 8. LinkedIn Outreach Templates
 
 ### Connection Request Message (Under 300 characters — LinkedIn limit)
 
@@ -389,7 +528,7 @@ If no response after Day 7, call the company's main customer service or business
 
 ---
 
-## 7. Call Script
+## 9. Call Script
 
 Use this script when calling the main customer or business number, or when connected directly to a BD team member.
 
@@ -425,7 +564,7 @@ Use this script when calling the main customer or business number, or when conne
 
 ---
 
-## 8. What to Do After a Response
+## 10. What to Do After a Response
 
 ### Case 1: "Yes, we have an API"
 
@@ -472,7 +611,132 @@ Use this script when calling the main customer or business number, or when conne
 
 ---
 
-## 9. Startup Limitation Handling
+## 11. Partnership Process Breakdown
+
+### Step-by-Step Onboarding Flow (per Partner)
+
+#### PharmEasy
+
+| Step | Action | Who Acts | Expected Duration |
+|---|---|---|---|
+| 1. Initial Contact | Send email + LinkedIn DM | Curex24 | Day 1 |
+| 2. First Response | Await BD team reply | PharmEasy BD | 3–7 business days |
+| 3. Intro Call | 30-min discovery call | Both | Week 1–2 |
+| 4. NDA Signing | Exchange and sign mutual NDA | Both (Legal) | 1–2 weeks |
+| 5. Business Verification | Share GST, incorporation, intro deck | Curex24 | Week 3 |
+| 6. API Documentation | Receive Postman collection / API spec | PharmEasy | Week 3–4 |
+| 7. Sandbox Access | Credentials provisioned; begin testing | Both (Engineering) | Week 4–5 |
+| 8. Testing Phase | Validate all endpoints; fix integration bugs | Curex24 Engineering | Week 5–7 |
+| 9. Go-Live Review | Final compliance + security check | Both | Week 7–8 |
+| 10. Production Go-Live | Switch to prod credentials; launch | Both | Week 8–10 |
+
+**Expected Total Timeline:** 8–10 weeks from first email to first live patient order  
+**Common Blockers:** NDA delays; missing GST/incorporation docs; webhook configuration issues  
+**Approval Difficulty:** ⭐⭐⭐ Medium (most startup-friendly of the four partners)
+
+---
+
+#### Tata 1mg
+
+| Step | Action | Who Acts | Expected Duration |
+|---|---|---|---|
+| 1. Initial Contact | Email to partnerships@1mg.com + LinkedIn | Curex24 | Day 1 |
+| 2. First Response | Await enterprise BD reply | Tata 1mg BD | 5–10 business days |
+| 3. Intro Call | Discovery + qualification call | Both | Week 2 |
+| 4. Business Qualification | Submit company profile, deck, registration docs | Curex24 | Week 2–3 |
+| 5. NDA + DPA Signing | Tata Group legal NDA + Data Processing Agreement | Both (Legal) | 2–4 weeks |
+| 6. Technical Scoping | Deep dive on API requirements; integration design | Both (Engineering) | Week 4–5 |
+| 7. API Documentation | Enterprise API docs received | Tata 1mg | Week 5–6 |
+| 8. Sandbox Access | Test environment credentials provisioned | Tata 1mg | Week 6–7 |
+| 9. Testing Phase | Full integration test including prescription flow | Curex24 Engineering | Week 7–9 |
+| 10. Volume Commitment | Agree on pilot volume terms | Both (Business) | Week 8–9 |
+| 11. Go-Live | Production credentials; launch | Both | Week 10–12 |
+
+**Expected Total Timeline:** 10–14 weeks  
+**Common Blockers:** Tata procurement approval chain; DPA negotiations; volume commitment standoff  
+**Approval Difficulty:** ⭐⭐⭐⭐⭐ Very Hard (enterprise Tata process; requires patience and persistence)
+
+---
+
+#### Apollo Pharmacy
+
+| Step | Action | Who Acts | Expected Duration |
+|---|---|---|---|
+| 1. Initial Contact | Email + LinkedIn to Apollo BD | Curex24 | Day 1 |
+| 2. First Response | Await AHLL BD team reply | Apollo BD | 5–7 business days |
+| 3. Intro Call | Discovery call; product demo likely requested | Both | Week 1–2 |
+| 4. NDA Signing | Apollo Health & Lifestyle NDA | Both (Legal) | 1–2 weeks |
+| 5. Business Verification | Incorporation doc + DPDP compliance brief | Curex24 | Week 3 |
+| 6. API Documentation | Receive API spec | Apollo | Week 3–4 |
+| 7. Sandbox Access | Test credentials provisioned | Apollo | Week 4–5 |
+| 8. Testing Phase | Integration test including store-pickup flow | Curex24 Engineering | Week 5–7 |
+| 9. Co-Branding Review | Optional: "Fulfilled by Apollo" branding discussion | Both (Business) | Week 6–7 |
+| 10. Go-Live | Production launch | Both | Week 7–10 |
+
+**Expected Total Timeline:** 8–10 weeks  
+**Common Blockers:** Co-branding / exclusivity clause negotiations; DPDP compliance review  
+**Approval Difficulty:** ⭐⭐⭐ Medium (healthcare brand alignment speeds up discussions)
+
+---
+
+#### Netmeds (Reliance)
+
+| Step | Action | Who Acts | Expected Duration |
+|---|---|---|---|
+| 1. Initial Contact | Email to partner@netmeds.com | Curex24 | Day 1 |
+| 2. First Response | Await Reliance Retail B2B reply | Netmeds / Reliance | 7–14 business days |
+| 3. Confirm API Availability | Ask directly: "Do you have a partner API?" | Curex24 | On first call |
+| 4. If Affiliate Only | Register at netmeds affiliate portal | Curex24 | Week 1–2 |
+| 5. If API Exists | Follow enterprise onboarding (similar to 1mg) | Both | 10–14 weeks |
+| 6. Affiliate Integration | Implement deep-link + tracking pixel | Curex24 Engineering | 1–2 days |
+| 7. Go-Live (Affiliate) | Launch affiliate redirect for Tier-2/3 orders | Both | Week 2–3 |
+
+**Expected Total Timeline:** 2–4 weeks (affiliate); 12–16 weeks (API if available)  
+**Common Blockers:** Reliance procurement is slow; API may not exist at accessible tier  
+**Approval Difficulty:** ⭐⭐⭐⭐ Hard (Reliance Retail bureaucracy; treat as backup)
+
+---
+
+## 12. Business Model Analysis
+
+### Business Model Comparison Chart
+
+| Factor | PharmEasy | Tata 1mg | Apollo Pharmacy | Netmeds |
+|---|---|---|---|---|
+| **Revenue Model** | Commission per order | Commission per order | Commission per order | Affiliate commission |
+| **Estimated Margin to Curex24** | 5–15% per order | 5–12% per order | 5–12% per order | 1–5% per referral |
+| **Pricing Control** | ❌ PharmEasy sets price | ❌ Tata 1mg sets price | ❌ Apollo sets price | ❌ Reliance sets price |
+| **Delivery Responsibility** | PharmEasy | Tata 1mg | Apollo (home + store) | Netmeds / Reliance |
+| **Refund Handling** | PharmEasy handles | Tata 1mg handles | Apollo handles | Netmeds handles |
+| **Prescription Verification** | PharmEasy pharmacist | Tata 1mg pharmacist | Apollo pharmacist | Netmeds pharmacist |
+| **Curex24 Role** | Order initiator + UI | Order initiator + UI | Order initiator + UI | Referral sender |
+| **Lab Test Revenue?** | ❌ No | ✅ Yes (bonus) | ⚠️ Possible | ❌ No |
+| **Startup Friendliness** | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐ |
+| **Go-Live Speed** | Fast (8–10 weeks) | Slow (10–14 weeks) | Medium (8–10 weeks) | Fast affiliate (2–4 weeks) |
+
+### What Curex24 Makes Per Order (Illustrative)
+
+| Order Value | PharmEasy 10% | Tata 1mg 8% | Apollo 8% | Netmeds 3% |
+|---|---|---|---|---|
+| ₹200 | ₹20 | ₹16 | ₹16 | ₹6 |
+| ₹500 | ₹50 | ₹40 | ₹40 | ₹15 |
+| ₹1,000 | ₹100 | ₹80 | ₹80 | ₹30 |
+| ₹2,000 | ₹200 | ₹160 | ₹160 | ₹60 |
+
+> These are illustrative estimates based on known industry ranges. Actual rates are negotiated in the partnership agreement.
+
+### Key Business Takeaways
+
+- Curex24 does **not control pricing** under any model — the partner sets medicine prices
+- Curex24 **does not handle delivery or returns** — this is entirely the partner's responsibility
+- Curex24's revenue comes from **commission/referral fees only**
+- The more orders Curex24 sends, the higher the commission rate it can negotiate over time
+- PharmEasy offers the best combination of **margin + speed + startup friendliness**
+- Tata 1mg adds **lab test revenue** as a bonus stream once the partnership is live
+
+---
+
+## 13. Startup Limitation Handling
 
 ### Current Reality
 
@@ -517,7 +781,7 @@ curex24.com (or your landing page URL)
 
 ---
 
-## 10. Outreach Tracking System
+## 14. Outreach Tracking System
 
 Update this table daily as outreach progresses.
 
@@ -535,69 +799,70 @@ Update this table daily as outreach progresses.
 
 ---
 
-## 11. Execution Timeline
+## 15. Execution Timeline
 
-### Day 1 — Prepare
+### Day 1–2 — Research & Prepare
 
 - [ ] Set up professional Gmail: `curex24.health@gmail.com` (or similar)
 - [ ] Write your 2-sentence Curex24 description (use consistently everywhere)
-- [ ] Identify landing page URL to include in emails
-- [ ] Find contact emails for all four partners (see Section 4.1 table)
-- [ ] Find 3–5 LinkedIn contacts per partner (use search queries in Section 4.1)
+- [ ] Confirm landing page URL to include in emails
+- [ ] Verify contact emails for all four partners (see Section 4.1 table)
+- [ ] Run LinkedIn search queries from Section 4.3 — find 5–8 contacts per partner
 - [ ] Send LinkedIn connection requests to all identified contacts
+- [ ] Prepare 1-page product PDF/deck (optional but helpful for follow-ups)
 
 ### Day 2 — Send Initial Emails
 
-- [ ] Send Template 1 (short) to `business@pharmeasy.in`
-- [ ] Send Template 1 (short) to `partnerships@1mg.com`
-- [ ] Send Template 1 (short) to `pharmacy@apollohospitals.com`
-- [ ] Send Template 1 (short) to `support@netmeds.com` (route to B2B request)
-- [ ] Log all emails sent in the tracking table (Section 10)
+- [ ] Send Template 1 to `business@pharmeasy.in` and `b2b@pharmeasy.in`
+- [ ] Send Template 1 to `partnerships@1mg.com`
+- [ ] Send Template 1 to `pharmacy@apollohospitals.com`
+- [ ] Send Template 1 to `partner@netmeds.com`
+- [ ] Log all emails sent in the tracking table (Section 14)
 
 ### Day 3–5 — Monitor & First Follow-Up
 
-- [ ] Check for replies twice per day
-- [ ] On Day 3: Send first follow-up email to any non-responders ("Just checking in on my email from [date]")
-- [ ] Respond to any LinkedIn connection acceptances with the follow-up message (Section 6)
+- [ ] Check for replies twice per day (morning + evening)
+- [ ] On Day 3: Send **Template 3 (follow-up)** to any non-responders
+- [ ] Respond to any LinkedIn connection acceptances with the follow-up message (Section 8)
 - [ ] Update tracking table
 
 ### Day 5 — LinkedIn Message (Even If Not Connected)
 
 - [ ] Send LinkedIn InMail or follow-up DM to all confirmed connections
-- [ ] For any partner with no response yet: try the secondary email or LinkedIn DM as a new entry point
+- [ ] For any partner with no response: try secondary email as new entry point
 
 ### Day 7 — Phone Outreach Attempt
 
-- [ ] Call the main business number for PharmEasy (priority)
-- [ ] Call Tata 1mg business line
-- [ ] Use the call script in Section 7
+- [ ] Call PharmEasy: 1800-120-1808 — ask for Business Development / B2B (priority)
+- [ ] Call Tata 1mg: 0124-4166666 — ask for Enterprise Partnerships
+- [ ] Use the call script in Section 9
 - [ ] Log outcomes in tracking table
 
 ### Day 10–14 — Second Follow-Up Wave
 
-- [ ] Send final follow-up email ("Last attempt before I explore other channels")
-- [ ] Try connecting with VP/Director level contacts on LinkedIn
+- [ ] Send **Template 4 (final escalation)** to any non-responders
+- [ ] Connect with VP/Director level contacts on LinkedIn
 - [ ] If still no response from any partner: seek warm introductions through investors, advisors, or healthtech network
 
-### Week 2 — Calls and Discovery
+### Week 2 — Discovery Calls
 
 - [ ] Conduct discovery calls with any responding partners
-- [ ] Use call script + technical question list
+- [ ] Use call script + technical question list from Section 9
 - [ ] Request API documentation and sandbox access
-- [ ] Compare responses using Case 1/2/3 playbook (Section 8)
+- [ ] Compare responses using Case 1/2/3 playbook (Section 10)
 - [ ] Begin NDA review process with the most responsive partner
 
-### Week 3 — Decision and Next Steps
+### Week 3+ — Integration Discussions
 
 - [ ] Select primary integration partner based on response quality and API capability
 - [ ] Begin commercial terms discussion
-- [ ] Technical integration scoping call
+- [ ] Technical integration scoping call with engineering team
 - [ ] Update `docs/pharmacy-partner-integration.md` tracker with live status
 - [ ] Communicate partner selection decision to engineering team
 
 ---
 
-## 12. Final Strategy Recommendation
+## 16. Final Strategy Recommendation
 
 ### Start With: PharmEasy
 
@@ -656,4 +921,4 @@ Update this table daily as outreach progresses.
 
 ---
 
-*This document is maintained by the Curex24 founding team. Update the tracking table in Section 10 daily. Move all confirmed partner details to `docs/pharmacy-partner-integration.md` as outreach progresses.*
+*This document is maintained by the Curex24 founding team. Update the tracking table in Section 14 daily. Move all confirmed partner details to `docs/pharmacy-partner-integration.md` as outreach progresses.*
