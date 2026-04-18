@@ -393,29 +393,35 @@ If no response after Day 7, call the company's main customer service or business
 
 ### Template 1 — Short API Inquiry (Use for First Contact)
 
-> **Subject:** API Integration & Partnership Inquiry — Curex24 Healthcare Platform
->
-> Hi [First Name / Team],
->
-> My name is [Your Name] from **Curex24** — we're building a digital healthcare platform that connects patients with doctors for online consultations and helps them manage prescriptions and medicine ordering in one place.
->
-> We're at the stage where we want to integrate a trusted e-pharmacy partner so our patients can order prescribed medicines directly within our app. We see [Partner Name] as a strong fit given your coverage and reputation.
->
-> I have a few quick questions:
->
-> 1. Does [Partner Name] offer an API for medicine search, order placement, and tracking for platform partners?
-> 2. What is the process to explore an integration or B2B partnership?
-> 3. Who is the right contact on your team for this?
->
-> Happy to share more about our platform. Our product is live at: [your URL or landing page]
->
-> Thank you for your time — I look forward to hearing from you.
->
-> Best regards,
-> [Your Name]
-> Co-founder / [Title], Curex24
-> [Email] | [Phone]
-> [Website/Landing page URL]
+> Dear Team,
+
+I hope you are doing well.
+
+My name is [Your Name], and I am part of the team at Curex24, a growing digital healthcare platform focused on connecting patients with healthcare providers and enabling seamless post-consultation services.
+
+We are currently expanding our platform to support medicine ordering for patients and are exploring potential integration opportunities with leading pharmacy partners like [PharmEasy / Tata 1mg / Apollo Pharmacy].
+
+At a high level, we are looking to:
+- Enable users to upload prescriptions and request medicines via our platform
+- Integrate with a licensed pharmacy partner for prescription verification, fulfillment, and delivery
+- Provide real-time order status updates within our application
+
+We would like to understand:
+1. Whether you offer APIs or partner integration solutions for third-party healthcare platforms
+2. The onboarding process for such partnerships
+3. Any technical documentation or sandbox access available for evaluation
+
+We are currently in the integration planning phase and would be happy to align with your team on how we can collaborate.
+
+Please let us know the appropriate point of contact for further discussion.
+
+Looking forward to your response.
+
+Best regards,  
+[Your Full Name]  
+Curex24 Team  
+[Your Phone Number]  
+[Temporary Email: curex24.health@gmail.com]
 
 ---
 
