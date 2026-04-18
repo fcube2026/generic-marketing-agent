@@ -13,7 +13,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 @Injectable()
 export class VideoConsultationService {
   private readonly logger = new Logger(VideoConsultationService.name);
-  private hms: HMSSDK;
+  private hms: HMSSDK | null = null;
   private readonly mockMode: boolean;
 
   constructor(
@@ -31,7 +31,14 @@ export class VideoConsultationService {
 
     const accessKey = this.config.get<string>('HMS_APP_ACCESS_KEY', '');
     const secret = this.config.get<string>('HMS_APP_SECRET', '');
-    this.hms = new HMSSDK(accessKey, secret);
+
+    if (accessKey && secret) {
+      this.hms = new HMSSDK(accessKey, secret);
+    } else if (!this.mockMode) {
+      this.logger.warn(
+        'HMS_APP_ACCESS_KEY or HMS_APP_SECRET not configured. Video consultation endpoints will not function. Set VIDEO_MOCK_MODE=true to use mock mode.',
+      );
+    }
   }
 
   private async getBookingWithParticipants(bookingId: string) {
@@ -78,6 +85,11 @@ export class VideoConsultationService {
       roomId = `mock-room-${bookingId}`;
       this.logger.debug(`[MOCK] createRoom — using mock roomId: ${roomId}`);
     } else {
+      if (!this.hms) {
+        throw new InternalServerErrorException(
+          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
+        );
+      }
       const templateId = this.config.get<string>('HMS_TEMPLATE_ID');
       try {
         const room = await this.hms.rooms.create({
@@ -129,6 +141,11 @@ export class VideoConsultationService {
         `[MOCK] generateToken — using mock token for userId: ${userId}`,
       );
     } else {
+      if (!this.hms) {
+        throw new InternalServerErrorException(
+          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
+        );
+      }
       try {
         const authToken = await this.hms.auth.getAuthToken({
           roomId: session.roomId,
