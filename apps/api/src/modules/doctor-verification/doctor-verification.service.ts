@@ -618,8 +618,6 @@ export class DoctorVerificationService {
 
     // Update DB — pipeline never auto-approves; always routes to admin review
     let overallStatus: VerificationLogStatus;
-    let updatedLicense: unknown;
-
     overallStatus =
       updatedAttempts >= MAX_AUTO_ATTEMPTS ? 'MANUAL_REVIEW' : 'NOT_FOUND';
 
@@ -627,7 +625,7 @@ export class DoctorVerificationService {
       overallStatus = 'NOT_FOUND';
     }
 
-    updatedLicense = await this.prisma.providerLicense.update({
+    const updatedLicense = await this.prisma.providerLicense.update({
       where: { id: licenseId },
       data: {
         status: 'PENDING',
