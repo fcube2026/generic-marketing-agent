@@ -16,6 +16,7 @@ COPY scripts/fix-react-instances.js ./scripts/
 COPY apps/api/package.json ./apps/api/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/mobile/package.json ./apps/mobile/
+COPY apps/doctor-portal/package.json ./apps/doctor-portal/
 COPY apps/marketing-agent/package.json ./apps/marketing-agent/
 COPY apps/patient-app/package.json ./apps/patient-app/
 COPY apps/provider-app/package.json ./apps/provider-app/
