@@ -1,13 +1,24 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PharmacyPartner } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   PharmacyPartnerProvider,
   MedicineResult,
 } from './providers/pharmacy-partner.interface';
+import { withRetry } from './utils/retry.util';
+import { CircuitBreaker } from './utils/circuit-breaker.util';
+import { toPharmacyError } from './errors/pharmacy.errors';
 
 @Injectable()
 export class PharmacyService {
+  private readonly logger = new Logger(PharmacyService.name);
+
+  /**
+   * Per-provider circuit breakers so that a single failing partner does not
+   * degrade the entire service.
+   */
+  private readonly circuitBreakers = new Map<string, CircuitBreaker>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
@@ -38,7 +49,7 @@ export class PharmacyService {
 
       const provider = this.resolveProvider(activePartner);
 
-      return this.searchProvider(provider, query, pincode);
+      return this.searchProvider(provider, query, pincode, activePartner.code);
     }
 
     const activePartners = await this.prisma.pharmacyPartner.findMany({
@@ -52,8 +63,8 @@ export class PharmacyService {
     }
 
     const results = await Promise.allSettled(
-      providers.map((provider) =>
-        this.searchProvider(provider, query, pincode),
+      providers.map(({ provider, key }) =>
+        this.searchProvider(provider, query, pincode, key),
       ),
     );
 
@@ -73,6 +84,7 @@ export class PharmacyService {
 
     return partners.map((partner) => {
       const providerKey = this.resolveProviderKey(partner.code, partner.name);
+      const cb = this.getCircuitBreaker(providerKey);
       return {
         id: partner.id,
         code: partner.code,
@@ -83,24 +95,34 @@ export class PharmacyService {
         priority: partner.priority,
         providerKey,
         registered: this.partnerProviders.has(providerKey),
+        circuitState: cb.currentState,
       };
     });
   }
 
   private resolveProviders(
     partners: PharmacyPartner[],
-  ): PharmacyPartnerProvider[] {
+  ): Array<{ provider: PharmacyPartnerProvider; key: string }> {
     const uniqueProviders = new Set<PharmacyPartnerProvider>();
+    const result: Array<{ provider: PharmacyPartnerProvider; key: string }> =
+      [];
 
     for (const partner of partners) {
       try {
-        uniqueProviders.add(this.resolveProvider(partner));
+        const provider = this.resolveProvider(partner);
+        if (!uniqueProviders.has(provider)) {
+          uniqueProviders.add(provider);
+          result.push({
+            provider,
+            key: this.resolveProviderKey(partner.code, partner.name),
+          });
+        }
       } catch {
         // Skip unregistered DB partners so search only queries configured providers.
       }
     }
 
-    return Array.from(uniqueProviders);
+    return result;
   }
 
   private resolveProvider(partner: Pick<PharmacyPartner, 'code' | 'name'>) {
@@ -119,9 +141,31 @@ export class PharmacyService {
   private async searchProvider(
     provider: PharmacyPartnerProvider,
     query: string,
-    pincode?: string,
+    pincode: string | undefined,
+    providerKey: string,
   ): Promise<MedicineResult[]> {
-    const medicines = await provider.searchMedicines(query);
+    const cb = this.getCircuitBreaker(providerKey);
+    const start = Date.now();
+
+    let medicines: MedicineResult[];
+    try {
+      medicines = await withRetry(
+        () => cb.execute(() => provider.searchMedicines(query)),
+        { maxAttempts: 3, baseDelayMs: 200 },
+        `${providerKey}.searchMedicines`,
+      );
+    } catch (err) {
+      const pharmacyErr = toPharmacyError(err);
+      this.logger.warn(
+        `[${providerKey}] searchMedicines failed after retries: ${pharmacyErr.message}`,
+        { query, latencyMs: Date.now() - start, errorCode: pharmacyErr.code },
+      );
+      return [];
+    }
+
+    this.logger.log(
+      `[${providerKey}] searchMedicines returned ${medicines.length} result(s) in ${Date.now() - start}ms`,
+    );
 
     if (!pincode) {
       return medicines;
@@ -130,9 +174,13 @@ export class PharmacyService {
     const withAvailability = await Promise.all(
       medicines.map(async (medicine) => {
         try {
-          const availability = await provider.checkAvailability(
-            medicine.id,
-            pincode,
+          const availability = await withRetry(
+            () =>
+              cb.execute(() =>
+                provider.checkAvailability(medicine.id, pincode),
+              ),
+            { maxAttempts: 2, baseDelayMs: 150 },
+            `${providerKey}.checkAvailability`,
           );
           if (!availability.available) {
             return null;
@@ -155,5 +203,18 @@ export class PharmacyService {
       return code.toLowerCase();
     }
     return name.toLowerCase();
+  }
+
+  private getCircuitBreaker(providerKey: string): CircuitBreaker {
+    if (!this.circuitBreakers.has(providerKey)) {
+      this.circuitBreakers.set(
+        providerKey,
+        new CircuitBreaker(providerKey, {
+          failureThreshold: 5,
+          resetTimeoutMs: 30_000,
+        }),
+      );
+    }
+    return this.circuitBreakers.get(providerKey)!;
   }
 }

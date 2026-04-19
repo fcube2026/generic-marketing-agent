@@ -6,6 +6,7 @@ import { PharmacyOrderService } from './pharmacy-order.service';
 import { MockPharmacyProvider } from './providers/mock-pharmacy.provider';
 import { PharmEasyProvider } from './providers/pharmeasy.provider';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
+import { PharmacyWebhookService } from './webhooks/pharmacy-webhook.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
@@ -15,6 +16,7 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
   providers: [
     MockPharmacyProvider,
     PharmEasyProvider,
+    PharmacyWebhookService,
     {
       provide: PHARMACY_PROVIDERS_MAP,
       useFactory: (
@@ -54,6 +56,6 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
       inject: [PrismaService, PHARMACY_PROVIDERS_MAP],
     },
   ],
-  exports: [PharmacyService, PharmacyOrderService],
+  exports: [PharmacyService, PharmacyOrderService, PharmacyWebhookService],
 })
 export class PharmacyModule {}
