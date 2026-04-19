@@ -322,13 +322,17 @@ export class PrescriptionService {
 
   /**
    * Simulates a notification to the patient after a verification action.
-   * In production, replace this with the NotificationsService call.
+   *
+   * TODO: Replace with a real NotificationsService call once a provider
+   * (push/SMS/WhatsApp) is wired up. Notification copy below is a placeholder
+   * and should be localised for production use.
    */
   private emitMockNotification(
     userId: string,
     prescriptionId: string,
     action: VerifyAction,
   ): void {
+    // Placeholder messages — replace with NotificationsService in production.
     const messages: Record<VerifyAction, string> = {
       [VerifyAction.APPROVE]:
         'Your prescription has been approved. You can now place your order.',
