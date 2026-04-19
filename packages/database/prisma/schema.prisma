@@ -761,17 +761,17 @@ enum PrescriptionReviewAction {
 }
 
 model UploadedPrescription {
-  id           String               @id @default(cuid())
-  userId       String
-  filePath     String
-  status       PrescriptionStatus   @default(PENDING_REVIEW)
-  reviewedBy   String?
-  reviewNotes  String?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id          String             @id @default(cuid())
+  userId      String
+  filePath    String
+  status      PrescriptionStatus @default(PENDING_REVIEW)
+  reviewedBy  String?
+  reviewNotes String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewLogs   PrescriptionReviewLog[]
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewLogs PrescriptionReviewLog[]
 
   @@index([userId])
   @@index([status])
@@ -787,7 +787,7 @@ model PrescriptionReviewLog {
   notes          String?
   createdAt      DateTime                 @default(now())
 
-  prescription   UploadedPrescription     @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  prescription UploadedPrescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
 
   @@index([prescriptionId])
   @@map("prescription_review_logs")
