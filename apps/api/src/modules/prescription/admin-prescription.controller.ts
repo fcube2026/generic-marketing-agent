@@ -8,6 +8,7 @@ import {
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 import { PrescriptionService } from './prescription.service';
 import { VerifyPrescriptionDto } from './dto/verify-prescription.dto';
+import { PrescriptionQueueQueryDto } from './dto/prescription-queue.dto';
 
 @ApiTags('admin-pharmacy-prescriptions')
 @ApiBearerAuth()
@@ -32,19 +33,12 @@ export class AdminPrescriptionController {
     enum: ['createdAt', 'updatedAt'],
   })
   @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
-  getQueue(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('sortBy') sortBy?: string,
-    @Query('order') order?: string,
-  ) {
+  getQueue(@Query() query: PrescriptionQueueQueryDto) {
     return this.prescriptionService.getQueue(
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 20,
-      (sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt') as
-        | 'createdAt'
-        | 'updatedAt',
-      (order === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc',
+      query.page ?? 1,
+      query.limit ?? 20,
+      query.sortBy ?? 'createdAt',
+      query.order ?? 'asc',
     );
   }
 

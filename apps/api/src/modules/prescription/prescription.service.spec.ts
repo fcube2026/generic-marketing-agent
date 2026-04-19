@@ -18,6 +18,7 @@ const mockPrisma = {
     findMany: jest.fn(),
     count: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
   prescriptionReviewLog: {
     create: jest.fn(),
@@ -62,20 +63,18 @@ describe('PrescriptionService', () => {
       mockPrisma.uploadedPrescription.create.mockResolvedValue({
         id: 'rx-1',
         userId: 'user-1',
-        filePath: 'user-1/rx-1',
+        filePath: '',
         status: PrescriptionStatus.PENDING_REVIEW,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      mockPrisma.uploadedPrescription.update.mockResolvedValue({
+        id: 'rx-1',
+        filePath: 'user-1/rx-1',
+      });
 
       const result = await service.handleUpload('user-1', validFile);
 
-      expect(mockStorage.uploadFile).toHaveBeenCalledWith(
-        'user-1',
-        expect.any(String),
-        validFile.buffer,
-        'image/jpeg',
-      );
       expect(mockPrisma.uploadedPrescription.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -84,12 +83,25 @@ describe('PrescriptionService', () => {
           }),
         }),
       );
+      expect(mockStorage.uploadFile).toHaveBeenCalledWith(
+        'user-1',
+        'rx-1',
+        validFile.buffer,
+        'image/jpeg',
+      );
+      expect(mockPrisma.uploadedPrescription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rx-1' },
+          data: { filePath: 'user-1/rx-1' },
+        }),
+      );
       expect(result).toHaveProperty('prescriptionId', 'rx-1');
     });
 
     it('accepts PNG files', async () => {
       const pngFile = { ...validFile, mimetype: 'image/png' };
       mockPrisma.uploadedPrescription.create.mockResolvedValue({ id: 'rx-2' });
+      mockPrisma.uploadedPrescription.update.mockResolvedValue({ id: 'rx-2' });
 
       await expect(
         service.handleUpload('user-1', pngFile),
@@ -99,6 +111,7 @@ describe('PrescriptionService', () => {
     it('accepts PDF files', async () => {
       const pdfFile = { ...validFile, mimetype: 'application/pdf' };
       mockPrisma.uploadedPrescription.create.mockResolvedValue({ id: 'rx-3' });
+      mockPrisma.uploadedPrescription.update.mockResolvedValue({ id: 'rx-3' });
 
       await expect(
         service.handleUpload('user-1', pdfFile),
@@ -126,7 +139,9 @@ describe('PrescriptionService', () => {
       expect(mockStorage.uploadFile).not.toHaveBeenCalled();
     });
 
-    it('propagates storage upload errors', async () => {
+    it('propagates storage upload errors and cleans up the DB record', async () => {
+      mockPrisma.uploadedPrescription.create.mockResolvedValue({ id: 'rx-1' });
+      mockPrisma.uploadedPrescription.delete.mockResolvedValue({});
       mockStorage.uploadFile.mockRejectedValueOnce(
         new Error('Storage bucket not found'),
       );
@@ -134,7 +149,10 @@ describe('PrescriptionService', () => {
       await expect(service.handleUpload('user-1', validFile)).rejects.toThrow(
         'Storage bucket not found',
       );
-      expect(mockPrisma.uploadedPrescription.create).not.toHaveBeenCalled();
+      // The dangling record should be cleaned up
+      expect(mockPrisma.uploadedPrescription.delete).toHaveBeenCalledWith({
+        where: { id: 'rx-1' },
+      });
     });
   });
 

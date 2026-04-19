@@ -16,6 +16,14 @@ export class PrescriptionStorageService {
   constructor(private readonly config: ConfigService) {
     const url = this.config.get<string>('SUPABASE_URL', '');
     const serviceKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
+
+    if (!url || !serviceKey) {
+      this.logger.warn(
+        'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured. ' +
+          'Prescription storage operations will fail at runtime.',
+      );
+    }
+
     this.client = createClient(url, serviceKey);
   }
 

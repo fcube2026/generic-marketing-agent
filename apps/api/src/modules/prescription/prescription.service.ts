@@ -5,7 +5,6 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import {
   PrescriptionStatus,
   PrescriptionReviewAction,
@@ -81,26 +80,37 @@ export class PrescriptionService {
       throw new BadRequestException('File size exceeds the 10 MB limit.');
     }
 
-    // Generate a deterministic prescription ID before uploading so the path
-    // matches the DB record.
-    const prescriptionId = randomUUID();
-
-    // Upload to Supabase Storage
-    const filePath = await this.storage.uploadFile(
-      userId,
-      prescriptionId,
-      file.buffer,
-      file.mimetype,
-    );
-
-    // Persist DB record
+    // Create the DB record first so Prisma assigns a cuid (consistent with
+    // all other models). A placeholder path is used until the upload succeeds.
     const prescription = await this.prisma.uploadedPrescription.create({
       data: {
-        id: prescriptionId,
         userId,
-        filePath,
+        filePath: '',
         status: PrescriptionStatus.PENDING_REVIEW,
       },
+    });
+
+    // Upload to Supabase Storage using the DB-generated ID as the path component.
+    let filePath: string;
+    try {
+      filePath = await this.storage.uploadFile(
+        userId,
+        prescription.id,
+        file.buffer,
+        file.mimetype,
+      );
+    } catch (err) {
+      // Clean up the dangling DB record on storage failure.
+      await this.prisma.uploadedPrescription
+        .delete({ where: { id: prescription.id } })
+        .catch(() => undefined);
+      throw err;
+    }
+
+    // Update the record with the real storage path.
+    await this.prisma.uploadedPrescription.update({
+      where: { id: prescription.id },
+      data: { filePath },
     });
 
     this.logger.log('Prescription uploaded successfully', {
