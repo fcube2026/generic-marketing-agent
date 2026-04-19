@@ -151,7 +151,7 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
         ? results
         : [
             {
-              id: `mock-dyn-001`,
+              id: `mock-dyn-${lower.replace(/\s+/g, '-')}-001`,
               name: `${query} 500mg`,
               manufacturer: 'Mock Pharma Ltd.',
               price: 12.0,
@@ -159,7 +159,7 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
               requiresPrescription: false,
             },
             {
-              id: `mock-dyn-002`,
+              id: `mock-dyn-${lower.replace(/\s+/g, '-')}-002`,
               name: `${query} 250mg`,
               manufacturer: 'Mock Pharma Ltd.',
               price: 7.5,

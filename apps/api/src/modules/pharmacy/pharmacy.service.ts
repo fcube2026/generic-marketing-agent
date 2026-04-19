@@ -103,15 +103,15 @@ export class PharmacyService {
   private resolveProviders(
     partners: PharmacyPartner[],
   ): Array<{ provider: PharmacyPartnerProvider; key: string }> {
-    const seen = new Set<PharmacyPartnerProvider>();
+    const uniqueProviders = new Set<PharmacyPartnerProvider>();
     const result: Array<{ provider: PharmacyPartnerProvider; key: string }> =
       [];
 
     for (const partner of partners) {
       try {
         const provider = this.resolveProvider(partner);
-        if (!seen.has(provider)) {
-          seen.add(provider);
+        if (!uniqueProviders.has(provider)) {
+          uniqueProviders.add(provider);
           result.push({
             provider,
             key: this.resolveProviderKey(partner.code, partner.name),

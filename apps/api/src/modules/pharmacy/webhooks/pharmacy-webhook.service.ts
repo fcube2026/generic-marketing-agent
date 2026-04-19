@@ -63,16 +63,23 @@ export class PharmacyWebhookService {
 
     let steps = 0;
 
-    const tick = () => {
+    if (maxSteps <= 0) {
+      this.logger.log(
+        `[webhook] maxSteps=${maxSteps} — nothing to schedule for order "${partnerOrderId}"`,
+      );
+      return { partnerOrderId, remainingSteps: 0, intervalMs };
+    }
+
+    const scheduleNext = () => {
       if (steps >= maxSteps) {
-        this.cancelProgression(partnerOrderId);
+        this.timers.delete(partnerOrderId);
         return;
       }
 
       const event = this.mockProvider.simulateNextStatusEvent(partnerOrderId);
       if (!event) {
         // Order reached a terminal state
-        this.cancelProgression(partnerOrderId);
+        this.timers.delete(partnerOrderId);
         return;
       }
 
@@ -84,16 +91,16 @@ export class PharmacyWebhookService {
 
       this.emit(statusEvent);
 
-      // Schedule next step
+      // Schedule next step unless we have reached the limit
       if (steps < maxSteps) {
-        const timer = setTimeout(tick, intervalMs);
+        const timer = setTimeout(scheduleNext, intervalMs);
         this.timers.set(partnerOrderId, timer);
       } else {
         this.timers.delete(partnerOrderId);
       }
     };
 
-    const timer = setTimeout(tick, intervalMs);
+    const timer = setTimeout(scheduleNext, intervalMs);
     this.timers.set(partnerOrderId, timer);
 
     this.logger.log(

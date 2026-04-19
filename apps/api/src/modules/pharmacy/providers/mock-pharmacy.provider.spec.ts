@@ -19,8 +19,9 @@ describe('MockPharmacyProvider', () => {
   beforeEach(() => {
     provider = new MockPharmacyProvider();
 
-    // Disable real timers so latency simulation resolves instantly
-    jest.useFakeTimers();
+    // Use fake timers for setTimeout (latency simulation) but keep
+    // nextTick/setImmediate real so Promise microtasks resolve correctly.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
   });
 
   afterEach(() => {
