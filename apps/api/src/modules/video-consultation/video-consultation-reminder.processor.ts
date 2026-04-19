@@ -15,6 +15,11 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
   }
 
   async process(job: Job<VideoReminderJobData>): Promise<void> {
+    // This processor is registered for the entire REMINDER_QUEUE, which may
+    // carry other job types in the future (e.g. appointment-level reminders
+    // added by AppointmentReminderScheduler).  Only 'video-reminder' jobs are
+    // handled here; all other job names are intentionally skipped so that
+    // separate processors can handle them without contention.
     if (job.name !== 'video-reminder') {
       return;
     }
