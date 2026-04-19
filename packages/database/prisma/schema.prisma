@@ -29,6 +29,7 @@ model User {
   patientProfile         PatientProfile?
   providerProfile        ProviderProfile?
   questionnaireResponse  QuestionnaireResponse?
+  uploadedPrescriptions  UploadedPrescription[]
 
   @@map("users")
 }
@@ -740,4 +741,54 @@ model VideoSession {
   @@index([status])
   @@index([creatorUserId])
   @@map("video_sessions")
+}
+
+// =======================
+// PRESCRIPTION UPLOAD & VERIFICATION
+// =======================
+
+enum PrescriptionStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  REUPLOAD_REQUIRED
+}
+
+enum PrescriptionReviewAction {
+  APPROVED
+  REJECTED
+  REUPLOAD
+}
+
+model UploadedPrescription {
+  id           String               @id @default(cuid())
+  userId       String
+  filePath     String
+  status       PrescriptionStatus   @default(PENDING_REVIEW)
+  reviewedBy   String?
+  reviewNotes  String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewLogs   PrescriptionReviewLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("uploaded_prescriptions")
+}
+
+model PrescriptionReviewLog {
+  id             String                   @id @default(cuid())
+  prescriptionId String
+  action         PrescriptionReviewAction
+  performedBy    String
+  notes          String?
+  createdAt      DateTime                 @default(now())
+
+  prescription   UploadedPrescription     @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@map("prescription_review_logs")
 }
