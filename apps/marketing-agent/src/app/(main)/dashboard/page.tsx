@@ -14,6 +14,7 @@ const quickActions = [
   { href: '/intake', label: 'Complete Intake', icon: '📝', desc: 'Answer business questions to personalise strategy' },
   { href: '/campaigns', label: 'View Campaigns', icon: '📣', desc: 'See active campaigns and generate new briefs' },
   { href: '/content-calendar', label: 'Content Calendar', icon: '📅', desc: 'Plan this week\'s content across platforms' },
+  { href: '/create', label: 'Create Content', icon: '✨', desc: 'Generate posts, visuals, and ad creatives with AI' },
   { href: '/agent', label: 'Ask Marketing Agent', icon: '🤖', desc: 'Get instant strategic or copy recommendations' },
 ];
 
