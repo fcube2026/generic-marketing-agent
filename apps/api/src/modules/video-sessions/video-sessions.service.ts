@@ -3,7 +3,6 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -20,82 +19,6 @@ export class VideoSessionsService {
 
   async startSession(bookingId: string, userId: string) {
     return this.upsertActiveSession(bookingId, userId, `curex24-${bookingId}`);
-  }
-
-  async startInstantSession(bookingId: string, userId: string) {
-    return this.upsertActiveSession(
-      bookingId,
-      userId,
-      `curex24-instant-${bookingId}-${Date.now()}`,
-    );
-  }
-
-  async createInstantSession(userId: string) {
-    const roomId = `curex24-instant-${Date.now()}`;
-    return this.prisma.videoSession.create({
-      data: {
-        roomId,
-        status: 'IN_PROGRESS',
-        startedAt: new Date(),
-        creatorUserId: userId,
-      },
-    });
-  }
-
-  async getSessionsForPatient(userId: string) {
-    const patientProfile = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-
-    if (!patientProfile) return [];
-
-    const bookings = await this.prisma.booking.findMany({
-      where: { patientId: patientProfile.id },
-      select: { provider: { select: { userId: true } } },
-      distinct: ['providerId'],
-    });
-
-    const providerUserIds = bookings.map((b) => b.provider.userId);
-    if (providerUserIds.length === 0) return [];
-
-    return this.prisma.videoSession.findMany({
-      where: {
-        status: 'IN_PROGRESS',
-        bookingId: null,
-        creatorUserId: { in: providerUserIds },
-      },
-      orderBy: { startedAt: 'desc' },
-      take: 5,
-    });
-  }
-
-  async listMySessions(userId: string) {
-    const provider = await this.prisma.providerProfile.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-
-    const conditions: Prisma.VideoSessionWhereInput[] = [
-      { creatorUserId: userId },
-    ];
-    if (provider) {
-      conditions.push({ booking: { provider: { userId } } });
-    }
-
-    return this.prisma.videoSession.findMany({
-      where: { OR: conditions },
-      include: {
-        booking: {
-          include: {
-            patient: { select: { name: true } },
-            serviceCategory: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
   }
 
   private async upsertActiveSession(

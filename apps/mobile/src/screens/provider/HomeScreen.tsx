@@ -55,7 +55,10 @@ export const HomeScreen: React.FC = () => {
     if (activeVideoBookings.length > 0) {
       navigation.navigate('VideoConsultation', { bookingId: activeVideoBookings[0].id });
     } else {
-      navigation.navigate('InstantMeeting');
+      Alert.alert(
+        'Video Consultations',
+        'You have no active video bookings. Accept a video consultation booking to start a session.',
+      );
     }
   };
 
@@ -129,7 +132,7 @@ export const HomeScreen: React.FC = () => {
           <Text style={styles.videoCardSub}>
             {activeVideoBookings.length > 0
               ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'Tap to start an instant meeting'}
+              : 'View your video consultation bookings'}
           </Text>
         </View>
         <Text style={styles.videoCardArrow}>→</Text>
