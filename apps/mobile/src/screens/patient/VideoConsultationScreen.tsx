@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -11,7 +11,6 @@ import { bookingService } from '../../services/bookingService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { BookingStatus, VideoSessionStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
-import { Linking } from 'react-native';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'VideoConsultation'>;
