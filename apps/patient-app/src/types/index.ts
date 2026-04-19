@@ -205,7 +205,6 @@ export interface PharmacyOrderItem {
 export type PharmacyOrderStatus =
   | 'PENDING'
   | 'PRESCRIPTION_REVIEW'
-  | 'PLACED'
   | 'CONFIRMED'
   | 'PACKED'
   | 'SHIPPED'

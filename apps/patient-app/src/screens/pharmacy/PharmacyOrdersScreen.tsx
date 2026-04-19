@@ -21,23 +21,29 @@ import { formatCurrency, formatDate } from '../../utils/format';
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 const STATUS_COLORS: Record<string, string> = {
-  PLACED: '#F59E0B',
+  PENDING: '#F59E0B',
+  PRESCRIPTION_REVIEW: '#D97706',
   CONFIRMED: '#2563EB',
   PACKED: '#7C3AED',
   SHIPPED: '#0EA5E9',
+  OUT_FOR_DELIVERY: '#0284C7',
   DELIVERED: '#10B981',
   CANCELLED: '#EF4444',
   RETURNED: '#6B7280',
+  REFUNDED: '#059669',
 };
 
 const STATUS_ICONS: Record<string, string> = {
-  PLACED: '🛒',
+  PENDING: '🛒',
+  PRESCRIPTION_REVIEW: '🧾',
   CONFIRMED: '✅',
   PACKED: '📦',
   SHIPPED: '🚚',
+  OUT_FOR_DELIVERY: '🛵',
   DELIVERED: '🎉',
   CANCELLED: '❌',
   RETURNED: '↩️',
+  REFUNDED: '💸',
 };
 
 export const PharmacyOrdersScreen: React.FC = () => {

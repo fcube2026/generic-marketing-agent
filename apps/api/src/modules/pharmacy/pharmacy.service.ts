@@ -107,9 +107,9 @@ export class PharmacyService {
     const providerKey = this.resolveProviderKey(partner.code, partner.name);
     const provider = this.partnerProviders.get(providerKey);
 
-    if (!provider || providerKey === 'mock') {
+    if (!provider) {
       throw new BadRequestException(
-        `No live pharmacy provider configured for partner: ${partner.code}`,
+        `No pharmacy provider configured for partner: ${partner.code}`,
       );
     }
 

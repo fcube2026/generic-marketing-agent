@@ -319,7 +319,7 @@ export class PharmacyOrderService {
   private mapPartnerStatus(partnerStatus: string): PharmacyOrderStatus {
     const normalized = partnerStatus.toUpperCase();
     const statusMap: Record<string, PharmacyOrderStatus> = {
-      PLACED: PharmacyOrderStatus.PLACED,
+      PLACED: PharmacyOrderStatus.PENDING,
       PENDING: PharmacyOrderStatus.PENDING,
       PRESCRIPTION_REVIEW: PharmacyOrderStatus.PRESCRIPTION_REVIEW,
       CONFIRMED: PharmacyOrderStatus.CONFIRMED,
@@ -355,7 +355,6 @@ export class PharmacyOrderService {
 
   private canCancel(status: PharmacyOrderStatus): boolean {
     const cancellableStatuses: PharmacyOrderStatus[] = [
-      PharmacyOrderStatus.PLACED,
       PharmacyOrderStatus.PENDING,
       PharmacyOrderStatus.PRESCRIPTION_REVIEW,
       PharmacyOrderStatus.CONFIRMED,

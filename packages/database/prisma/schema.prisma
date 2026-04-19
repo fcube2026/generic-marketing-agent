@@ -667,7 +667,6 @@ model PharmacyOrderItem {
 // =======================
 
 enum PharmacyOrderStatus {
-  PLACED
   PENDING
   PRESCRIPTION_REVIEW
   CONFIRMED

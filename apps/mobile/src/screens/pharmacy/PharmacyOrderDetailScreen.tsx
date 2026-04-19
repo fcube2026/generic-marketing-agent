@@ -21,7 +21,6 @@ import { canCancelPharmacyOrder } from '../../utils/pharmacy';
 type Route = RouteProp<PatientStackParamList, 'PharmacyOrderDetail'>;
 
 const STATUS_COLORS: Record<string, string> = {
-  PLACED: Colors.warning,
   PENDING: Colors.warning,
   PRESCRIPTION_REVIEW: Colors.warning,
   CONFIRMED: Colors.secondary,
@@ -30,7 +29,6 @@ const STATUS_COLORS: Record<string, string> = {
   OUT_FOR_DELIVERY: Colors.primary,
   DELIVERED: Colors.success,
   CANCELLED: Colors.error,
-  FAILED: Colors.error,
   RETURNED: Colors.error,
   REFUNDED: Colors.success,
 };

@@ -59,7 +59,7 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
     );
     return {
       partnerOrderId: `MOCK-ORD-${Date.now()}`,
-      status: 'PLACED',
+      status: 'PENDING',
       totalAmount,
       items: order.items,
     };

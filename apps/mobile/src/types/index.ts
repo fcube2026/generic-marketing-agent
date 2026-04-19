@@ -122,7 +122,6 @@ export interface RecommendationResponse {
 }
 
 export type PharmacyOrderStatus =
-  | 'PLACED'
   | 'PENDING'
   | 'PRESCRIPTION_REVIEW'
   | 'CONFIRMED'
@@ -131,7 +130,6 @@ export type PharmacyOrderStatus =
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'FAILED'
   | 'RETURNED'
   | 'REFUNDED';
 
