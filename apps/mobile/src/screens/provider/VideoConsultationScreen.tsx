@@ -63,16 +63,10 @@ export const VideoConsultationScreen: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['video-session', bookingId] });
   };
 
-  const startMutation = useMutation({
-    mutationFn: () => bookingService.startVideoSession(bookingId),
+  const createRoomMutation = useMutation({
+    mutationFn: () => bookingService.createVideoRoom(bookingId),
     onSuccess: invalidate,
-    onError: () => Alert.alert('Error', 'Failed to start video session.'),
-  });
-
-  const instantMutation = useMutation({
-    mutationFn: () => bookingService.startInstantSession(bookingId),
-    onSuccess: invalidate,
-    onError: () => Alert.alert('Error', 'Failed to start instant session.'),
+    onError: () => Alert.alert('Error', 'Failed to create video room.'),
   });
 
   const endMutation = useMutation({
@@ -85,18 +79,21 @@ export const VideoConsultationScreen: React.FC = () => {
     return <LoadingSpinner fullScreen message="Loading video session..." />;
   }
 
-  const isLive = session?.status === 'IN_PROGRESS';
-  const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
+  const sessionExists = Boolean(session);
+  const isActive = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
+  const isMutating = createRoomMutation.isPending || endMutation.isPending;
 
-  const handleJoin = () => {
-    if (session?.roomId) {
-      const url = `https://meet.jit.si/${session.roomId}`;
-      Linking.openURL(url).catch(() => {});
+  const handleJoin = async () => {
+    try {
+      const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      const url = `https://app.100ms.live/preview/${roomId}?token=${token}`;
+      Linking.openURL(url).catch(() =>
+        Alert.alert('Error', 'Could not open the video call link.'),
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to get join token. Please try again.');
     }
   };
-
-  const isMutating =
-    startMutation.isPending || instantMutation.isPending || endMutation.isPending;
 
   return (
     <ScrollView style={styles.container}>
@@ -134,7 +131,7 @@ export const VideoConsultationScreen: React.FC = () => {
           <View style={styles.noSession}>
             <Text style={styles.noSessionIcon}>🎥</Text>
             <Text style={styles.noSessionText}>
-              No video session started yet. Click "Start Consultation" to begin.
+              No video room created yet. Click "Create Video Room" to set up the 100ms session.
             </Text>
           </View>
         ) : (
@@ -181,44 +178,34 @@ export const VideoConsultationScreen: React.FC = () => {
       </Card>
 
       {/* Action buttons */}
-      {canStart && (
+      {!sessionExists && (
         <TouchableOpacity
-          style={[styles.startButton, isMutating && { opacity: 0.7 }]}
-          onPress={() => startMutation.mutate()}
+          style={[styles.createButton, isMutating && { opacity: 0.7 }]}
+          onPress={() => createRoomMutation.mutate()}
           disabled={isMutating}
         >
-          <Text style={styles.startButtonText}>
-            {startMutation.isPending ? 'Starting…' : '▶️ Start Consultation'}
+          <Text style={styles.createButtonText}>
+            {createRoomMutation.isPending ? 'Creating…' : '▶️ Create Video Room'}
           </Text>
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={[styles.instantButton, isMutating && { opacity: 0.7 }]}
-        onPress={() => instantMutation.mutate()}
-        disabled={isMutating}
-      >
-        <Text style={styles.instantButtonText}>
-          {instantMutation.isPending ? 'Starting…' : '⚡ Start Instant Meeting'}
-        </Text>
-      </TouchableOpacity>
+      {isActive && (
+        <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
+          <Text style={styles.joinButtonText}>🎥 Join Video Call (100ms)</Text>
+        </TouchableOpacity>
+      )}
 
-      {isLive && (
-        <>
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-            <Text style={styles.joinButtonText}>🎥 Join Video Call (Jitsi)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.endButton, isMutating && { opacity: 0.7 }]}
-            onPress={() => endMutation.mutate()}
-            disabled={isMutating}
-          >
-            <Text style={styles.endButtonText}>
-              {endMutation.isPending ? 'Ending…' : '✅ End Consultation'}
-            </Text>
-          </TouchableOpacity>
-        </>
+      {isActive && (
+        <TouchableOpacity
+          style={[styles.endButton, isMutating && { opacity: 0.7 }]}
+          onPress={() => endMutation.mutate()}
+          disabled={isMutating}
+        >
+          <Text style={styles.endButtonText}>
+            {endMutation.isPending ? 'Ending…' : '✅ End Consultation'}
+          </Text>
+        </TouchableOpacity>
       )}
 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -257,7 +244,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  startButton: {
+  createButton: {
     margin: 16,
     marginTop: 20,
     backgroundColor: Colors.primary,
@@ -265,16 +252,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  startButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  instantButton: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#7C3AED',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  instantButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  createButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   joinButton: {
     marginHorizontal: 16,
     marginTop: 12,

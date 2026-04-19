@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { bookingService } from '../../services/bookingService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { BookingStatus, VideoSessionStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
+import { Linking } from 'react-native';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'VideoConsultation'>;
@@ -53,14 +54,17 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
     return <LoadingSpinner fullScreen message="Loading video session..." />;
   }
 
-  const canJoin =
-    session &&
-    session.status === 'IN_PROGRESS';
+  const canJoin = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
 
-  const handleJoin = () => {
-    if (session?.roomId) {
-      const url = `https://meet.jit.si/${session.roomId}`;
-      Linking.openURL(url).catch(() => {});
+  const handleJoin = async () => {
+    try {
+      const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      const url = `https://app.100ms.live/preview/${roomId}?token=${token}`;
+      Linking.openURL(url).catch(() =>
+        Alert.alert('Error', 'Could not open the video call link.'),
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to get join token. Please try again.');
     }
   };
 
@@ -100,7 +104,7 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
           <View style={styles.noSession}>
             <Text style={styles.noSessionIcon}>🎥</Text>
             <Text style={styles.noSessionText}>
-              The video session will be created once the provider accepts your booking.
+              The video room will be ready once the provider sets up the session.
             </Text>
           </View>
         ) : (
@@ -143,7 +147,7 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
       {/* Join button */}
       {canJoin && (
         <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-          <Text style={styles.joinButtonText}>🎥 Join Video Call</Text>
+          <Text style={styles.joinButtonText}>🎥 Join Video Call (100ms)</Text>
         </TouchableOpacity>
       )}
 
