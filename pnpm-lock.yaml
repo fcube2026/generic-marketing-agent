@@ -316,9 +316,6 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@expo/config-plugins':
-        specifier: ~8.0.0
-        version: 8.0.11
       '@react-native-async-storage/async-storage':
         specifier: 1.23.1
         version: 1.23.1(react-native@0.74.5(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(@types/react@18.2.79)(react@18.2.0))

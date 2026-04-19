@@ -83,7 +83,6 @@ async function main() {
 
   const providerApiBaseUrl =
     process.env.PHARMACY_PARTNER_API_URL ??
-    process.env.PHARMEASY_API_URL ??
     'https://mock-pharmacy.invalid';
   for (const partner of PHARMACY_PARTNERS) {
     await prisma.pharmacyPartner.upsert({

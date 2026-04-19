@@ -4,6 +4,7 @@
 
 const IS_STAGING = process.env.APP_ENV === 'staging';
 const IS_PRODUCTION = process.env.APP_ENV === 'production';
+const EAS_PROJECT_ID = '32ba7225-63f2-4092-95e5-1e24cb77d6a2';
 
 const getAppName = (): string => {
   if (IS_STAGING) return 'Curex24 Staging';
@@ -47,7 +48,6 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       backgroundColor: '#0D9488',
     },
     package: getBundleId(),
-    useNextNotificationsApi: true,
   },
   web: {
     favicon: './assets/icon.png',
@@ -59,7 +59,7 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
     eas: {
-      projectId: process.env.EAS_PROJECT_ID || '',
+      projectId: process.env.EAS_PROJECT_ID || EAS_PROJECT_ID,
     },
   },
   plugins: [

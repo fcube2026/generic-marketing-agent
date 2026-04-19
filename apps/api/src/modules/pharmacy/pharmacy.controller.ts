@@ -23,7 +23,7 @@ export class PharmacyController {
   ) {}
 
   /**
-   * GET /pharmacy/medicines/search?query=paracetamol&partner=pharmeasy
+   * GET /pharmacy/medicines/search?query=paracetamol&partner=demo-pharmacy
    * Search medicines across one or all active pharmacy partners.
    */
   @Get('medicines/search')
