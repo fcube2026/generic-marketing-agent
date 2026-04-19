@@ -8,6 +8,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
 
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -29,6 +30,7 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private videoReminderService: VideoConsultationReminderService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -373,6 +375,18 @@ export class BookingsService {
           },
         },
       );
+
+      // Schedule pre-session reminders for video consultations
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.scheduleReminders(
+          bookingId,
+          booking.scheduledAt,
+          booking.patient.userId,
+          booking.provider.userId,
+          booking.provider.name,
+          booking.patient.name,
+        );
+      }
     }
 
     return updated;
@@ -483,6 +497,10 @@ export class BookingsService {
             },
           );
         }
+      }
+      // Cancel scheduled video consultation reminders if applicable
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.cancelReminders(bookingId);
       }
     }
 
