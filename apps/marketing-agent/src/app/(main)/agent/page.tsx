@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { type AgentMessage } from '@/lib/data';
+import { GeneratedImage } from '@/components/ui/GeneratedImage';
 
 const suggestedPrompts = [
   "Write Google Search ad copy for home visits in Mumbai",
@@ -351,6 +352,57 @@ Caption: "Doctor visits, examines, and sends your digital prescription within th
 **Tip:** Generate all 3 variations and A/B test in Meta Ads Manager. The photorealistic doorstep scene typically outperforms in patient acquisition campaigns by 15–25% CTR.`,
 };
 
+function getImagePromptForRequest(lower: string): string | null {
+  // Explicit DALL-E / image prompt requests → always generate image
+  if (lower.includes('dall-e') || lower.includes('dalle') || lower.includes('image prompt') || lower.includes('visual prompt')) {
+    return 'photorealistic doctor in white coat arriving at modern apartment door, patient smiling and welcoming, bright natural daylight, warm interior lighting, compact medical kit, shallow depth of field, 8K DSLR quality';
+  }
+
+  // Infographic
+  if (lower.includes('infographic')) {
+    return 'clean healthcare infographic showing four steps to book a home doctor visit, flat illustration style, healthcare blue and white, numbered step icons, modern minimalist design, vertical format';
+  }
+
+  // Carousel / slides
+  if (lower.includes('carousel') || (lower.includes('slides') && lower.includes('instagram'))) {
+    return 'Instagram carousel opening slide, professional doctor visiting patient at home, warm welcoming scene, bright modern apartment, healthcare blue and white, photorealistic lifestyle photography';
+  }
+
+  // Reels / short video thumbnail
+  if (lower.includes('reel') && (lower.includes('generate') || lower.includes('create') || lower.includes('write'))) {
+    return 'vertical social media visual for healthcare brand, smiling doctor in white coat at modern apartment door, warm cinematic lighting, mobile-first 9:16 composition, high quality';
+  }
+
+  // Post or visual generation requests for visual platforms
+  const isCreating = ['generate', 'create', 'make', 'design', 'draft'].some((w) => lower.includes(w));
+  const isVisualPost =
+    lower.includes('visual') ||
+    lower.includes('image') ||
+    lower.includes('picture') ||
+    lower.includes('banner') ||
+    lower.includes('graphic') ||
+    (lower.includes('post') &&
+      ['instagram', 'facebook', 'linkedin', 'social media'].some((p) => lower.includes(p)));
+
+  if (!isCreating || !isVisualPost) return null;
+
+  if (lower.includes('instagram')) {
+    return 'Instagram square social media post for healthcare brand curex24, doctor home visit lifestyle photography, warm natural lighting, photorealistic, 1:1 format, high quality';
+  }
+  if (lower.includes('linkedin')) {
+    return 'LinkedIn post image for healthcare brand, professional doctor in modern bright home setting, blue and white corporate tones, trustworthy and clean, landscape format';
+  }
+  if (lower.includes('facebook')) {
+    return 'Facebook post visual for healthcare brand, warm doctor-patient home visit scene, inviting lifestyle photography, brand blue and white, high quality';
+  }
+  if (lower.includes('youtube') || lower.includes('thumbnail')) {
+    return 'YouTube thumbnail, doctor home visit curex24, high contrast bold composition, cinematic quality, expressive scene, 16:9 format';
+  }
+
+  // Generic visual generation
+  return 'professional social media marketing visual for healthcare brand curex24, doctor visiting patient at home, warm photorealistic scene, healthcare blue accents, premium quality';
+}
+
 function getAgentResponse(userMessage: string): string {
   const trimmed = userMessage.trim();
 
@@ -463,7 +515,7 @@ Here's what I can do for you:
 
 ✍️ **Write** — ad copy, email sequences, social posts, Reels scripts, WhatsApp campaigns
 📊 **Strategise** — budget allocation, channel prioritisation, retention analysis
-🎨 **Create visuals** — DALL-E 3 prompts, Midjourney commands, infographic briefs
+🖼️ **Generate visuals** — actual AI-generated images for Instagram, LinkedIn, Facebook, infographics, banners — ready to download
 📣 **Build campaigns** — Google, Meta, LinkedIn, YouTube — full creative packages
 
 For complete content production (Post Generator, Visual Generator, Ad Creative Generator), visit the **✨ Create Content** studio in the sidebar.
@@ -489,6 +541,11 @@ function MessageBubble({ msg }: { msg: AgentMessage }) {
         }`}
       >
         <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+        {msg.imagePrompt && (
+          <div className="mt-3">
+            <GeneratedImage prompt={msg.imagePrompt} label="AI-Generated Visual" />
+          </div>
+        )}
         <div className={`text-xs mt-1 ${isAgent ? 'text-gray-400' : 'text-primary-light'}`}>{msg.timestamp}</div>
       </div>
       {!isAgent && (
@@ -518,8 +575,14 @@ export default function AgentPage() {
     setInput('');
     setIsTyping(true);
     setTimeout(() => {
-      const response = getAgentResponse(text);
-      const agentMsg: AgentMessage = { role: 'agent', content: response, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      const content = getAgentResponse(text);
+      const imagePrompt = getImagePromptForRequest(text.trim().toLowerCase());
+      const agentMsg: AgentMessage = {
+        role: 'agent',
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        ...(imagePrompt ? { imagePrompt } : {}),
+      };
       setMessages((prev) => [...prev, agentMsg]);
       setIsTyping(false);
     }, 1200);

@@ -673,6 +673,7 @@ export interface AgentMessage {
   role: 'user' | 'agent';
   content: string;
   timestamp: string;
+  imagePrompt?: string;
 }
 
 export const sampleConversation: AgentMessage[] = [
