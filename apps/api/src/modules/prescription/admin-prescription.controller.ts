@@ -1,0 +1,82 @@
+import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
+import { PrescriptionService } from './prescription.service';
+import { VerifyPrescriptionDto } from './dto/verify-prescription.dto';
+
+@ApiTags('admin-pharmacy-prescriptions')
+@ApiBearerAuth()
+@Roles('ADMIN')
+@Controller('admin/pharmacy/prescriptions')
+export class AdminPrescriptionController {
+  constructor(private readonly prescriptionService: PrescriptionService) {}
+
+  /**
+   * GET /admin/pharmacy/prescriptions/queue
+   *
+   * Returns all prescriptions pending pharmacist review.
+   * Supports pagination and sorting.
+   */
+  @Get('queue')
+  @ApiOperation({ summary: 'Get pending prescription review queue' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'updatedAt'],
+  })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  getQueue(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('order') order?: string,
+  ) {
+    return this.prescriptionService.getQueue(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+      (sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt') as
+        | 'createdAt'
+        | 'updatedAt',
+      (order === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc',
+    );
+  }
+
+  /**
+   * GET /admin/pharmacy/prescriptions/:id
+   *
+   * Fetch prescription details with a 5-minute signed file URL.
+   */
+  @Get(':id')
+  @ApiOperation({ summary: 'Get prescription details with signed file URL' })
+  getDetails(@Param('id') id: string) {
+    return this.prescriptionService.getDetails(id);
+  }
+
+  /**
+   * POST /admin/pharmacy/prescriptions/:id/verify
+   *
+   * Approve, reject, or request re-upload for a prescription.
+   * Records the action in the audit log.
+   */
+  @Post(':id/verify')
+  @ApiOperation({ summary: 'Verify (approve/reject/reupload) a prescription' })
+  verifyPrescription(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: VerifyPrescriptionDto,
+  ) {
+    return this.prescriptionService.verifyPrescription(
+      id,
+      user.id,
+      dto.action,
+      dto.notes,
+    );
+  }
+}
