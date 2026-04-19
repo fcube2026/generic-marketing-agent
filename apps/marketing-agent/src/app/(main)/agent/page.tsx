@@ -352,50 +352,49 @@ Caption: "Doctor visits, examines, and sends your digital prescription within th
 **Tip:** Generate all 3 variations and A/B test in Meta Ads Manager. The photorealistic doorstep scene typically outperforms in patient acquisition campaigns by 15–25% CTR.`,
 };
 
-function getImagePromptForRequest(lower: string): string | null {
+const CREATION_KEYWORDS = ['generate', 'create', 'make', 'design', 'draft'];
+const VISUAL_KEYWORDS = ['visual', 'image', 'picture', 'banner', 'graphic'];
+const VISUAL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'social media'];
+
+function getImagePromptForRequest(msg: string): string | null {
   // Explicit DALL-E / image prompt requests → always generate image
-  if (lower.includes('dall-e') || lower.includes('dalle') || lower.includes('image prompt') || lower.includes('visual prompt')) {
+  if (msg.includes('dall-e') || msg.includes('dalle') || msg.includes('image prompt') || msg.includes('visual prompt')) {
     return 'photorealistic doctor in white coat arriving at modern apartment door, patient smiling and welcoming, bright natural daylight, warm interior lighting, compact medical kit, shallow depth of field, 8K DSLR quality';
   }
 
   // Infographic
-  if (lower.includes('infographic')) {
+  if (msg.includes('infographic')) {
     return 'clean healthcare infographic showing four steps to book a home doctor visit, flat illustration style, healthcare blue and white, numbered step icons, modern minimalist design, vertical format';
   }
 
   // Carousel / slides
-  if (lower.includes('carousel') || (lower.includes('slides') && lower.includes('instagram'))) {
+  if (msg.includes('carousel') || (msg.includes('slides') && msg.includes('instagram'))) {
     return 'Instagram carousel opening slide, professional doctor visiting patient at home, warm welcoming scene, bright modern apartment, healthcare blue and white, photorealistic lifestyle photography';
   }
 
   // Reels / short video thumbnail
-  if (lower.includes('reel') && (lower.includes('generate') || lower.includes('create') || lower.includes('write'))) {
+  if (msg.includes('reel') && CREATION_KEYWORDS.some((w) => msg.includes(w))) {
     return 'vertical social media visual for healthcare brand, smiling doctor in white coat at modern apartment door, warm cinematic lighting, mobile-first 9:16 composition, high quality';
   }
 
   // Post or visual generation requests for visual platforms
-  const isCreating = ['generate', 'create', 'make', 'design', 'draft'].some((w) => lower.includes(w));
+  const isCreating = CREATION_KEYWORDS.some((w) => msg.includes(w));
   const isVisualPost =
-    lower.includes('visual') ||
-    lower.includes('image') ||
-    lower.includes('picture') ||
-    lower.includes('banner') ||
-    lower.includes('graphic') ||
-    (lower.includes('post') &&
-      ['instagram', 'facebook', 'linkedin', 'social media'].some((p) => lower.includes(p)));
+    VISUAL_KEYWORDS.some((w) => msg.includes(w)) ||
+    (msg.includes('post') && VISUAL_PLATFORMS.some((p) => msg.includes(p)));
 
   if (!isCreating || !isVisualPost) return null;
 
-  if (lower.includes('instagram')) {
+  if (msg.includes('instagram')) {
     return 'Instagram square social media post for healthcare brand curex24, doctor home visit lifestyle photography, warm natural lighting, photorealistic, 1:1 format, high quality';
   }
-  if (lower.includes('linkedin')) {
+  if (msg.includes('linkedin')) {
     return 'LinkedIn post image for healthcare brand, professional doctor in modern bright home setting, blue and white corporate tones, trustworthy and clean, landscape format';
   }
-  if (lower.includes('facebook')) {
+  if (msg.includes('facebook')) {
     return 'Facebook post visual for healthcare brand, warm doctor-patient home visit scene, inviting lifestyle photography, brand blue and white, high quality';
   }
-  if (lower.includes('youtube') || lower.includes('thumbnail')) {
+  if (msg.includes('youtube') || msg.includes('thumbnail')) {
     return 'YouTube thumbnail, doctor home visit curex24, high contrast bold composition, cinematic quality, expressive scene, 16:9 format';
   }
 
