@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,6 +46,19 @@ export const VideoConsultationScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const queryClient = useQueryClient();
   const { bookingId } = route.params;
+  const [mockCallActive, setMockCallActive] = useState(false);
+  const [mockSeconds, setMockSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (mockCallActive) {
+      timerRef.current = setInterval(() => setMockSeconds((s) => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setMockSeconds(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [mockCallActive]);
 
   const { data: booking, isLoading: bookingLoading } = useQuery({
     queryKey: ['booking', bookingId],
@@ -86,6 +99,10 @@ export const VideoConsultationScreen: React.FC = () => {
   const handleJoin = async () => {
     try {
       const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      if (token.startsWith('mock-token-')) {
+        setMockCallActive(true);
+        return;
+      }
       const url = `https://app.100ms.live/preview/${roomId}?token=${token}`;
       Linking.openURL(url).catch(() =>
         Alert.alert('Error', 'Could not open the video call link.'),
@@ -94,6 +111,39 @@ export const VideoConsultationScreen: React.FC = () => {
       Alert.alert('Error', 'Failed to get join token. Please try again.');
     }
   };
+
+  if (mockCallActive) {
+    const mins = Math.floor(mockSeconds / 60).toString().padStart(2, '0');
+    const secs = (mockSeconds % 60).toString().padStart(2, '0');
+    return (
+      <View style={styles.mockCall}>
+        <View style={styles.mockVideo}>
+          <Text style={styles.mockVideoIcon}>🙋</Text>
+          <Text style={styles.mockVideoLabel}>Patient (Mock)</Text>
+        </View>
+        <View style={styles.mockVideoSelf}>
+          <Text style={styles.mockVideoSelfIcon}>👨‍⚕️</Text>
+          <Text style={styles.mockVideoSelfLabel}>You</Text>
+        </View>
+        <Text style={styles.mockTimer}>{mins}:{secs}</Text>
+        <Text style={styles.mockBadge}>🧪 MOCK SESSION</Text>
+        <View style={styles.mockControls}>
+          <TouchableOpacity style={styles.mockCtrlBtn}>
+            <Text style={styles.mockCtrlIcon}>🎤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.mockCtrlBtn}>
+            <Text style={styles.mockCtrlIcon}>📷</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mockCtrlBtn, styles.mockEndBtn]}
+            onPress={() => setMockCallActive(false)}
+          >
+            <Text style={styles.mockCtrlIcon}>📵</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -281,4 +331,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonText: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' },
+  mockCall: {
+    flex: 1,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  mockVideo: {
+    width: '100%',
+    height: 260,
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  mockVideoIcon: { fontSize: 72 },
+  mockVideoLabel: { color: '#94A3B8', marginTop: 8, fontSize: 14 },
+  mockVideoSelf: {
+    position: 'absolute',
+    top: 60,
+    right: 32,
+    width: 80,
+    height: 100,
+    backgroundColor: '#334155',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockVideoSelfIcon: { fontSize: 28 },
+  mockVideoSelfLabel: { color: '#94A3B8', fontSize: 10, marginTop: 4 },
+  mockTimer: { color: Colors.white, fontSize: 32, fontWeight: '700', marginTop: 16 },
+  mockBadge: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
+    letterSpacing: 1,
+  },
+  mockControls: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 32,
+  },
+  mockCtrlBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockEndBtn: { backgroundColor: '#EF4444' },
+  mockCtrlIcon: { fontSize: 24 },
 });
