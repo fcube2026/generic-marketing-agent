@@ -499,6 +499,7 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
 
       - name: Deploy to Vercel (staging)
         if: steps.check-secrets.outputs.skip != 'true'

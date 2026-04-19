@@ -81,29 +81,16 @@ export const bookingService = {
     return r.data;
   },
 
-  startVideoSession: async (bookingId: string) => {
-    const r = await api.post(`/video-sessions/${bookingId}/start`);
+  createVideoRoom: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/create`);
     return r.data;
   },
 
-  startInstantSession: async (bookingId: string) => {
-    const r = await api.post(`/video-sessions/${bookingId}/instant`);
-    return r.data;
-  },
-
-  startStandaloneInstantSession: async () => {
-    const r = await api.post('/video-sessions/instant');
-    return r.data;
-  },
-
-  getMyVideoSessions: async () => {
-    const r = await api.get('/video-sessions/my');
-    return r.data;
-  },
-
-  getInstantSessionsForPatient: async () => {
-    const r = await api.get('/video-sessions/for-patient');
-    return r.data;
+  getVideoToken: async (bookingId: string, role?: string) => {
+    const r = await api.get(`/video-sessions/${bookingId}/token`, {
+      params: role ? { role } : {},
+    });
+    return r.data as { token: string; roomId: string; role: string };
   },
 
   endVideoSession: async (bookingId: string) => {

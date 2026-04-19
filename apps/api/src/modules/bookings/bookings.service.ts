@@ -70,6 +70,14 @@ export class BookingsService {
         'This provider does not offer clinic visits.',
       );
     }
+    if (
+      dto.mode === 'VIDEO_CONSULTATION' &&
+      !provider.videoConsultationEnabled
+    ) {
+      throw new BadRequestException(
+        'This provider does not offer video consultations.',
+      );
+    }
 
     // Validate address is provided for home visits
     if (dto.mode === 'HOME_VISIT' && !dto.addressId) {
@@ -121,7 +129,9 @@ export class BookingsService {
     const fee =
       dto.mode === 'HOME_VISIT'
         ? provider.consultationFeeHomeVisit
-        : provider.consultationFeeDoctorPlace;
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? provider.consultationFeeVideoConsultation
+          : provider.consultationFeeDoctorPlace;
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -160,7 +170,12 @@ export class BookingsService {
     });
 
     // Notify provider of new booking request with push and SMS
-    const modeText = dto.mode === 'HOME_VISIT' ? 'home visit' : 'clinic visit';
+    const modeText =
+      dto.mode === 'HOME_VISIT'
+        ? 'home visit'
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? 'video consultation'
+          : 'clinic visit';
     await this.notificationsService.sendNotification(
       {
         userId: provider.userId,

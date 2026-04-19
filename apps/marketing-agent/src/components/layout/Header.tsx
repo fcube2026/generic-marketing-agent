@@ -14,6 +14,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/experiments': { title: 'Experiments', subtitle: 'A/B tests, experiment log, results, and learnings' },
   '/reports': { title: 'Reports & KPIs', subtitle: 'Performance reporting, funnel analysis, and channel comparison' },
   '/agent': { title: 'AI Marketing Agent', subtitle: 'Chat with your AI CMO for strategy, copy, and execution guidance' },
+  '/create': { title: 'AI Content Studio', subtitle: 'Generate posts, visuals, and ad creatives — powered by ChatGPT, DALL-E 3, Midjourney, and more' },
 };
 
 export default function Header() {

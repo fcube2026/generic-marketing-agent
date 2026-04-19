@@ -13,7 +13,6 @@ import { HistoryScreen } from '../screens/provider/HistoryScreen';
 import { EarningsScreen } from '../screens/provider/EarningsScreen';
 import { ProfileScreen } from '../screens/provider/ProfileScreen';
 import { VideoConsultationScreen } from '../screens/provider/VideoConsultationScreen';
-import { InstantMeetingScreen } from '../screens/provider/InstantMeetingScreen';
 import { Colors } from '../constants/colors';
 
 export type ProviderStackParamList = {
@@ -23,7 +22,6 @@ export type ProviderStackParamList = {
   IncomingBooking: undefined;
   BookingDetail: { bookingId: string };
   VideoConsultation: { bookingId: string };
-  InstantMeeting: undefined;
   ConsultationForm: { bookingId: string };
   Kyc: undefined;
 };
@@ -59,7 +57,6 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="IncomingBooking" component={IncomingBookingScreen} options={{ title: 'New Booking' }} />
     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} options={{ title: 'Booking Details' }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
-    <Stack.Screen name="InstantMeeting" component={InstantMeetingScreen} options={{ title: 'Instant Meeting' }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
   </Stack.Navigator>

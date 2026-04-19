@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +17,8 @@ import { providerService } from '../../services/providerService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { ProviderWithDistance } from '../../types';
 import { useBookingStore } from '../../store/bookingStore';
+import { BookingMode } from '../../types';
+import { formatCurrency } from '../../utils/format';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'ProviderList'>;
@@ -37,20 +40,59 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     return a.consultationFeeHomeVisit - b.consultationFeeHomeVisit;
   });
 
-  const handleSelectProvider = (provider: ProviderWithDistance) => {
+  const navigateToConfirm = (
+    provider: ProviderWithDistance,
+    mode: BookingMode,
+    fee: number,
+  ) => {
     setSelectedProvider(provider);
+    setSelectedMode(mode);
+    navigation.navigate('BookingConfirm', { providerId: provider.id, mode, fee });
+  };
+
+  const handleSelectProvider = (provider: ProviderWithDistance) => {
+    const modes: { label: string; mode: BookingMode; fee: number }[] = [];
+
     if (provider.homeVisitEnabled) {
-      setSelectedMode('HOME_VISIT');
-    } else {
-      setSelectedMode('DOCTOR_PLACE');
+      modes.push({
+        label: `🏠 Home Visit — ${formatCurrency(provider.consultationFeeHomeVisit)}`,
+        mode: 'HOME_VISIT',
+        fee: provider.consultationFeeHomeVisit,
+      });
     }
-    navigation.navigate('BookingConfirm', {
-      providerId: provider.id,
-      mode: provider.homeVisitEnabled ? 'HOME_VISIT' : 'DOCTOR_PLACE',
-      fee: provider.homeVisitEnabled
-        ? provider.consultationFeeHomeVisit
-        : provider.consultationFeeDoctorPlace,
-    });
+    if (provider.doctorPlaceVisitEnabled) {
+      modes.push({
+        label: `🏥 Clinic Visit — ${formatCurrency(provider.consultationFeeDoctorPlace)}`,
+        mode: 'DOCTOR_PLACE',
+        fee: provider.consultationFeeDoctorPlace,
+      });
+    }
+    if (provider.videoConsultationEnabled) {
+      modes.push({
+        label: `📹 Video Consultation — ${formatCurrency(provider.consultationFeeVideoConsultation)}`,
+        mode: 'VIDEO_CONSULTATION',
+        fee: provider.consultationFeeVideoConsultation,
+      });
+    }
+
+    if (modes.length === 0) return;
+
+    if (modes.length === 1) {
+      navigateToConfirm(provider, modes[0].mode, modes[0].fee);
+      return;
+    }
+
+    Alert.alert(
+      'Select Booking Mode',
+      `How would you like to consult Dr. ${provider.name}?`,
+      [
+        ...modes.map(({ label, mode, fee }) => ({
+          text: label,
+          onPress: () => navigateToConfirm(provider, mode, fee),
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
   };
 
   if (isLoading) return <LoadingSpinner fullScreen message="Finding providers..." />;

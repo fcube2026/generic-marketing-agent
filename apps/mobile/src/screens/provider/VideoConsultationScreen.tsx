@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,6 +46,19 @@ export const VideoConsultationScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const queryClient = useQueryClient();
   const { bookingId } = route.params;
+  const [mockCallActive, setMockCallActive] = useState(false);
+  const [mockSeconds, setMockSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (mockCallActive) {
+      timerRef.current = setInterval(() => setMockSeconds((s) => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setMockSeconds(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [mockCallActive]);
 
   const { data: booking, isLoading: bookingLoading } = useQuery({
     queryKey: ['booking', bookingId],
@@ -63,16 +76,10 @@ export const VideoConsultationScreen: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['video-session', bookingId] });
   };
 
-  const startMutation = useMutation({
-    mutationFn: () => bookingService.startVideoSession(bookingId),
+  const createRoomMutation = useMutation({
+    mutationFn: () => bookingService.createVideoRoom(bookingId),
     onSuccess: invalidate,
-    onError: () => Alert.alert('Error', 'Failed to start video session.'),
-  });
-
-  const instantMutation = useMutation({
-    mutationFn: () => bookingService.startInstantSession(bookingId),
-    onSuccess: invalidate,
-    onError: () => Alert.alert('Error', 'Failed to start instant session.'),
+    onError: () => Alert.alert('Error', 'Failed to create video room.'),
   });
 
   const endMutation = useMutation({
@@ -85,18 +92,58 @@ export const VideoConsultationScreen: React.FC = () => {
     return <LoadingSpinner fullScreen message="Loading video session..." />;
   }
 
-  const isLive = session?.status === 'IN_PROGRESS';
-  const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
+  const sessionExists = Boolean(session);
+  const isActive = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
+  const isMutating = createRoomMutation.isPending || endMutation.isPending;
 
-  const handleJoin = () => {
-    if (session?.roomId) {
-      const url = `https://meet.jit.si/${session.roomId}`;
-      Linking.openURL(url).catch(() => {});
+  const handleJoin = async () => {
+    try {
+      const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      if (token.startsWith('mock-token-')) {
+        setMockCallActive(true);
+        return;
+      }
+      const url = `https://app.100ms.live/preview/${roomId}?token=${token}`;
+      Linking.openURL(url).catch(() =>
+        Alert.alert('Error', 'Could not open the video call link.'),
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to get join token. Please try again.');
     }
   };
 
-  const isMutating =
-    startMutation.isPending || instantMutation.isPending || endMutation.isPending;
+  if (mockCallActive) {
+    const mins = Math.floor(mockSeconds / 60).toString().padStart(2, '0');
+    const secs = (mockSeconds % 60).toString().padStart(2, '0');
+    return (
+      <View style={styles.mockCall}>
+        <View style={styles.mockVideo}>
+          <Text style={styles.mockVideoIcon}>🙋</Text>
+          <Text style={styles.mockVideoLabel}>Patient (Mock)</Text>
+        </View>
+        <View style={styles.mockVideoSelf}>
+          <Text style={styles.mockVideoSelfIcon}>👨‍⚕️</Text>
+          <Text style={styles.mockVideoSelfLabel}>You</Text>
+        </View>
+        <Text style={styles.mockTimer}>{mins}:{secs}</Text>
+        <Text style={styles.mockBadge}>🧪 MOCK SESSION</Text>
+        <View style={styles.mockControls}>
+          <TouchableOpacity style={styles.mockCtrlBtn}>
+            <Text style={styles.mockCtrlIcon}>🎤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.mockCtrlBtn}>
+            <Text style={styles.mockCtrlIcon}>📷</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.mockCtrlBtn, styles.mockEndBtn]}
+            onPress={() => setMockCallActive(false)}
+          >
+            <Text style={styles.mockCtrlIcon}>📵</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -134,7 +181,7 @@ export const VideoConsultationScreen: React.FC = () => {
           <View style={styles.noSession}>
             <Text style={styles.noSessionIcon}>🎥</Text>
             <Text style={styles.noSessionText}>
-              No video session started yet. Click "Start Consultation" to begin.
+              No video room created yet. Click "Create Video Room" to set up the 100ms session.
             </Text>
           </View>
         ) : (
@@ -181,44 +228,34 @@ export const VideoConsultationScreen: React.FC = () => {
       </Card>
 
       {/* Action buttons */}
-      {canStart && (
+      {!sessionExists && (
         <TouchableOpacity
-          style={[styles.startButton, isMutating && { opacity: 0.7 }]}
-          onPress={() => startMutation.mutate()}
+          style={[styles.createButton, isMutating && { opacity: 0.7 }]}
+          onPress={() => createRoomMutation.mutate()}
           disabled={isMutating}
         >
-          <Text style={styles.startButtonText}>
-            {startMutation.isPending ? 'Starting…' : '▶️ Start Consultation'}
+          <Text style={styles.createButtonText}>
+            {createRoomMutation.isPending ? 'Creating…' : '▶️ Create Video Room'}
           </Text>
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={[styles.instantButton, isMutating && { opacity: 0.7 }]}
-        onPress={() => instantMutation.mutate()}
-        disabled={isMutating}
-      >
-        <Text style={styles.instantButtonText}>
-          {instantMutation.isPending ? 'Starting…' : '⚡ Start Instant Meeting'}
-        </Text>
-      </TouchableOpacity>
+      {isActive && (
+        <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
+          <Text style={styles.joinButtonText}>🎥 Join Video Call (100ms)</Text>
+        </TouchableOpacity>
+      )}
 
-      {isLive && (
-        <>
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
-            <Text style={styles.joinButtonText}>🎥 Join Video Call (Jitsi)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.endButton, isMutating && { opacity: 0.7 }]}
-            onPress={() => endMutation.mutate()}
-            disabled={isMutating}
-          >
-            <Text style={styles.endButtonText}>
-              {endMutation.isPending ? 'Ending…' : '✅ End Consultation'}
-            </Text>
-          </TouchableOpacity>
-        </>
+      {isActive && (
+        <TouchableOpacity
+          style={[styles.endButton, isMutating && { opacity: 0.7 }]}
+          onPress={() => endMutation.mutate()}
+          disabled={isMutating}
+        >
+          <Text style={styles.endButtonText}>
+            {endMutation.isPending ? 'Ending…' : '✅ End Consultation'}
+          </Text>
+        </TouchableOpacity>
       )}
 
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -257,7 +294,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  startButton: {
+  createButton: {
     margin: 16,
     marginTop: 20,
     backgroundColor: Colors.primary,
@@ -265,16 +302,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  startButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  instantButton: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#7C3AED',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  instantButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  createButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   joinButton: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -303,4 +331,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonText: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' },
+  mockCall: {
+    flex: 1,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  mockVideo: {
+    width: '100%',
+    height: 260,
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  mockVideoIcon: { fontSize: 72 },
+  mockVideoLabel: { color: '#94A3B8', marginTop: 8, fontSize: 14 },
+  mockVideoSelf: {
+    position: 'absolute',
+    top: 60,
+    right: 32,
+    width: 80,
+    height: 100,
+    backgroundColor: '#334155',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockVideoSelfIcon: { fontSize: 28 },
+  mockVideoSelfLabel: { color: '#94A3B8', fontSize: 10, marginTop: 4 },
+  mockTimer: { color: Colors.white, fontSize: 32, fontWeight: '700', marginTop: 16 },
+  mockBadge: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
+    letterSpacing: 1,
+  },
+  mockControls: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 32,
+  },
+  mockCtrlBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mockEndBtn: { backgroundColor: '#EF4444' },
+  mockCtrlIcon: { fontSize: 24 },
 });
