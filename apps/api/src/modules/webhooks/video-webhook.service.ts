@@ -193,7 +193,7 @@ export class VideoWebhookService {
     }
 
     let session: Awaited<
-      ReturnType<typeof this.prisma.videoSession.findFirst>
+      ReturnType<typeof this.prisma.videoSession.findUnique>
     > | null = null;
 
     if (room_id) {
