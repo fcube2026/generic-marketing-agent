@@ -19,6 +19,9 @@ CREATE TYPE "PharmacyOrderStatus" AS ENUM (
 );
 
 ALTER TABLE "pharmacy_orders"
+ALTER COLUMN "status" DROP DEFAULT;
+
+ALTER TABLE "pharmacy_orders"
 ALTER COLUMN "status" TYPE "PharmacyOrderStatus"
 USING ("status"::text::"PharmacyOrderStatus");
 

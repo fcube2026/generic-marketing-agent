@@ -32,17 +32,17 @@ const prisma = new PrismaClient();
 
 const PHARMACY_PARTNERS = [
   {
-    code: 'pharmeasy',
-    name: 'PharmEasy',
-    displayName: 'PharmEasy',
-    description: 'Primary staging pharmacy partner for Curex24 QA.',
+    code: 'demo-pharmacy',
+    name: 'Demo Pharmacy',
+    displayName: 'Curex Demo Pharmacy',
+    description: 'Primary mock pharmacy partner for Curex24 QA and MVP flows.',
     priority: 1,
   },
   {
-    code: 'pharmeasy-express',
-    name: 'PharmEasy Express',
-    displayName: 'PharmEasy Express',
-    description: 'Secondary PharmEasy route for staging verification.',
+    code: 'demo-pharmacy-express',
+    name: 'Demo Pharmacy Express',
+    displayName: 'Curex Demo Pharmacy Express',
+    description: 'Secondary mock pharmacy route for QA and staging verification.',
     priority: 2,
   },
 ] as const;
@@ -82,7 +82,9 @@ async function main() {
   console.log(`✅ Ensured ${STAGING_CATEGORIES.length} staging service categories`);
 
   const providerApiBaseUrl =
-    process.env.PHARMEASY_API_URL ?? 'https://pharmeasy.invalid';
+    process.env.PHARMACY_PARTNER_API_URL ??
+    process.env.PHARMEASY_API_URL ??
+    'https://mock-pharmacy.invalid';
   for (const partner of PHARMACY_PARTNERS) {
     await prisma.pharmacyPartner.upsert({
       where: { code: partner.code },
