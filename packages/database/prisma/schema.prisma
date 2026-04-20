@@ -843,7 +843,7 @@ model MarketingBusinessProfile {
 }
 
 model MarketingCampaign {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   objective   String
   channel     String
@@ -851,16 +851,16 @@ model MarketingCampaign {
   budget      String
   duration    String
   kpi         String
-  status      String   @default("planned") // 'active' | 'planned' | 'completed' | 'paused'
-  headline    String[] @default([])
-  description String[] @default([])
-  spend       Float    @default(0)
-  impressions Int      @default(0)
-  conversions Int      @default(0)
+  status      String    @default("planned") // 'active' | 'planned' | 'completed' | 'paused'
+  headline    String[]  @default([])
+  description String[]  @default([])
+  spend       Float     @default(0)
+  impressions Int       @default(0)
+  conversions Int       @default(0)
   startDate   DateTime?
   endDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([status])
   @@map("marketing_campaigns")
@@ -888,17 +888,17 @@ model MarketingExperiment {
 }
 
 model MarketingContentItem {
-  id        String   @id @default(cuid())
-  week      Int
-  day       String
-  platform  String
-  pillar    String // 'patient-education' | 'provider-spotlight' | 'product-education' | 'social-proof' | 'local-health'
-  title     String
-  format    String
-  status    String   @default("planned") // 'planned' | 'in-progress' | 'ready' | 'published'
+  id          String    @id @default(cuid())
+  week        Int
+  day         String
+  platform    String
+  pillar      String // 'patient-education' | 'provider-spotlight' | 'product-education' | 'social-proof' | 'local-health'
+  title       String
+  format      String
+  status      String    @default("planned") // 'planned' | 'in-progress' | 'ready' | 'published'
   scheduledAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([week])
   @@index([status])
@@ -919,11 +919,11 @@ model MarketingSeoPage {
 }
 
 model MarketingKeywordCluster {
-  id       String   @id @default(cuid())
-  cluster  String
-  type     String // 'transactional' | 'informational' | 'comparison' | 'provider-side'
-  priority String // 'high' | 'medium' | 'low'
-  keywords Json     @default("[]") // Array<{ keyword, volume, difficulty }>
+  id        String   @id @default(cuid())
+  cluster   String
+  type      String // 'transactional' | 'informational' | 'comparison' | 'provider-side'
+  priority  String // 'high' | 'medium' | 'low'
+  keywords  Json     @default("[]") // Array<{ keyword, volume, difficulty }>
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
