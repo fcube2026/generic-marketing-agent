@@ -667,6 +667,352 @@ export const ninetyDayPlan: PlanItem[] = [
   { phase: '61-90', category: 'PR', task: 'Share milestone announcement (press, social, LinkedIn)', owner: 'Founder + Marketing', done: false },
 ];
 
+// ─── Marketing Skills Catalog ────────────────────────────────────────────────
+//
+// Full catalogue of agent skills modelled on the marketingskills spec
+// (https://agentskills.io). Each skill represents a specialised marketing
+// workflow the AI Marketing Agent can execute.
+
+export type MarketingSkillCategory =
+  | 'Conversion Optimization'
+  | 'Content & Copy'
+  | 'SEO & Discovery'
+  | 'Paid & Distribution'
+  | 'Measurement & Testing'
+  | 'Retention'
+  | 'Growth Engineering'
+  | 'Strategy & Monetization'
+  | 'Sales & RevOps';
+
+export interface MarketingSkill {
+  id: string;
+  name: string;
+  category: MarketingSkillCategory;
+  icon: string;
+  description: string;
+  examplePrompt: string;
+}
+
+export const marketingSkills: MarketingSkill[] = [
+  // Measurement & Testing
+  {
+    id: 'ab-test-setup',
+    name: 'A/B Test Setup',
+    category: 'Measurement & Testing',
+    icon: '🧪',
+    description: 'Plan, design, or implement an A/B test or experiment, or build a growth experimentation program.',
+    examplePrompt: 'Design an A/B test for the curex24 home-page hero — give me the hypothesis, variants, sample size, and success metric.',
+  },
+  {
+    id: 'analytics-tracking',
+    name: 'Analytics Tracking',
+    category: 'Measurement & Testing',
+    icon: '📊',
+    description: 'Set up, improve, or audit analytics tracking and measurement (events, conversions, attribution).',
+    examplePrompt: 'Set up GA4 + Meta Pixel event tracking for the curex24 booking funnel — list every event, parameter, and where to fire it.',
+  },
+
+  // Paid & Distribution
+  {
+    id: 'ad-creative',
+    name: 'Ad Creative',
+    category: 'Paid & Distribution',
+    icon: '🎯',
+    description: 'Generate, iterate, or scale ad creative — headlines, descriptions, primary text, or full ad sets.',
+    examplePrompt: 'Generate 10 Meta ad creative variations for curex24 patient acquisition — headlines, primary text, and visual direction.',
+  },
+  {
+    id: 'paid-ads',
+    name: 'Paid Ads',
+    category: 'Paid & Distribution',
+    icon: '💸',
+    description: 'Help with paid advertising campaigns on Google Ads, Meta, LinkedIn, Twitter/X, and more.',
+    examplePrompt: 'Plan a ₹3L Google Search campaign for curex24 — campaign structure, keyword themes, bidding, and negatives.',
+  },
+
+  // SEO & Discovery
+  {
+    id: 'ai-seo',
+    name: 'AI SEO',
+    category: 'SEO & Discovery',
+    icon: '🤖',
+    description: 'Optimize content for AI search engines, get cited by LLMs, or appear in AI-generated answers (AEO/GEO/LLMO).',
+    examplePrompt: 'Optimize the curex24 "home doctor visit" page so it gets cited by ChatGPT and Perplexity for healthcare queries.',
+  },
+  {
+    id: 'seo-audit',
+    name: 'SEO Audit',
+    category: 'SEO & Discovery',
+    icon: '🔍',
+    description: 'Audit, review, or diagnose SEO issues on a site — technical, on-page, and content.',
+    examplePrompt: 'Run an SEO audit on curex24.com and rank the top 10 fixes by impact and effort.',
+  },
+  {
+    id: 'programmatic-seo',
+    name: 'Programmatic SEO',
+    category: 'SEO & Discovery',
+    icon: '🧬',
+    description: 'Create SEO-driven pages at scale using templates and structured data.',
+    examplePrompt: 'Design a programmatic SEO template for "[doctor type] in [city]" landing pages for curex24.',
+  },
+  {
+    id: 'site-architecture',
+    name: 'Site Architecture',
+    category: 'SEO & Discovery',
+    icon: '🗺️',
+    description: 'Plan, map, or restructure page hierarchy, navigation, URL structure, and internal linking.',
+    examplePrompt: 'Propose an information architecture for curex24.com that supports patients, providers, and SEO long-tail.',
+  },
+  {
+    id: 'competitor-alternatives',
+    name: 'Competitor / Alternatives',
+    category: 'SEO & Discovery',
+    icon: '⚔️',
+    description: 'Create competitor comparison or alternative pages for SEO and sales enablement.',
+    examplePrompt: 'Write a "curex24 vs Practo" comparison page optimised for SEO and bottom-of-funnel conversion.',
+  },
+  {
+    id: 'schema-markup',
+    name: 'Schema Markup',
+    category: 'SEO & Discovery',
+    icon: '🏷️',
+    description: 'Add, fix, or optimize schema markup and structured data on a site.',
+    examplePrompt: 'Generate JSON-LD schema for a curex24 doctor profile page (Physician + Service + AggregateRating).',
+  },
+  {
+    id: 'aso-audit',
+    name: 'ASO Audit',
+    category: 'SEO & Discovery',
+    icon: '📱',
+    description: 'Audit or optimize an App Store or Google Play listing.',
+    examplePrompt: 'Audit the curex24 Play Store listing — title, subtitle, screenshots, keywords, and conversion improvements.',
+  },
+
+  // Retention
+  {
+    id: 'churn-prevention',
+    name: 'Churn Prevention',
+    category: 'Retention',
+    icon: '🛡️',
+    description: 'Reduce churn, build cancellation flows, set up save offers, recover failed payments, or run dunning.',
+    examplePrompt: 'Design a 4-step cancellation save-flow for curex24 patients with personalised offers and surveys.',
+  },
+
+  // Content & Copy
+  {
+    id: 'cold-email',
+    name: 'Cold Email',
+    category: 'Content & Copy',
+    icon: '📧',
+    description: 'Write B2B cold emails and follow-up sequences that get replies.',
+    examplePrompt: 'Write a 4-step cold email sequence to corporate HR teams pitching curex24 employee health benefits.',
+  },
+  {
+    id: 'copywriting',
+    name: 'Copywriting',
+    category: 'Content & Copy',
+    icon: '✍️',
+    description: 'Write, rewrite, or improve marketing copy for any page — homepage, landing pages, features, pricing.',
+    examplePrompt: 'Rewrite the curex24 homepage hero section using a problem-agitation-solution framework.',
+  },
+  {
+    id: 'copy-editing',
+    name: 'Copy Editing',
+    category: 'Content & Copy',
+    icon: '📝',
+    description: 'Edit, review, or improve existing marketing copy, or refresh outdated content.',
+    examplePrompt: 'Edit this draft of our LinkedIn provider recruitment post for clarity, brevity, and tone.',
+  },
+  {
+    id: 'email-sequence',
+    name: 'Email Sequence',
+    category: 'Content & Copy',
+    icon: '📬',
+    description: 'Create or optimize an email sequence, drip campaign, automated email flow, or lifecycle email.',
+    examplePrompt: 'Build a 7-email patient onboarding sequence for curex24 — goal: first booking within 14 days.',
+  },
+  {
+    id: 'social-content',
+    name: 'Social Content',
+    category: 'Content & Copy',
+    icon: '📲',
+    description: 'Create, schedule, or optimize social content for LinkedIn, Twitter/X, Instagram, and more.',
+    examplePrompt: 'Draft 5 LinkedIn posts about curex24’s home-doctor model — mix of education, story, and CTA.',
+  },
+
+  // Conversion Optimization
+  {
+    id: 'page-cro',
+    name: 'Page CRO',
+    category: 'Conversion Optimization',
+    icon: '📈',
+    description: 'Optimize, improve, or increase conversions on any marketing page — homepage, landing pages, etc.',
+    examplePrompt: 'Audit the curex24 booking landing page and propose 8 prioritised CRO experiments.',
+  },
+  {
+    id: 'signup-flow-cro',
+    name: 'Signup Flow CRO',
+    category: 'Conversion Optimization',
+    icon: '🚪',
+    description: 'Optimize signup, registration, account creation, or trial activation flows.',
+    examplePrompt: 'Reduce friction in the curex24 patient signup flow — current drop-off is 38% on phone-OTP step.',
+  },
+  {
+    id: 'onboarding-cro',
+    name: 'Onboarding CRO',
+    category: 'Conversion Optimization',
+    icon: '🧭',
+    description: 'Optimize post-signup onboarding, user activation, first-run experience, or time-to-value.',
+    examplePrompt: 'Redesign curex24 first-run onboarding to lift signup→first-booking from 28% to 40%.',
+  },
+  {
+    id: 'form-cro',
+    name: 'Form CRO',
+    category: 'Conversion Optimization',
+    icon: '🧾',
+    description: 'Optimize lead capture, contact, or non-signup forms for higher completion rates.',
+    examplePrompt: 'Improve the curex24 corporate-enquiry form — 12 fields today, 4% completion rate.',
+  },
+  {
+    id: 'popup-cro',
+    name: 'Popup CRO',
+    category: 'Conversion Optimization',
+    icon: '🪟',
+    description: 'Create or optimize popups, modals, overlays, slide-ins, or banners for conversion.',
+    examplePrompt: 'Design an exit-intent popup for the curex24 pricing page that captures email + offers ₹100 off.',
+  },
+  {
+    id: 'paywall-upgrade-cro',
+    name: 'Paywall / Upgrade CRO',
+    category: 'Conversion Optimization',
+    icon: '🔓',
+    description: 'Create or optimize in-app paywalls, upgrade screens, upsell modals, or feature gates.',
+    examplePrompt: 'Design an in-app upgrade screen prompting curex24 patients to subscribe to the annual care plan.',
+  },
+
+  // Customer & Strategy
+  {
+    id: 'customer-research',
+    name: 'Customer Research',
+    category: 'Strategy & Monetization',
+    icon: '🧠',
+    description: 'Conduct, analyze, or synthesize customer research — interviews, surveys, JTBD.',
+    examplePrompt: 'Plan 8 customer interviews with curex24 active patients — recruitment script, questions, and synthesis template.',
+  },
+  {
+    id: 'content-strategy',
+    name: 'Content Strategy',
+    category: 'Strategy & Monetization',
+    icon: '🧱',
+    description: 'Plan a content strategy, decide what content to create, or figure out what topics to cover.',
+    examplePrompt: 'Build a 90-day content strategy for the curex24 blog — pillars, topics, and distribution plan.',
+  },
+  {
+    id: 'launch-strategy',
+    name: 'Launch Strategy',
+    category: 'Strategy & Monetization',
+    icon: '🚀',
+    description: 'Plan a product launch, feature announcement, or release strategy.',
+    examplePrompt: 'Plan a launch for curex24’s new mental-health home-visit service — channels, sequence, and assets.',
+  },
+  {
+    id: 'marketing-ideas',
+    name: 'Marketing Ideas',
+    category: 'Strategy & Monetization',
+    icon: '💡',
+    description: 'Get marketing ideas, inspiration, or strategies for a SaaS or software product.',
+    examplePrompt: 'Give me 20 unconventional growth ideas for curex24 — specifically for the Mumbai market.',
+  },
+  {
+    id: 'marketing-psychology',
+    name: 'Marketing Psychology',
+    category: 'Strategy & Monetization',
+    icon: '🧬',
+    description: 'Apply psychological principles, mental models, or behavioural science to marketing.',
+    examplePrompt: 'Apply behavioural-science principles to lift curex24 referral participation from 9% to 15%.',
+  },
+  {
+    id: 'pricing-strategy',
+    name: 'Pricing Strategy',
+    category: 'Strategy & Monetization',
+    icon: '🏷️',
+    description: 'Help with pricing decisions, packaging, or monetization strategy.',
+    examplePrompt: 'Propose a 3-tier pricing/packaging model for curex24 home-visit subscriptions.',
+  },
+  {
+    id: 'product-marketing-context',
+    name: 'Product Marketing Context',
+    category: 'Strategy & Monetization',
+    icon: '🧩',
+    description: 'Create or update the product marketing context document — positioning, ICP, audience, messaging.',
+    examplePrompt: 'Build the product marketing context doc for curex24 — ICP, positioning, value props, and key messages.',
+  },
+
+  // Growth Engineering
+  {
+    id: 'free-tool-strategy',
+    name: 'Free Tool Strategy',
+    category: 'Growth Engineering',
+    icon: '🛠️',
+    description: 'Plan, evaluate, or build a free tool for marketing — lead generation, SEO value, or virality.',
+    examplePrompt: 'Design a free "BMI + home health risk" tool for curex24 to drive organic traffic and email signups.',
+  },
+  {
+    id: 'lead-magnets',
+    name: 'Lead Magnets',
+    category: 'Growth Engineering',
+    icon: '🧲',
+    description: 'Create, plan, or optimize a lead magnet for email capture or lead generation.',
+    examplePrompt: 'Create a downloadable "Family Health Calendar" lead magnet for curex24 — outline + landing page copy.',
+  },
+  {
+    id: 'referral-program',
+    name: 'Referral Program',
+    category: 'Growth Engineering',
+    icon: '🔗',
+    description: 'Create, optimize, or analyze a referral program, affiliate program, or word-of-mouth strategy.',
+    examplePrompt: 'Design a 2-sided referral program for curex24 patients — incentives, mechanics, and launch plan.',
+  },
+  {
+    id: 'community-marketing',
+    name: 'Community Marketing',
+    category: 'Growth Engineering',
+    icon: '🫂',
+    description: 'Build and leverage online communities to drive product growth and brand loyalty.',
+    examplePrompt: 'Launch a curex24 patient community on WhatsApp + Reddit — name, content plan, and 30-day calendar.',
+  },
+
+  // Sales & RevOps
+  {
+    id: 'revops',
+    name: 'RevOps',
+    category: 'Sales & RevOps',
+    icon: '🧮',
+    description: 'Help with revenue operations, lead lifecycle, scoring, routing, and pipeline management.',
+    examplePrompt: 'Design a lead-scoring + routing model for curex24’s corporate (B2B) pipeline.',
+  },
+  {
+    id: 'sales-enablement',
+    name: 'Sales Enablement',
+    category: 'Sales & RevOps',
+    icon: '📑',
+    description: 'Create sales collateral — pitch decks, one-pagers, objection handling docs, demo scripts.',
+    examplePrompt: 'Create a 10-slide pitch deck for curex24 corporate-wellness sales calls.',
+  },
+];
+
+export const marketingSkillCategories: MarketingSkillCategory[] = [
+  'Conversion Optimization',
+  'Content & Copy',
+  'SEO & Discovery',
+  'Paid & Distribution',
+  'Measurement & Testing',
+  'Retention',
+  'Growth Engineering',
+  'Strategy & Monetization',
+  'Sales & RevOps',
+];
+
 // ─── Agent Messages ───────────────────────────────────────────────────────────
 
 export interface AgentMessage {
