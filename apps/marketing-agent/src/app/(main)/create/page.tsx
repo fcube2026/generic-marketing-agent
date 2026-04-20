@@ -96,6 +96,7 @@ const CAMPAIGN_OBJECTIVES = [
 function buildImagePromptForVisual(
   format: typeof FORMAT_TYPES[number],
   style: typeof VISUAL_STYLES[number],
+  customSubject?: string,
 ): string {
   const conceptMap: Record<typeof FORMAT_TYPES[number], string> = {
     'Square Post (1:1)': 'warm welcoming scene of a professional doctor visiting a patient at home, doctor in white coat smiling, bright modern apartment',
@@ -120,7 +121,7 @@ function buildImagePromptForVisual(
     'Neon / Dark Mode': 'neon colours, dark background, glowing effects, high contrast, modern digital aesthetic',
   };
 
-  return `${conceptMap[format]}, ${styleMap[style]}, healthcare blue #1E6FCC accent, professional`;
+  return `${customSubject?.trim() ? customSubject.trim() : conceptMap[format]}, ${styleMap[style]}, healthcare blue #1E6FCC accent, professional`;
 }
 
 function buildPostImagePrompt(platform: string, pillar: string): string {
@@ -229,7 +230,7 @@ function generatePost(platform: string, pillar: string, tone: string): string {
   return output;
 }
 
-function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string, tool: string): string {
+function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string, tool: string, customSubject?: string): string {
   const dimensions = FORMAT_DIMENSIONS[format];
 
   const toolGuide: Record<string, string> = {
@@ -263,7 +264,9 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
     'WhatsApp Status (9:16)': 'Vertical status card. Top: greeting + brand name. Middle: core message with emoji. Bottom: CTA with phone number or link. WhatsApp green accent.',
   };
 
-  const concept = conceptMap[format] ?? 'A professional healthcare brand visual for curex24, focusing on home doctor visits.';
+  const concept = customSubject?.trim()
+    ? customSubject.trim()
+    : (conceptMap[format] ?? 'A professional healthcare brand visual for curex24, focusing on home doctor visits.');
 
   let prompt = `**Format:** ${format}\n**Dimensions:** ${dimensions}\n**Visual Style:** ${style}\n**AI Tool:** ${tool}\n\n`;
   prompt += `---\n\n`;
@@ -557,18 +560,36 @@ function VisualGeneratorTab() {
   const [format, setFormat] = useState<typeof FORMAT_TYPES[number]>('Square Post (1:1)');
   const [style, setStyle] = useState<typeof VISUAL_STYLES[number]>('Photorealistic');
   const [tool, setTool] = useState<typeof AI_TOOLS[number]>('DALL-E 3');
+  const [customSubject, setCustomSubject] = useState('');
   const [output, setOutput] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
 
   function generate() {
-    setOutput(generateVisualPrompt(format, style, tool));
-    setImagePrompt(buildImagePromptForVisual(format, style));
+    setOutput(generateVisualPrompt(format, style, tool, customSubject));
+    setImagePrompt(buildImagePromptForVisual(format, style, customSubject));
   }
 
   const pixels = FORMAT_PIXELS[format];
 
   return (
     <div className="space-y-6">
+      <div>
+        <label htmlFor="visual-subject" className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Describe Your Image <span className="text-gray-400 normal-case font-normal">(optional — leave blank to use the default brand scene for the selected format)</span>
+        </label>
+        <textarea
+          id="visual-subject"
+          value={customSubject}
+          onChange={(e) => setCustomSubject(e.target.value)}
+          rows={3}
+          placeholder="e.g. A friendly female pediatrician examining a smiling toddler in a bright clinic, parent watching from the side"
+          className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Tip: be specific about subject, setting, mood and any props. The selected Visual Style and Format dimensions are added automatically.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Format</label>
