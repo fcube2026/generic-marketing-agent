@@ -17,7 +17,7 @@ const CATEGORY_ICON: Record<MarketingSkillCategory, string> = {
   'SEO & Discovery': '🔍',
   'Paid & Distribution': '💸',
   'Measurement & Testing': '🧪',
-  'Retention': '🔄',
+  'Retention': '🛡️',
   'Growth Engineering': '🛠️',
   'Strategy & Monetization': '🎯',
   'Sales & RevOps': '🤝',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type AgentMessage, marketingSkills } from '@/lib/data';
@@ -634,18 +634,7 @@ function AgentPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // If the page is opened with ?skill=<id>, auto-send that skill's example prompt once.
-  useEffect(() => {
-    const skillId = searchParams?.get('skill');
-    if (!skillId || handledSkillRef.current === skillId) return;
-    const skill = marketingSkills.find((s) => s.id === skillId);
-    if (!skill) return;
-    handledSkillRef.current = skillId;
-    send(skill.examplePrompt);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  function send(text: string) {
+  const send = useCallback((text: string) => {
     if (!text.trim()) return;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: AgentMessage = { role: 'user', content: text, timestamp: now };
@@ -664,7 +653,17 @@ function AgentPageInner() {
       setMessages((prev) => [...prev, agentMsg]);
       setIsTyping(false);
     }, 1200);
-  }
+  }, []);
+
+  // If the page is opened with ?skill=<id>, auto-send that skill's example prompt once.
+  useEffect(() => {
+    const skillId = searchParams?.get('skill');
+    if (!skillId || handledSkillRef.current === skillId) return;
+    const skill = marketingSkills.find((s) => s.id === skillId);
+    if (!skill) return;
+    handledSkillRef.current = skillId;
+    send(skill.examplePrompt);
+  }, [searchParams, send]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] max-w-4xl mx-auto">
