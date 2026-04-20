@@ -263,9 +263,126 @@ export class ProvidersService {
       include: {
         patient: { include: { user: true } },
         serviceCategory: true,
+        consultationSummary: true,
+        videoSession: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
+  }
+
+  async getPatients(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { providerId: profile.id },
+      include: {
+        patient: { include: { user: true } },
+        consultationSummary: true,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+
+    const patientMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        phone: string;
+        email: string | null;
+        gender: string | null;
+        dateOfBirth: Date | null;
+        visitCount: number;
+        lastVisit: Date;
+        lastStatus: string;
+        lastDiagnosis: string | null;
+      }
+    >();
+
+    for (const booking of bookings) {
+      const pid = booking.patient.id;
+      if (!patientMap.has(pid)) {
+        patientMap.set(pid, {
+          id: pid,
+          name: booking.patient.name,
+          phone: booking.patient.user.phone,
+          email: booking.patient.user.email ?? null,
+          gender: booking.patient.gender ?? null,
+          dateOfBirth: booking.patient.dateOfBirth ?? null,
+          visitCount: 1,
+          lastVisit: booking.scheduledAt,
+          lastStatus: booking.status,
+          lastDiagnosis: booking.consultationSummary?.diagnosis ?? null,
+        });
+      } else {
+        patientMap.get(pid)!.visitCount++;
+      }
+    }
+
+    return Array.from(patientMap.values());
+  }
+
+  async getPatientConsultations(userId: string, patientId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { providerId: profile.id, patientId },
+      include: {
+        patient: { include: { user: true } },
+        serviceCategory: true,
+        consultationSummary: { include: { prescriptions: true } },
+        videoSession: true,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+
+    if (bookings.length === 0) {
+      throw new NotFoundException(
+        'Patient not found or not treated by this doctor',
+      );
+    }
+
+    const patient = bookings[0].patient;
+    return {
+      id: patient.id,
+      name: patient.name,
+      phone: patient.user.phone,
+      email: patient.user.email,
+      gender: patient.gender,
+      dateOfBirth: patient.dateOfBirth,
+      emergencyContact: patient.emergencyContact,
+      visitCount: bookings.length,
+      consultations: bookings.map((b) => ({
+        id: b.id,
+        scheduledAt: b.scheduledAt,
+        status: b.status,
+        mode: b.mode,
+        symptoms: b.symptoms,
+        totalFee: b.totalFee,
+        serviceCategory: b.serviceCategory.name,
+        videoSession: b.videoSession
+          ? {
+              id: b.videoSession.id,
+              status: b.videoSession.status,
+              roomId: b.videoSession.roomId,
+            }
+          : null,
+        summary: b.consultationSummary
+          ? {
+              diagnosis: b.consultationSummary.diagnosis,
+              observations: b.consultationSummary.observations,
+              nextSteps: b.consultationSummary.nextSteps,
+              followUp: b.consultationSummary.followUpRecommendation,
+              prescriptions: b.consultationSummary.prescriptions,
+            }
+          : null,
+      })),
+    };
   }
 
   async getEarnings(userId: string) {

@@ -85,6 +85,10 @@ export interface Booking {
   serviceCategory?: ServiceCategory;
   address?: Address;
   videoSession?: VideoSession;
+  /** URL of the prescription issued during this consultation (mock field) */
+  prescriptionUrl?: string;
+  /** Whether a pharmacy order has already been placed for this booking (mock field) */
+  hasOrder?: boolean;
 }
 
 export interface VideoSession {
@@ -122,7 +126,6 @@ export interface RecommendationResponse {
 }
 
 export type PharmacyOrderStatus =
-  | 'PLACED'
   | 'PENDING'
   | 'PRESCRIPTION_REVIEW'
   | 'CONFIRMED'
@@ -131,7 +134,6 @@ export type PharmacyOrderStatus =
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'FAILED'
   | 'RETURNED'
   | 'REFUNDED';
 

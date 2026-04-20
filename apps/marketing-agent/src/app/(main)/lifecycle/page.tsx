@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
 import Badge from '@/components/ui/Badge';
-import { lifecycleFlows, type LifecycleFlow } from '@/lib/data';
+import { listLifecycleFlows } from '@/lib/services/marketingService';
+import type { LifecycleFlow } from '@/lib/types';
 
 function FlowCard({ flow }: { flow: LifecycleFlow }) {
   const [expanded, setExpanded] = useState(false);
@@ -68,6 +69,34 @@ function FlowCard({ flow }: { flow: LifecycleFlow }) {
 
 export default function LifecyclePage() {
   const [segment, setSegment] = useState<'all' | 'patient' | 'provider'>('all');
+  const [lifecycleFlows, setLifecycleFlows] = useState<LifecycleFlow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listLifecycleFlows()
+      .then((flows) => {
+        if (!cancelled) setLifecycleFlows(flows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load lifecycle flows');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+  if (error)
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
 
   const filtered = lifecycleFlows.filter((f) => segment === 'all' || f.segment === segment);
   const activeFlows = lifecycleFlows.filter((f) => f.status === 'active').length;

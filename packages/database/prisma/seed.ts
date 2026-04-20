@@ -449,7 +449,160 @@ async function main() {
   }
   console.log(`✅ Seeded ${bookingsCreated} bookings with payments, payouts, diagnostics, and referrals`);
 
+  // ─── Marketing seed data ──────────────────────────────────────────────────
+  await seedMarketing();
+
   console.log('🌱 Seeding complete!');
+}
+
+async function seedMarketing() {
+  console.log('🌱 Seeding marketing data...');
+
+  // Business profile (singleton)
+  await prisma.marketingBusinessProfile.upsert({
+    where: { id: 'default' },
+    create: {
+      id: 'default',
+      primaryGrowthFocus: 'both',
+      biggestBottleneck: 'demand',
+      monthlyBudget: 500000,
+      allocatedBudget: 200000,
+      targetCities: ['Mumbai', 'Delhi', 'Bengaluru'],
+      bestPerforming: 'Word-of-mouth and referrals',
+      topPatientPersona: 'Urban Busy Professional (25–40)',
+      topReasonPatientChooses: 'Speed and convenience of home visits',
+      topReasonProviderJoins: 'Steady patient flow without marketing effort',
+      competitors: ['Practo', 'PharmEasy', 'DocsApp'],
+      founderLedBrand: true,
+    },
+    update: {},
+  });
+
+  // Sample campaign
+  await prisma.marketingCampaign.upsert({
+    where: { id: 'seed-campaign-1' },
+    create: {
+      id: 'seed-campaign-1',
+      name: 'Mumbai Patient Acquisition — Spring 2026',
+      objective: 'Drive 500 new patient signups in Mumbai',
+      channel: 'Meta Ads + Google Search',
+      audience: 'Urban professionals 25–40, Mumbai metro',
+      budget: '₹2L',
+      duration: '4 weeks',
+      kpi: 'CAC < ₹300, signup → first booking > 30%',
+      status: 'active',
+      headline: ['See a doctor at home in 30 minutes', 'No more clinic queues'],
+      description: ['Verified GPs and specialists', 'Home visit ₹499 onwards'],
+      spend: 60000,
+      impressions: 240000,
+      conversions: 180,
+    },
+    update: {},
+  });
+
+  // Sample experiment
+  await prisma.marketingExperiment.upsert({
+    where: { id: 'seed-exp-1' },
+    create: {
+      id: 'seed-exp-1',
+      name: 'Landing hero copy: benefit vs feature',
+      hypothesis: 'Benefit-led headline lifts booking-start rate',
+      channel: 'Web — Mumbai LP',
+      control: 'Feature: "GPs, specialists, home visits"',
+      variant: 'Benefit: "See a doctor at home in 30 minutes"',
+      metric: 'Booking start rate',
+      startDate: '2026-04-01',
+      endDate: '2026-04-15',
+      status: 'completed',
+      result: 'Variant +14% booking starts',
+      winner: 'variant',
+      lift: '+14%',
+    },
+    update: {},
+  });
+
+  // Sample content item
+  await prisma.marketingContentItem.upsert({
+    where: { id: 'seed-content-1' },
+    create: {
+      id: 'seed-content-1',
+      week: 1,
+      day: 'Mon',
+      platform: 'Instagram',
+      pillar: 'patient-education',
+      title: '5 signs your child needs a paediatrician home visit',
+      format: 'Carousel',
+      status: 'published',
+    },
+    update: {},
+  });
+
+  // Sample SEO page
+  await prisma.marketingSeoPage.upsert({
+    where: { url: '/mumbai/general-physician' },
+    create: {
+      url: '/mumbai/general-physician',
+      type: 'city-specialty',
+      title: 'General Physician in Mumbai — Home Visit | curex24',
+      status: 'live',
+      targetKeyword: 'general physician mumbai home visit',
+    },
+    update: {},
+  });
+
+  // Sample keyword cluster
+  await prisma.marketingKeywordCluster.upsert({
+    where: { id: 'seed-cluster-1' },
+    create: {
+      id: 'seed-cluster-1',
+      cluster: 'home doctor visit',
+      type: 'transactional',
+      priority: 'high',
+      keywords: [
+        { keyword: 'home doctor visit mumbai', volume: '4.4K', difficulty: 'Medium' },
+        { keyword: 'doctor at home delhi', volume: '3.6K', difficulty: 'Medium' },
+        { keyword: 'home visit doctor near me', volume: '8.1K', difficulty: 'High' },
+      ],
+    },
+    update: {},
+  });
+
+  // Sample lifecycle flow
+  await prisma.marketingLifecycleFlow.upsert({
+    where: { id: 'seed-flow-1' },
+    create: {
+      id: 'seed-flow-1',
+      name: 'Patient onboarding (D0–D7)',
+      segment: 'patient',
+      trigger: 'User signup',
+      status: 'active',
+      steps: {
+        create: [
+          { day: 0, channel: 'Email', message: 'Welcome to curex24 — book your first home visit', goal: 'First booking', order: 0 },
+          { day: 2, channel: 'Push', message: 'Still deciding? Browse top-rated GPs in your area', goal: 'Activate', order: 1 },
+          { day: 5, channel: 'SMS', message: '₹100 off your first booking — code WELCOME100', goal: 'Conversion', order: 2 },
+        ],
+      },
+    },
+    update: {},
+  });
+
+  // Sample plan items
+  const planItems = [
+    { id: 'seed-plan-1', phase: '1-30', category: 'Foundation', task: 'Complete business intake (Tier 1)', owner: 'Founder', done: true },
+    { id: 'seed-plan-2', phase: '1-30', category: 'Acquisition', task: 'Launch Meta Ads in Mumbai (₹2L test)', owner: 'Growth', done: true },
+    { id: 'seed-plan-3', phase: '31-60', category: 'Activation', task: 'Ship onboarding lifecycle email flow', owner: 'CRM', done: false },
+    { id: 'seed-plan-4', phase: '61-90', category: 'Retention', task: 'Launch referral program v1', owner: 'Growth', done: false },
+  ];
+  for (const item of planItems) {
+    await prisma.marketingPlanItem.upsert({
+      where: { id: item.id },
+      create: item,
+      update: {},
+    });
+  }
+
+  console.log('✅ Marketing seed data inserted');
 }
 
 main()

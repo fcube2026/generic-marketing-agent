@@ -1,4 +1,4 @@
-const { withAppBuildGradle } = require("@expo/config-plugins");
+const { withAppBuildGradle } = require("expo/config-plugins");
 
 module.exports = function withStaticEntryFile(config) {
   return withAppBuildGradle(config, (config) => {
@@ -11,7 +11,7 @@ module.exports = function withStaticEntryFile(config) {
         line.includes("execute")
       ) {
         const indent = (line.match(/^\s*/) || [""])[0];
-        return `${indent}entryFile = file("index.js")`;
+        return `${indent}entryFile = file("../../index.js")`;
       }
       return line;
     });

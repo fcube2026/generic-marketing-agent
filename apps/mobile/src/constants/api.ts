@@ -37,5 +37,6 @@ export const ENDPOINTS = {
     MEDICINES_SEARCH: '/pharmacy/medicines/search',
     PARTNERS: '/pharmacy/partners',
     ORDERS: '/pharmacy/orders',
+    PRESCRIPTIONS_UPLOAD: '/pharmacy/prescriptions/upload',
   },
 };

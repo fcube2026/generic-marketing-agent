@@ -21,11 +21,14 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { DoctorVerificationModule } from './modules/doctor-verification/doctor-verification.module';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
+import { PrescriptionModule } from './modules/prescription/prescription.module';
 import { SmsModule } from './modules/sms/sms.module';
 import { VideoSessionsModule } from './modules/video-sessions/video-sessions.module';
 import { VideoConsultationModule } from './modules/video-consultation/video-consultation.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
 
@@ -59,8 +62,11 @@ import { HealthModule } from './common/health/health.module';
     TrackingModule,
     DoctorVerificationModule,
     PharmacyModule,
+    PrescriptionModule,
     VideoSessionsModule,
     VideoConsultationModule,
+    WebhooksModule,
+    MarketingModule,
   ],
   providers: [BootstrapService],
 })

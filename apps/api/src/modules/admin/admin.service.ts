@@ -56,6 +56,63 @@ export class AdminService {
     return provider;
   }
 
+  async getProviderPatients(providerId: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { providerId },
+      include: {
+        patient: { include: { user: true } },
+        consultationSummary: true,
+        serviceCategory: true,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+
+    const patientMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        phone: string;
+        email: string | null;
+        gender: string | null;
+        dateOfBirth: Date | null;
+        visitCount: number;
+        lastVisit: Date;
+        lastStatus: string;
+        lastDiagnosis: string | null;
+        lastService: string;
+      }
+    >();
+
+    for (const booking of bookings) {
+      const pid = booking.patient.id;
+      if (!patientMap.has(pid)) {
+        patientMap.set(pid, {
+          id: pid,
+          name: booking.patient.name,
+          phone: booking.patient.user.phone,
+          email: booking.patient.user.email ?? null,
+          gender: booking.patient.gender ?? null,
+          dateOfBirth: booking.patient.dateOfBirth ?? null,
+          visitCount: 1,
+          lastVisit: booking.scheduledAt,
+          lastStatus: booking.status,
+          lastDiagnosis: booking.consultationSummary?.diagnosis ?? null,
+          lastService: booking.serviceCategory.name,
+        });
+      } else {
+        patientMap.get(pid)!.visitCount++;
+      }
+    }
+
+    return Array.from(patientMap.values());
+  }
+
   async getPendingProviders() {
     return this.prisma.providerProfile.findMany({
       where: { isVerified: false, isActive: true },
@@ -564,7 +621,7 @@ export class AdminService {
   async getAdminUsers(page = 1, limit = 20, search?: string) {
     const skip = (page - 1) * limit;
     const where: any = {
-      role: { in: ['ADMIN', 'MARKETING_AGENT'] },
+      role: { in: ['ADMIN', 'PHARMACIST', 'MARKETING_AGENT'] },
     };
     if (search) {
       where.OR = [

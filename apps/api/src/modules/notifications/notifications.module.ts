@@ -7,13 +7,17 @@ import { WhatsAppModule } from '../whatsapp/whatsapp.module';
 import { NotificationQueueProcessor } from './notification-queue.processor';
 import { FallbackQueueProcessor } from './fallback-queue.processor';
 import { AppointmentReminderScheduler } from './appointment-reminder.scheduler';
+import { QUEUES_ENABLED } from '../../common/queue/queue.module';
+
+const queueProviders = QUEUES_ENABLED
+  ? [NotificationQueueProcessor, FallbackQueueProcessor]
+  : [];
 
 @Module({
   imports: [PushNotificationModule, SmsModule, WhatsAppModule],
   providers: [
     NotificationsService,
-    NotificationQueueProcessor,
-    FallbackQueueProcessor,
+    ...queueProviders,
     AppointmentReminderScheduler,
   ],
   controllers: [NotificationsController],

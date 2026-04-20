@@ -73,27 +73,14 @@ export default function VideoConsultationDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  const handleStart = async () => {
+  const handleCreate = async () => {
     setActionLoading(true);
     setError(null);
     try {
-      const res = await api.post(`/video-sessions/${bookingId}/start`);
+      const res = await api.post(`/video-sessions/${bookingId}/create`);
       setSession(res.data);
     } catch {
-      setError('Failed to start session. Please try again.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleInstant = async () => {
-    setActionLoading(true);
-    setError(null);
-    try {
-      const res = await api.post(`/video-sessions/${bookingId}/instant`);
-      setSession(res.data);
-    } catch {
-      setError('Failed to start instant meeting. Please try again.');
+      setError('Failed to create video room. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -112,9 +99,14 @@ export default function VideoConsultationDetailPage() {
     }
   };
 
-  const handleJoin = () => {
-    if (session?.roomId) {
-      window.open(`https://meet.jit.si/${session.roomId}`, '_blank');
+  const handleJoin = async () => {
+    setError(null);
+    try {
+      const res = await api.get(`/video-sessions/${bookingId}/token`);
+      const { token, roomId } = res.data as { token: string; roomId: string };
+      window.open(`https://app.100ms.live/preview/${roomId}?token=${token}`, '_blank');
+    } catch {
+      setError('Failed to get join token. Please try again.');
     }
   };
 
@@ -126,8 +118,8 @@ export default function VideoConsultationDetailPage() {
     );
   }
 
-  const isLive = session?.status === 'IN_PROGRESS';
-  const canStart = !session || session.status === 'CREATED' || session.status === 'WAITING';
+  const sessionExists = Boolean(session);
+  const isActive = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
 
   const formatDuration = (seconds: number) => {
     if (seconds === 0) return '0s';
@@ -200,7 +192,7 @@ export default function VideoConsultationDetailPage() {
           <div className="text-center py-8">
             <div className="text-4xl mb-3">📹</div>
             <p className="text-gray-500 text-sm">
-              No video session started yet. Use the buttons below to begin.
+              No video room created yet. Use the button below to set up the 100ms room.
             </p>
           </div>
         ) : (
@@ -251,41 +243,33 @@ export default function VideoConsultationDetailPage() {
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        {canStart && (
+        {!sessionExists && (
           <button
-            onClick={handleStart}
+            onClick={handleCreate}
             disabled={actionLoading}
             className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition disabled:opacity-60"
           >
-            {actionLoading ? 'Starting…' : '▶️ Start Consultation'}
+            {actionLoading ? 'Creating…' : '▶️ Create Video Room'}
           </button>
         )}
 
-        <button
-          onClick={handleInstant}
-          disabled={actionLoading}
-          className="w-full py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition disabled:opacity-60"
-        >
-          {actionLoading ? 'Starting…' : '⚡ Start Instant Meeting'}
-        </button>
+        {isActive && (
+          <button
+            onClick={handleJoin}
+            className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition"
+          >
+            🎥 Join Video Call (100ms)
+          </button>
+        )}
 
-        {isLive && (
-          <>
-            <button
-              onClick={handleJoin}
-              className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition"
-            >
-              🎥 Join Video Call (Jitsi)
-            </button>
-
-            <button
-              onClick={handleEnd}
-              disabled={actionLoading}
-              className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition disabled:opacity-60"
-            >
-              {actionLoading ? 'Ending…' : '✅ End Consultation'}
-            </button>
-          </>
+        {isActive && (
+          <button
+            onClick={handleEnd}
+            disabled={actionLoading}
+            className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition disabled:opacity-60"
+          >
+            {actionLoading ? 'Ending…' : '✅ End Consultation'}
+          </button>
         )}
       </div>
     </div>

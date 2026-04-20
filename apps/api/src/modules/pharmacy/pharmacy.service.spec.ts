@@ -84,4 +84,32 @@ describe('PharmacyService', () => {
       }),
     ]);
   });
+
+  it('allows the mock provider for development medicine search', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'mock',
+      isActive: true,
+    });
+
+    const serviceWithMock = new PharmacyService(
+      mockPrisma,
+      new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+    );
+
+    const results = await serviceWithMock.searchMedicines(
+      'paracetamol',
+      undefined,
+      'mock',
+    );
+
+    expect(mockProvider.searchMedicines).toHaveBeenCalledWith('paracetamol');
+    expect(results).toEqual([
+      expect.objectContaining({
+        id: 'med-1',
+        name: 'Paracetamol 500',
+      }),
+    ]);
+  });
 });

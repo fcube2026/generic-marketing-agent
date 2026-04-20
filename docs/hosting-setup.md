@@ -534,6 +534,7 @@ feature/* ─── PR ───► develop ─── PR ───► main
 - Cloudflare proxy hides Railway/Vercel origin IPs
 - Railway internal networking for future microservices
 - Supabase connection via SSL-encrypted pooler
+- Prescription uploads stored in a private Supabase Storage bucket and served only through short-lived signed URLs
 
 ### Headers (Admin Dashboard)
 - `X-Content-Type-Options: nosniff`

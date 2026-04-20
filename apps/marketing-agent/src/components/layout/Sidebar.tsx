@@ -13,6 +13,8 @@ const navItems = [
   { href: '/lifecycle', label: 'Lifecycle & CRM', icon: '🔄' },
   { href: '/experiments', label: 'Experiments', icon: '🧪' },
   { href: '/reports', label: 'Reports & KPIs', icon: '📈' },
+  { href: '/create', label: 'Create Content', icon: '✨' },
+  { href: '/skills', label: 'Skills Library', icon: '🧠' },
   { href: '/agent', label: 'AI Marketing Agent', icon: '🤖' },
 ];
 
@@ -48,7 +50,7 @@ export default function Sidebar() {
 
       <div className="px-6 py-4 border-t border-gray-100">
         <div className="text-xs text-gray-400 space-y-0.5">
-          <p className="font-semibold text-gray-500">Marketing Agent v1.0</p>
+          <p className="font-semibold text-gray-500">Marketing Agent v2.0</p>
           <p>Healthcare, anytime. Anywhere.</p>
         </div>
       </div>

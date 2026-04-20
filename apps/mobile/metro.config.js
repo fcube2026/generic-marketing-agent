@@ -1,16 +1,24 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const { resolve } = require('metro-resolver');
 const path = require('path');
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
+const upstreamResolveRequest = config.resolver.resolveRequest;
 
 // Keep Metro watching the app itself only. Watching the monorepo-level
 // node_modules tree on Windows/OneDrive causes transform worker OOM.
 config.watchFolders = [
   projectRoot,
 ];
+
+// Windows + OneDrive tends to fail spawning many Metro transform workers.
+// Keep the worker pool small for local dev stability.
+if (process.platform === 'win32') {
+  config.maxWorkers = 2;
+}
 
 // Ensure node_modules resolve from both the app and monorepo root
 config.resolver.nodeModulesPaths = [
@@ -50,10 +58,10 @@ config.resolver.extraNodeModules = {
 // nested node_modules. This guarantees only ONE physical copy gets bundled.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (SINGLETON_PACKAGES.includes(moduleName)) {
-    return context.resolveRequest(
+    return resolve(
       {
         ...context,
-        resolveRequest: undefined,
+        resolveRequest: upstreamResolveRequest,
         // Trick: pretend the import originates from the project root.
         // The resolver walks up from here and finds apps/mobile/node_modules/
         // first, skipping any nested copies inside @react-navigation etc.
@@ -63,7 +71,12 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       platform,
     );
   }
-  return context.resolveRequest(context, moduleName, platform);
+
+  if (upstreamResolveRequest) {
+    return upstreamResolveRequest(context, moduleName, platform);
+  }
+
+  return resolve(context, moduleName, platform);
 };
 
 module.exports = config;

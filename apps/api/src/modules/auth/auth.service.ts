@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  OnModuleInit,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -16,8 +17,73 @@ const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
+
+  /**
+   * On boot, in non-production environments (staging/dev), ensure a known
+   * admin account exists with a deterministic password. This makes the
+   * staging admin portal usable even when Railway's ADMIN_PASSWORD env var
+   * has drifted to an unknown value or the DB row's passwordHash is missing.
+   *
+   * Gated to APP_ENV !== 'production' so production credentials are never
+   * overwritten by this routine.
+   */
+  async onModuleInit() {
+    if (process.env.APP_ENV === 'production') return;
+    if (process.env.DISABLE_STAGING_ADMIN_BOOTSTRAP === 'true') return;
+
+    const email = this.adminEmail;
+    const plainPassword = this.adminPassword;
+
+    try {
+      const passwordHash = await bcrypt.hash(plainPassword, 10);
+      const existing = await this.prisma.user.findFirst({
+        where: { email },
+      });
+
+      if (!existing) {
+        await this.prisma.user.upsert({
+          where: { phone: ADMIN_PHONE },
+          create: {
+            phone: ADMIN_PHONE,
+            email,
+            role: Role.ADMIN,
+            passwordHash,
+            isActive: true,
+          },
+          update: {
+            email,
+            role: Role.ADMIN,
+            passwordHash,
+            isActive: true,
+          },
+        });
+        this.logger.log(
+          `[bootstrap] Created staging admin user email=${email}`,
+        );
+      } else {
+        // On staging, always reset the password to the env-configured value
+        // so admin login is guaranteed to work regardless of DB drift.
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            role: Role.ADMIN,
+            isActive: true,
+          },
+        });
+        this.logger.log(
+          `[bootstrap] Reset staging admin password email=${email}`,
+        );
+      }
+    } catch (err) {
+      // Don't crash app boot if DB/migrations aren't ready yet.
+      this.logger.warn(
+        `[bootstrap] Staging admin bootstrap skipped: ${err.message}`,
+      );
+    }
+  }
 
   /** Read credentials lazily so Railway env vars are guaranteed to be present */
   private get adminEmail() {
@@ -151,7 +217,7 @@ export class AuthService {
       const dbUser = await this.prisma.user.findFirst({
         where: {
           email: dto.email,
-          role: { in: [Role.ADMIN, Role.MARKETING_AGENT] },
+          role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
         },
       });
 

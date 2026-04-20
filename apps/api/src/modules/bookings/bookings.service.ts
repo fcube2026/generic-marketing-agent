@@ -8,6 +8,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
 
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -29,6 +30,7 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private videoReminderService: VideoConsultationReminderService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -68,6 +70,14 @@ export class BookingsService {
     if (dto.mode === 'DOCTOR_PLACE' && !provider.doctorPlaceVisitEnabled) {
       throw new BadRequestException(
         'This provider does not offer clinic visits.',
+      );
+    }
+    if (
+      dto.mode === 'VIDEO_CONSULTATION' &&
+      !provider.videoConsultationEnabled
+    ) {
+      throw new BadRequestException(
+        'This provider does not offer video consultations.',
       );
     }
 
@@ -121,7 +131,9 @@ export class BookingsService {
     const fee =
       dto.mode === 'HOME_VISIT'
         ? provider.consultationFeeHomeVisit
-        : provider.consultationFeeDoctorPlace;
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? provider.consultationFeeVideoConsultation
+          : provider.consultationFeeDoctorPlace;
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -160,7 +172,12 @@ export class BookingsService {
     });
 
     // Notify provider of new booking request with push and SMS
-    const modeText = dto.mode === 'HOME_VISIT' ? 'home visit' : 'clinic visit';
+    const modeText =
+      dto.mode === 'HOME_VISIT'
+        ? 'home visit'
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? 'video consultation'
+          : 'clinic visit';
     await this.notificationsService.sendNotification(
       {
         userId: provider.userId,
@@ -358,6 +375,18 @@ export class BookingsService {
           },
         },
       );
+
+      // Schedule pre-session reminders for video consultations
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.scheduleReminders(
+          bookingId,
+          booking.scheduledAt,
+          booking.patient.userId,
+          booking.provider.userId,
+          booking.provider.name,
+          booking.patient.name,
+        );
+      }
     }
 
     return updated;
@@ -468,6 +497,10 @@ export class BookingsService {
             },
           );
         }
+      }
+      // Cancel scheduled video consultation reminders if applicable
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.cancelReminders(bookingId);
       }
     }
 

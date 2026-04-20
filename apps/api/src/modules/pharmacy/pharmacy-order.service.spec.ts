@@ -46,12 +46,17 @@ describe('PharmacyOrderService', () => {
     }),
   };
 
+  const mockPrescriptionService = {
+    assertPrescriptionApproved: jest.fn(),
+  } as any;
+
   let service: PharmacyOrderService;
 
   beforeEach(() => {
     service = new PharmacyOrderService(
       mockPrisma,
       new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+      mockPrescriptionService,
     );
     jest.clearAllMocks();
     mockPrisma.user.findUnique.mockResolvedValue({ role: Role.PATIENT });
@@ -154,6 +159,77 @@ describe('PharmacyOrderService', () => {
       }),
     );
     expect(result.pharmacyPartnerId).toBe('partner-1');
+  });
+
+  it('enforces approval for uploaded prescriptions before creating an order', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'Mock',
+      displayName: 'Mock Partner',
+      isActive: true,
+    });
+    mockPrisma.address.findFirst.mockResolvedValue({
+      id: 'address-1',
+      userId: 'user-1',
+      addressLine: 'Street 1',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560001',
+    });
+    mockPrisma.pharmacyOrder.create.mockResolvedValue({
+      id: 'order-1',
+      orderNumber: 'PHARM-TEST',
+      patientProfileId: 'patient-profile-1',
+      bookingId: null,
+      prescriptionId: null,
+      uploadedPrescriptionId: 'upload-rx-1',
+      pharmacyPartnerId: 'partner-1',
+      partnerOrderId: 'partner-order-1',
+      status: PharmacyOrderStatus.PENDING,
+      deliveryAddressId: 'address-1',
+      prescriptionImageUrl: null,
+      subtotal: 50,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 50,
+      estimatedDeliveryAt: null,
+      deliveredAt: null,
+      notes: null,
+      createdAt: new Date('2026-04-16T00:00:00Z'),
+      updatedAt: new Date('2026-04-16T00:00:00Z'),
+      deliveryAddress: {
+        addressLine: 'Street 1',
+        city: 'Bengaluru',
+        state: 'KA',
+        pincode: '560001',
+      },
+      pharmacyPartner: {
+        id: 'partner-1',
+        code: 'mock',
+        name: 'Mock',
+        displayName: 'Mock Partner',
+      },
+      items: [],
+    });
+
+    await service.placeOrder('user-1', {
+      partnerId: 'partner-1',
+      deliveryAddressId: 'address-1',
+      uploadedPrescriptionId: 'upload-rx-1',
+      items: [
+        {
+          medicineCode: 'med-1',
+          medicineName: 'Paracetamol',
+          quantity: 2,
+          unitPrice: 25,
+        },
+      ],
+    });
+
+    expect(
+      mockPrescriptionService.assertPrescriptionApproved,
+    ).toHaveBeenCalledWith('upload-rx-1', 'user-1');
   });
 
   it('cancels an order through the provider when allowed', async () => {

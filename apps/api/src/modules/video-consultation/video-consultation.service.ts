@@ -13,15 +13,32 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 @Injectable()
 export class VideoConsultationService {
   private readonly logger = new Logger(VideoConsultationService.name);
-  private hms: HMSSDK;
+  private hms: HMSSDK | null = null;
+  private readonly mockMode: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
+    this.mockMode =
+      this.config.get<string>('VIDEO_MOCK_MODE', 'false') === 'true';
+
+    if (this.mockMode) {
+      this.logger.warn(
+        'VideoConsultationService is running in MOCK mode — no real 100ms API calls will be made.',
+      );
+    }
+
     const accessKey = this.config.get<string>('HMS_APP_ACCESS_KEY', '');
     const secret = this.config.get<string>('HMS_APP_SECRET', '');
-    this.hms = new HMSSDK(accessKey, secret);
+
+    if (accessKey && secret) {
+      this.hms = new HMSSDK(accessKey, secret);
+    } else if (!this.mockMode) {
+      this.logger.warn(
+        'HMS_APP_ACCESS_KEY or HMS_APP_SECRET not configured. Video consultation endpoints will not function. Set VIDEO_MOCK_MODE=true to use mock mode.',
+      );
+    }
   }
 
   private async getBookingWithParticipants(bookingId: string) {
@@ -62,23 +79,33 @@ export class VideoConsultationService {
     });
     if (existing) return existing;
 
-    const templateId = this.config.get<string>('HMS_TEMPLATE_ID');
-
     let roomId: string;
-    try {
-      const room = await this.hms.rooms.create({
-        name: `curex24-${bookingId}`,
-        description: `Video consultation for booking ${bookingId}`,
-        ...(templateId ? { template_id: templateId } : {}),
-      });
-      roomId = room.id;
-    } catch (err) {
-      this.logger.error(
-        `Failed to create 100ms room for booking ${bookingId}: ${(err as Error).message}`,
-      );
-      throw new InternalServerErrorException(
-        'Failed to create video room. Please try again.',
-      );
+
+    if (this.mockMode) {
+      roomId = `mock-room-${bookingId}`;
+      this.logger.debug(`[MOCK] createRoom — using mock roomId: ${roomId}`);
+    } else {
+      if (!this.hms) {
+        throw new InternalServerErrorException(
+          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
+        );
+      }
+      const templateId = this.config.get<string>('HMS_TEMPLATE_ID');
+      try {
+        const room = await this.hms.rooms.create({
+          name: `curex24-${bookingId}`,
+          description: `Video consultation for booking ${bookingId}`,
+          ...(templateId ? { template_id: templateId } : {}),
+        });
+        roomId = room.id;
+      } catch (err) {
+        this.logger.error(
+          `Failed to create 100ms room for booking ${bookingId}: ${(err as Error).message}`,
+        );
+        throw new InternalServerErrorException(
+          'Failed to create video room. Please try again.',
+        );
+      }
     }
 
     return this.prisma.videoSession.create({
@@ -107,20 +134,33 @@ export class VideoConsultationService {
     }
 
     let token: string;
-    try {
-      const authToken = await this.hms.auth.getAuthToken({
-        roomId: session.roomId,
-        userId,
-        role: tokenRole,
-      });
-      token = authToken.token;
-    } catch (err) {
-      this.logger.error(
-        `Failed to generate 100ms token for booking ${bookingId}: ${(err as Error).message}`,
+
+    if (this.mockMode) {
+      token = `mock-token-${session.roomId}-${userId}-${tokenRole}`;
+      this.logger.debug(
+        `[MOCK] generateToken — using mock token for userId: ${userId}`,
       );
-      throw new InternalServerErrorException(
-        'Failed to generate join token. Please try again.',
-      );
+    } else {
+      if (!this.hms) {
+        throw new InternalServerErrorException(
+          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
+        );
+      }
+      try {
+        const authToken = await this.hms.auth.getAuthToken({
+          roomId: session.roomId,
+          userId,
+          role: tokenRole,
+        });
+        token = authToken.token;
+      } catch (err) {
+        this.logger.error(
+          `Failed to generate 100ms token for booking ${bookingId}: ${(err as Error).message}`,
+        );
+        throw new InternalServerErrorException(
+          'Failed to generate join token. Please try again.',
+        );
+      }
     }
 
     return { token, roomId: session.roomId, role: tokenRole };

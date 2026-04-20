@@ -10,6 +10,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
+import { PrescriptionService } from '../prescription/prescription.service';
 
 type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
@@ -17,7 +18,9 @@ type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
     deliveryAddress: true;
     pharmacyPartner: true;
   };
-}>;
+}> & {
+  uploadedPrescriptionId?: string | null;
+};
 
 @Injectable()
 export class PharmacyOrderService {
@@ -26,6 +29,7 @@ export class PharmacyOrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
+    private readonly prescriptionService: PrescriptionService,
   ) {}
 
   async placeOrder(
@@ -66,6 +70,13 @@ export class PharmacyOrderService {
       }
     }
 
+    if (dto.uploadedPrescriptionId) {
+      await this.prescriptionService.assertPrescriptionApproved(
+        dto.uploadedPrescriptionId,
+        userId,
+      );
+    }
+
     const provider = this.resolveProvider(partner.code, partner.name);
     const partnerItems = dto.items.map((item) => ({
       medicineCode: item.medicineCode,
@@ -91,6 +102,7 @@ export class PharmacyOrderService {
         patientProfileId: patient.id,
         bookingId: dto.bookingId ?? null,
         prescriptionId: dto.prescriptionId ?? null,
+        uploadedPrescriptionId: dto.uploadedPrescriptionId ?? null,
         pharmacyPartnerId: partner.id,
         partnerOrderId: partnerResult.partnerOrderId,
         deliveryAddressId: address.id,
@@ -319,7 +331,7 @@ export class PharmacyOrderService {
   private mapPartnerStatus(partnerStatus: string): PharmacyOrderStatus {
     const normalized = partnerStatus.toUpperCase();
     const statusMap: Record<string, PharmacyOrderStatus> = {
-      PLACED: PharmacyOrderStatus.PLACED,
+      PLACED: PharmacyOrderStatus.PENDING,
       PENDING: PharmacyOrderStatus.PENDING,
       PRESCRIPTION_REVIEW: PharmacyOrderStatus.PRESCRIPTION_REVIEW,
       CONFIRMED: PharmacyOrderStatus.CONFIRMED,
@@ -355,7 +367,6 @@ export class PharmacyOrderService {
 
   private canCancel(status: PharmacyOrderStatus): boolean {
     const cancellableStatuses: PharmacyOrderStatus[] = [
-      PharmacyOrderStatus.PLACED,
       PharmacyOrderStatus.PENDING,
       PharmacyOrderStatus.PRESCRIPTION_REVIEW,
       PharmacyOrderStatus.CONFIRMED,
@@ -374,6 +385,7 @@ export class PharmacyOrderService {
       patientProfileId: order.patientProfileId,
       bookingId: order.bookingId,
       prescriptionId: order.prescriptionId,
+      uploadedPrescriptionId: order.uploadedPrescriptionId,
       pharmacyPartnerId: order.pharmacyPartnerId,
       partnerCode: order.pharmacyPartner.code,
       partnerName:
