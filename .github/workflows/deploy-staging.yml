@@ -335,6 +335,10 @@ jobs:
     needs: [deploy-admin, deploy-api]
     permissions:
       contents: read
+    env:
+      # Promoted to job level so it can be referenced from step-level `if`
+      # expressions (the `secrets` context is not available in `if`).
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -420,7 +424,7 @@ jobs:
           echo "Report artifact: playwright-report-staging-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify Slack on failure
-        if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && secrets.SLACK_WEBHOOK_URL != ''
+        if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -437,7 +441,6 @@ jobs:
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Check smoke test result

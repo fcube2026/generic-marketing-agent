@@ -333,6 +333,10 @@ jobs:
       issues: write
     environment:
       name: production
+    env:
+      # Promoted to job level so it can be referenced from step-level `if`
+      # expressions (the `secrets` context is not available in `if`).
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -435,7 +439,7 @@ jobs:
             console.log(`Created issue: ${issue.data.html_url}`);
 
       - name: Notify Slack on production smoke failure
-        if: steps.smoke.outcome == 'failure' && secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.smoke.outcome == 'failure' && env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -452,7 +456,6 @@ jobs:
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Fail job if smoke tests failed
