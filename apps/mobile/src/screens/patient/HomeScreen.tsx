@@ -151,26 +151,6 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.videoCardArrow}>→</Text>
       </TouchableOpacity>
 
-      {/* Order Medicines Quick Access */}
-      <TouchableOpacity style={styles.pharmacyCard} onPress={() => navigation.navigate('MedicineSearch')}>
-        <Text style={styles.videoCardIcon}>💊</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Order Medicines</Text>
-          <Text style={styles.videoCardSub}>Search and order medicines online</Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
-
-      {/* Prescription Order Quick Access */}
-      <TouchableOpacity style={styles.pharmacyCard} onPress={() => navigation.navigate('PrescriptionOrder')}>
-        <Text style={styles.videoCardIcon}>📋</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Prescription Order</Text>
-          <Text style={styles.videoCardSub}>Upload prescription and order medicines</Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
-
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
@@ -310,21 +290,4 @@ const styles = StyleSheet.create({
   videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   videoCardArrow: { fontSize: 18, color: Colors.textMuted },
-  pharmacyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.success,
-  },
 });

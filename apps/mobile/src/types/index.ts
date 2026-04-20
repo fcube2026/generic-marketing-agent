@@ -85,6 +85,10 @@ export interface Booking {
   serviceCategory?: ServiceCategory;
   address?: Address;
   videoSession?: VideoSession;
+  /** URL of the prescription issued during this consultation (mock field) */
+  prescriptionUrl?: string;
+  /** Whether a pharmacy order has already been placed for this booking (mock field) */
+  hasOrder?: boolean;
 }
 
 export interface VideoSession {

@@ -34,7 +34,7 @@ export type PatientStackParamList = {
   ConsultationSummary: { bookingId: string };
   VideoConsultation: { bookingId: string };
   MedicineSearch: undefined;
-  PrescriptionOrder: undefined;
+  PrescriptionOrder: { bookingId?: string; prescriptionUrl?: string } | undefined;
   PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };
