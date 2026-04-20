@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { GeneratedImage } from '@/components/ui/GeneratedImage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,29 @@ const FORMAT_DIMENSIONS: Record<typeof FORMAT_TYPES[number], string> = {
   'WhatsApp Status (9:16)': '1080×1920 px, aspect ratio 9:16',
 };
 
+// Closest Pollinations-friendly pixel dimensions per format
+const FORMAT_PIXELS: Record<typeof FORMAT_TYPES[number], { w: number; h: number }> = {
+  'Square Post (1:1)': { w: 1024, h: 1024 },
+  'Portrait Post (4:5)': { w: 820, h: 1024 },
+  'Story / Reel (9:16)': { w: 576, h: 1024 },
+  'Landscape Banner (16:9)': { w: 1024, h: 576 },
+  'Twitter/X Card (2:1)': { w: 1024, h: 512 },
+  'LinkedIn Banner (4:1)': { w: 1024, h: 256 },
+  'Pinterest Pin (2:3)': { w: 682, h: 1024 },
+  'YouTube Thumbnail (16:9)': { w: 1024, h: 576 },
+  'Facebook Cover (2.7:1)': { w: 1024, h: 379 },
+  'WhatsApp Status (9:16)': { w: 576, h: 1024 },
+};
+
+// Social post dimensions for Pollinations
+const POST_PLATFORM_PIXELS: Record<string, { w: number; h: number }> = {
+  Instagram: { w: 1024, h: 1024 },
+  LinkedIn: { w: 1024, h: 536 },
+  'Twitter/X': { w: 1024, h: 512 },
+  Facebook: { w: 1024, h: 536 },
+  WhatsApp: { w: 1024, h: 1024 },
+};
+
 const AD_PLATFORMS = ['Google Search', 'Google Display', 'Meta (Facebook/Instagram)', 'LinkedIn Ads', 'YouTube Ads', 'WhatsApp Ads'] as const;
 const CAMPAIGN_OBJECTIVES = [
   'Brand Awareness',
@@ -66,6 +90,59 @@ const CAMPAIGN_OBJECTIVES = [
   'Re-engagement / Retargeting',
   'Seasonal Offer',
 ] as const;
+
+// ─── Image Prompt Builders ────────────────────────────────────────────────────
+
+function buildImagePromptForVisual(
+  format: typeof FORMAT_TYPES[number],
+  style: typeof VISUAL_STYLES[number],
+): string {
+  const conceptMap: Record<typeof FORMAT_TYPES[number], string> = {
+    'Square Post (1:1)': 'warm welcoming scene of a professional doctor visiting a patient at home, doctor in white coat smiling, bright modern apartment',
+    'Portrait Post (4:5)': 'close-up portrait of a confident smiling Indian doctor holding a medical kit, soft bokeh home background',
+    'Story / Reel (9:16)': 'full-height vertical social media visual, doctor at patient door in bright daylight, warm colour palette, mobile-first composition',
+    'Landscape Banner (16:9)': 'wide-angle doctor and patient interaction in a cosy living room, doctor reviewing notes on tablet, bright airy room',
+    'Twitter/X Card (2:1)': 'horizontal composition doctor at home visit, bold clean design, blue and white healthcare tones, professional photography',
+    'LinkedIn Banner (4:1)': 'ultra-wide professional banner, subtle gradient navy to white, doctor silhouette, clean corporate healthcare aesthetic',
+    'Pinterest Pin (2:3)': 'tall vertical pin, healthcare booking steps infographic, clean icons, numbered, blue and white',
+    'YouTube Thumbnail (16:9)': 'bold YouTube thumbnail composition, high contrast, doctor at door, expressive cinematic scene',
+    'Facebook Cover (2.7:1)': 'wide Facebook cover, gradient background, doctor and patient USP illustration, professional brand visual',
+    'WhatsApp Status (9:16)': 'vertical WhatsApp status card, friendly doctor avatar, minimal clean design, healthcare blue accent',
+  };
+
+  const styleMap: Record<typeof VISUAL_STYLES[number], string> = {
+    Photorealistic: 'photorealistic DSLR photo quality, natural lighting, shallow depth of field, hyper-detailed, 8K resolution',
+    'Flat Illustration': 'flat vector illustration, clean lines, geometric shapes, pastel palette, minimal shadows, modern design',
+    Minimalist: 'minimalist design, lots of white space, single focal point, muted tones, clean and simple',
+    'Bold & Typographic': 'bold graphic design poster style, high contrast colours, strong visual hierarchy, dynamic composition',
+    Cinematic: 'cinematic photography, dramatic lighting, movie-still quality, colour graded, wide angle lens',
+    Watercolour: 'watercolour painting, soft brush strokes, artistic, dreamy, paper texture, flowing colours',
+    'Neon / Dark Mode': 'neon colours, dark background, glowing effects, high contrast, modern digital aesthetic',
+  };
+
+  return `${conceptMap[format]}, ${styleMap[style]}, healthcare blue #1E6FCC accent, professional`;
+}
+
+function buildPostImagePrompt(platform: string, pillar: string): string {
+  const pillarImages: Record<string, string> = {
+    'Education & Awareness': 'educational healthcare scene, doctor explaining to patient in bright home, warm and informative, clear and professional',
+    'Trust & Social Proof': 'happy patient giving thumbs up after home doctor visit, warm genuine moment, bright home environment, trustworthy healthcare scene',
+    'Product/Service Highlight': 'doctor using smartphone healthcare booking app during home visit, modern technology in healthcare, clean professional scene',
+    'Brand Story': 'heartfelt moment between doctor and elderly patient at home, warm emotional lighting, storytelling photography',
+    'Community & Engagement': 'diverse group of happy healthy urban Indian people, community healthcare, vibrant energetic social visual',
+    'Offer & Promotion': 'vibrant promotional healthcare visual, doctor home visit, energetic call-to-action composition, bold brand colours',
+  };
+
+  const platformStyle: Record<string, string> = {
+    Instagram: 'Instagram square 1:1 format, high-quality lifestyle photography, warm saturated tones',
+    LinkedIn: 'LinkedIn professional landscape format, clean corporate aesthetic, blue and white tones',
+    'Twitter/X': 'Twitter card 2:1 horizontal, bold punchy design, high contrast',
+    Facebook: 'Facebook post format, engaging lifestyle image, approachable and warm',
+    WhatsApp: 'simple clean square image, minimal design, clear and direct, professional',
+  };
+
+  return `${pillarImages[pillar] ?? 'professional healthcare social media post, curex24 home doctor service'}, ${platformStyle[platform] ?? 'social media post format'}, healthcare blue accent, premium brand quality`;
+}
 
 // ─── Generators ───────────────────────────────────────────────────────────────
 
@@ -397,10 +474,14 @@ function PostGeneratorTab() {
   const [pillar, setPillar] = useState<typeof CONTENT_PILLARS[number]>('Education & Awareness');
   const [tone, setTone] = useState<typeof TONES[number]>('Professional');
   const [output, setOutput] = useState('');
+  const [imagePrompt, setImagePrompt] = useState('');
 
   function generate() {
     setOutput(generatePost(platform, pillar, tone));
+    setImagePrompt(buildPostImagePrompt(platform, pillar));
   }
+
+  const pixels = POST_PLATFORM_PIXELS[platform] ?? { w: 1024, h: 1024 };
 
   return (
     <div className="space-y-6">
@@ -461,9 +542,12 @@ function PostGeneratorTab() {
         onClick={generate}
         className="w-full py-3 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary-dark transition"
       >
-        ✨ Generate Post Copy
+        ✨ Generate Post
       </button>
 
+      {imagePrompt && (
+        <GeneratedImage prompt={imagePrompt} width={pixels.w} height={pixels.h} label={`${platform} Visual — ${pillar}`} />
+      )}
       {output && <OutputBox content={output} />}
     </div>
   );
@@ -474,10 +558,14 @@ function VisualGeneratorTab() {
   const [style, setStyle] = useState<typeof VISUAL_STYLES[number]>('Photorealistic');
   const [tool, setTool] = useState<typeof AI_TOOLS[number]>('DALL-E 3');
   const [output, setOutput] = useState('');
+  const [imagePrompt, setImagePrompt] = useState('');
 
   function generate() {
     setOutput(generateVisualPrompt(format, style, tool));
+    setImagePrompt(buildImagePromptForVisual(format, style));
   }
+
+  const pixels = FORMAT_PIXELS[format];
 
   return (
     <div className="space-y-6">
@@ -538,9 +626,12 @@ function VisualGeneratorTab() {
         onClick={generate}
         className="w-full py-3 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary-dark transition"
       >
-        🎨 Generate Visual Prompt
+        🎨 Generate Visual
       </button>
 
+      {imagePrompt && (
+        <GeneratedImage prompt={imagePrompt} width={pixels.w} height={pixels.h} label={`${format} — ${style}`} />
+      )}
       {output && <OutputBox content={output} />}
     </div>
   );
@@ -608,8 +699,8 @@ function AdCreativeGeneratorTab() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'post', label: '✍️ Post Generator', desc: '5 platforms × 6 pillars × tone' },
-  { id: 'visual', label: '🎨 Visual Generator', desc: '10 formats × 7 styles × 5 AI tools' },
+  { id: 'post', label: '✍️ Post Generator', desc: '5 platforms × 6 pillars × tone + AI visual' },
+  { id: 'visual', label: '🎨 Visual Generator', desc: 'Generate actual AI images — 10 formats × 7 styles' },
   { id: 'ad', label: '📣 Ad Creative', desc: '6 platforms × 6 objectives' },
 ] as const;
 
