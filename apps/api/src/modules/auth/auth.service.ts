@@ -16,6 +16,13 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
 
+// Well-known staging admin credentials, always provisioned on non-production
+// environments so the staging admin portal is reachable with the documented
+// defaults regardless of Railway env-var drift. See docs/api-testing-strategy.md.
+const WELL_KNOWN_STAGING_ADMIN_EMAIL = 'admin@curex24.com';
+const WELL_KNOWN_STAGING_ADMIN_PASSWORD = 'admin123';
+const WELL_KNOWN_STAGING_ADMIN_PHONE = '+0000000002';
+
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
@@ -33,9 +40,33 @@ export class AuthService implements OnModuleInit {
     if (process.env.APP_ENV === 'production') return;
     if (process.env.DISABLE_STAGING_ADMIN_BOOTSTRAP === 'true') return;
 
-    const email = this.adminEmail;
-    const plainPassword = this.adminPassword;
+    // 1. Provision the env-configured admin (may match the well-known one).
+    await this.bootstrapAdmin(this.adminEmail, this.adminPassword, ADMIN_PHONE);
 
+    // 2. Always provision the well-known staging admin so the documented
+    //    defaults work even when ADMIN_EMAIL/ADMIN_PASSWORD on Railway have
+    //    drifted to other values. Skip if it's the same as the env-configured
+    //    admin to avoid duplicate work.
+    if (this.adminEmail !== WELL_KNOWN_STAGING_ADMIN_EMAIL) {
+      await this.bootstrapAdmin(
+        WELL_KNOWN_STAGING_ADMIN_EMAIL,
+        WELL_KNOWN_STAGING_ADMIN_PASSWORD,
+        WELL_KNOWN_STAGING_ADMIN_PHONE,
+      );
+    }
+  }
+
+  /**
+   * Idempotently provision an ADMIN user with the given email/password.
+   * Looks up by email first; if not found, upserts by the supplied phone
+   * placeholder. Always resets the password hash so login is guaranteed to
+   * work regardless of DB drift.
+   */
+  private async bootstrapAdmin(
+    email: string,
+    plainPassword: string,
+    phonePlaceholder: string,
+  ) {
     try {
       const passwordHash = await bcrypt.hash(plainPassword, 10);
       const existing = await this.prisma.user.findFirst({
@@ -44,9 +75,9 @@ export class AuthService implements OnModuleInit {
 
       if (!existing) {
         await this.prisma.user.upsert({
-          where: { phone: ADMIN_PHONE },
+          where: { phone: phonePlaceholder },
           create: {
-            phone: ADMIN_PHONE,
+            phone: phonePlaceholder,
             email,
             role: Role.ADMIN,
             passwordHash,
@@ -63,8 +94,6 @@ export class AuthService implements OnModuleInit {
           `[bootstrap] Created staging admin user email=${email}`,
         );
       } else {
-        // On staging, always reset the password to the env-configured value
-        // so admin login is guaranteed to work regardless of DB drift.
         await this.prisma.user.update({
           where: { id: existing.id },
           data: {
@@ -80,7 +109,7 @@ export class AuthService implements OnModuleInit {
     } catch (err) {
       // Don't crash app boot if DB/migrations aren't ready yet.
       this.logger.warn(
-        `[bootstrap] Staging admin bootstrap skipped: ${err.message}`,
+        `[bootstrap] Staging admin bootstrap skipped for email=${email}: ${err.message}`,
       );
     }
   }
