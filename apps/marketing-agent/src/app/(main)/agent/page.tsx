@@ -704,18 +704,23 @@ function AgentPageInner() {
 
       // Snapshot history at submit time (last ~10 turns, agent intro excluded
       // because the brand intro lives in the server-side system prompt).
-      let history: ChatTurn[] = [];
-      setMessages((prev) => {
-        const next = [...prev, userMsg];
-        history = next
-          .slice(1) // drop INTRO_MESSAGE
-          .slice(-10)
-          .map<ChatTurn>((m) => ({
-            role: m.role === 'agent' ? 'assistant' : 'user',
-            content: m.content,
-          }));
-        return next;
-      });
+      //
+      // IMPORTANT: build `history` synchronously *before* calling setMessages.
+      // React 18 may invoke functional updaters later during render, which
+      // would mean the async generateChatReply() below fires with an empty
+      // history and the server rejects the request as `messages must not be
+      // empty`. Reading from the closure-captured `messages` is safe here
+      // because `send` is recreated whenever `messages` changes (via the
+      // useCallback dep below).
+      const nextMessages = [...messages, userMsg];
+      const history: ChatTurn[] = nextMessages
+        .slice(1) // drop INTRO_MESSAGE
+        .slice(-10)
+        .map<ChatTurn>((m) => ({
+          role: m.role === 'agent' ? 'assistant' : 'user',
+          content: m.content,
+        }));
+      setMessages(nextMessages);
       setInput('');
       setIsTyping(true);
 
@@ -742,7 +747,7 @@ function AgentPageInner() {
         setIsTyping(false);
       })();
     },
-    [],
+    [messages],
   );
 
   // If the page is opened with ?skill=<id>, auto-send that skill's example prompt once.
