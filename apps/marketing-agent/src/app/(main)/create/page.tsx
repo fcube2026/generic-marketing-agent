@@ -37,13 +37,7 @@ const VISUAL_STYLES = [
   'Watercolour',
   'Neon / Dark Mode',
 ] as const;
-const AI_TOOLS = [
-  'DALL-E 3',
-  'Midjourney',
-  'Stable Diffusion',
-  'Adobe Firefly',
-  'Canva AI',
-] as const;
+const AI_TOOLS = ['OpenAI gpt-image-1'] as const;
 
 const FORMAT_DIMENSIONS: Record<typeof FORMAT_TYPES[number], string> = {
   'Square Post (1:1)': '1080×1080 px, aspect ratio 1:1',
@@ -234,11 +228,8 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
   const dimensions = FORMAT_DIMENSIONS[format];
 
   const toolGuide: Record<string, string> = {
-    'DALL-E 3': 'Use descriptive, scene-based prompts. Specify style, lighting, mood, and composition. DALL-E 3 follows instructions closely — be explicit.',
-    'Midjourney': 'Append --ar for aspect ratio, --v 6 for quality, --style raw for photorealism. Separate concept from style with "::" weight operators.',
-    'Stable Diffusion': 'Use positive and negative prompts. Add quality boosters: "masterpiece, best quality, 4k, ultra-detailed". Use LoRA or controlnet references for brand consistency.',
-    'Adobe Firefly': 'Use Adobe Firefly\'s "text to image" with content credentials. Ideal for commercially safe images. Specify brand colours and composition.',
-    'Canva AI': 'Use Canva\'s text-to-image for direct design integration. Keep prompts simple and descriptive. Combine with Canva templates for production speed.',
+    'OpenAI gpt-image-1':
+      'Use descriptive, scene-based prompts. Specify subject, setting, lighting, mood, composition and style. gpt-image-1 follows long, explicit instructions closely. Avoid watermarks/text overlays in the prompt — add typography in your design tool.',
   };
 
   const stylePrompts: Record<string, string> = {
@@ -275,26 +266,6 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
   prompt += `Style: ${stylePrompts[style] ?? style}.\n\n`;
   prompt += `Brand palette: Healthcare blue (#1E6FCC), clean white (#FFFFFF), warm grey (#F5F5F5), accent green (#22C55E).\n\n`;
   prompt += `Technical: ${dimensions}, optimised for digital display, no text overlaid (add in design tool).\n\n`;
-
-  if (tool === 'Midjourney') {
-    const arMap: Record<string, string> = {
-      'Square Post (1:1)': '--ar 1:1',
-      'Portrait Post (4:5)': '--ar 4:5',
-      'Story / Reel (9:16)': '--ar 9:16',
-      'Landscape Banner (16:9)': '--ar 16:9',
-      'Twitter/X Card (2:1)': '--ar 2:1',
-      'LinkedIn Banner (4:1)': '--ar 4:1',
-      'Pinterest Pin (2:3)': '--ar 2:3',
-      'YouTube Thumbnail (16:9)': '--ar 16:9',
-      'Facebook Cover (2.7:1)': '--ar 82:31',
-      'WhatsApp Status (9:16)': '--ar 9:16',
-    };
-    prompt += `**Midjourney suffix:** ${arMap[format] ?? '--ar 1:1'} --v 6 --style raw --q 2\n\n`;
-  }
-
-  if (tool === 'Stable Diffusion') {
-    prompt += `**Negative prompt:** blurry, low quality, watermark, text, deformed, ugly, bad anatomy, bad proportions\n\n`;
-  }
 
   prompt += `---\n\n**Tool Guidance:**\n${toolGuide[tool] ?? ''}`;
 
@@ -559,7 +530,7 @@ function PostGeneratorTab() {
 function VisualGeneratorTab() {
   const [format, setFormat] = useState<typeof FORMAT_TYPES[number]>('Square Post (1:1)');
   const [style, setStyle] = useState<typeof VISUAL_STYLES[number]>('Photorealistic');
-  const [tool, setTool] = useState<typeof AI_TOOLS[number]>('DALL-E 3');
+  const [tool, setTool] = useState<typeof AI_TOOLS[number]>('OpenAI gpt-image-1');
   const [customSubject, setCustomSubject] = useState('');
   const [output, setOutput] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
@@ -733,7 +704,7 @@ export default function CreatePage() {
       {/* AI Skills Banner */}
       <div className="bg-gradient-to-r from-primary/10 to-purple-50 border border-primary/20 rounded-xl px-5 py-3 flex flex-wrap items-center gap-3">
         <span className="text-xs font-semibold text-primary uppercase tracking-wide">Powered by</span>
-        {['ChatGPT (GPT-4o)', 'DALL-E 3', 'Midjourney', 'Stable Diffusion', 'Adobe Firefly', 'Canva AI'].map((tool) => (
+        {['OpenAI GPT-4o', 'OpenAI gpt-image-1'].map((tool) => (
           <span key={tool} className="text-xs px-2.5 py-1 bg-white border border-gray-200 rounded-full text-gray-700 font-medium shadow-sm">
             {tool}
           </span>

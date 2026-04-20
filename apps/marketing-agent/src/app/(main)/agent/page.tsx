@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type AgentMessage, marketingSkills } from '@/lib/data';
 import { GeneratedImage } from '@/components/ui/GeneratedImage';
+import {
+  describeAiError,
+  generateChatReply,
+  type ChatTurn,
+} from '@/lib/services/aiService';
 
 const suggestedPrompts = [
   "Write Google Search ad copy for home visits in Mumbai",
@@ -21,6 +26,9 @@ const suggestedPrompts = [
   "What's my biggest retention risk right now?",
 ];
 
+// Canned fallback responses used only when the OpenAI-backed /api/ai/chat
+// route is unavailable (e.g. no OPENAI_API_KEY configured). When the LLM is
+// healthy we always prefer its live reply.
 const agentResponses: Record<string, string> = {
   "Write Google Search ad copy for home visits in Mumbai": `Here are 3 headline and description sets for Google Search — home visits in Mumbai:
 
@@ -616,7 +624,7 @@ Alternatively, try the **✨ Create Content** studio — it generates ready-to-p
 
 const INTRO_MESSAGE: AgentMessage = {
   role: 'agent',
-  content: `👋 I'm your AI Marketing Agent for curex24 — powered by **ChatGPT (GPT-4o)**, **DALL-E 3**, **Midjourney**, **GitHub Copilot**, **Stable Diffusion**, and **Claude**.
+  content: `👋 I'm your AI Marketing Agent for curex24 — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI gpt-image-1** for on-demand visuals.
 
 I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`programmatic-seo\`, \`pricing-strategy\`, and \`referral-program\`.
 
@@ -687,26 +695,55 @@ function AgentPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const send = useCallback((text: string) => {
-    if (!text.trim()) return;
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const userMsg: AgentMessage = { role: 'user', content: text, timestamp: now };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setIsTyping(true);
-    setTimeout(() => {
-      const content = getAgentResponse(text);
-      const imagePrompt = getImagePromptForRequest(text.trim().toLowerCase());
-      const agentMsg: AgentMessage = {
-        role: 'agent',
-        content,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        ...(imagePrompt ? { imagePrompt } : {}),
-      };
-      setMessages((prev) => [...prev, agentMsg]);
-      setIsTyping(false);
-    }, 1200);
-  }, []);
+  const send = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const userMsg: AgentMessage = { role: 'user', content: trimmed, timestamp: now };
+
+      // Snapshot history at submit time (last ~10 turns, agent intro excluded
+      // because the brand intro lives in the server-side system prompt).
+      let history: ChatTurn[] = [];
+      setMessages((prev) => {
+        const next = [...prev, userMsg];
+        history = next
+          .slice(1) // drop INTRO_MESSAGE
+          .slice(-10)
+          .map<ChatTurn>((m) => ({
+            role: m.role === 'agent' ? 'assistant' : 'user',
+            content: m.content,
+          }));
+        return next;
+      });
+      setInput('');
+      setIsTyping(true);
+
+      const imagePrompt = getImagePromptForRequest(trimmed.toLowerCase());
+
+      (async () => {
+        let content: string;
+        try {
+          const result = await generateChatReply({ messages: history });
+          content = result.reply;
+        } catch (err) {
+          // If the LLM is unavailable (no API key, upstream error, etc.) fall
+          // back to the canned response set so the UI stays usable.
+          const fallback = getAgentResponse(trimmed);
+          content = `${fallback}\n\n_⚠️ Live AI unavailable: ${describeAiError(err, 'unknown error')}._`;
+        }
+        const agentMsg: AgentMessage = {
+          role: 'agent',
+          content,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          ...(imagePrompt ? { imagePrompt } : {}),
+        };
+        setMessages((prev) => [...prev, agentMsg]);
+        setIsTyping(false);
+      })();
+    },
+    [],
+  );
 
   // If the page is opened with ?skill=<id>, auto-send that skill's example prompt once.
   useEffect(() => {
@@ -723,7 +760,7 @@ function AgentPageInner() {
       {/* AI Skills Banner */}
       <div className="bg-gradient-to-r from-primary/10 to-purple-50 border border-primary/20 rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold text-primary uppercase tracking-wide">Powered by</span>
-        {['ChatGPT (GPT-4o)', 'DALL-E 3', 'Midjourney', 'GitHub Copilot', 'Stable Diffusion', 'Claude'].map((tool) => (
+        {['OpenAI GPT-4o', 'OpenAI gpt-image-1'].map((tool) => (
           <span key={tool} className="text-xs px-2 py-0.5 bg-white border border-gray-200 rounded-full text-gray-700 font-medium">
             {tool}
           </span>

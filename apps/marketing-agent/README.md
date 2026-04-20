@@ -17,6 +17,23 @@ pnpm --filter @curex24/marketing-agent dev
 | Variable | Required (hosted) | Description |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | **Yes** | Full base URL of the Curex24 API, e.g. `https://api.curex24.com/api/v1` |
+| `OPENAI_API_KEY` | **Yes (for live AI)** | Server-side OpenAI key. Powers `/api/ai/chat` and `/api/ai/image`. Without it the agent falls back to canned responses and the Visual Generator returns a friendly error. |
+| `OPENAI_TEXT_MODEL` | No | Chat/completion model. Defaults to `gpt-4o-mini`. Use `gpt-4o` for higher quality. |
+| `OPENAI_IMAGE_MODEL` | No | Image model. Defaults to `gpt-image-1` (DALL-E 3 successor). |
+| `OPENAI_BASE_URL` | No | Override the OpenAI base URL (e.g. for Azure OpenAI or a self-hosted proxy). |
+| `MARKETING_AGENT_SKIP_AUTH` | No | Set to `true` only in dev/test to skip the upstream JWT-validation hop on AI routes. **Never set this in production.** |
+
+> ⚠️ **Do not** prefix the OpenAI variables with `NEXT_PUBLIC_`. They are read only from server-side route handlers; prefixing would leak the key to the browser bundle.
+
+### AI provider switching
+
+The default integration uses **OpenAI** for both text (`gpt-4o-mini`/`gpt-4o`) and images (`gpt-image-1`). To switch providers:
+
+1. Replace the SDK import in `src/lib/ai/openai-client.ts` with the chosen vendor's SDK (e.g. `@anthropic-ai/sdk`, `@google/genai`, `@stability/sdk`, `replicate`).
+2. Update the model/size handling in `src/app/api/ai/chat/route.ts` and `src/app/api/ai/image/route.ts` to match the new SDK's contract.
+3. Keep the `{ reply }` / `{ dataUrl | url }` response shape so the client wrappers in `src/lib/services/aiService.ts` and the `<GeneratedImage />` component work unchanged.
+
+> Note: **Midjourney has no public API** and was removed from the UI. Adobe Firefly and Canva AI are also not wired up — only providers actually called from the routes appear in the "Powered by" badges.
 
 ### API URL selection
 
