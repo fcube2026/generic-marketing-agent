@@ -3,7 +3,6 @@ import { ENDPOINTS } from '../constants/api';
 
 export interface NmcVerificationPayload {
   fullName: string;
-  fatherName?: string;
   nmcRegistrationNumber: string;
   stateCouncil: string;
   yearOfAdmission: string;
