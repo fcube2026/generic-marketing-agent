@@ -15,6 +15,12 @@ export interface FaceVerificationPayload {
   referenceImageData?: string;
 }
 
+export interface VerificationDocumentsPayload {
+  aadhaarDocumentUrl: string;
+  medicalCertificateUrl: string;
+  licenseId?: string;
+}
+
 // Provider management service (used by provider screens)
 
 export const providerService = {
@@ -52,9 +58,24 @@ export const providerService = {
     return r.data;
   },
 
-  /** Submit face verification data. */
+  /** Submit face verification data (base64 live selfie). */
   submitFaceVerification: async (data: FaceVerificationPayload) => {
     const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_FACE, data);
+    return r.data;
+  },
+
+  /** Upload Aadhaar + medical certificate document URLs for OCR and admin review. */
+  submitVerificationDocuments: async (data: VerificationDocumentsPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_DOCUMENTS, data);
+    return r.data;
+  },
+
+  /** Record the doctor's DigiLocker consent for secure document fetch. */
+  recordDigilockerConsent: async (licenseId?: string) => {
+    const r = await api.post(
+      ENDPOINTS.VERIFICATION.DIGILOCKER_CONSENT,
+      licenseId ? { licenseId } : {},
+    );
     return r.data;
   },
 

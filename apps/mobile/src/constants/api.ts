@@ -24,6 +24,8 @@ export const ENDPOINTS = {
   VERIFICATION: {
     SUBMIT_NMC: '/providers/me/verification/nmc',
     SUBMIT_FACE: '/providers/me/verification/face',
+    SUBMIT_DOCUMENTS: '/providers/me/verification/documents',
+    DIGILOCKER_CONSENT: '/providers/me/verification/digilocker-consent',
     LOGS: '/providers/me/verification/logs',
   },
   SERVICES: '/services',

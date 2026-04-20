@@ -38,6 +38,12 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     bundleIdentifier: getBundleId(),
     infoPlist: {
       UIBackgroundModes: ['remote-notification'],
+      NSCameraUsageDescription:
+        'Camera access is required for face verification and document capture during KYC.',
+      NSPhotoLibraryUsageDescription:
+        'Photo library access is required to upload verification documents (Aadhaar and medical certificate).',
+      NSPhotoLibraryAddUsageDescription:
+        'Photo library write access is required to save captured document images.',
     },
   },
   android: {
@@ -48,6 +54,12 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     },
     package: getBundleId(),
     useNextNotificationsApi: true,
+    permissions: [
+      'android.permission.CAMERA',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.READ_MEDIA_IMAGES',
+    ],
   },
   web: {
     favicon: './assets/icon.png',
@@ -64,6 +76,13 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
   },
   plugins: [
     './plugins/withStaticEntryFile',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow Curex24 to access your photos for document upload.',
+        cameraPermission: 'Allow Curex24 to use the camera for face verification and document capture.',
+      },
+    ],
     [
       'expo-notifications',
       {
