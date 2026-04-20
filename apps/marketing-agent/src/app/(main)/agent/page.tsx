@@ -606,20 +606,382 @@ Here's how I'd run this skill for **curex24**:
 Want me to run this skill end-to-end now? Reply with **yes — run ${skill.id}**, or refine the prompt above.`;
   }
 
-  return `I'd be happy to help with that. Based on curex24's current marketing position:
+  // Intent-aware structured drafts — produced specifically for the user's
+  // prompt so the fallback never returns generic boilerplate.
+  const intentReply = getIntentDraft(trimmed, lower);
+  if (intentReply) return intentReply;
 
-**Key context:**
-• You're in early growth stage (1→10)
-• Primary bottleneck: provider supply + D30 patient retention
-• Budget: ₹5L/mo, 60% Google Search, 25% Meta
-• Top performing: referrals and direct search intent
+  return `Here's a starter answer for **"${trimmed}"** — tailored to curex24 (at-home doctor visits in Mumbai / Delhi / Bengaluru, early-growth stage, ₹5L/mo budget).
 
-To give you the most targeted recommendation on "${trimmed}", I'd need a bit more context:
-- Is this for patient acquisition, provider recruitment, or retention?
-- Which city/market is your priority right now?
-- What's your timeline?
+**Recommended structure:**
+1. **Audience & intent** — who exactly is this for, and what are they trying to do right now?
+2. **Core message** — the single most important thing to communicate (one sentence).
+3. **Proof points** — 3 specific, credible reasons (verified doctors, transparent pricing, 30-min ETA, 4.8★ rating, 150+ providers, etc.).
+4. **Call to action** — exactly one primary CTA that maps to a measurable conversion.
+5. **Distribution** — which channel(s) and what format (post / email / page / ad).
 
-Alternatively, try the **✨ Create Content** studio — it generates ready-to-publish posts, visual prompts, and full ad creatives for every platform. Or complete your **Intake** questionnaire to personalise all recommendations.`;
+**Suggested next step for "${trimmed}":**
+• Tell me the channel/format (e.g. "as a landing page", "as a Google ad set", "as a 5-slide carousel") and I'll produce the full draft.
+• Or open the **✨ Create Content** studio for fully-formatted post / visual / ad creative output.`;
+}
+
+// ---------------------------------------------------------------------------
+// Intent-aware fallback drafts
+// ---------------------------------------------------------------------------
+// When the live LLM is unavailable we still want the agent to actually
+// engage with the user's prompt. These helpers pattern-match common content
+// requests (comparison page, landing page, blog outline, ad copy, email,
+// social post, hero, pricing, etc.) and emit a tailored starter draft that
+// re-uses the user's phrasing instead of dumping the same boilerplate.
+function getIntentDraft(prompt: string, lower: string): string | null {
+  // ---- Comparison / vs / alternatives page ------------------------------
+  // e.g. "Write a curex24 vs Practo comparison page optimised for SEO..."
+  if (
+    lower.includes('comparison page') ||
+    lower.includes('alternatives page') ||
+    lower.includes(' alternative') ||
+    /\bvs\.?\b/.test(lower) ||
+    /\bversus\b/.test(lower)
+  ) {
+    const competitor = extractCompetitor(prompt);
+    return `**📄 Comparison page draft — curex24 vs ${competitor}**
+_Optimised for SEO + bottom-of-funnel conversion_
+
+**Target query cluster:**
+• "${competitor.toLowerCase()} vs curex24"
+• "${competitor.toLowerCase()} alternatives"
+• "best home doctor service india"
+• "${competitor.toLowerCase()} home visit price"
+
+**URL:** \`/compare/${slugify(competitor)}-vs-curex24\`
+**Title tag:** curex24 vs ${competitor} — Which Home Doctor Service Wins in 2026?
+**Meta description:** Compare curex24 and ${competitor} on price, doctor verification, ETA and coverage in Mumbai, Delhi and Bengaluru. Independent side-by-side breakdown.
+
+**Page sections (in order):**
+1. **H1** — curex24 vs ${competitor}: Side-by-Side for Home Doctor Visits
+2. **TL;DR comparison table** — 6 rows: ETA, price (₹), doctor verification, cities live, payment options, refund policy
+3. **Who should pick which?** — 2 short paragraphs ("Pick curex24 if…" / "Pick ${competitor} if…") — honest, not snarky
+4. **Feature-by-feature breakdown** — 4–6 H2 sections, each with a 2-column table and 2-line summary
+5. **Pricing comparison** — real ₹ examples for GP visit, blood test, repeat consult
+6. **What real patients say** — 2 short verified quotes per side (no fabricated testimonials)
+7. **FAQ schema block** — 5 Qs (price, coverage, refund, emergency, insurance) with FAQPage JSON-LD
+8. **Bottom-of-funnel CTA** — "Book a curex24 home visit in 2 minutes" with phone number + WhatsApp deep-link
+9. **Related comparisons** — internal links to /compare/* siblings (programmatic-SEO hub)
+
+**On-page SEO checklist:**
+• Comparison schema (Product + Review) — ⚠️ avoid \`Review\` markup if you can't surface real reviews on-page (Google penalty risk).
+• Internal link from /pricing, /how-it-works, and the city pages.
+• 1 outbound link to ${competitor}'s homepage (rel="nofollow") — earns trust signals.
+• Image alt text uses the literal query "${competitor.toLowerCase()} vs curex24".
+
+**CRO levers (BoFU):**
+• Sticky bottom bar on mobile with "Book in 2 min — ₹X visit fee in your city".
+• Exit-intent overlay: "Not sure? Get a free 5-min call with a curex24 doctor — ₹0".
+• Trust strip directly above the CTA: "150+ verified doctors • 4.8★ • Refund if doctor doesn't arrive in 60 min".
+
+Want me to expand any section into final copy, or generate the comparison table rows with concrete claims?`;
+  }
+
+  // ---- Landing page -----------------------------------------------------
+  if (lower.includes('landing page') || lower.includes('lander') || lower.includes('squeeze page')) {
+    return `**📄 Landing page draft for: "${prompt}"**
+
+**Above the fold:**
+• **H1:** [single benefit-led headline — verb + outcome + timeframe, e.g. "See a verified doctor at home in 30 minutes"]
+• **Subhead:** one line covering price, coverage, trust signal
+• **Primary CTA button:** "Book in 2 min" (mobile-first, ≥48px, accent colour)
+• **Hero visual:** doctor at apartment door, warm/natural lighting (use Visual Generator)
+• **Trust strip:** "150+ verified doctors • Mumbai / Delhi / Bengaluru • 4.8★ on 12k bookings"
+
+**Section order (top → bottom):**
+1. Hero (above)
+2. **3 ICP-pain bullets** — what curex24 fixes (queue, travel, unverified doctors)
+3. **How it works — 4 steps** — book → match → arrive → pay (use the infographic brief)
+4. **What's included** — visit fee, prescription, lab order if needed
+5. **Social proof** — 3 short quotes + city + verified badge
+6. **Pricing transparency block** — exact ₹ for GP / specialist / paediatric, "no surge"
+7. **Risk reversal** — "Refund if doctor doesn't arrive on time"
+8. **FAQ** (6–8 questions, FAQPage schema)
+9. **Final CTA repeat** — sticky on mobile
+
+**Conversion checklist:**
+• One CTA per screen, same colour, same wording.
+• Form ≤3 fields (phone, city, time slot). Phone-only "instant call back" variant for a/b test.
+• Page weight <300KB above-the-fold; LCP <2.5s on 4G.
+• Track: scroll depth 25/50/75/100, CTA click, form submit, phone-tap, WhatsApp-tap.
+
+Tell me the channel this LP is for (Google Search / Meta cold / WhatsApp blast / SEO) and I'll tailor headline, proof, and offer accordingly.`;
+  }
+
+  // ---- Homepage / hero section -----------------------------------------
+  if (lower.includes('homepage') || lower.includes('home page') || lower.includes('hero section') || lower.includes('hero copy')) {
+    return `**🏠 Homepage / hero draft**
+
+**Hero H1 (3 options to A/B):**
+A) Doctor at your door in 30 minutes
+B) India's most trusted at-home doctor service
+C) Skip the queue. See a doctor at home today.
+
+**Subhead:** Verified GPs, paediatricians and specialists across Mumbai, Delhi and Bengaluru. Transparent ₹ pricing. Book in 2 minutes.
+
+**Primary CTA:** Book a home visit
+**Secondary CTA:** See pricing in your city
+
+**Below the fold (in order):**
+1. **3-up "why curex24"** — Verified · Transparent · Fast
+2. **How it works — 4 cards** — Book / Match / Visit / Pay
+3. **Services** — GP, Paediatric, Diagnostics, Pharmacy delivery (each links out)
+4. **Cities live** — Mumbai, Delhi, Bengaluru (clickable city pages)
+5. **Trust block** — 150+ doctors · 4.8★ · 12k bookings
+6. **Press / partners strip**
+7. **Final CTA** — sticky mobile
+
+**Tracking events:** \`hero_cta_click\`, \`city_select\`, \`pricing_view\`, \`book_start\`, \`book_complete\`.
+
+Want full final copy for a specific variant (A / B / C)?`;
+  }
+
+  // ---- Pricing page -----------------------------------------------------
+  if (lower.includes('pricing page') || lower.includes('pricing strategy') || lower.includes('plans page') || (lower.includes('pricing') && (lower.includes('page') || lower.includes('write')))) {
+    return `**💰 Pricing page draft**
+
+**Promise above the fold:** "Transparent ₹ pricing. No surge. No surprise charges."
+
+**Layout:** 3-column comparison (GP / Specialist / Paediatric) — each column shows:
+• City-level ₹ (Mumbai / Delhi / Bengaluru tabs)
+• What's included (visit fee, prescription, follow-up window, refund window)
+• Primary CTA — "Book a [GP] home visit"
+
+**Below the table:**
+• **Add-ons** — diagnostics, pharmacy delivery (link to those pages)
+• **Insurance & corporate** — single CTA for HR partnerships
+• **FAQ** — "Why these prices?", "Is there a cancellation fee?", "Do I pay before or after?", "Refund policy?"
+
+**Conversion levers:**
+• Show savings vs. competitor avg (use the comparison page data, no fabricated numbers).
+• Add "Most booked in Mumbai" badge on the busiest column.
+• Sticky bottom CTA on mobile with the cheapest visible price.
+
+**Schema:** \`Product\` + \`Offer\` per service, with \`priceCurrency: INR\` and \`areaServed\`.
+
+Want me to draft the actual ₹ table rows or the FAQ copy in full?`;
+  }
+
+  // ---- SEO blog / article outline --------------------------------------
+  if (
+    lower.includes('blog post') ||
+    lower.includes('blog article') ||
+    lower.includes('seo article') ||
+    lower.includes('seo post') ||
+    lower.includes('article ideas') ||
+    (lower.includes('seo') && (lower.includes('write') || lower.includes('outline') || lower.includes('draft')))
+  ) {
+    return `**📝 SEO article outline for: "${prompt}"**
+
+**Search intent:** informational with commercial undertone (assumed — confirm).
+**Primary keyword cluster:** [pull from Search Console / Ahrefs — e.g. "home doctor visit mumbai", "doctor at home cost"].
+
+**URL:** \`/blog/${slugify(prompt).slice(0, 60)}\`
+**Title tag (≤60 chars):** [keyword] — [benefit] | curex24
+**Meta description (≤155 chars):** Plain-English answer in one sentence + soft CTA.
+
+**Outline (H2 / H3):**
+1. **TL;DR** — 3-bullet answer block (so AI Overviews / featured snippets can lift it).
+2. **What is [topic]?** — definition + when it's relevant.
+3. **How it works step-by-step** — numbered list, screenshot-able.
+4. **Cost in India** — real ₹ ranges per city (Mumbai / Delhi / Bengaluru).
+5. **When you should NOT use this** — honest, builds trust.
+6. **How curex24 does this** — single paragraph + product link (soft CTA).
+7. **FAQ** — 5 questions with FAQPage JSON-LD.
+
+**On-page checklist:**
+• Word count: 1,200–1,800 (match top-3 competitors, don't pad).
+• Internal links: 2 to service pages, 1 to a city page, 1 to a related blog.
+• Featured snippet target: put the 40–60-word answer at the very top.
+• Image: 1 hero (use Visual Generator) + 1 diagram. Alt text uses primary keyword.
+
+**Distribution after publish:**
+• LinkedIn post + Twitter thread re-purposed from TL;DR.
+• Internal link from the city page within 7 days.
+• Re-check rank at day 14 / 30; refresh at day 90 if stuck >position 8.
+
+Want me to flesh out a specific section into final copy?`;
+  }
+
+  // ---- Email / sequence ------------------------------------------------
+  if (
+    lower.includes('email sequence') ||
+    lower.includes('drip campaign') ||
+    lower.includes('lifecycle email') ||
+    (lower.includes('email') && (lower.includes('write') || lower.includes('draft') || lower.includes('day')))
+  ) {
+    return `**📬 Email draft for: "${prompt}"**
+
+**Subject line (3 to A/B):**
+A) [Specific outcome in 5 words]
+B) [Question that names the user's pain]
+C) [Number + benefit, e.g. "₹X off your next home visit"]
+
+**Preheader:** One-line value prop, 40–80 chars, doesn't repeat the subject.
+
+**Body structure (≤120 words):**
+1. **Hook** — one sentence connecting to a recent action or pain.
+2. **Value** — 2–3 bullets of what they get.
+3. **Single CTA** — button + plain-text link backup ("Book your home visit →").
+4. **PS** — soft trust signal ("Refund if doctor doesn't arrive on time").
+
+**Send rules:**
+• Tuesday or Thursday, 10:00 IST (India open-rate sweet spot).
+• Throttle: 1 marketing email per user per 72h.
+• Suppress: anyone with an active booking in the last 24h.
+
+**Tracking:** \`email_sent\`, \`email_open\`, \`email_click\` (per CTA), \`email_unsubscribe\`. Attribute revenue with a 7-day post-click + 1-day post-open window.
+
+Tell me the lifecycle stage (welcome / activation / re-engage / win-back) and I'll write the full final copy.`;
+  }
+
+  // ---- Ad copy / Google / Meta / LinkedIn ads --------------------------
+  if (
+    lower.includes('ad copy') ||
+    lower.includes('ad set') ||
+    lower.includes('google ad') ||
+    lower.includes('meta ad') ||
+    lower.includes('facebook ad') ||
+    lower.includes('linkedin ad') ||
+    lower.includes('youtube ad') ||
+    lower.includes('search ad') ||
+    lower.includes('display ad') ||
+    (lower.includes('ad') && lower.includes('write'))
+  ) {
+    const platform = detectAdPlatform(lower);
+    return `**🎯 ${platform} ad draft for: "${prompt}"**
+
+**Headlines (3 to test, ≤30 chars each):**
+1. Doctor at Home in 30 Min
+2. Verified Mumbai Doctors
+3. Skip the Queue — Book Now
+
+**Descriptions (2 to test, ≤90 chars):**
+A) Verified doctors at your doorstep. Transparent ₹ pricing. Book in 2 minutes.
+B) Same-day home visits. 4.8★ rated. Refund if doctor doesn't arrive on time.
+
+**Primary text / long copy (Meta / LinkedIn):**
+Tired of waiting hours at a clinic? curex24 sends a verified doctor to your home in under 30 minutes — Mumbai, Delhi and Bengaluru. Transparent ₹ pricing, real-time tracking, 4.8★ from 12,000+ patients. Book in 2 minutes.
+
+**CTA button:** Book Now
+**Landing page:** /book?utm_source=${platform.toLowerCase().replace(/[^a-z]/g, '')}&utm_medium=cpc&utm_campaign=[campaign]
+**Targeting hint:** city = Mumbai/Delhi/Bengaluru, age 28–55, intent keywords ("doctor near me", "home doctor", "GP appointment").
+
+**Measurement:**
+• Conversion event: \`book_complete\`, value = visit fee in INR.
+• Optimisation: 7-day click + 1-day view.
+• Frequency cap: 3/week.
+
+Want full RSA assets (15 headlines × 4 descriptions) or a Meta carousel variant?`;
+  }
+
+  // ---- Social post (Instagram / LinkedIn / Facebook / Twitter) ---------
+  if (
+    lower.includes('instagram post') ||
+    lower.includes('linkedin post') ||
+    lower.includes('facebook post') ||
+    lower.includes('twitter post') ||
+    lower.includes('x post') ||
+    lower.includes('social post') ||
+    (lower.includes('post') && (lower.includes('write') || lower.includes('draft')))
+  ) {
+    return `**📲 Social post draft for: "${prompt}"**
+
+**Hook (first line — must earn the scroll-stop):**
+[Bold contrarian statement OR a specific number, e.g. "We saw 1,247 home patients in Mumbai last month. Here's what surprised us."]
+
+**Body (3–5 short lines, one idea per line):**
+• Concrete pain or insight
+• Specific proof / data point
+• What this means for the reader
+
+**CTA (last line):**
+"Book a curex24 home visit → curex24.com" OR a question that drives comments.
+
+**Hashtags (3–5, mix of broad + niche):** #healthcare #doctorathome #mumbaihealth #healthtechindia
+
+**Visual:** square 1:1 (Instagram) / 1.91:1 (LinkedIn) — use the Visual Generator.
+
+**Best post time (India):** Tue/Wed/Thu 09:30 or 19:00 IST.
+
+Tell me the platform + content pillar (Education / Trust / Promo / Behind-the-scenes / Patient story / Doctor story) and I'll write the final copy.`;
+  }
+
+  // ---- WhatsApp / SMS / push -------------------------------------------
+  if (lower.includes('whatsapp') || lower.includes(' sms') || lower.includes('push notification') || lower.includes('push notif')) {
+    const channel = lower.includes('whatsapp') ? 'WhatsApp' : lower.includes('sms') ? 'SMS' : 'Push';
+    return `**💬 ${channel} draft for: "${prompt}"**
+
+**Message (≤160 chars for SMS, ≤200 for ${channel}):**
+"Hi [Name] — your last curex24 visit was [N] days ago. Need a doctor today? Book in 2 min: [shortlink]. Reply STOP to opt out."
+
+**Best practice:**
+• Personalise with first name + last booking detail (real data, never fabricated).
+• Single shortlink with UTM (\`utm_source=${channel.toLowerCase()}&utm_medium=lifecycle\`).
+• Send window: 10:00–19:00 IST. Never on Sunday before 11:00.
+• Frequency cap: 1 message per user per 7 days for non-transactional.
+• Always include opt-out (TRAI / WhatsApp policy compliance).
+
+**Measurement:** delivered → clicked → booked, attribute within 24h click window.
+
+Want a 3-message sequence (day 0 / day 3 / day 7) or a single broadcast?`;
+  }
+
+  // ---- Feature page ----------------------------------------------------
+  if (lower.includes('feature page') || lower.includes('product page')) {
+    return `**🧩 Feature page draft for: "${prompt}"**
+
+**Above the fold:**
+• **H1:** [feature name] — [outcome it delivers]
+• **Subhead:** one line covering who it's for + the headline benefit
+• **Primary CTA:** Book / Try / See pricing
+• **Visual:** product screenshot or lifestyle hero
+
+**Sections:**
+1. **The problem** — 1 short paragraph, name the pain literally
+2. **How [feature] works** — 3-step illustrated breakdown
+3. **What you get** — 4–6 concrete bullets (no marketing fluff)
+4. **Who it's for** — 2–3 ICP cards (with city + use case)
+5. **Proof** — 2 quotes + 1 number (e.g. "Avg ETA: 27 min in Mumbai")
+6. **FAQ** — 5 Qs with FAQPage schema
+7. **Final CTA** — sticky on mobile
+
+**Conversion checklist:** one CTA, ≤3 form fields, page weight <300KB AFT, LCP <2.5s.
+
+Want me to expand any section into final copy?`;
+  }
+
+  return null;
+}
+
+function extractCompetitor(prompt: string): string {
+  // Heuristics: "curex24 vs X comparison page" → X.
+  const vsMatch = prompt.match(/(?:curex24\s*)?vs\.?\s+([A-Za-z0-9][\w\.\-]*(?:\s+[A-Z][\w\.\-]*){0,2})/i);
+  if (vsMatch?.[1]) return vsMatch[1].trim().replace(/\s+(comparison|page|alternatives?|article|landing).*$/i, '').trim();
+  const altMatch = prompt.match(/([A-Za-z0-9][\w\.\-]*)\s+alternatives?/i);
+  if (altMatch?.[1] && altMatch[1].toLowerCase() !== 'curex24') return altMatch[1].trim();
+  return 'the competitor';
+}
+
+function detectAdPlatform(lower: string): string {
+  if (lower.includes('google') || lower.includes('search ad')) return 'Google Ads';
+  if (lower.includes('linkedin')) return 'LinkedIn Ads';
+  if (lower.includes('youtube')) return 'YouTube Ads';
+  if (lower.includes('meta') || lower.includes('facebook') || lower.includes('instagram')) return 'Meta Ads';
+  return 'Ad';
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
 }
 
 const INTRO_MESSAGE: AgentMessage = {
@@ -733,9 +1095,13 @@ function AgentPageInner() {
           content = result.reply;
         } catch (err) {
           // If the LLM is unavailable (no API key, upstream error, etc.) fall
-          // back to the canned response set so the UI stays usable.
+          // back to the intent-aware canned response set so the UI stays
+          // useful. Surface the warning at the TOP of the message so the user
+          // immediately understands why they're seeing a draft instead of a
+          // live AI answer (rather than burying it at the bottom).
           const fallback = getAgentResponse(trimmed);
-          content = `${fallback}\n\n_⚠️ Live AI unavailable: ${describeAiError(err, 'unknown error')}._`;
+          const reason = describeAiError(err, 'unknown error');
+          content = `> ⚠️ **Live AI is currently unavailable** (${reason}). Showing a tailored offline draft below — set \`OPENAI_API_KEY\` on the server to restore full GPT-4o responses.\n\n${fallback}`;
         }
         const agentMsg: AgentMessage = {
           role: 'agent',
