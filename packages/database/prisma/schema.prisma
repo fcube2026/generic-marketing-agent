@@ -10,27 +10,27 @@ datasource db {
 }
 
 model User {
-  id                     String                  @id @default(cuid())
-  phone                  String                  @unique
-  email                  String?                 @unique
-  passwordHash           String?
-  isActive               Boolean                 @default(true)
-  role                   Role                    @default(PATIENT)
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  addresses              Address[]
-  adminActions           AdminAction[]           @relation("AdminActions")
-  auditLogs              AuditLog[]
-  deviceTokens           DeviceToken[]
-  notifications          Notification[]
-  notificationLogs       NotificationLog[]
-  notificationPreference NotificationPreference?
-  otpVerifications       OtpVerification[]
-  patientProfile         PatientProfile?
-  providerProfile        ProviderProfile?
-  questionnaireResponse  QuestionnaireResponse?
-  uploadedPrescriptions  UploadedPrescription[]
-  assignedPrescriptionReviews UploadedPrescription[] @relation("AssignedPrescriptionReviews")
+  id                          String                  @id @default(cuid())
+  phone                       String                  @unique
+  email                       String?                 @unique
+  passwordHash                String?
+  isActive                    Boolean                 @default(true)
+  role                        Role                    @default(PATIENT)
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  addresses                   Address[]
+  adminActions                AdminAction[]           @relation("AdminActions")
+  auditLogs                   AuditLog[]
+  deviceTokens                DeviceToken[]
+  notifications               Notification[]
+  notificationLogs            NotificationLog[]
+  notificationPreference      NotificationPreference?
+  otpVerifications            OtpVerification[]
+  patientProfile              PatientProfile?
+  providerProfile             ProviderProfile?
+  questionnaireResponse       QuestionnaireResponse?
+  uploadedPrescriptions       UploadedPrescription[]
+  assignedPrescriptionReviews UploadedPrescription[]  @relation("AssignedPrescriptionReviews")
 
   @@map("users")
 }
@@ -614,35 +614,35 @@ model PharmacyPartner {
 }
 
 model PharmacyOrder {
-  id                   String              @id @default(cuid())
-  orderNumber          String              @unique
-  patientProfileId     String
-  bookingId            String?
-  prescriptionId       String?
+  id                     String              @id @default(cuid())
+  orderNumber            String              @unique
+  patientProfileId       String
+  bookingId              String?
+  prescriptionId         String?
   uploadedPrescriptionId String?
-  pharmacyPartnerId    String
-  partnerOrderId       String?
-  deliveryAddressId    String
-  prescriptionImageUrl String?
-  subtotal             Float
-  deliveryFee          Float               @default(0)
-  discount             Float               @default(0)
-  totalAmount          Float
-  status               PharmacyOrderStatus @default(PENDING)
-  estimatedDeliveryAt  DateTime?
-  deliveredAt          DateTime?
-  notes                String?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  pharmacyPartnerId      String
+  partnerOrderId         String?
+  deliveryAddressId      String
+  prescriptionImageUrl   String?
+  subtotal               Float
+  deliveryFee            Float               @default(0)
+  discount               Float               @default(0)
+  totalAmount            Float
+  status                 PharmacyOrderStatus @default(PENDING)
+  estimatedDeliveryAt    DateTime?
+  deliveredAt            DateTime?
+  notes                  String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
-  items           PharmacyOrderItem[]
-  statusHistory   PharmacyOrderStatusHistory[]
-  booking         Booking?            @relation(fields: [bookingId], references: [id])
-  deliveryAddress Address             @relation(fields: [deliveryAddressId], references: [id])
-  patientProfile  PatientProfile      @relation(fields: [patientProfileId], references: [id])
-  pharmacyPartner PharmacyPartner     @relation(fields: [pharmacyPartnerId], references: [id])
-  prescription    Prescription?       @relation(fields: [prescriptionId], references: [id])
-  uploadedPrescription UploadedPrescription? @relation(fields: [uploadedPrescriptionId], references: [id])
+  items                PharmacyOrderItem[]
+  statusHistory        PharmacyOrderStatusHistory[]
+  booking              Booking?                     @relation(fields: [bookingId], references: [id])
+  deliveryAddress      Address                      @relation(fields: [deliveryAddressId], references: [id])
+  patientProfile       PatientProfile               @relation(fields: [patientProfileId], references: [id])
+  pharmacyPartner      PharmacyPartner              @relation(fields: [pharmacyPartnerId], references: [id])
+  prescription         Prescription?                @relation(fields: [prescriptionId], references: [id])
+  uploadedPrescription UploadedPrescription?        @relation(fields: [uploadedPrescriptionId], references: [id])
 
   @@index([patientProfileId])
   @@index([pharmacyPartnerId])
@@ -673,10 +673,10 @@ model PharmacyOrderStatusHistory {
   id              String              @id @default(cuid())
   pharmacyOrderId String
   status          PharmacyOrderStatus
-  source          String?             // e.g. "webhook:mock", "webhook:partner-xyz", "manual"
+  source          String? // e.g. "webhook:mock", "webhook:partner-xyz", "manual"
   timestamp       DateTime            @default(now())
 
-  pharmacyOrder   PharmacyOrder       @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
+  pharmacyOrder PharmacyOrder @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
 
   @@unique([pharmacyOrderId, status])
   @@index([pharmacyOrderId])
@@ -782,21 +782,21 @@ enum PrescriptionReviewAction {
 }
 
 model UploadedPrescription {
-  id          String             @id @default(cuid())
-  userId      String
-  filePath    String
-  status      PrescriptionStatus @default(PENDING_REVIEW)
+  id                 String             @id @default(cuid())
+  userId             String
+  filePath           String
+  status             PrescriptionStatus @default(PENDING_REVIEW)
   assignedReviewerId String?
-  assignedAt   DateTime?
-  reviewedBy  String?
-  reviewNotes String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  assignedAt         DateTime?
+  reviewedBy         String?
+  reviewNotes        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignedReviewer User?             @relation("AssignedPrescriptionReviews", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
-  reviewLogs PrescriptionReviewLog[]
-  pharmacyOrders PharmacyOrder[]
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedReviewer User?                   @relation("AssignedPrescriptionReviews", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
+  reviewLogs       PrescriptionReviewLog[]
+  pharmacyOrders   PharmacyOrder[]
 
   @@index([userId])
   @@index([status])
