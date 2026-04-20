@@ -9,6 +9,13 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import api from '../../services/api';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 
+/** Fallback prescription image used when medicinesAdvised exist but no explicit URL */
+const MOCK_PRESCRIPTION_URL =
+  'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80';
+
+/** Cooldown (ms) to prevent double-tap on the CTA button */
+const CTA_COOLDOWN_MS = 1000;
+
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'ConsultationSummary'>;
   route: RouteProp<PatientStackParamList, 'ConsultationSummary'>;
@@ -28,13 +35,13 @@ export const ConsultationSummaryScreen: React.FC<Props> = ({ navigation, route }
 
   // Derive mock prescription / order flags from the summary response
   const prescriptionUrl: string | undefined =
-    summary?.prescriptionUrl ?? (summary?.medicinesAdvised?.length ? 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80' : undefined);
+    summary?.prescriptionUrl ?? (summary?.medicinesAdvised?.length ? MOCK_PRESCRIPTION_URL : undefined);
   const hasOrder: boolean = summary?.hasOrder === true;
   const medicineCount: number = summary?.medicinesAdvised?.length ?? 0;
 
   const handleOrderPress = () => {
     setCtaDisabled(true);
-    setTimeout(() => setCtaDisabled(false), 1000);
+    setTimeout(() => setCtaDisabled(false), CTA_COOLDOWN_MS);
 
     if (hasOrder) {
       // Navigate to order details (mock: use PharmacyOrders list as fallback)
