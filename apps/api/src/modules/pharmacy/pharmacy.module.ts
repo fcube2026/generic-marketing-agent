@@ -12,11 +12,12 @@ import { WebhookRateLimitGuard } from './webhooks/guards/webhook-rate-limit.guar
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrescriptionModule } from '../prescription/prescription.module';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { PharmacyJobModule } from './jobs/pharmacy-job.module';
 
 export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
 
 @Module({
-  imports: [PrescriptionModule],
+  imports: [PrescriptionModule, PharmacyJobModule],
   controllers: [PharmacyController, PharmacyWebhookController],
   providers: [
     MockPharmacyProvider,
@@ -62,6 +63,7 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
     PharmacyWebhookService,
     PharmacyOrderWebhookService,
     MockWebhookSimulatorService,
+    PharmacyJobModule,
   ],
 })
 export class PharmacyModule {}
