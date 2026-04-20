@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsString,
   Min,
-  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -267,6 +266,5 @@ export class UpdatePlanItemDto {
 export class UpsertIntakeResponseDto {
   @IsString() questionId: string;
   // Value is freeform JSON: string | string[] | boolean | number
-  @IsOptional() @IsObject() valueObject?: Record<string, unknown>;
   value: unknown;
 }

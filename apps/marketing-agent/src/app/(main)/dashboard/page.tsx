@@ -95,7 +95,6 @@ export default function DashboardPage() {
     '61-90': { done: 0, total: 0 },
   };
   for (const item of ninetyDayPlan) {
-    if (!phaseProgress[item.phase]) continue;
     phaseProgress[item.phase].total++;
     if (item.done) phaseProgress[item.phase].done++;
   }

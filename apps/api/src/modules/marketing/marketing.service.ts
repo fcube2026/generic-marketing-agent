@@ -602,11 +602,9 @@ export class MarketingService {
     );
     if (cohort.length === 0) return 0;
 
-    const cohortIds = cohort.map((c) => c.patientId);
     let retained = 0;
     for (const c of cohort) {
       const firstAt = c._min.createdAt!;
-      const windowStart = new Date(firstAt.getTime());
       const windowEnd = new Date(
         firstAt.getTime() + windowDays * 24 * 60 * 60 * 1000,
       );
@@ -618,9 +616,6 @@ export class MarketingService {
         },
       });
       if (repeats > 0) retained++;
-      // Acknowledge windowStart/cohortIds usage to keep linter quiet
-      void windowStart;
-      void cohortIds;
     }
     return Math.round((retained / cohort.length) * 100);
   }
