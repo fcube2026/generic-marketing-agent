@@ -5,6 +5,10 @@ import { PharmacyOrderService } from './pharmacy-order.service';
 import { MockPharmacyProvider } from './providers/mock-pharmacy.provider';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
 import { PharmacyWebhookService } from './webhooks/pharmacy-webhook.service';
+import { PharmacyOrderWebhookService } from './webhooks/pharmacy-order-webhook.service';
+import { MockWebhookSimulatorService } from './webhooks/mock-webhook-simulator.service';
+import { PharmacyWebhookController } from './webhooks/pharmacy-webhook.controller';
+import { WebhookRateLimitGuard } from './webhooks/guards/webhook-rate-limit.guard';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrescriptionModule } from '../prescription/prescription.module';
 import { PrescriptionService } from '../prescription/prescription.service';
@@ -13,10 +17,13 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
 
 @Module({
   imports: [PrescriptionModule],
-  controllers: [PharmacyController],
+  controllers: [PharmacyController, PharmacyWebhookController],
   providers: [
     MockPharmacyProvider,
     PharmacyWebhookService,
+    PharmacyOrderWebhookService,
+    MockWebhookSimulatorService,
+    WebhookRateLimitGuard,
     {
       provide: PHARMACY_PROVIDERS_MAP,
       useFactory: (
@@ -49,6 +56,12 @@ export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
       inject: [PrismaService, PHARMACY_PROVIDERS_MAP, PrescriptionService],
     },
   ],
-  exports: [PharmacyService, PharmacyOrderService, PharmacyWebhookService],
+  exports: [
+    PharmacyService,
+    PharmacyOrderService,
+    PharmacyWebhookService,
+    PharmacyOrderWebhookService,
+    MockWebhookSimulatorService,
+  ],
 })
 export class PharmacyModule {}

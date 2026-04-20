@@ -636,6 +636,7 @@ model PharmacyOrder {
   updatedAt            DateTime            @updatedAt
 
   items           PharmacyOrderItem[]
+  statusHistory   PharmacyOrderStatusHistory[]
   booking         Booking?            @relation(fields: [bookingId], references: [id])
   deliveryAddress Address             @relation(fields: [deliveryAddressId], references: [id])
   patientProfile  PatientProfile      @relation(fields: [patientProfileId], references: [id])
@@ -666,6 +667,21 @@ model PharmacyOrderItem {
   pharmacyOrder PharmacyOrder @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
 
   @@map("pharmacy_order_items")
+}
+
+model PharmacyOrderStatusHistory {
+  id              String              @id @default(cuid())
+  pharmacyOrderId String
+  status          PharmacyOrderStatus
+  source          String?             // e.g. "webhook:mock", "webhook:partner-xyz", "manual"
+  timestamp       DateTime            @default(now())
+
+  pharmacyOrder   PharmacyOrder       @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyOrderId, status])
+  @@index([pharmacyOrderId])
+  @@index([timestamp])
+  @@map("pharmacy_order_status_history")
 }
 
 // =======================
