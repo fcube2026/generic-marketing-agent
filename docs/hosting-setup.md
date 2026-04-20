@@ -304,7 +304,7 @@ Set in each environment (`production` / `staging`):
 | `JWT_EXPIRES_IN` | `7d` | `7d` |
 | `ADMIN_EMAIL` | `admin@curex24.com` | `admin@staging.curex24.com` |
 | `ADMIN_PASSWORD` | Strong password | Different password |
-| `CORS_ORIGINS` | `https://curex24.com,https://app.curex24.com,https://admin.curex24.com` | `https://staging.curex24.com,https://admin.staging.curex24.com` |
+| `CORS_ORIGINS` | `https://curex24.com,https://app.curex24.com,https://admin.curex24.com,https://doctor.curex24.com` | `https://staging.curex24.com,https://admin.staging.curex24.com,https://doctor.staging.curex24.com` |
 | `SUPABASE_URL` | Prod Supabase URL | Staging Supabase URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Prod service role key | Staging service role key |
 
@@ -681,7 +681,7 @@ DATABASE_URL="<direct-url>" npx prisma migrate deploy
 - [ ] **Admin access**: `https://admin.curex24.com` loads and login works
 - [ ] **Staging API**: `curl https://api.staging.curex24.com/` returns `{"status":"ok","environment":"staging"}`
 - [ ] **Staging admin**: `https://admin.staging.curex24.com` loads
-- [ ] **CORS**: No CORS errors when admin calls API
+- [ ] **CORS**: No CORS errors when admin or doctor portal calls API
 - [ ] **Mobile staging build**: Installs with "Curex24 Staging" name, connects to staging API
 - [ ] **Environment isolation**: Staging DB has no production data
 - [ ] **Seed data**: Staging has demo patients, providers, bookings

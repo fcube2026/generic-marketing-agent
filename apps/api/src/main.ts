@@ -15,7 +15,25 @@ async function bootstrap() {
   const isWildcard = allowedOrigins.includes('*');
 
   app.enableCors({
-    origin: isWildcard ? '*' : allowedOrigins,
+    origin: isWildcard
+      ? '*'
+      : (
+          origin: string | undefined,
+          callback: (err: Error | null, allow?: boolean) => void,
+        ) => {
+          // Allow requests with no origin (mobile apps, Postman, server-to-server)
+          if (!origin) return callback(null, true);
+          // Allow if explicitly listed in CORS_ORIGINS
+          if (allowedOrigins.includes(origin)) return callback(null, true);
+          // Allow any *.curex24.com subdomain (admin, doctor, app, etc.)
+          if (
+            /^https:\/\/([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*curex24\.com$/i.test(
+              origin,
+            )
+          )
+            return callback(null, true);
+          callback(new Error('Not allowed by CORS'));
+        },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
