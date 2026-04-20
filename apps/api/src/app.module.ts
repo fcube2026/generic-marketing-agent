@@ -28,6 +28,7 @@ import { VideoConsultationModule } from './modules/video-consultation/video-cons
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
 
@@ -65,6 +66,7 @@ import { HealthModule } from './common/health/health.module';
     VideoSessionsModule,
     VideoConsultationModule,
     WebhooksModule,
+    MarketingModule,
   ],
   providers: [BootstrapService],
 })
