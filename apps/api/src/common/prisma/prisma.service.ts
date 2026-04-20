@@ -79,12 +79,15 @@ export class PrismaService
    */
   private async ensureUserColumns(): Promise<void> {
     try {
-      await this.$executeRawUnsafe(`
-        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email" TEXT;
-        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
-        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true;
-      `);
-      // Index creation is separate (can't be inside a multi-statement batch easily)
+      await this.$executeRawUnsafe(
+        'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email" TEXT',
+      );
+      await this.$executeRawUnsafe(
+        'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT',
+      );
+      await this.$executeRawUnsafe(
+        'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true',
+      );
       await this.$executeRawUnsafe(`
         CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "users"("email");
       `);

@@ -35,6 +35,10 @@ export class CreatePharmacyOrderDto {
   @IsString()
   prescriptionId?: string;
 
+  @IsOptional()
+  @IsString()
+  uploadedPrescriptionId?: string;
+
   @IsString()
   partnerId: string;
 

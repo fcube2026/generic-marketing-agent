@@ -1,30 +1,70 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /** Bucket used for all uploaded prescription files. */
-const BUCKET = 'prescriptions';
+const DEFAULT_BUCKET = 'prescriptions';
 
 /** Signed URL expiry in seconds (5 minutes). */
 const SIGNED_URL_EXPIRY_SECONDS = 300;
 
+const BUCKET_FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024;
+const BUCKET_ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+];
+
 @Injectable()
-export class PrescriptionStorageService {
-  private readonly client: SupabaseClient;
+export class PrescriptionStorageService implements OnModuleInit {
+  private readonly client: SupabaseClient | null;
   private readonly logger = new Logger(PrescriptionStorageService.name);
+  private readonly bucketName: string;
+  private readonly signedUrlExpirySeconds: number;
+  private readonly hasValidConfig: boolean;
 
   constructor(private readonly config: ConfigService) {
     const url = this.config.get<string>('SUPABASE_URL', '');
     const serviceKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
+    this.bucketName = this.config.get<string>(
+      'PRESCRIPTION_STORAGE_BUCKET',
+      DEFAULT_BUCKET,
+    );
+    this.signedUrlExpirySeconds = this.config.get<number>(
+      'PRESCRIPTION_SIGNED_URL_EXPIRY_SECONDS',
+      SIGNED_URL_EXPIRY_SECONDS,
+    );
 
     if (!url || !serviceKey) {
       this.logger.warn(
         'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured. ' +
           'Prescription storage operations will fail at runtime.',
       );
+      this.hasValidConfig = false;
+      this.client = null;
+      return;
+    }
+
+    if (!this.isServiceRoleKey(serviceKey)) {
+      this.logger.error(
+        'SUPABASE_SERVICE_ROLE_KEY is not a service-role/secret key. ' +
+          'Use the backend service role key, not the anon or publishable key.',
+      );
+      this.hasValidConfig = false;
+      this.client = null;
+      return;
     }
 
     this.client = createClient(url, serviceKey);
+    this.hasValidConfig = true;
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!this.client || !this.hasValidConfig) {
+      return;
+    }
+
+    await this.ensureBucketConfiguration();
   }
 
   /**
@@ -42,10 +82,11 @@ export class PrescriptionStorageService {
     buffer: Buffer,
     mimetype: string,
   ): Promise<string> {
+    const client = this.getClient();
     const filePath = `${userId}/${prescriptionId}`;
 
-    const { error } = await this.client.storage
-      .from(BUCKET)
+    const { error } = await client.storage
+      .from(this.bucketName)
       .upload(filePath, buffer, {
         contentType: mimetype,
         upsert: false,
@@ -74,9 +115,11 @@ export class PrescriptionStorageService {
    * @returns A time-limited signed download URL.
    */
   async getSignedUrl(filePath: string): Promise<string> {
-    const { data, error } = await this.client.storage
-      .from(BUCKET)
-      .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS);
+    const client = this.getClient();
+
+    const { data, error } = await client.storage
+      .from(this.bucketName)
+      .createSignedUrl(filePath, this.signedUrlExpirySeconds);
 
     if (error || !data?.signedUrl) {
       this.logger.error(
@@ -88,5 +131,126 @@ export class PrescriptionStorageService {
     }
 
     return data.signedUrl;
+  }
+
+  private getClient(): SupabaseClient {
+    if (!this.client || !this.hasValidConfig) {
+      throw new Error(
+        'Prescription storage is not configured. Set SUPABASE_URL and a valid SUPABASE_SERVICE_ROLE_KEY.',
+      );
+    }
+
+    return this.client;
+  }
+
+  private async ensureBucketConfiguration(): Promise<void> {
+    const client = this.getClient();
+
+    const { data: bucket, error: getBucketError } =
+      await client.storage.getBucket(this.bucketName);
+
+    if (getBucketError) {
+      const { error: createBucketError } = await client.storage.createBucket(
+        this.bucketName,
+        {
+          public: false,
+          fileSizeLimit: `${BUCKET_FILE_SIZE_LIMIT_BYTES}`,
+          allowedMimeTypes: BUCKET_ALLOWED_MIME_TYPES,
+        },
+      );
+
+      if (createBucketError) {
+        this.logger.error(
+          `Failed to create prescription bucket ${this.bucketName}: ${createBucketError.message}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `Created private prescription bucket ${this.bucketName} with restricted MIME types and 10 MB limit.`,
+      );
+      return;
+    }
+
+    const bucketNeedsUpdate =
+      bucket.public ||
+      bucket.file_size_limit !== BUCKET_FILE_SIZE_LIMIT_BYTES ||
+      !this.sameMimeTypes(
+        bucket.allowed_mime_types ?? [],
+        BUCKET_ALLOWED_MIME_TYPES,
+      );
+
+    if (!bucketNeedsUpdate) {
+      return;
+    }
+
+    const { error: updateBucketError } = await client.storage.updateBucket(
+      this.bucketName,
+      {
+        public: false,
+        fileSizeLimit: `${BUCKET_FILE_SIZE_LIMIT_BYTES}`,
+        allowedMimeTypes: BUCKET_ALLOWED_MIME_TYPES,
+      },
+    );
+
+    if (updateBucketError) {
+      this.logger.error(
+        `Failed to update prescription bucket ${this.bucketName}: ${updateBucketError.message}`,
+      );
+      return;
+    }
+
+    this.logger.log(
+      `Updated prescription bucket ${this.bucketName} to private access with restricted MIME types and 10 MB limit.`,
+    );
+  }
+
+  private sameMimeTypes(current: string[], expected: string[]): boolean {
+    if (current.length !== expected.length) {
+      return false;
+    }
+
+    const currentSorted = [...current].sort();
+    const expectedSorted = [...expected].sort();
+
+    return currentSorted.every(
+      (value, index) => value === expectedSorted[index],
+    );
+  }
+
+  private isServiceRoleKey(value: string): boolean {
+    if (value.startsWith('sb_secret_')) {
+      return true;
+    }
+
+    if (value.startsWith('sb_publishable_')) {
+      return false;
+    }
+
+    const jwtPayload = this.decodeJwtPayload(value);
+    if (!jwtPayload || typeof jwtPayload !== 'object') {
+      return false;
+    }
+
+    return jwtPayload.role === 'service_role';
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    try {
+      const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized.padEnd(
+        Math.ceil(normalized.length / 4) * 4,
+        '=',
+      );
+      const json = Buffer.from(padded, 'base64').toString('utf8');
+      return JSON.parse(json) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
   }
 }

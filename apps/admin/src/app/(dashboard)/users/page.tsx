@@ -112,6 +112,7 @@ export default function UsersPage() {
 
   const getRoleBadge = (role: string) => {
     if (role === 'ADMIN') return <Badge variant="info">Admin</Badge>;
+    if (role === 'PHARMACIST') return <Badge variant="success">Pharmacist</Badge>;
     if (role === 'MARKETING_AGENT') return <Badge variant="warning">Marketing</Badge>;
     if (role === 'PROVIDER') return <Badge variant="success">Provider</Badge>;
     if (role === 'PATIENT') return <Badge variant="default">Patient</Badge>;
@@ -139,7 +140,7 @@ export default function UsersPage() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
-            <h2 className="text-lg font-bold mb-4">Add New Admin User</h2>
+            <h2 className="text-lg font-bold mb-4">Add New Staff User</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -183,6 +184,7 @@ export default function UsersPage() {
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="ADMIN">Admin</option>
+                  <option value="PHARMACIST">Pharmacist</option>
                   <option value="MARKETING_AGENT">Marketing Agent</option>
                 </select>
               </div>
@@ -272,7 +274,7 @@ export default function UsersPage() {
                     {new Date(user.createdAt).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-4 py-3">
-                    {(user.role === 'ADMIN' || user.role === 'MARKETING_AGENT') && (
+                    {(user.role === 'ADMIN' || user.role === 'PHARMACIST' || user.role === 'MARKETING_AGENT') && (
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleToggleActive(user)}

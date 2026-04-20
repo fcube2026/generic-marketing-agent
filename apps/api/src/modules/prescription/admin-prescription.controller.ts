@@ -9,10 +9,11 @@ import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 import { PrescriptionService } from './prescription.service';
 import { VerifyPrescriptionDto } from './dto/verify-prescription.dto';
 import { PrescriptionQueueQueryDto } from './dto/prescription-queue.dto';
+import { AssignPrescriptionDto } from './dto/assign-prescription.dto';
 
 @ApiTags('admin-pharmacy-prescriptions')
 @ApiBearerAuth()
-@Roles('ADMIN')
+@Roles('ADMIN', 'PHARMACIST')
 @Controller('admin/pharmacy/prescriptions')
 export class AdminPrescriptionController {
   constructor(private readonly prescriptionService: PrescriptionService) {}
@@ -42,6 +43,23 @@ export class AdminPrescriptionController {
     );
   }
 
+  @Get('reviewers')
+  @ApiOperation({ summary: 'Get active prescription reviewers' })
+  getReviewers() {
+    return this.prescriptionService.getReviewers();
+  }
+
+  @Post(':id/assign')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Assign a prescription to a reviewer' })
+  assignReviewer(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: AssignPrescriptionDto,
+  ) {
+    return this.prescriptionService.assignReviewer(id, dto.reviewerId, user.id);
+  }
+
   /**
    * GET /admin/pharmacy/prescriptions/:id
    *
@@ -68,7 +86,7 @@ export class AdminPrescriptionController {
   ) {
     return this.prescriptionService.verifyPrescription(
       id,
-      user.id,
+      { id: user.id, role: user.role },
       dto.action,
       dto.notes,
     );

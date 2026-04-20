@@ -3,9 +3,14 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrescriptionStatus, PrescriptionReviewAction } from '@prisma/client';
+import {
+  PrescriptionStatus,
+  PrescriptionReviewAction,
+  Role,
+} from '@prisma/client';
 import { PrescriptionService } from './prescription.service';
 import { VerifyAction } from './dto/verify-prescription.dto';
+import type { UploadedPrescriptionFile } from './prescription.service';
 
 // ---------------------------------------------------------------------------
 // Mock dependencies
@@ -14,6 +19,7 @@ import { VerifyAction } from './dto/verify-prescription.dto';
 const mockPrisma = {
   uploadedPrescription: {
     create: jest.fn(),
+    findFirst: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
     count: jest.fn(),
@@ -24,6 +30,10 @@ const mockPrisma = {
     create: jest.fn(),
   },
   $transaction: jest.fn(),
+  user: {
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+  },
 } as any;
 
 const mockStorage = {
@@ -31,6 +41,10 @@ const mockStorage = {
   getSignedUrl: jest
     .fn()
     .mockResolvedValue('https://supabase.example.com/signed'),
+} as any;
+
+const mockNotifications = {
+  createNotification: jest.fn().mockResolvedValue({ inAppId: 'notif-1' }),
 } as any;
 
 // ---------------------------------------------------------------------------
@@ -41,8 +55,21 @@ describe('PrescriptionService', () => {
   let service: PrescriptionService;
 
   beforeEach(() => {
-    service = new PrescriptionService(mockPrisma, mockStorage);
+    service = new PrescriptionService(
+      mockPrisma,
+      mockStorage,
+      mockNotifications,
+    );
     jest.clearAllMocks();
+    mockPrisma.user.findMany.mockResolvedValue([
+      {
+        id: 'admin-1',
+        email: 'admin@curex24.com',
+        phone: '+910000000001',
+        role: Role.ADMIN,
+      },
+    ]);
+    mockPrisma.uploadedPrescription.findFirst.mockResolvedValue(null);
   });
 
   // -------------------------------------------------------------------------
@@ -50,7 +77,7 @@ describe('PrescriptionService', () => {
   // -------------------------------------------------------------------------
 
   describe('handleUpload', () => {
-    const validFile: Express.Multer.File = {
+    const validFile: UploadedPrescriptionFile = {
       fieldname: 'file',
       originalname: 'prescription.jpg',
       encoding: '7bit',
@@ -71,6 +98,7 @@ describe('PrescriptionService', () => {
       mockPrisma.uploadedPrescription.update.mockResolvedValue({
         id: 'rx-1',
         filePath: 'user-1/rx-1',
+        assignedReviewerId: 'admin-1',
       });
 
       const result = await service.handleUpload('user-1', validFile);
@@ -92,7 +120,11 @@ describe('PrescriptionService', () => {
       expect(mockPrisma.uploadedPrescription.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'rx-1' },
-          data: { filePath: 'user-1/rx-1' },
+          data: {
+            filePath: 'user-1/rx-1',
+            assignedReviewerId: 'admin-1',
+            assignedAt: expect.any(Date),
+          },
         }),
       );
       expect(result).toHaveProperty('prescriptionId', 'rx-1');
@@ -154,6 +186,39 @@ describe('PrescriptionService', () => {
         where: { id: 'rx-1' },
       });
     });
+
+    it('auto-assigns uploads round-robin across active reviewers', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        {
+          id: 'admin-1',
+          email: 'admin@curex24.com',
+          phone: '+910000000001',
+          role: Role.ADMIN,
+        },
+        {
+          id: 'pharmacist-1',
+          email: 'pharmacist@curex24.com',
+          phone: '+910000000002',
+          role: Role.PHARMACIST,
+        },
+      ]);
+      mockPrisma.uploadedPrescription.findFirst.mockResolvedValue({
+        assignedReviewerId: 'admin-1',
+      });
+      mockPrisma.uploadedPrescription.create.mockResolvedValue({ id: 'rx-7' });
+      mockPrisma.uploadedPrescription.update.mockResolvedValue({ id: 'rx-7' });
+
+      await service.handleUpload('user-1', validFile);
+
+      expect(mockPrisma.uploadedPrescription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rx-7' },
+          data: expect.objectContaining({
+            assignedReviewerId: 'pharmacist-1',
+          }),
+        }),
+      );
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -161,16 +226,21 @@ describe('PrescriptionService', () => {
   // -------------------------------------------------------------------------
 
   describe('verifyPrescription', () => {
+    const adminActor = { id: 'admin-1', role: Role.ADMIN };
+
     const pendingPrescription = {
       id: 'rx-1',
       userId: 'user-1',
       filePath: 'user-1/rx-1',
       status: PrescriptionStatus.PENDING_REVIEW,
+      assignedReviewerId: null,
+      assignedAt: null,
       reviewedBy: null,
       reviewNotes: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       user: { id: 'user-1', phone: '+911234567890', email: null },
+      assignedReviewer: null,
     };
 
     beforeEach(() => {
@@ -193,7 +263,7 @@ describe('PrescriptionService', () => {
     it('approves a pending prescription', async () => {
       const result = await service.verifyPrescription(
         'rx-1',
-        'admin-1',
+        adminActor,
         VerifyAction.APPROVE,
         'All good',
       );
@@ -203,6 +273,8 @@ describe('PrescriptionService', () => {
           where: { id: 'rx-1' },
           data: expect.objectContaining({
             status: PrescriptionStatus.APPROVED,
+            assignedReviewerId: 'admin-1',
+            assignedAt: expect.any(Date),
             reviewedBy: 'admin-1',
             reviewNotes: 'All good',
           }),
@@ -218,6 +290,16 @@ describe('PrescriptionService', () => {
         }),
       );
       expect(result).toBeDefined();
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          type: 'PRESCRIPTION_REVIEW_RESULT',
+          metadata: expect.objectContaining({
+            prescriptionId: 'rx-1',
+            action: VerifyAction.APPROVE,
+          }),
+        }),
+      );
     });
 
     it('rejects a pending prescription', async () => {
@@ -228,7 +310,7 @@ describe('PrescriptionService', () => {
 
       await service.verifyPrescription(
         'rx-1',
-        'admin-1',
+        adminActor,
         VerifyAction.REJECT,
         'Image is blurry',
       );
@@ -250,7 +332,7 @@ describe('PrescriptionService', () => {
 
       await service.verifyPrescription(
         'rx-1',
-        'admin-1',
+        adminActor,
         VerifyAction.REUPLOAD,
       );
 
@@ -270,7 +352,7 @@ describe('PrescriptionService', () => {
       });
 
       await expect(
-        service.verifyPrescription('rx-1', 'admin-1', VerifyAction.APPROVE),
+        service.verifyPrescription('rx-1', adminActor, VerifyAction.APPROVE),
       ).rejects.toThrow(BadRequestException);
 
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
@@ -283,7 +365,7 @@ describe('PrescriptionService', () => {
       });
 
       await expect(
-        service.verifyPrescription('rx-1', 'admin-1', VerifyAction.REJECT),
+        service.verifyPrescription('rx-1', adminActor, VerifyAction.REJECT),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -291,8 +373,94 @@ describe('PrescriptionService', () => {
       mockPrisma.uploadedPrescription.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.verifyPrescription('unknown', 'admin-1', VerifyAction.APPROVE),
+        service.verifyPrescription('unknown', adminActor, VerifyAction.APPROVE),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('prevents pharmacists from reviewing prescriptions assigned to someone else', async () => {
+      mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
+        ...pendingPrescription,
+        assignedReviewerId: 'pharmacist-2',
+      });
+
+      await expect(
+        service.verifyPrescription(
+          'rx-1',
+          { id: 'pharmacist-1', role: Role.PHARMACIST },
+          VerifyAction.APPROVE,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('assignReviewer', () => {
+    it('assigns a pending prescription to an active reviewer', async () => {
+      mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
+        id: 'rx-1',
+        userId: 'user-1',
+        filePath: 'user-1/rx-1',
+        status: PrescriptionStatus.PENDING_REVIEW,
+        assignedReviewerId: null,
+        assignedAt: null,
+        reviewedBy: null,
+        reviewNotes: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: 'user-1', phone: '+911234567890', email: null },
+        assignedReviewer: null,
+      });
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'pharmacist-1',
+        email: 'pharmacist@curex24.com',
+        phone: '+910000000002',
+        role: Role.PHARMACIST,
+      });
+      mockPrisma.uploadedPrescription.update.mockResolvedValue({
+        id: 'rx-1',
+        assignedReviewerId: 'pharmacist-1',
+      });
+
+      await service.assignReviewer('rx-1', 'pharmacist-1', 'admin-1');
+
+      expect(mockPrisma.uploadedPrescription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rx-1' },
+          data: expect.objectContaining({
+            assignedReviewerId: 'pharmacist-1',
+            assignedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('getReviewers', () => {
+    it('returns active admin and pharmacist users for assignment', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        {
+          id: 'admin-1',
+          email: 'admin@curex24.com',
+          phone: '+910000000001',
+          role: Role.ADMIN,
+        },
+        {
+          id: 'pharmacist-1',
+          email: 'pharmacist@curex24.com',
+          phone: '+910000000002',
+          role: Role.PHARMACIST,
+        },
+      ]);
+
+      const reviewers = await service.getReviewers();
+
+      expect(reviewers).toHaveLength(2);
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            role: { in: [Role.ADMIN, Role.PHARMACIST] },
+          }),
+        }),
+      );
     });
   });
 
@@ -304,34 +472,49 @@ describe('PrescriptionService', () => {
     it('passes silently when the prescription is APPROVED', async () => {
       mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
         id: 'rx-1',
+        userId: 'user-1',
         status: PrescriptionStatus.APPROVED,
       });
 
       await expect(
-        service.assertPrescriptionApproved('rx-1'),
+        service.assertPrescriptionApproved('rx-1', 'user-1'),
       ).resolves.toBeUndefined();
     });
 
     it('throws ForbiddenException when prescription is PENDING_REVIEW', async () => {
       mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
         id: 'rx-1',
+        userId: 'user-1',
         status: PrescriptionStatus.PENDING_REVIEW,
       });
 
-      await expect(service.assertPrescriptionApproved('rx-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertPrescriptionApproved('rx-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws ForbiddenException when prescription is REJECTED', async () => {
       mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
         id: 'rx-1',
+        userId: 'user-1',
         status: PrescriptionStatus.REJECTED,
       });
 
-      await expect(service.assertPrescriptionApproved('rx-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertPrescriptionApproved('rx-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when the prescription belongs to another user', async () => {
+      mockPrisma.uploadedPrescription.findUnique.mockResolvedValue({
+        id: 'rx-1',
+        userId: 'other-user',
+        status: PrescriptionStatus.APPROVED,
+      });
+
+      await expect(
+        service.assertPrescriptionApproved('rx-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws NotFoundException for an unknown prescription', async () => {
@@ -354,9 +537,17 @@ describe('PrescriptionService', () => {
         userId: 'user-1',
         filePath: 'user-1/rx-1',
         status: PrescriptionStatus.PENDING_REVIEW,
+        assignedReviewerId: 'admin-1',
+        assignedAt: new Date(Date.now() - 60 * 1000),
         createdAt: new Date(Date.now() - 5 * 60 * 1000),
         updatedAt: new Date(),
         user: { id: 'user-1', phone: '+911234567890', email: null },
+        assignedReviewer: {
+          id: 'admin-1',
+          email: 'admin@curex24.com',
+          phone: '+910000000001',
+          role: Role.ADMIN,
+        },
       };
       mockPrisma.uploadedPrescription.findUnique.mockResolvedValue(rx);
 

@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 import { PrescriptionService } from './prescription.service';
+import type { UploadedPrescriptionFile } from './prescription.service';
 
 @ApiTags('pharmacy-prescriptions')
 @ApiBearerAuth()
@@ -52,7 +53,7 @@ export class PrescriptionController {
   })
   uploadPrescription(
     @CurrentUser() user: any,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedPrescriptionFile,
   ) {
     if (!file) {
       throw new BadRequestException('No file provided.');

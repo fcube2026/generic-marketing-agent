@@ -1,5 +1,8 @@
-import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const SORT_FIELDS = ['createdAt', 'updatedAt'] as const;
+const SORT_ORDERS = ['asc', 'desc'] as const;
 
 export class PrescriptionQueueQueryDto {
   @IsOptional()
@@ -16,10 +19,10 @@ export class PrescriptionQueueQueryDto {
   limit?: number;
 
   @IsOptional()
-  @IsEnum(['createdAt', 'updatedAt'])
+  @IsIn(SORT_FIELDS)
   sortBy?: 'createdAt' | 'updatedAt';
 
   @IsOptional()
-  @IsEnum(['asc', 'desc'])
+  @IsIn(SORT_ORDERS)
   order?: 'asc' | 'desc';
 }

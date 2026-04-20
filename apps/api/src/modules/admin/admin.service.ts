@@ -564,7 +564,7 @@ export class AdminService {
   async getAdminUsers(page = 1, limit = 20, search?: string) {
     const skip = (page - 1) * limit;
     const where: any = {
-      role: { in: ['ADMIN', 'MARKETING_AGENT'] },
+      role: { in: ['ADMIN', 'PHARMACIST', 'MARKETING_AGENT'] },
     };
     if (search) {
       where.OR = [

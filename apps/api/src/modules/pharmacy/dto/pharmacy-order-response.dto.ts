@@ -16,6 +16,7 @@ export class PharmacyOrderResponseDto {
   patientProfileId: string;
   bookingId?: string | null;
   prescriptionId?: string | null;
+  uploadedPrescriptionId?: string | null;
   pharmacyPartnerId: string;
   partnerCode: string;
   partnerName: string;

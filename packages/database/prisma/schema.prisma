@@ -30,6 +30,7 @@ model User {
   providerProfile        ProviderProfile?
   questionnaireResponse  QuestionnaireResponse?
   uploadedPrescriptions  UploadedPrescription[]
+  assignedPrescriptionReviews UploadedPrescription[] @relation("AssignedPrescriptionReviews")
 
   @@map("users")
 }
@@ -537,6 +538,7 @@ enum Role {
   PATIENT
   PROVIDER
   ADMIN
+  PHARMACIST
   MARKETING_AGENT
 }
 
@@ -617,6 +619,7 @@ model PharmacyOrder {
   patientProfileId     String
   bookingId            String?
   prescriptionId       String?
+  uploadedPrescriptionId String?
   pharmacyPartnerId    String
   partnerOrderId       String?
   deliveryAddressId    String
@@ -638,9 +641,11 @@ model PharmacyOrder {
   patientProfile  PatientProfile      @relation(fields: [patientProfileId], references: [id])
   pharmacyPartner PharmacyPartner     @relation(fields: [pharmacyPartnerId], references: [id])
   prescription    Prescription?       @relation(fields: [prescriptionId], references: [id])
+  uploadedPrescription UploadedPrescription? @relation(fields: [uploadedPrescriptionId], references: [id])
 
   @@index([patientProfileId])
   @@index([pharmacyPartnerId])
+  @@index([uploadedPrescriptionId])
   @@index([status])
   @@index([createdAt])
   @@map("pharmacy_orders")
@@ -765,17 +770,22 @@ model UploadedPrescription {
   userId      String
   filePath    String
   status      PrescriptionStatus @default(PENDING_REVIEW)
+  assignedReviewerId String?
+  assignedAt   DateTime?
   reviewedBy  String?
   reviewNotes String?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
   user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedReviewer User?             @relation("AssignedPrescriptionReviews", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
   reviewLogs PrescriptionReviewLog[]
+  pharmacyOrders PharmacyOrder[]
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([assignedReviewerId])
   @@map("uploaded_prescriptions")
 }
 

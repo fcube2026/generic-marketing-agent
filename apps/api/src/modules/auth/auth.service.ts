@@ -151,7 +151,7 @@ export class AuthService {
       const dbUser = await this.prisma.user.findFirst({
         where: {
           email: dto.email,
-          role: { in: [Role.ADMIN, Role.MARKETING_AGENT] },
+          role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
         },
       });
 
