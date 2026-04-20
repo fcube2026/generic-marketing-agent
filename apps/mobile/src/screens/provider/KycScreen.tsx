@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,68 +11,157 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { Colors } from '../../constants/colors';
-import { providerService, NmcVerificationPayload } from '../../services/providerService';
+import {
+  providerService,
+  NmcVerificationPayload,
+  VerificationDocumentsPayload,
+} from '../../services/providerService';
 import { INDIAN_STATE_COUNCILS } from '../../constants/stateCouncils';
 
-type VerificationStatus = 'SUCCESS' | 'APPROVED' | 'NOT_FOUND' | 'ERROR' | 'MANUAL_REVIEW' | 'INCOMPLETE';
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3;
+type StepStatus = 'pending' | 'processing' | 'done' | 'failed';
+
+interface VerificationProgress {
+  nmc: StepStatus;
+  smc: StepStatus;
+  digilocker: StepStatus;
+  documents: StepStatus;
+  face: StepStatus;
+  licenseId?: string;
+}
+
+interface PipelineStep {
+  source: string;
+  found: boolean;
+}
 
 interface VerificationLog {
   id: string;
-  status: VerificationStatus;
+  status: string;
   registrationNumber: string;
   createdAt: string;
+  verificationSource?: string;
   rawResponse?: {
-    issueCode?: number;
     issueLabel?: string;
-    confidenceScore?: number;
-    steps?: Array<{
-      source: string;
-      found: boolean;
-      score: number;
-      details: Record<string, unknown>;
-    }>;
+    steps?: PipelineStep[];
   };
 }
 
-const STATUS_CONFIG: Record<VerificationStatus, { color: string; icon: string; message: string }> = {
-  SUCCESS: { color: Colors.success, icon: '✅', message: 'Verified successfully!' },
-  APPROVED: { color: Colors.success, icon: '✅', message: 'Already verified. Your registration is active.' },
-  NOT_FOUND: { color: Colors.warning, icon: '⚠️', message: 'Registration not found in records.' },
-  ERROR: { color: Colors.error, icon: '❌', message: 'Verification service error. Please try again.' },
-  MANUAL_REVIEW: { color: '#6366F1', icon: '🔍', message: 'Sent for manual review by our team.' },
-  INCOMPLETE: { color: Colors.textMuted, icon: '📝', message: 'Please complete all required fields.' },
+// ─── Step Circle ──────────────────────────────────────────────────────────────
+
+interface StepCircleProps {
+  number: number;
+  label: string;
+  status: StepStatus;
+}
+
+function StepCircle({ number, label, status }: StepCircleProps) {
+  const bgMap: Record<StepStatus, string> = {
+    pending: '#F1F5F9',
+    processing: '#EFF6FF',
+    done: '#DCFCE7',
+    failed: '#FEE2E2',
+  };
+  const borderMap: Record<StepStatus, string> = {
+    pending: '#CBD5E1',
+    processing: '#3B82F6',
+    done: '#22C55E',
+    failed: '#EF4444',
+  };
+  const iconColorMap: Record<StepStatus, string> = {
+    pending: '#94A3B8',
+    processing: '#2563EB',
+    done: '#16A34A',
+    failed: '#DC2626',
+  };
+
+  let iconContent: React.ReactNode;
+  if (status === 'processing') {
+    iconContent = <ActivityIndicator size="small" color={iconColorMap.processing} />;
+  } else {
+    const icon = status === 'done' ? '✓' : status === 'failed' ? '✗' : `${number}`;
+    iconContent = (
+      <Text style={[circleStyles.icon, { color: iconColorMap[status] }]}>{icon}</Text>
+    );
+  }
+
+  return (
+    <View style={circleStyles.wrapper}>
+      <View
+        style={[
+          circleStyles.circle,
+          { backgroundColor: bgMap[status], borderColor: borderMap[status] },
+        ]}
+      >
+        {iconContent}
+      </View>
+      <Text
+        style={[
+          circleStyles.label,
+          (status === 'done' || status === 'failed') && { fontWeight: '600' },
+        ]}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const circleStyles = StyleSheet.create({
+  wrapper: { alignItems: 'center', width: 60 },
+  circle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  icon: { fontSize: 18, fontWeight: '700' },
+  label: { fontSize: 10, color: '#64748B', textAlign: 'center', lineHeight: 14 },
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<string, string> = {
+  NMC_API: 'NMC / Surepass Check',
+  SMC_PORTAL: 'State Medical Council Portal',
+  DIGILOCKER_CONSENT: 'DigiLocker Consent',
+  DOCUMENT_UPLOAD: 'Document Upload (OCR)',
+  FACE: 'Face Verification',
+  PIPELINE: 'Verification Pipeline',
 };
 
-const ISSUE_CODE_COLORS: Record<number, string> = {
-  100: Colors.success,
-  200: '#10B981',
-  300: Colors.warning,
-  400: Colors.error,
-  500: '#6366F1',
-  600: Colors.error,
-  700: Colors.textMuted,
-};
+function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source.replace(/_/g, ' ');
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export const KycScreen: React.FC = () => {
   const queryClient = useQueryClient();
 
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [fullName, setFullName] = useState('');
-  const [fatherName, setFatherName] = useState('');
-  const [nmcRegistrationNumber, setNmcRegistrationNumber] = useState('');
+  const [regNumber, setRegNumber] = useState('');
   const [stateCouncil, setStateCouncil] = useState('');
-  const [yearOfAdmission, setYearOfAdmission] = useState('');
-  const [lastStatus, setLastStatus] = useState<VerificationStatus | null>(null);
-  const [lastIssueCode, setLastIssueCode] = useState<number | null>(null);
-  const [lastConfidenceScore, setLastConfidenceScore] = useState<number | null>(null);
   const [showCouncilPicker, setShowCouncilPicker] = useState(false);
   const [councilSearch, setCouncilSearch] = useState('');
+  const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
 
-  const { data: profile } = useQuery({
-    queryKey: ['provider-profile'],
-    queryFn: providerService.getProfile,
+  const [progress, setProgress] = useState<VerificationProgress>({
+    nmc: 'pending',
+    smc: 'pending',
+    digilocker: 'pending',
+    documents: 'pending',
+    face: 'pending',
   });
 
   const { data: logs = [], isLoading: logsLoading } = useQuery({
@@ -80,426 +169,873 @@ export const KycScreen: React.FC = () => {
     queryFn: providerService.getVerificationLogs,
   });
 
-  const mutation = useMutation({
+  // ── Step 1 → 2 ─────────────────────────────────────────────────────────────
+
+  const handleStep1Next = () => {
+    if (!fullName.trim()) {
+      Alert.alert('Required', 'Please enter your full name.');
+      return;
+    }
+    setWizardStep(2);
+  };
+
+  // ── NMC Mutation ───────────────────────────────────────────────────────────
+
+  const nmcMutation = useMutation({
     mutationFn: (payload: NmcVerificationPayload) =>
       providerService.submitNmcVerification(payload),
-    onSuccess: (data) => {
-      const status: VerificationStatus = data?.status ?? 'ERROR';
-      setLastStatus(status);
-      setLastIssueCode(data?.issueCode ?? null);
-      setLastConfidenceScore(data?.confidenceScore ?? null);
-      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
-      const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.ERROR;
-      const issueLabel = data?.issueLabel ? `\nStatus: ${data.issueLabel}` : '';
-      const scoreMsg = data?.confidenceScore != null ? `\nConfidence: ${data.confidenceScore}%` : '';
-      Alert.alert(`${cfg.icon} Verification Result`, `${cfg.message}${issueLabel}${scoreMsg}`);
+    onMutate: () => {
+      setProgress((p) => ({ ...p, nmc: 'processing', smc: 'pending' }));
     },
-    onError: (error: unknown) => {
-      setLastStatus('ERROR');
-      const httpStatus = axios.isAxiosError(error) ? error.response?.status : undefined;
-      if (httpStatus === 404) {
-        Alert.alert('❌ Profile Not Found', 'Please complete your provider profile before submitting for verification.');
-      } else if (httpStatus === 401) {
-        Alert.alert('❌ Session Expired', 'Your session has expired. Please log in again.');
-      } else {
-        Alert.alert('❌ Error', 'Failed to submit verification request. Please try again.');
-      }
+    onSuccess: (data: any) => {
+      const nmcStep = (data?.steps ?? []).find((s: PipelineStep) => s.source === 'NMC_API');
+      const smcStep = (data?.steps ?? []).find((s: PipelineStep) => s.source === 'SMC_PORTAL');
+      setProgress((p) => ({
+        ...p,
+        nmc: nmcStep?.found ? 'done' : 'failed',
+        smc: smcStep?.found ? 'done' : 'failed',
+        licenseId: data?.license?.id ?? p.licenseId,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
+    },
+    onError: () => {
+      setProgress((p) => ({ ...p, nmc: 'failed', smc: 'failed' }));
     },
   });
 
-  const handleSubmit = () => {
-    if (!fullName.trim()) {
-      Alert.alert('Missing Field', 'Please enter your full name.');
-      return;
-    }
-    if (!nmcRegistrationNumber.trim()) {
-      Alert.alert('Missing Field', 'Please enter your NMC registration number.');
+  const handleStep2Submit = () => {
+    if (!regNumber.trim()) {
+      Alert.alert('Required', 'Please enter your registration number.');
       return;
     }
     if (!stateCouncil) {
-      Alert.alert('Missing Field', 'Please select your State Medical Council.');
+      Alert.alert('Required', 'Please select your State Medical Council.');
       return;
     }
-    if (!yearOfAdmission.trim()) {
-      Alert.alert('Missing Field', 'Please enter your year of admission.');
-      return;
-    }
-    if (!/^\d{4}$/.test(yearOfAdmission.trim())) {
-      Alert.alert('Invalid Year', 'Year of admission must be a 4-digit year (e.g. 2005).');
-      return;
-    }
-    mutation.mutate({
+    setWizardStep(3);
+    nmcMutation.mutate({
       fullName: fullName.trim(),
-      fatherName: fatherName.trim() || undefined,
-      nmcRegistrationNumber: nmcRegistrationNumber.trim(),
+      nmcRegistrationNumber: regNumber.trim(),
       stateCouncil,
-      yearOfAdmission: yearOfAdmission.trim(),
+      yearOfAdmission: new Date().getFullYear().toString(),
     });
   };
+
+  // ── DigiLocker ─────────────────────────────────────────────────────────────
+
+  const digilockerMutation = useMutation({
+    mutationFn: () => providerService.recordDigilockerConsent(progress.licenseId),
+    onMutate: () => setProgress((p) => ({ ...p, digilocker: 'processing' })),
+    onSuccess: () => setProgress((p) => ({ ...p, digilocker: 'done' })),
+    onError: () => setProgress((p) => ({ ...p, digilocker: 'failed' })),
+  });
+
+  const handleDigilockerConsent = () => {
+    Alert.alert(
+      'DigiLocker Consent',
+      'By tapping "I Agree", you authorise Curex24 to fetch your Aadhaar and medical registration documents from DigiLocker for verification.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'I Agree', onPress: () => digilockerMutation.mutate() },
+      ],
+    );
+  };
+
+  // ── Documents ──────────────────────────────────────────────────────────────
+
+  const documentsMutation = useMutation({
+    mutationFn: (payload: VerificationDocumentsPayload) =>
+      providerService.submitVerificationDocuments(payload),
+    onSuccess: () => setProgress((p) => ({ ...p, documents: 'done' })),
+    onError: () => setProgress((p) => ({ ...p, documents: 'failed' })),
+  });
+
+  const pickImage = async (fromCamera: boolean): Promise<string | null> => {
+    if (fromCamera) {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+      if (!result.canceled && result.assets[0]) return result.assets[0].uri;
+    } else {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+      });
+      if (!result.canceled && result.assets[0]) return result.assets[0].uri;
+    }
+    return null;
+  };
+
+  const promptImageSource = (title: string, onPick: (uri: string) => void) => {
+    Alert.alert(title, 'How would you like to provide this document?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const uri = await pickImage(true);
+          if (uri) onPick(uri);
+        },
+      },
+      {
+        text: 'Choose from Gallery',
+        onPress: async () => {
+          const uri = await pickImage(false);
+          if (uri) onPick(uri);
+        },
+      },
+    ]);
+  };
+
+  const handleDocumentUpload = useCallback(async () => {
+    const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (libPerm.status !== 'granted' && camPerm.status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Camera or photo library access is needed to upload your verification documents. Please enable it in Settings.',
+      );
+      return;
+    }
+
+    promptImageSource('Aadhaar Card (1 of 2)', (aadhaarUri) => {
+      promptImageSource('Medical Certificate (2 of 2)', (certUri) => {
+        setProgress((p) => ({ ...p, documents: 'processing' }));
+        documentsMutation.mutate({
+          aadhaarDocumentUrl: aadhaarUri,
+          medicalCertificateUrl: certUri,
+          licenseId: progress.licenseId,
+        });
+      });
+    });
+  }, [progress.licenseId]);
+
+  // ── Face Verification ──────────────────────────────────────────────────────
+
+  const faceMutation = useMutation({
+    mutationFn: (base64: string) =>
+      providerService.submitFaceVerification({ liveFaceData: base64 }),
+    onSuccess: () => setProgress((p) => ({ ...p, face: 'done' })),
+    onError: () => setProgress((p) => ({ ...p, face: 'failed' })),
+  });
+
+  const handleFaceCapture = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Camera Permission Required',
+        'Camera access is needed to capture your face for identity verification. Please enable it in Settings.',
+      );
+      return;
+    }
+    Alert.alert(
+      'Face Verification',
+      'Ensure you are in a well-lit area. Look directly at the camera and take a clear selfie.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Take Selfie',
+          onPress: async () => {
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.7,
+              allowsEditing: true,
+              aspect: [1, 1],
+              cameraType: ImagePicker.CameraType.front,
+              base64: true,
+            });
+            if (!result.canceled && result.assets[0]?.base64) {
+              setProgress((p) => ({ ...p, face: 'processing' }));
+              faceMutation.mutate(`data:image/jpeg;base64,${result.assets[0].base64}`);
+            }
+          },
+        },
+      ],
+    );
+  }, []);
+
+  // ── Derived state ──────────────────────────────────────────────────────────
 
   const filteredCouncils = INDIAN_STATE_COUNCILS.filter((c) =>
     c.toLowerCase().includes(councilSearch.toLowerCase()),
   );
 
-  const isVerified = profile?.isVerified ?? false;
-  const bannerStatus = lastStatus ?? (isVerified ? 'SUCCESS' : null);
-  const bannerCfg = bannerStatus ? STATUS_CONFIG[bannerStatus] : null;
+  const isAutomatedDone =
+    progress.nmc !== 'pending' && progress.nmc !== 'processing';
+
+  const allStepsDone =
+    progress.digilocker === 'done' &&
+    progress.documents === 'done' &&
+    progress.face === 'done';
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <View style={styles.root}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>KYC & Verification</Text>
-        <Text style={styles.headerSub}>Verify your medical registration with India's councils</Text>
-      </View>
-
-      {/* Status banner */}
-      {bannerCfg && (
-        <View style={[styles.statusBanner, { backgroundColor: bannerCfg.color }]}>
-          <Text style={styles.statusText}>
-            {isVerified && !lastStatus ? '✅ Account Verified' : `${bannerCfg.icon} ${bannerCfg.message}`}
-          </Text>
-          {lastIssueCode != null && (
-            <View style={[styles.issueCodeBadge, { backgroundColor: ISSUE_CODE_COLORS[lastIssueCode] ?? '#6B7280' }]}>
-              <Text style={styles.issueCodeText}>Code {lastIssueCode}</Text>
-            </View>
-          )}
-          {lastConfidenceScore != null && (
-            <Text style={styles.confidenceText}>Confidence: {lastConfidenceScore}%</Text>
-          )}
+        {wizardStep > 1 && (
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => setWizardStep((s) => (s - 1) as WizardStep)}
+            disabled={wizardStep === 3 && nmcMutation.isPending}
+          >
+            <Text style={styles.backBtnText}>{'← Back'}</Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>KYC Verification</Text>
+          <Text style={styles.headerSub}>Step {wizardStep} of 3</Text>
         </View>
-      )}
-
-      {/* Form */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Doctor Details</Text>
-
-        <Text style={styles.label}>
-          Full Name <Text style={styles.required}>*</Text>
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. Dr. Priya Sharma"
-          placeholderTextColor={Colors.textMuted}
-          value={fullName}
-          onChangeText={setFullName}
-          autoCapitalize="words"
-        />
-
-        <Text style={styles.label}>Father's Name <Text style={styles.optional}>(optional)</Text></Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. Rajesh Sharma"
-          placeholderTextColor={Colors.textMuted}
-          value={fatherName}
-          onChangeText={setFatherName}
-          autoCapitalize="words"
-        />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>NMC Registration Details</Text>
-
-        <Text style={styles.label}>
-          NMC Registration Number <Text style={styles.required}>*</Text>
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. MH-12345"
-          placeholderTextColor={Colors.textMuted}
-          value={nmcRegistrationNumber}
-          onChangeText={setNmcRegistrationNumber}
-          autoCapitalize="characters"
-        />
-
-        <Text style={styles.label}>
-          State Medical Council <Text style={styles.required}>*</Text>
-        </Text>
-        <TouchableOpacity
-          style={[styles.input, styles.pickerBtn]}
-          onPress={() => { setCouncilSearch(''); setShowCouncilPicker(true); }}
-        >
-          <Text style={stateCouncil ? styles.pickerValueText : styles.pickerPlaceholder}>
-            {stateCouncil || 'Select your State Medical Council'}
-          </Text>
-          <Text style={styles.pickerChevron}>▼</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>
-          Year of Admission <Text style={styles.required}>*</Text>
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. 2005"
-          placeholderTextColor={Colors.textMuted}
-          value={yearOfAdmission}
-          onChangeText={setYearOfAdmission}
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-      </View>
-
-      {/* Verification steps info */}
-      <View style={styles.stepsCard}>
-        <Text style={styles.stepsTitle}>🔒 Verification Pipeline</Text>
-        <Text style={styles.stepsSubtitle}>Your registration will be checked through:</Text>
-        {[
-          { icon: '1️⃣', label: 'NMC / Surepass API check', weight: '35 pts' },
-          { icon: '2️⃣', label: 'State Medical Council portal', weight: '30 pts' },
-          { icon: '3️⃣', label: 'DigiLocker documents', weight: '15 pts' },
-          { icon: '4️⃣', label: 'OCR document parsing', weight: '10 pts' },
-          { icon: '5️⃣', label: 'Face verification', weight: '10 pts' },
-        ].map((step) => (
-          <View key={step.label} style={styles.stepRow}>
-            <Text style={styles.stepIcon}>{step.icon}</Text>
-            <Text style={styles.stepLabel}>{step.label}</Text>
-            <Text style={styles.stepWeight}>{step.weight}</Text>
-          </View>
+      {/* Step dots */}
+      <View style={styles.dotsRow}>
+        {[1, 2, 3].map((s) => (
+          <View
+            key={s}
+            style={[
+              styles.dot,
+              wizardStep === s && styles.dotActive,
+              wizardStep > s && styles.dotDone,
+            ]}
+          />
         ))}
       </View>
 
-      <TouchableOpacity
-        style={[styles.submitBtn, mutation.isPending && styles.submitBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={mutation.isPending}
-      >
-        {mutation.isPending ? (
-          <ActivityIndicator color={Colors.white} />
-        ) : (
-          <Text style={styles.submitBtnText}>Submit for Verification</Text>
-        )}
-      </TouchableOpacity>
+      <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
 
-      {/* Verification history */}
-      <View style={styles.logsSection}>
-        <Text style={styles.logsSectionTitle}>Verification History</Text>
-        {logsLoading ? (
-          <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />
-        ) : (logs as VerificationLog[]).length === 0 ? (
-          <Text style={styles.noLogsText}>No verification attempts yet.</Text>
-        ) : (
-          (logs as VerificationLog[]).map((log) => {
-            const cfg = STATUS_CONFIG[log.status as VerificationStatus] ?? STATUS_CONFIG.ERROR;
-            const issueCode = log.rawResponse?.issueCode;
-            const score = log.rawResponse?.confidenceScore;
-            const steps = log.rawResponse?.steps ?? [];
-            return (
-              <View key={log.id} style={[styles.logItem, { borderLeftColor: cfg.color }]}>
-                <View style={styles.logHeader}>
-                  <Text style={styles.logStatus}>
-                    {cfg.icon} {log.status}
-                  </Text>
-                  {issueCode != null && (
-                    <View style={[styles.issueCodeSmall, { backgroundColor: ISSUE_CODE_COLORS[issueCode] ?? '#6B7280' }]}>
-                      <Text style={styles.issueCodeSmallText}>Code {issueCode}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.logDetail}>Reg: {log.registrationNumber}</Text>
-                {log.rawResponse?.issueLabel && (
-                  <Text style={styles.logIssueLabel}>{log.rawResponse.issueLabel}</Text>
-                )}
-                {score != null && (
-                  <View style={styles.scoreBar}>
-                    <View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: score >= 90 ? Colors.success : score >= 50 ? Colors.warning : Colors.error }]} />
-                    <Text style={styles.scoreBarText}>{score}% confidence</Text>
-                  </View>
-                )}
-                {steps.length > 0 && (
-                  <View style={styles.stepsBreakdown}>
-                    {steps.map((s) => (
-                      <Text key={s.source} style={styles.stepBreakdownText}>
-                        {s.found ? '✅' : '❌'} {s.source.replace(/_/g, ' ')} (+{s.score})
-                      </Text>
-                    ))}
-                  </View>
-                )}
-                <Text style={styles.logDate}>
-                  {new Date(log.createdAt).toLocaleDateString('en-IN', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+        {/* ════ STEP 1 — Full Name ════ */}
+        {wizardStep === 1 && (
+          <View style={styles.stepBox}>
+            <Text style={styles.stepTitle}>What is your full name?</Text>
+            <Text style={styles.stepDesc}>
+              Enter your name exactly as it appears on your medical registration.
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Dr. Priya Sharma"
+              placeholderTextColor={Colors.textMuted}
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+              autoFocus
+              returnKeyType="next"
+              onSubmitEditing={handleStep1Next}
+            />
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleStep1Next}>
+              <Text style={styles.primaryBtnText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ════ STEP 2 — Registration + Council ════ */}
+        {wizardStep === 2 && (
+          <View style={styles.stepBox}>
+            <Text style={styles.stepTitle}>Registration Details</Text>
+            <Text style={styles.stepDesc}>
+              Enter your medical registration number and select your State Medical Council.
+            </Text>
+
+            <Text style={styles.label}>
+              Registration Number <Text style={styles.req}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. MH-12345"
+              placeholderTextColor={Colors.textMuted}
+              value={regNumber}
+              onChangeText={setRegNumber}
+              autoCapitalize="characters"
+              returnKeyType="next"
+            />
+
+            <Text style={styles.label}>
+              State Medical Council <Text style={styles.req}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={[styles.input, styles.pickerBtn]}
+              onPress={() => {
+                setCouncilSearch('');
+                setShowCouncilPicker(true);
+              }}
+            >
+              <Text style={stateCouncil ? styles.pickerValue : styles.pickerPlaceholder}>
+                {stateCouncil || 'Select your State Medical Council'}
+              </Text>
+              <Text style={styles.chevron}>{'▼'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                nmcMutation.isPending && styles.primaryBtnDisabled,
+              ]}
+              onPress={handleStep2Submit}
+              disabled={nmcMutation.isPending}
+            >
+              <Text style={styles.primaryBtnText}>Start Verification</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ════ STEP 3 — Progress & Actions ════ */}
+        {wizardStep === 3 && (
+          <View style={styles.stepBox}>
+            <Text style={styles.stepTitle}>Verification Progress</Text>
+            <Text style={styles.stepDesc}>
+              Complete each step below. Your profile will go to admin review once all steps are done.
+            </Text>
+
+            {/* Progress circles */}
+            <View style={styles.circlesRow}>
+              {(
+                [
+                  { key: 'nmc' as keyof VerificationProgress, label: 'NMC\nCheck' },
+                  { key: 'smc' as keyof VerificationProgress, label: 'SMC\nPortal' },
+                  { key: 'digilocker' as keyof VerificationProgress, label: 'DigiLocker' },
+                  { key: 'documents' as keyof VerificationProgress, label: 'Documents' },
+                  { key: 'face' as keyof VerificationProgress, label: 'Face\nCheck' },
+                ]
+              ).map((item, index) => (
+                <React.Fragment key={String(item.key)}>
+                  <StepCircle
+                    number={index + 1}
+                    label={item.label}
+                    status={progress[item.key] as StepStatus}
+                  />
+                  {index < 4 && <View style={styles.circleLine} />}
+                </React.Fragment>
+              ))}
+            </View>
+
+            {/* Admin approval badge */}
+            <View style={styles.adminBadge}>
+              <Text style={styles.adminBadgeText}>{'🔒  Pending Admin Approval'}</Text>
+            </View>
+
+            {/* Automated check — loading */}
+            {progress.nmc === 'processing' && (
+              <View style={styles.card}>
+                <ActivityIndicator color={Colors.primary} style={{ marginBottom: 10 }} />
+                <Text style={styles.cardTitle}>Checking your registration…</Text>
+                <Text style={styles.cardDesc}>
+                  Verifying with NMC and State Medical Council. This takes a few seconds.
                 </Text>
               </View>
-            );
-          })
-        )}
-      </View>
+            )}
 
-      <View style={{ height: 40 }} />
-
-      {/* State Council Picker Modal */}
-      <Modal
-        visible={showCouncilPicker}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowCouncilPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select State Medical Council</Text>
-              <TouchableOpacity onPress={() => setShowCouncilPicker(false)}>
-                <Text style={styles.modalClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search council..."
-              placeholderTextColor={Colors.textMuted}
-              value={councilSearch}
-              onChangeText={setCouncilSearch}
-              autoFocus
-            />
-            <FlatList
-              data={filteredCouncils}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.councilOption, stateCouncil === item && styles.councilOptionSelected]}
-                  onPress={() => { setStateCouncil(item); setShowCouncilPicker(false); }}
+            {/* Automated check — results */}
+            {isAutomatedDone && (
+              <>
+                <View
+                  style={[
+                    styles.card,
+                    styles.resultCard,
+                    {
+                      borderLeftColor:
+                        progress.nmc === 'done' ? '#22C55E' : '#EF4444',
+                    },
+                  ]}
                 >
-                  <Text style={[styles.councilOptionText, stateCouncil === item && styles.councilOptionTextSelected]}>
-                    {item}
+                  <Text style={styles.resultIcon}>
+                    {progress.nmc === 'done' ? '✅' : '❌'}
                   </Text>
-                  {stateCouncil === item && <Text style={styles.checkmark}>✓</Text>}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>NMC Verification</Text>
+                    <Text style={styles.cardDesc}>
+                      {progress.nmc === 'done'
+                        ? 'Found in National Medical Commission records.'
+                        : 'Not found in NMC records. Our admin team will review manually.'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.card,
+                    styles.resultCard,
+                    {
+                      borderLeftColor:
+                        progress.smc === 'done' ? '#22C55E' : '#EF4444',
+                    },
+                  ]}
+                >
+                  <Text style={styles.resultIcon}>
+                    {progress.smc === 'done' ? '✅' : '❌'}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>State Medical Council</Text>
+                    <Text style={styles.cardDesc}>
+                      {progress.smc === 'done'
+                        ? `Verified on ${stateCouncil}.`
+                        : 'Not found on the State Medical Council portal. Admin will review.'}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* DigiLocker */}
+            {isAutomatedDone && progress.digilocker !== 'done' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>{'🔐 DigiLocker Consent'}</Text>
+                <Text style={styles.cardDesc}>
+                  Allow Curex24 to securely fetch your Aadhaar and medical certificate from
+                  DigiLocker to speed up verification.
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    digilockerMutation.isPending && styles.actionBtnDisabled,
+                  ]}
+                  onPress={handleDigilockerConsent}
+                  disabled={digilockerMutation.isPending}
+                >
+                  {digilockerMutation.isPending ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <Text style={styles.actionBtnText}>Give Consent</Text>
+                  )}
                 </TouchableOpacity>
-              )}
-              style={styles.councilList}
-              keyboardShouldPersistTaps="handled"
-            />
+              </View>
+            )}
+            {progress.digilocker === 'done' && (
+              <View style={[styles.card, styles.doneCard]}>
+                <Text style={styles.doneCardText}>{'✅  DigiLocker consent recorded'}</Text>
+              </View>
+            )}
+
+            {/* Document Upload */}
+            {isAutomatedDone && progress.documents !== 'done' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>{'📄 Upload Documents'}</Text>
+                <Text style={styles.cardDesc}>
+                  Capture or upload your Aadhaar card and Medical Registration Certificate.
+                  Our OCR system will extract and validate the details.
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    documentsMutation.isPending && styles.actionBtnDisabled,
+                  ]}
+                  onPress={handleDocumentUpload}
+                  disabled={documentsMutation.isPending}
+                >
+                  {documentsMutation.isPending ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <Text style={styles.actionBtnText}>{'📷  Upload Documents'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+            {progress.documents === 'done' && (
+              <View style={[styles.card, styles.doneCard]}>
+                <Text style={styles.doneCardText}>{'✅  Documents uploaded successfully'}</Text>
+              </View>
+            )}
+
+            {/* Face Verification */}
+            {isAutomatedDone && progress.face !== 'done' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>{'🤳 Face Verification'}</Text>
+                <Text style={styles.cardDesc}>
+                  Take a clear selfie in a well-lit area to verify your identity. Look
+                  directly at the camera.
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    faceMutation.isPending && styles.actionBtnDisabled,
+                  ]}
+                  onPress={handleFaceCapture}
+                  disabled={faceMutation.isPending}
+                >
+                  {faceMutation.isPending ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <Text style={styles.actionBtnText}>{'📸  Take Selfie'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+            {progress.face === 'done' && (
+              <View style={[styles.card, styles.doneCard]}>
+                <Text style={styles.doneCardText}>{'✅  Face verification complete'}</Text>
+              </View>
+            )}
+
+            {/* All complete */}
+            {allStepsDone && (
+              <View style={[styles.card, styles.allDoneCard]}>
+                <Text style={styles.allDoneTitle}>{'🎉 All steps completed!'}</Text>
+                <Text style={styles.allDoneDesc}>
+                  Your profile is now under admin review. You will be notified once approved.
+                </Text>
+              </View>
+            )}
           </View>
+        )}
+
+        {/* ════ Verification History ════ */}
+        <View style={styles.historySection}>
+          <Text style={styles.historySectionTitle}>Verification History</Text>
+          {logsLoading ? (
+            <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />
+          ) : (logs as VerificationLog[]).length === 0 ? (
+            <Text style={styles.noLogsText}>No verification attempts yet.</Text>
+          ) : (
+            (logs as VerificationLog[]).map((log) => (
+              <TouchableOpacity
+                key={log.id}
+                style={styles.logItem}
+                onPress={() => setSelectedLog(log)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.logRow}>
+                  <Text style={styles.logSource} numberOfLines={1}>
+                    {sourceLabel(log.verificationSource ?? log.status)}
+                  </Text>
+                  <Text style={styles.logDate}>
+                    {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
+                {log.rawResponse?.issueLabel && (
+                  <Text style={styles.logStatus}>
+                    {log.rawResponse.issueLabel === 'Pending Admin Approval'
+                      ? '🔒 Awaiting admin review'
+                      : `⚠️ ${log.rawResponse.issueLabel}`}
+                  </Text>
+                )}
+                <Text style={styles.logHint}>{'Tap to view details →'}</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
-      </Modal>
-    </ScrollView>
+
+        <View style={{ height: 40 }} />
+
+        {/* ── Council Picker Modal ── */}
+        <Modal
+          visible={showCouncilPicker}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowCouncilPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select State Medical Council</Text>
+                <TouchableOpacity onPress={() => setShowCouncilPicker(false)}>
+                  <Text style={styles.modalClose}>{'✕'}</Text>
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search council..."
+                placeholderTextColor={Colors.textMuted}
+                value={councilSearch}
+                onChangeText={setCouncilSearch}
+                autoFocus
+              />
+              <FlatList
+                data={filteredCouncils}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.councilItem,
+                      stateCouncil === item && styles.councilItemSelected,
+                    ]}
+                    onPress={() => {
+                      setStateCouncil(item);
+                      setShowCouncilPicker(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.councilItemText,
+                        stateCouncil === item && styles.councilItemTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                    {stateCouncil === item && (
+                      <Text style={styles.checkmark}>{'✓'}</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+                style={{ maxHeight: 400 }}
+                keyboardShouldPersistTaps="handled"
+              />
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── Log Detail Modal ── */}
+        <Modal
+          visible={!!selectedLog}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setSelectedLog(null)}
+        >
+          {selectedLog && (
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContainer, { maxHeight: '85%' }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Verification Detail</Text>
+                  <TouchableOpacity onPress={() => setSelectedLog(null)}>
+                    <Text style={styles.modalClose}>{'✕'}</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ padding: 16 }}>
+                  <Text style={styles.detailDate}>
+                    {new Date(selectedLog.createdAt).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                  <Text style={styles.detailReg}>
+                    Registration: {selectedLog.registrationNumber}
+                  </Text>
+
+                  <Text style={styles.detailSectionTitle}>Step Status</Text>
+
+                  {(selectedLog.rawResponse?.steps ?? []).length > 0 ? (
+                    (selectedLog.rawResponse?.steps ?? []).map((step) => (
+                      <View key={step.source} style={styles.detailStep}>
+                        <View
+                          style={[
+                            styles.detailCircle,
+                            {
+                              backgroundColor: step.found ? '#DCFCE7' : '#FEE2E2',
+                            },
+                          ]}
+                        >
+                          <Text style={{ fontSize: 14 }}>
+                            {step.found ? '✓' : '✗'}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.detailStepLabel}>
+                            {sourceLabel(step.source)}
+                          </Text>
+                          <Text style={styles.detailStepStatus}>
+                            {step.found ? 'Verified' : 'Not found / Failed'}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <View style={styles.detailStep}>
+                      <View style={[styles.detailCircle, { backgroundColor: '#FEF3C7' }]}>
+                        <Text style={{ fontSize: 14 }}>{'⟳'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.detailStepLabel}>
+                          {sourceLabel(
+                            selectedLog.verificationSource ?? selectedLog.status,
+                          )}
+                        </Text>
+                        <Text style={styles.detailStepStatus}>
+                          {selectedLog.rawResponse?.issueLabel ?? 'Processing'}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {selectedLog.rawResponse?.issueLabel && (
+                    <View style={styles.stuckBanner}>
+                      <Text style={styles.stuckBannerText}>
+                        {selectedLog.rawResponse.issueLabel === 'Pending Admin Approval'
+                          ? '🔒 All checks done — waiting for admin approval'
+                          : `⚠️ Stuck at: ${selectedLog.rawResponse.issueLabel}`}
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </Modal>
+      </ScrollView>
+    </View>
   );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, padding: 20, paddingTop: 24 },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.white },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  statusBanner: { margin: 16, borderRadius: 10, padding: 14, alignItems: 'center', gap: 6 },
-  statusText: { fontSize: 15, fontWeight: '700', color: Colors.white, textAlign: 'center' },
-  issueCodeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+  root: { flex: 1, backgroundColor: Colors.background },
+
+  header: {
+    backgroundColor: Colors.primary,
+    paddingTop: 24,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  issueCodeText: { fontSize: 12, fontWeight: '700', color: Colors.white },
-  confidenceText: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
-  section: {
-    backgroundColor: Colors.white,
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+  backBtn: { paddingRight: 12 },
+  backBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
+  headerCenter: { flex: 1 },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: Colors.white },
+  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    backgroundColor: Colors.primary,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 16 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.3)' },
+  dotActive: { backgroundColor: Colors.white, width: 24 },
+  dotDone: { backgroundColor: 'rgba(255,255,255,0.65)' },
+
+  scroll: { flex: 1 },
+  stepBox: { padding: 20 },
+  stepTitle: { fontSize: 22, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  stepDesc: { fontSize: 14, color: Colors.textMuted, marginBottom: 24, lineHeight: 20 },
+
   label: { fontSize: 13, fontWeight: '600', color: Colors.text, marginBottom: 6 },
-  required: { color: Colors.error, fontWeight: '700' },
-  optional: { color: Colors.textMuted, fontWeight: '400', fontSize: 12 },
+  req: { color: Colors.error },
   input: {
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: Colors.text,
-    backgroundColor: '#F8FAFC',
-    marginBottom: 14,
-  },
-  pickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  pickerPlaceholder: { color: Colors.textMuted, fontSize: 15, flex: 1 },
-  pickerValueText: { color: Colors.text, fontSize: 15, flex: 1 },
-  pickerChevron: { color: Colors.textMuted, fontSize: 12, marginLeft: 8 },
-  stepsCard: {
-    backgroundColor: '#EFF6FF',
-    margin: 16,
-    marginTop: 12,
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
+    fontSize: 15,
+    color: Colors.text,
+    backgroundColor: Colors.white,
+    marginBottom: 16,
   },
-  stepsTitle: { fontSize: 14, fontWeight: '700', color: '#1E40AF', marginBottom: 4 },
-  stepsSubtitle: { fontSize: 12, color: '#3B82F6', marginBottom: 10 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  stepIcon: { fontSize: 14, width: 28 },
-  stepLabel: { flex: 1, fontSize: 13, color: '#1E3A5F' },
-  stepWeight: { fontSize: 12, fontWeight: '700', color: '#1E40AF' },
-  submitBtn: {
+  pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pickerPlaceholder: { color: Colors.textMuted, fontSize: 15, flex: 1 },
+  pickerValue: { color: Colors.text, fontSize: 15, flex: 1 },
+  chevron: { color: Colors.textMuted, fontSize: 12, marginLeft: 8 },
+
+  primaryBtn: {
     backgroundColor: Colors.primary,
-    marginHorizontal: 16,
-    marginTop: 16,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    marginTop: 8,
   },
-  submitBtnDisabled: { backgroundColor: Colors.textMuted },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
-  logsSection: { margin: 16, marginTop: 24 },
-  logsSectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 12 },
-  noLogsText: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 8 },
-  logItem: {
+  primaryBtnDisabled: { backgroundColor: Colors.textMuted },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
+
+  circlesRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  circleLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginBottom: 22,
+    marginHorizontal: 2,
+  },
+  adminBadge: {
+    alignSelf: 'center',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  adminBadgeText: { fontSize: 13, fontWeight: '600', color: '#4F46E5' },
+
+  card: {
     backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  resultCard: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, gap: 12 },
+  resultIcon: { fontSize: 24 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 6 },
+  cardDesc: { fontSize: 13, color: Colors.textMuted, marginBottom: 14, lineHeight: 18 },
+  actionBtn: {
+    backgroundColor: Colors.primary,
     borderRadius: 10,
     padding: 12,
+    alignItems: 'center',
+  },
+  actionBtnDisabled: { backgroundColor: Colors.textMuted },
+  actionBtnText: { fontSize: 14, fontWeight: '700', color: Colors.white },
+  doneCard: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#86EFAC' },
+  doneCardText: { fontSize: 14, fontWeight: '600', color: '#16A34A', textAlign: 'center' },
+  allDoneCard: { backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#22C55E' },
+  allDoneTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#16A34A',
+    textAlign: 'center',
+  },
+  allDoneDesc: { fontSize: 13, color: '#166534', textAlign: 'center', marginTop: 6 },
+
+  historySection: { paddingHorizontal: 16, marginTop: 8 },
+  historySectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  noLogsText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  logItem: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 10,
-    borderLeftWidth: 4,
     elevation: 1,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
-  logHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  logStatus: { fontSize: 14, fontWeight: '700', color: Colors.text, flex: 1 },
-  issueCodeSmall: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  issueCodeSmallText: { fontSize: 11, fontWeight: '700', color: Colors.white },
-  logDetail: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  logIssueLabel: { fontSize: 12, color: Colors.text, marginTop: 3, fontStyle: 'italic' },
-  scoreBar: {
-    height: 18,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 9,
-    marginTop: 8,
-    overflow: 'hidden',
-    justifyContent: 'center',
+  logRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  scoreBarFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 9,
-    opacity: 0.7,
-  },
-  scoreBarText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.text,
-    textAlign: 'center',
-    zIndex: 1,
-  },
-  stepsBreakdown: { marginTop: 6 },
-  stepBreakdownText: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  logDate: { fontSize: 11, color: Colors.textMuted, marginTop: 6 },
-  // Modal styles
+  logSource: { fontSize: 13, fontWeight: '700', color: Colors.text, flex: 1 },
+  logDate: { fontSize: 11, color: Colors.textMuted, marginLeft: 8 },
+  logReg: { fontSize: 12, color: Colors.textMuted },
+  logStatus: { fontSize: 12, color: '#D97706', marginTop: 4, fontWeight: '600' },
+  logHint: { fontSize: 11, color: Colors.primary, marginTop: 6, fontStyle: 'italic' },
+
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -528,8 +1064,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     backgroundColor: '#F8FAFC',
   },
-  councilList: { maxHeight: 400 },
-  councilOption: {
+  councilItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -537,8 +1072,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
-  councilOptionSelected: { backgroundColor: '#EFF6FF' },
-  councilOptionText: { flex: 1, fontSize: 14, color: Colors.text },
-  councilOptionTextSelected: { fontWeight: '700', color: Colors.primary },
+  councilItemSelected: { backgroundColor: '#EFF6FF' },
+  councilItemText: { flex: 1, fontSize: 14, color: Colors.text },
+  councilItemTextSelected: { fontWeight: '700', color: Colors.primary },
   checkmark: { fontSize: 16, color: Colors.primary, fontWeight: '700' },
+
+  detailDate: { fontSize: 12, color: Colors.textMuted, marginBottom: 4 },
+  detailReg: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 16 },
+  detailSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 10,
+  },
+  detailStep: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
+  detailCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailStepLabel: { fontSize: 13, fontWeight: '600', color: Colors.text },
+  detailStepStatus: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  stuckBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  stuckBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+    textAlign: 'center',
+  },
 });
