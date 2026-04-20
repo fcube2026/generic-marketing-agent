@@ -15,6 +15,7 @@ import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { OnboardingScreen } from '../screens/patient/OnboardingScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
+import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
 import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
@@ -33,6 +34,7 @@ export type PatientStackParamList = {
   ConsultationSummary: { bookingId: string };
   VideoConsultation: { bookingId: string };
   MedicineSearch: undefined;
+  PrescriptionOrder: undefined;
   PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };
@@ -77,6 +79,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
     <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
+    <Stack.Screen name="PrescriptionOrder" component={PrescriptionOrderScreen} options={{ title: 'Prescription Order' }} />
     <Stack.Screen name="PharmacyCheckout" component={PharmacyCheckoutScreen} options={{ title: 'Checkout' }} />
     <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
