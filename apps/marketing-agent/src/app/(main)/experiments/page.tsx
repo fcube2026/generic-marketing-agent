@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import { experiments, type Experiment, type ExperimentStatus } from '@/lib/data';
+import { listExperiments } from '@/lib/services/marketingService';
+import type { Experiment, ExperimentStatus } from '@/lib/types';
 
 function ExperimentRow({ exp }: { exp: Experiment }) {
   const [expanded, setExpanded] = useState(false);
@@ -68,6 +69,34 @@ function ExperimentRow({ exp }: { exp: Experiment }) {
 
 export default function ExperimentsPage() {
   const [filter, setFilter] = useState<ExperimentStatus | 'all'>('all');
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listExperiments()
+      .then((items) => {
+        if (!cancelled) setExperiments(items);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load experiments');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+  if (error)
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
 
   const filtered = experiments.filter((e) => filter === 'all' || e.status === filter);
   const counts = {
@@ -76,7 +105,6 @@ export default function ExperimentsPage() {
     planned: experiments.filter((e) => e.status === 'planned').length,
   };
   const winnerVariant = experiments.filter((e) => e.winner === 'variant').length;
-  const winnerControl = experiments.filter((e) => e.winner === 'control').length;
 
   return (
     <div className="space-y-6">

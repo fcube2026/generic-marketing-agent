@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import { campaigns, type Campaign } from '@/lib/data';
+import { listCampaigns } from '@/lib/services/marketingService';
+import type { Campaign } from '@/lib/types';
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const [expanded, setExpanded] = useState(false);
@@ -74,6 +75,34 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
 
 export default function CampaignsPage() {
   const [filter, setFilter] = useState<Campaign['status'] | 'all'>('all');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listCampaigns()
+      .then((items) => {
+        if (!cancelled) setCampaigns(items);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load campaigns');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+  if (error)
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
 
   const filtered = campaigns.filter((c) => filter === 'all' || c.status === filter);
   const counts = {
