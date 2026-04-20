@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOpenAIClient, TEXT_MODEL } from '@/lib/ai/openai-client';
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
+import {
+  pollinationsChat,
+  POLLINATIONS_TEXT_MODEL,
+  PollinationsError,
+} from '@/lib/ai/pollinations';
 
 // We talk to OpenAI from the route handler — keep us on the Node.js runtime.
 export const runtime = 'nodejs';
@@ -122,16 +127,29 @@ export async function POST(req: NextRequest) {
     systemPrompt = `${DEFAULT_SYSTEM_PROMPT}\n\nAdditional context:\n${body.system.trim()}`;
   }
 
-  // 4. Call OpenAI
+  // 4. Call OpenAI — or fall back to the free Pollinations provider if no key
+  //    is configured. This keeps the agent usable in local/dev/preview
+  //    environments without a paid OPENAI_API_KEY.
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'OpenAI client unavailable';
-    return NextResponse.json(
-      { error: message, code: 'provider_not_configured' },
-      { status: 503 },
-    );
+  } catch {
+    try {
+      const reply = await pollinationsChat({ system: systemPrompt, messages });
+      // eslint-disable-next-line no-console
+      console.log(`[ai/chat] model=${POLLINATIONS_TEXT_MODEL} (fallback)`);
+      return NextResponse.json({ reply, model: POLLINATIONS_TEXT_MODEL });
+    } catch (fallbackErr) {
+      const status = fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
+      const message =
+        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
+      // eslint-disable-next-line no-console
+      console.error('[ai/chat] Pollinations fallback failed', { status, message });
+      return NextResponse.json(
+        { error: message, code: 'provider_error' },
+        { status: 502 },
+      );
+    }
   }
 
   try {
