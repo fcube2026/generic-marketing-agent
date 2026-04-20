@@ -352,39 +352,31 @@ Caption: "Doctor visits, examines, and sends your digital prescription within th
 **Tip:** Generate all 3 variations and A/B test in Meta Ads Manager. The photorealistic doorstep scene typically outperforms in patient acquisition campaigns by 15–25% CTR.`,
 };
 
-const CREATION_KEYWORDS = ['generate', 'create', 'make', 'design', 'draft'];
-const VISUAL_KEYWORDS = ['visual', 'image', 'picture', 'banner', 'graphic'];
-const VISUAL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'social media'];
-
-function getImagePromptForRequest(msg: string): string | null {
-  // Explicit DALL-E / image prompt requests → always generate image
+// Image generation is compulsory — every agent reply ships with a contextual
+// AI-generated visual. getImagePromptForRequest always returns a prompt string
+// (never null) so the UI is guaranteed to render an image alongside the copy.
+function getImagePromptForRequest(msg: string): string {
+  // Explicit DALL-E / image prompt requests → photorealistic hero shot
   if (msg.includes('dall-e') || msg.includes('dalle') || msg.includes('image prompt') || msg.includes('visual prompt')) {
     return 'photorealistic doctor in white coat arriving at modern apartment door, patient smiling and welcoming, bright natural daylight, warm interior lighting, compact medical kit, shallow depth of field, 8K DSLR quality';
   }
 
   // Infographic
-  if (msg.includes('infographic')) {
+  if (msg.includes('infographic') || msg.includes('how it works') || msg.includes('4 steps') || msg.includes('four steps')) {
     return 'clean healthcare infographic showing four steps to book a home doctor visit, flat illustration style, healthcare blue and white, numbered step icons, modern minimalist design, vertical format';
   }
 
   // Carousel / slides
-  if (msg.includes('carousel') || (msg.includes('slides') && msg.includes('instagram'))) {
+  if (msg.includes('carousel') || msg.includes('slides') || msg.includes('swipe')) {
     return 'Instagram carousel opening slide, professional doctor visiting patient at home, warm welcoming scene, bright modern apartment, healthcare blue and white, photorealistic lifestyle photography';
   }
 
   // Reels / short video thumbnail
-  if (msg.includes('reel') && CREATION_KEYWORDS.some((w) => msg.includes(w))) {
+  if (msg.includes('reel') || msg.includes('tiktok') || msg.includes('short video') || msg.includes('day-in-the-life')) {
     return 'vertical social media visual for healthcare brand, smiling doctor in white coat at modern apartment door, warm cinematic lighting, mobile-first 9:16 composition, high quality';
   }
 
-  // Post or visual generation requests for visual platforms
-  const isCreating = CREATION_KEYWORDS.some((w) => msg.includes(w));
-  const isVisualPost =
-    VISUAL_KEYWORDS.some((w) => msg.includes(w)) ||
-    (msg.includes('post') && VISUAL_PLATFORMS.some((p) => msg.includes(p)));
-
-  if (!isCreating || !isVisualPost) return null;
-
+  // Platform-specific posts
   if (msg.includes('instagram')) {
     return 'Instagram square social media post for healthcare brand curex24, doctor home visit lifestyle photography, warm natural lighting, photorealistic, 1:1 format, high quality';
   }
@@ -394,11 +386,42 @@ function getImagePromptForRequest(msg: string): string | null {
   if (msg.includes('facebook')) {
     return 'Facebook post visual for healthcare brand, warm doctor-patient home visit scene, inviting lifestyle photography, brand blue and white, high quality';
   }
+  if (msg.includes('twitter') || msg.includes('thread') || msg.includes('tweet') || msg.includes(' x ')) {
+    return 'Twitter/X header visual for healthcare brand curex24, doctor and patient at home, clean modern composition, blue and white brand palette, 16:9 landscape';
+  }
+  if (msg.includes('whatsapp')) {
+    return 'WhatsApp marketing visual for healthcare brand curex24, friendly doctor with phone notification, warm brand colors, square format, photorealistic';
+  }
   if (msg.includes('youtube') || msg.includes('thumbnail')) {
     return 'YouTube thumbnail, doctor home visit curex24, high contrast bold composition, cinematic quality, expressive scene, 16:9 format';
   }
 
-  // Generic visual generation
+  // Channel / format specific creatives
+  if (msg.includes('google') || msg.includes('search ad') || msg.includes('ppc')) {
+    return 'Google search ad creative for healthcare brand curex24, clean modern doctor visiting patient at home, professional lifestyle photography, healthcare blue and white, landscape composition';
+  }
+  if (msg.includes('email') || msg.includes('onboarding') || msg.includes('newsletter')) {
+    return 'email header banner for healthcare brand curex24, friendly doctor at modern apartment door welcoming patient, warm natural lighting, clean editorial composition, wide landscape format';
+  }
+  if (msg.includes('seo') || msg.includes('blog') || msg.includes('article')) {
+    return 'editorial blog hero image for healthcare brand curex24, doctor at home with patient, warm photojournalistic style, soft natural light, wide landscape composition, high quality';
+  }
+  if (msg.includes('recruit') || msg.includes('provider') || msg.includes('doctor') || msg.includes('hire')) {
+    return 'professional photograph of confident doctor in white coat smiling at camera in modern bright home environment, premium recruitment marketing visual, healthcare blue accents, photorealistic';
+  }
+  if (msg.includes('ad copy') || msg.includes('ad creative') || msg.includes('campaign')) {
+    return 'premium ad creative for healthcare brand curex24, doctor visiting patient at home, warm cinematic lighting, brand blue and white palette, high-converting lifestyle photography';
+  }
+
+  // Strategy / analytics / generic chat → still ship a brand visual
+  if (msg.includes('budget') || msg.includes('allocat') || msg.includes('spend')) {
+    return 'modern marketing dashboard visualization for healthcare brand curex24, clean charts and growth graphs, blue and white color palette, minimal editorial illustration style';
+  }
+  if (msg.includes('retention') || msg.includes('churn') || msg.includes('lifecycle')) {
+    return 'editorial illustration of patient lifecycle journey for healthcare brand curex24, clean modern flat design, blue and white palette, friendly doctor and patient connection icons';
+  }
+
+  // Default fallback — every message gets a high-quality brand visual
   return 'professional social media marketing visual for healthcare brand curex24, doctor visiting patient at home, warm photorealistic scene, healthcare blue accents, premium quality';
 }
 
@@ -514,7 +537,7 @@ Here's what I can do for you:
 
 ✍️ **Write** — ad copy, email sequences, social posts, Reels scripts, WhatsApp campaigns
 📊 **Strategise** — budget allocation, channel prioritisation, retention analysis
-🖼️ **Generate visuals** — actual AI-generated images for Instagram, LinkedIn, Facebook, infographics, banners — ready to download
+🖼️ **Generate visuals** — every reply ships with a real AI-generated image (Instagram, LinkedIn, Facebook, infographics, banners) ready to download
 📣 **Build campaigns** — Google, Meta, LinkedIn, YouTube — full creative packages
 
 For complete content production (Post Generator, Visual Generator, Ad Creative Generator), visit the **✨ Create Content** studio in the sidebar.
@@ -580,7 +603,7 @@ export default function AgentPage() {
         role: 'agent',
         content,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        ...(imagePrompt ? { imagePrompt } : {}),
+        imagePrompt,
       };
       setMessages((prev) => [...prev, agentMsg]);
       setIsTyping(false);
