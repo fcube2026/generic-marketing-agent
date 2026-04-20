@@ -353,10 +353,63 @@ Caption: "Doctor visits, examines, and sends your digital prescription within th
 **Tip:** Generate all 3 variations and A/B test in Meta Ads Manager. The photorealistic doorstep scene typically outperforms in patient acquisition campaigns by 15–25% CTR.`,
 };
 
-// Image generation is compulsory — every agent reply ships with a contextual
-// AI-generated visual. getImagePromptForRequest always returns a prompt string
-// (never null) so the UI is guaranteed to render an image alongside the copy.
-function getImagePromptForRequest(msg: string): string {
+// Image generation is opt-in — the agent only generates a visual when the
+// user's message explicitly asks for one (e.g. "image", "visual", "post",
+// "carousel", "reel", "thumbnail", "banner", "infographic", "ad creative",
+// "dall-e", etc.). For normal text questions the function returns null so
+// the reply stays text-only.
+const VISUAL_INTENT_KEYWORDS = [
+  'image',
+  'images',
+  'visual',
+  'visuals',
+  'picture',
+  'photo',
+  'photograph',
+  'illustration',
+  'illustrate',
+  'infographic',
+  'carousel',
+  'slide',
+  'slides',
+  'reel',
+  'reels',
+  'tiktok',
+  'short video',
+  'thumbnail',
+  'banner',
+  'poster',
+  'creative',
+  'mockup',
+  'mock-up',
+  'hero shot',
+  'graphic',
+  'artwork',
+  'design a',
+  'render',
+  'dall-e',
+  'dalle',
+  'midjourney',
+  'stable diffusion',
+  'generate a post',
+  'generate post',
+  'create a post',
+  'instagram post',
+  'linkedin post',
+  'facebook post',
+  'whatsapp creative',
+  'youtube thumbnail',
+  'ad creative',
+];
+
+function wantsVisual(msg: string): boolean {
+  return VISUAL_INTENT_KEYWORDS.some((kw) => msg.includes(kw));
+}
+
+function getImagePromptForRequest(msg: string): string | null {
+  // Only generate a visual when the user explicitly asks for one.
+  if (!wantsVisual(msg)) return null;
+
   // Explicit DALL-E / image prompt requests → photorealistic hero shot
   if (msg.includes('dall-e') || msg.includes('dalle') || msg.includes('image prompt') || msg.includes('visual prompt')) {
     return 'photorealistic doctor in white coat arriving at modern apartment door, patient smiling and welcoming, bright natural daylight, warm interior lighting, compact medical kit, shallow depth of field, 8K DSLR quality';
@@ -571,7 +624,7 @@ Here's what I can do for you:
 
 ✍️ **Write** — ad copy, email sequences, social posts, Reels scripts, WhatsApp campaigns
 📊 **Strategise** — budget allocation, channel prioritisation, retention analysis
-🖼️ **Generate visuals** — every reply ships with a real AI-generated image (Instagram, LinkedIn, Facebook, infographics, banners) ready to download
+🖼️ **Generate visuals on request** — ask for an image, post, carousel, reel, infographic, banner or ad creative and I'll ship a real AI-generated visual ready to download. Plain questions get a plain text answer.
 📣 **Build campaigns** — Google, Meta, LinkedIn, YouTube — full creative packages
 🧠 **Run skills** — browse the full catalogue in **Skills Library** or just ask me by name (e.g. "run cold-email", "do an seo-audit").
 
@@ -648,7 +701,7 @@ function AgentPageInner() {
         role: 'agent',
         content,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        imagePrompt,
+        ...(imagePrompt ? { imagePrompt } : {}),
       };
       setMessages((prev) => [...prev, agentMsg]);
       setIsTyping(false);
