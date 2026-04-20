@@ -155,6 +155,10 @@ export const KycScreen: React.FC = () => {
   const [showCouncilPicker, setShowCouncilPicker] = useState(false);
   const [councilSearch, setCouncilSearch] = useState('');
   const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
+  // Show document upload view after DigiLocker consent
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  // Show face-checking state after selfie is taken
+  const [faceChecking, setFaceChecking] = useState(false);
 
   const [progress, setProgress] = useState<VerificationProgress>({
     nmc: 'pending',
@@ -236,7 +240,14 @@ export const KycScreen: React.FC = () => {
       'By tapping "I Agree", you authorise Curex24 to fetch your Aadhaar and medical registration documents from DigiLocker for verification.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'I Agree', onPress: () => digilockerMutation.mutate() },
+        {
+          text: 'I Agree',
+          onPress: () => {
+            digilockerMutation.mutate();
+            // Navigate to the document upload sub-view
+            setShowDocumentUpload(true);
+          },
+        },
       ],
     );
   };
@@ -319,8 +330,14 @@ export const KycScreen: React.FC = () => {
   const faceMutation = useMutation({
     mutationFn: (base64: string) =>
       providerService.submitFaceVerification({ liveFaceData: base64 }),
-    onSuccess: () => setProgress((p) => ({ ...p, face: 'done' })),
-    onError: () => setProgress((p) => ({ ...p, face: 'failed' })),
+    onSuccess: () => {
+      setFaceChecking(false);
+      setProgress((p) => ({ ...p, face: 'done' }));
+    },
+    onError: () => {
+      setFaceChecking(false);
+      setProgress((p) => ({ ...p, face: 'failed' }));
+    },
   });
 
   const handleFaceCapture = useCallback(async () => {
@@ -349,6 +366,7 @@ export const KycScreen: React.FC = () => {
               base64: true,
             });
             if (!result.canceled && result.assets[0]?.base64) {
+              setFaceChecking(true);
               setProgress((p) => ({ ...p, face: 'processing' }));
               faceMutation.mutate(`data:image/jpeg;base64,${result.assets[0].base64}`);
             }
@@ -484,7 +502,7 @@ export const KycScreen: React.FC = () => {
         )}
 
         {/* ════ STEP 3 — Progress & Actions ════ */}
-        {wizardStep === 3 && (
+        {wizardStep === 3 && !showDocumentUpload && (
           <View style={styles.stepBox}>
             <Text style={styles.stepTitle}>Verification Progress</Text>
             <Text style={styles.stepDesc}>
@@ -610,27 +628,23 @@ export const KycScreen: React.FC = () => {
               </View>
             )}
 
-            {/* Document Upload */}
-            {isAutomatedDone && progress.documents !== 'done' && (
+            {/* Document Upload — shown as action card if not uploading via DigiLocker flow */}
+            {isAutomatedDone && progress.documents !== 'done' && progress.digilocker !== 'processing' && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>{'📄 Upload Documents'}</Text>
                 <Text style={styles.cardDesc}>
-                  Capture or upload your Aadhaar card and Medical Registration Certificate.
-                  Our OCR system will extract and validate the details.
+                  Upload your MBBS certificate, registration certificate and Aadhaar card
+                  for verification.
                 </Text>
                 <TouchableOpacity
                   style={[
                     styles.actionBtn,
                     documentsMutation.isPending && styles.actionBtnDisabled,
                   ]}
-                  onPress={handleDocumentUpload}
+                  onPress={() => setShowDocumentUpload(true)}
                   disabled={documentsMutation.isPending}
                 >
-                  {documentsMutation.isPending ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.actionBtnText}>{'📷  Upload Documents'}</Text>
-                  )}
+                  <Text style={styles.actionBtnText}>{'📷  Upload Documents'}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -640,27 +654,31 @@ export const KycScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Face Verification — checking state overlay */}
+            {faceChecking && (
+              <View style={[styles.card, styles.faceCheckingCard]}>
+                <ActivityIndicator color={Colors.primary} size="large" style={{ marginBottom: 12 }} />
+                <Text style={styles.faceCheckingTitle}>Checking Verification…</Text>
+                <Text style={styles.faceCheckingDesc}>
+                  Matching your selfie with the photo on your NMC / State Council registration.
+                  Please wait.
+                </Text>
+              </View>
+            )}
+
             {/* Face Verification */}
-            {isAutomatedDone && progress.face !== 'done' && (
+            {isAutomatedDone && progress.face !== 'done' && !faceChecking && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>{'🤳 Face Verification'}</Text>
                 <Text style={styles.cardDesc}>
-                  Take a clear selfie in a well-lit area to verify your identity. Look
-                  directly at the camera.
+                  Take a clear selfie in a well-lit area to verify your identity. Your selfie
+                  will be matched against your NMC or State Council registration photo.
                 </Text>
                 <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    faceMutation.isPending && styles.actionBtnDisabled,
-                  ]}
+                  style={styles.actionBtn}
                   onPress={handleFaceCapture}
-                  disabled={faceMutation.isPending}
                 >
-                  {faceMutation.isPending ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.actionBtnText}>{'📸  Take Selfie'}</Text>
-                  )}
+                  <Text style={styles.actionBtnText}>{'📸  Take Selfie'}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -679,51 +697,119 @@ export const KycScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+
+            {/* Verification History — visible only on this final page */}
+            <View style={styles.historySection}>
+              <Text style={styles.historySectionTitle}>Verification History</Text>
+              {logsLoading ? (
+                <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />
+              ) : (logs as VerificationLog[]).length === 0 ? (
+                <Text style={styles.noLogsText}>No verification attempts yet.</Text>
+              ) : (
+                (logs as VerificationLog[]).map((log) => (
+                  <TouchableOpacity
+                    key={log.id}
+                    style={styles.logItem}
+                    onPress={() => setSelectedLog(log)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.logRow}>
+                      <Text style={styles.logSource} numberOfLines={1}>
+                        {sourceLabel(log.verificationSource ?? log.status)}
+                      </Text>
+                      <Text style={styles.logDate}>
+                        {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
+                    {log.rawResponse?.issueLabel && (
+                      <Text style={styles.logStatus}>
+                        {log.rawResponse.issueLabel === 'Pending Admin Approval'
+                          ? '🔒 Awaiting admin review'
+                          : `⚠️ ${log.rawResponse.issueLabel}`}
+                      </Text>
+                    )}
+                    <Text style={styles.logHint}>{'Tap to view details →'}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
           </View>
         )}
 
-        {/* ════ Verification History ════ */}
-        <View style={styles.historySection}>
-          <Text style={styles.historySectionTitle}>Verification History</Text>
-          {logsLoading ? (
-            <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />
-          ) : (logs as VerificationLog[]).length === 0 ? (
-            <Text style={styles.noLogsText}>No verification attempts yet.</Text>
-          ) : (
-            (logs as VerificationLog[]).map((log) => (
-              <TouchableOpacity
-                key={log.id}
-                style={styles.logItem}
-                onPress={() => setSelectedLog(log)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.logRow}>
-                  <Text style={styles.logSource} numberOfLines={1}>
-                    {sourceLabel(log.verificationSource ?? log.status)}
-                  </Text>
-                  <Text style={styles.logDate}>
-                    {new Date(log.createdAt).toLocaleDateString('en-IN', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                </View>
-                <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
-                {log.rawResponse?.issueLabel && (
-                  <Text style={styles.logStatus}>
-                    {log.rawResponse.issueLabel === 'Pending Admin Approval'
-                      ? '🔒 Awaiting admin review'
-                      : `⚠️ ${log.rawResponse.issueLabel}`}
-                  </Text>
-                )}
-                <Text style={styles.logHint}>{'Tap to view details →'}</Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
+        {/* ════ STEP 3 — Document Upload sub-view ════ */}
+        {wizardStep === 3 && showDocumentUpload && (
+          <View style={styles.stepBox}>
+            <TouchableOpacity
+              style={styles.backBtnInline}
+              onPress={() => setShowDocumentUpload(false)}
+            >
+              <Text style={styles.backBtnInlineText}>{'← Back'}</Text>
+            </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+            <Text style={styles.stepTitle}>Upload Documents</Text>
+            <Text style={styles.stepDesc}>
+              Please upload the following documents. Our OCR system will extract
+              and validate your details automatically.
+            </Text>
+
+            {/* Document upload action */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{'🪪 Aadhaar Card'}</Text>
+              <Text style={styles.cardDesc}>
+                Upload a clear photo or scan of your Aadhaar card (front side).
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{'🎓 MBBS / Degree Certificate'}</Text>
+              <Text style={styles.cardDesc}>
+                Upload your MBBS or relevant medical degree certificate.
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{'📋 Registration Certificate'}</Text>
+              <Text style={styles.cardDesc}>
+                Upload your state medical council registration certificate.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.primaryBtn,
+                documentsMutation.isPending && styles.primaryBtnDisabled,
+              ]}
+              onPress={handleDocumentUpload}
+              disabled={documentsMutation.isPending}
+            >
+              {documentsMutation.isPending ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color={Colors.white} />
+                  <Text style={styles.primaryBtnText}>Uploading…</Text>
+                </View>
+              ) : (
+                <Text style={styles.primaryBtnText}>{'📷  Upload All Documents'}</Text>
+              )}
+            </TouchableOpacity>
+
+            {progress.documents === 'done' && (
+              <View style={[styles.card, styles.doneCard, { marginTop: 16 }]}>
+                <Text style={styles.doneCardText}>{'✅  Documents uploaded successfully'}</Text>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { marginTop: 12 }]}
+                  onPress={() => setShowDocumentUpload(false)}
+                >
+                  <Text style={styles.actionBtnText}>Continue to Face Verification</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ── Council Picker Modal ── */}
         <Modal
@@ -996,6 +1082,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   allDoneDesc: { fontSize: 13, color: '#166534', textAlign: 'center', marginTop: 6 },
+
+  faceCheckingCard: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  faceCheckingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.primary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  faceCheckingDesc: {
+    fontSize: 13,
+    color: '#1E40AF',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  backBtnInline: { marginBottom: 16 },
+  backBtnInlineText: { color: Colors.primary, fontSize: 15, fontWeight: '600' },
 
   historySection: { paddingHorizontal: 16, marginTop: 8 },
   historySectionTitle: {
