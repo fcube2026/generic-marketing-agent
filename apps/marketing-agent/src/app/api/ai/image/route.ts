@@ -8,6 +8,7 @@ import {
   POLLINATIONS_IMAGE_MODEL,
   PollinationsError,
 } from '@/lib/ai/pollinations';
+import { getErrorStatus } from '@/lib/ai/error-utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -131,6 +132,36 @@ export async function POST(req: NextRequest) {
       requestedHeight: height,
     });
   } catch (err: unknown) {
+    // If OpenAI rejects our credentials (401/403), transparently fall back to
+    // the free Pollinations provider — same behaviour as when no key is set —
+    // so a stale/revoked OPENAI_API_KEY does not break the whole experience.
+    const status = getErrorStatus(err);
+    if (status === 401 || status === 403) {
+      // eslint-disable-next-line no-console
+      console.warn('[ai/image] OpenAI rejected the API key, falling back to Pollinations');
+      try {
+        const { dataUrl } = await pollinationsImage({ prompt, width, height });
+        // eslint-disable-next-line no-console
+        console.log(
+          `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (auth-fallback) requested=${width}x${height}`,
+        );
+        return NextResponse.json({
+          dataUrl,
+          model: POLLINATIONS_IMAGE_MODEL,
+          size,
+          requestedWidth: width,
+          requestedHeight: height,
+        });
+      } catch (fallbackErr) {
+        const fbStatus =
+          fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
+        const message =
+          fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
+        // eslint-disable-next-line no-console
+        console.error('[ai/image] Pollinations auth-fallback failed', { status: fbStatus, message });
+        // fall through to the original error handler
+      }
+    }
     return handleOpenAIError(err);
   }
 }

@@ -7,6 +7,7 @@ import {
   POLLINATIONS_TEXT_MODEL,
   PollinationsError,
 } from '@/lib/ai/pollinations';
+import { getErrorStatus } from '@/lib/ai/error-utils';
 
 // We talk to OpenAI from the route handler — keep us on the Node.js runtime.
 export const runtime = 'nodejs';
@@ -189,6 +190,28 @@ export async function POST(req: NextRequest) {
         : undefined,
     });
   } catch (err: unknown) {
+    // If OpenAI rejects our credentials (401/403), transparently fall back to
+    // the free Pollinations provider — same behaviour as when no key is set —
+    // so a stale/revoked OPENAI_API_KEY does not break the whole experience.
+    const status = getErrorStatus(err);
+    if (status === 401 || status === 403) {
+      // eslint-disable-next-line no-console
+      console.warn('[ai/chat] OpenAI rejected the API key, falling back to Pollinations');
+      try {
+        const reply = await pollinationsChat({ system: systemPrompt, messages });
+        // eslint-disable-next-line no-console
+        console.log(`[ai/chat] model=${POLLINATIONS_TEXT_MODEL} (auth-fallback)`);
+        return NextResponse.json({ reply, model: POLLINATIONS_TEXT_MODEL });
+      } catch (fallbackErr) {
+        const fbStatus =
+          fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
+        const message =
+          fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
+        // eslint-disable-next-line no-console
+        console.error('[ai/chat] Pollinations auth-fallback failed', { status: fbStatus, message });
+        // fall through to the original error handler
+      }
+    }
     return handleOpenAIError(err);
   }
 }
