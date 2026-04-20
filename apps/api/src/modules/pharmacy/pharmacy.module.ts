@@ -13,8 +13,11 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrescriptionModule } from '../prescription/prescription.module';
 import { PrescriptionService } from '../prescription/prescription.service';
 import { PharmacyJobModule } from './jobs/pharmacy-job.module';
+import { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
 
-export const PHARMACY_PROVIDERS_MAP = 'PHARMACY_PROVIDERS_MAP';
+// Re-export so existing consumers of `import { PHARMACY_PROVIDERS_MAP } from './pharmacy.module'`
+// continue to work.
+export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
 
 @Module({
   imports: [PrescriptionModule, PharmacyJobModule],

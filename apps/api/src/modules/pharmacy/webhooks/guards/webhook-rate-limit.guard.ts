@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
 
 /**
@@ -27,9 +28,16 @@ export class WebhookRateLimitGuard implements CanActivate {
   /** Request timestamps per IP. */
   private readonly requestLog = new Map<string, number[]>();
 
-  constructor(maxRequests = 60, windowMs = 60_000) {
-    this.maxRequests = maxRequests;
-    this.windowMs = windowMs;
+  /**
+   * @param maxRequests - Max requests within the window (default: 60).
+   * @param windowMs   - Window duration in ms (default: 60 000).
+   *
+   * When NestJS instantiates this guard via DI it calls `new WebhookRateLimitGuard()`
+   * with no arguments, so the defaults apply. Tests can pass custom values directly.
+   */
+  constructor(@Optional() maxRequests?: number, @Optional() windowMs?: number) {
+    this.maxRequests = maxRequests ?? 60;
+    this.windowMs = windowMs ?? 60_000;
   }
 
   canActivate(context: ExecutionContext): boolean {
