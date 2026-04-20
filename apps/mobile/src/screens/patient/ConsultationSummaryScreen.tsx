@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -14,8 +14,9 @@ type Props = {
   route: RouteProp<PatientStackParamList, 'ConsultationSummary'>;
 };
 
-export const ConsultationSummaryScreen: React.FC<Props> = ({ route }) => {
+export const ConsultationSummaryScreen: React.FC<Props> = ({ navigation, route }) => {
   const { bookingId } = route.params;
+  const [ctaDisabled, setCtaDisabled] = useState(false);
 
   const { data: summary, isLoading } = useQuery({
     queryKey: ['consultation-summary', bookingId],
@@ -24,6 +25,27 @@ export const ConsultationSummaryScreen: React.FC<Props> = ({ route }) => {
       return res.data;
     },
   });
+
+  // Derive mock prescription / order flags from the summary response
+  const prescriptionUrl: string | undefined =
+    summary?.prescriptionUrl ?? (summary?.medicinesAdvised?.length ? 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80' : undefined);
+  const hasOrder: boolean = summary?.hasOrder === true;
+  const medicineCount: number = summary?.medicinesAdvised?.length ?? 0;
+
+  const handleOrderPress = () => {
+    setCtaDisabled(true);
+    setTimeout(() => setCtaDisabled(false), 1000);
+
+    if (hasOrder) {
+      // Navigate to order details (mock: use PharmacyOrders list as fallback)
+      navigation.navigate('PharmacyOrders');
+    } else {
+      navigation.navigate('PrescriptionOrder', {
+        bookingId,
+        prescriptionUrl,
+      });
+    }
+  };
 
   if (isLoading) return <LoadingSpinner fullScreen message="Loading summary..." />;
 
@@ -91,6 +113,38 @@ export const ConsultationSummaryScreen: React.FC<Props> = ({ route }) => {
           </View>
         )}
       </Card>
+
+      {/* Order Medicines / View Order CTA – visible only when a prescription exists */}
+      {prescriptionUrl && (
+        <TouchableOpacity
+          style={[styles.orderButton, hasOrder && styles.orderButtonSecondary]}
+          onPress={handleOrderPress}
+          disabled={ctaDisabled}
+          activeOpacity={0.8}
+        >
+          <View style={styles.orderButtonContent}>
+            <Text style={styles.orderButtonIcon}>{hasOrder ? '📦' : '💊'}</Text>
+            <View style={styles.orderButtonTextWrap}>
+              <Text style={styles.orderButtonTitle}>
+                {hasOrder ? 'View Order' : 'Order Medicines'}
+              </Text>
+              <Text style={styles.orderButtonSubtitle}>
+                {hasOrder
+                  ? 'Track your medicine delivery'
+                  : 'Get your prescribed medicines delivered'}
+              </Text>
+            </View>
+            {!hasOrder && medicineCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{medicineCount}</Text>
+              </View>
+            )}
+            <Text style={styles.orderButtonArrow}>→</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      <View style={{ height: 24 }} />
     </ScrollView>
   );
 };
@@ -112,4 +166,42 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },
+  orderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  orderButtonSecondary: {
+    backgroundColor: Colors.secondary,
+  },
+  orderButtonContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  orderButtonIcon: { fontSize: 28, marginRight: 12 },
+  orderButtonTextWrap: { flex: 1 },
+  orderButtonTitle: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  orderButtonSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+  orderButtonArrow: { fontSize: 20, color: Colors.white, marginLeft: 8 },
+  badge: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginRight: 4,
+  },
+  badgeText: { fontSize: 12, fontWeight: '800', color: Colors.primary },
 });

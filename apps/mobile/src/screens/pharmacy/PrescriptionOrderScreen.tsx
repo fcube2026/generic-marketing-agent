@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
@@ -26,6 +26,7 @@ import {
 } from '../../store/pharmacyOrderStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
+type Route = RouteProp<PatientStackParamList, 'PrescriptionOrder'>;
 
 /** Sample prescription image for the "From Recent Consultation" option */
 const MOCK_PRESCRIPTION_URL =
@@ -54,6 +55,7 @@ const SkeletonBox: React.FC<{ width?: number | string; height?: number }> = ({
 
 export const PrescriptionOrderScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
   const [previewVisible, setPreviewVisible] = useState(false);
 
   const {
@@ -70,6 +72,14 @@ export const PrescriptionOrderScreen: React.FC = () => {
     selectPharmacy,
     resetOrder,
   } = usePharmacyOrderStore();
+
+  // ---- Auto-attach prescription from navigation params ---------------------
+  useEffect(() => {
+    const incomingUrl = route.params?.prescriptionUrl;
+    if (incomingUrl && !prescriptionUrl) {
+      setPrescription(incomingUrl);
+    }
+  }, [route.params?.prescriptionUrl, prescriptionUrl, setPrescription]);
 
   // ---- Prescription upload via API -----------------------------------------
   const uploadPrescription = useCallback(
