@@ -6,6 +6,10 @@ const LOCAL_API_URL = 'http://localhost:3000/api/v1';
 const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
 
 function getApiBaseUrl(): string {
+  // Build-time env var takes highest priority (set in Vercel/CI)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname.includes('staging')) {
@@ -14,9 +18,6 @@ function getApiBaseUrl(): string {
     if (!LOCAL_HOSTNAMES.includes(hostname)) {
       return PRODUCTION_API_URL;
     }
-  }
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
   }
   return LOCAL_API_URL;
 }

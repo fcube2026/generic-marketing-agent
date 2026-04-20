@@ -37,6 +37,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
   await page.route('**/api/v1/auth/admin-login', loginRouteHandler);
 
   await page.goto('/login');
+  await page.waitForSelector('[data-testid="login-form"]', { timeout: 30_000 });
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();

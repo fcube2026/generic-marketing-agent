@@ -302,12 +302,15 @@ jobs:
       - name: Check if Vercel secrets are configured
         id: check-secrets
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ADMIN_PROJECT_ID }}" ]; then
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ADMIN_PROJECT_ID" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "⚠️ VERCEL_TOKEN or VERCEL_ADMIN_PROJECT_ID not configured — skipping admin deploy"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ADMIN_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
