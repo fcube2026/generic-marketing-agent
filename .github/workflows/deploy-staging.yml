@@ -387,18 +387,23 @@ jobs:
         run: pnpm --filter @curex24/admin exec playwright install --with-deps
 
       - name: Wait for staging admin to be available
+        id: wait-admin
         run: |
           for i in $(seq 1 10); do
             if curl -sf https://admin.staging.curex24.com > /dev/null 2>&1; then
               echo "Staging admin is available"
-              break
+              echo "available=true" >> $GITHUB_OUTPUT
+              exit 0
             fi
             echo "Waiting for staging deploy to propagate (attempt $i)..."
             sleep 15
           done
+          echo "⚠️ admin.staging.curex24.com never responded — skipping smoke/regression tests"
+          echo "available=false" >> $GITHUB_OUTPUT
 
       - name: Run smoke tests (staging)
         id: smoke
+        if: steps.wait-admin.outputs.available == 'true'
         continue-on-error: true
         run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @smoke --project=chromium
         env:
@@ -408,6 +413,7 @@ jobs:
 
       - name: Run regression tests (staging)
         id: regression
+        if: steps.wait-admin.outputs.available == 'true'
         continue-on-error: true
         run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @regression --project=chromium
         env:

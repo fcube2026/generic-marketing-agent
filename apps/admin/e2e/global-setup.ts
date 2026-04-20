@@ -37,7 +37,14 @@ async function globalSetup(config: FullConfig): Promise<void> {
   await page.route('**/api/v1/auth/admin-login', loginRouteHandler);
 
   await page.goto('/login');
-  await page.waitForSelector('[data-testid="login-form"]', { timeout: 30_000 });
+  // Wait up to 15s for the login form — if the page is behind Vercel protection
+  // or otherwise unavailable, fail immediately with a clear message.
+  const formVisible = await page.locator('[data-testid="login-form"]').waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false);
+  if (!formVisible) {
+    const pageTitle = await page.title();
+    const url = page.url();
+    throw new Error(`Login form not found at ${url} (page title: "${pageTitle}"). The site may be behind Vercel Deployment Protection or not yet deployed.`);
+  }
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
