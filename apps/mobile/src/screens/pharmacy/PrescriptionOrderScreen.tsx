@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,7 @@ const SkeletonBox: React.FC<{ width?: number | string; height?: number }> = ({
   <View
     style={[
       styles.skeleton,
-      { width, height, borderRadius: height / 2 },
+      { width: width as any, height, borderRadius: height / 2 },
     ]}
   />
 );
@@ -192,8 +192,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
   };
 
   // ---- Cleanup on unmount --------------------------------------------------
-  // (optional: reset store when user leaves)
-  // useEffect(() => () => resetOrder(), [resetOrder]);
+  useEffect(() => () => resetOrder(), [resetOrder]);
 
   // ========================================================================
   // Render
