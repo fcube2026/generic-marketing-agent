@@ -23,8 +23,6 @@ import {
   usePharmacyOrderStore,
   MOCK_PHARMACIES,
   computeTotal,
-  MockPharmacy,
-  PrescriptionMedicine,
 } from '../../store/pharmacyOrderStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
@@ -45,7 +43,7 @@ const SkeletonBox: React.FC<{ width?: number | string; height?: number }> = ({
   <View
     style={[
       styles.skeleton,
-      { width: width as number, height, borderRadius: height / 2 },
+      { width, height, borderRadius: height / 2 },
     ]}
   />
 );
@@ -319,7 +317,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
         )}
 
         {!isUploading &&
-          medicines.map((med: PrescriptionMedicine) => (
+          medicines.map((med) => (
             <View key={med.id} style={styles.medicineRow}>
               <View style={styles.medicineInfo}>
                 <Text style={styles.medicineName}>{med.name}</Text>
@@ -360,7 +358,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🏥 Select Pharmacy</Text>
 
-        {MOCK_PHARMACIES.map((pharmacy: MockPharmacy) => {
+        {MOCK_PHARMACIES.map((pharmacy) => {
           const isSelected = selectedPharmacy?.id === pharmacy.id;
           const pharmacyTotal = computeTotal(medicines, pharmacy);
 
@@ -433,7 +431,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
         />
       </View>
 
-      <View style={{ height: 40 }} />
+      <View style={styles.bottomSpacer} />
 
       {/* ----------------------------------------------------------------- */}
       {/* Image Preview Modal                                                */}
@@ -668,6 +666,7 @@ const styles = StyleSheet.create({
 
   // Checkout
   checkoutArea: { marginHorizontal: 16, marginTop: 20 },
+  bottomSpacer: { height: 40 },
 
   // Modal
   modalOverlay: {

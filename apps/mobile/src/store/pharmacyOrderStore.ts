@@ -101,7 +101,7 @@ export const usePharmacyOrderStore = create<PharmacyOrderState>((set) => ({
 
   selectPharmacy: (pharmacy) => set({ selectedPharmacy: pharmacy }),
 
-  resetOrder: () => set(initialState),
+  resetOrder: () => set({ ...initialState }),
 }));
 
 /** Compute the total price (medicines subtotal + delivery fee) */
