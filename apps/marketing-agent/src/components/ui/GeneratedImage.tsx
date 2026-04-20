@@ -1,19 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { describeAiError, generateImage } from '@/lib/services/aiService';
 
 const BRAND_SUFFIX =
   ', curex24 healthcare brand, professional quality, clean composition, no watermark, no text overlay';
 
-// Pollinations.ai is a free, no-key endpoint and can occasionally 5xx/timeout
-// (especially with the flux model on first cold request). We retry a few times
-// with a new seed, and fall back to the faster `turbo` model on later attempts.
 const MAX_ATTEMPTS = 3;
-const MODEL_BY_ATTEMPT = ['flux', 'flux', 'turbo'] as const;
-
-function randomSeed() {
-  return Math.floor(Math.random() * 1_000_000);
-}
 
 interface GeneratedImageProps {
   prompt: string;
@@ -22,23 +15,9 @@ interface GeneratedImageProps {
   label?: string;
 }
 
-function buildSrc(opts: {
-  prompt: string;
-  width: number;
-  height: number;
-  seed: number;
-  model: string;
-}) {
-  const { prompt, width, height, seed, model } = opts;
-  const params = new URLSearchParams({
-    width: String(width),
-    height: String(height),
-    nologo: 'true',
-    model,
-    seed: String(seed),
-    referrer: 'curex24',
-  });
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`;
+interface ImageData {
+  src: string;
+  size: string;
 }
 
 export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: GeneratedImageProps) {
@@ -46,33 +25,50 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
 
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
-  const [seed, setSeed] = useState(randomSeed);
+  const [image, setImage] = useState<ImageData | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Reset state when the prompt or dimensions change so a re-render fetches
-  // a fresh image instead of showing a stale error.
+  // Token to discard stale responses if props change while a request is in flight.
+  const requestIdRef = useRef(0);
+
   useEffect(() => {
-    setStatus('loading');
-    setAttempt(0);
-    setSeed(randomSeed());
-  }, [fullPrompt, width, height]);
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
 
-  const model = MODEL_BY_ATTEMPT[Math.min(attempt, MODEL_BY_ATTEMPT.length - 1)];
-  const src = buildSrc({ prompt: fullPrompt, width, height, seed, model });
+    setStatus('loading');
+    setImage(null);
+    setErrorMessage('');
+
+    (async () => {
+      try {
+        const result = await generateImage({ prompt: fullPrompt, width, height });
+        if (cancelled || requestIdRef.current !== requestId) return;
+        const src = result.dataUrl ?? result.url ?? '';
+        if (!src) {
+          setErrorMessage('Image provider returned no image');
+          setStatus('error');
+          return;
+        }
+        setImage({ src, size: result.size });
+        setStatus('loaded');
+      } catch (err) {
+        if (cancelled || requestIdRef.current !== requestId) return;
+        setErrorMessage(describeAiError(err, 'Image generation failed'));
+        setStatus('error');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fullPrompt, width, height, attempt]);
 
   function retry() {
-    setStatus('loading');
-    setAttempt(0);
-    setSeed(randomSeed());
-  }
-
-  function handleError() {
     if (attempt + 1 < MAX_ATTEMPTS) {
-      // Auto-retry with a new seed (and possibly a different model).
-      setStatus('loading');
       setAttempt((a) => a + 1);
-      setSeed(randomSeed());
     } else {
-      setStatus('error');
+      // Reset back to attempt 0 so the user can try again from scratch.
+      setAttempt(0);
     }
   }
 
@@ -87,7 +83,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
         {status !== 'loaded' && (
           <div
             className={`flex flex-col items-center justify-center gap-2 bg-gray-100 px-4 ${
-              status === 'error' ? 'h-40' : 'h-52'
+              status === 'error' ? 'h-44' : 'h-52'
             }`}
           >
             {status === 'loading' ? (
@@ -100,8 +96,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
             ) : (
               <>
                 <p className="text-xs text-gray-500 text-center">
-                  ⚠️ Image generation failed after {MAX_ATTEMPTS} attempts. The free Pollinations.ai
-                  endpoint may be busy.
+                  ⚠️ {errorMessage || 'Image generation failed.'}
                 </p>
                 <button
                   type="button"
@@ -114,24 +109,26 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
             )}
           </div>
         )}
-        <img
-          // Force <img> to remount on each attempt so the browser re-fetches.
-          key={`${attempt}-${seed}`}
-          src={src}
-          alt={label ?? 'AI-generated marketing visual'}
-          className={`w-full h-auto ${status === 'loaded' ? 'block' : 'hidden'}`}
-          onLoad={() => setStatus('loaded')}
-          onError={handleError}
-        />
-        {status === 'loaded' && (
-          <a
-            href={src}
-            target="_blank"
-            rel="noreferrer"
-            className="absolute bottom-2 right-2 text-xs px-2.5 py-1 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-700 hover:bg-white transition shadow-sm"
-          >
-            ⬇️ Download
-          </a>
+        {image && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image.src}
+              alt={label ?? 'AI-generated marketing visual'}
+              className={`w-full h-auto ${status === 'loaded' ? 'block' : 'hidden'}`}
+            />
+            {status === 'loaded' && (
+              <a
+                href={image.src}
+                download={`curex24-${Date.now()}.png`}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute bottom-2 right-2 text-xs px-2.5 py-1 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-700 hover:bg-white transition shadow-sm"
+              >
+                ⬇️ Download
+              </a>
+            )}
+          </>
         )}
       </div>
     </div>
