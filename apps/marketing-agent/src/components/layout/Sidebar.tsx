@@ -14,6 +14,7 @@ const navItems = [
   { href: '/experiments', label: 'Experiments', icon: '🧪' },
   { href: '/reports', label: 'Reports & KPIs', icon: '📈' },
   { href: '/create', label: 'Create Content', icon: '✨' },
+  { href: '/skills', label: 'Skills Library', icon: '🧠' },
   { href: '/agent', label: 'AI Marketing Agent', icon: '🤖' },
 ];
 

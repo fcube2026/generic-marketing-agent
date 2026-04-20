@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { type AgentMessage } from '@/lib/data';
+import { useSearchParams } from 'next/navigation';
+import { type AgentMessage, marketingSkills } from '@/lib/data';
 import { GeneratedImage } from '@/components/ui/GeneratedImage';
 
 const suggestedPrompts = [
@@ -513,6 +514,37 @@ Referrals at 9% vs 15% target. A single CTA on the post-booking confirmation scr
 Want me to produce the assets for any of these now? Or head to the **✨ Create Content** studio for full post/ad creative generation.`;
   }
 
+  // Try matching a marketing skill by id, name, or keywords
+  const skill = marketingSkills.find(
+    (s) =>
+      lower.includes(s.id) ||
+      lower.includes(s.id.replace(/-/g, ' ')) ||
+      lower.includes(s.name.toLowerCase()),
+  );
+  if (skill) {
+    return `**🧠 Skill: ${skill.icon} ${skill.name}** — _${skill.category}_
+
+${skill.description}
+
+Here's how I'd run this skill for **curex24**:
+
+**1. Discovery**
+• Pull the latest data from your business intake (ICP, budget, bottleneck) and recent KPIs.
+• Identify the specific outcome we're optimising for.
+
+**2. Framework**
+• Apply the proven \`${skill.id}\` workflow — frameworks, templates, and benchmarks from the marketing-skills library.
+• Tailor every step to curex24's home-doctor positioning and Mumbai/Delhi/Bengaluru markets.
+
+**3. Output**
+• Ready-to-ship deliverables (copy, briefs, plans, or tracking specs) with clear next steps and owners.
+
+**Suggested starting prompt:**
+> "${skill.examplePrompt}"
+
+Want me to run this skill end-to-end now? Reply with **yes — run ${skill.id}**, or refine the prompt above.`;
+  }
+
   return `I'd be happy to help with that. Based on curex24's current marketing position:
 
 **Key context:**
@@ -533,12 +565,15 @@ const INTRO_MESSAGE: AgentMessage = {
   role: 'agent',
   content: `👋 I'm your AI Marketing Agent for curex24 — powered by **ChatGPT (GPT-4o)**, **DALL-E 3**, **Midjourney**, **GitHub Copilot**, **Stable Diffusion**, and **Claude**.
 
+I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`programmatic-seo\`, \`pricing-strategy\`, and \`referral-program\`.
+
 Here's what I can do for you:
 
 ✍️ **Write** — ad copy, email sequences, social posts, Reels scripts, WhatsApp campaigns
 📊 **Strategise** — budget allocation, channel prioritisation, retention analysis
 🖼️ **Generate visuals** — every reply ships with a real AI-generated image (Instagram, LinkedIn, Facebook, infographics, banners) ready to download
 📣 **Build campaigns** — Google, Meta, LinkedIn, YouTube — full creative packages
+🧠 **Run skills** — browse the full catalogue in **Skills Library** or just ask me by name (e.g. "run cold-email", "do an seo-audit").
 
 For complete content production (Post Generator, Visual Generator, Ad Creative Generator), visit the **✨ Create Content** studio in the sidebar.
 
@@ -580,16 +615,26 @@ function MessageBubble({ msg }: { msg: AgentMessage }) {
 }
 
 export default function AgentPage() {
+  return (
+    <Suspense fallback={null}>
+      <AgentPageInner />
+    </Suspense>
+  );
+}
+
+function AgentPageInner() {
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<AgentMessage[]>([INTRO_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const handledSkillRef = useRef<string | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  function send(text: string) {
+  const send = useCallback((text: string) => {
     if (!text.trim()) return;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: AgentMessage = { role: 'user', content: text, timestamp: now };
@@ -608,7 +653,17 @@ export default function AgentPage() {
       setMessages((prev) => [...prev, agentMsg]);
       setIsTyping(false);
     }, 1200);
-  }
+  }, []);
+
+  // If the page is opened with ?skill=<id>, auto-send that skill's example prompt once.
+  useEffect(() => {
+    const skillId = searchParams?.get('skill');
+    if (!skillId || handledSkillRef.current === skillId) return;
+    const skill = marketingSkills.find((s) => s.id === skillId);
+    if (!skill) return;
+    handledSkillRef.current = skillId;
+    send(skill.examplePrompt);
+  }, [searchParams, send]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-120px)] max-w-4xl mx-auto">
@@ -620,7 +675,10 @@ export default function AgentPage() {
             {tool}
           </span>
         ))}
-        <Link href="/create" className="ml-auto text-xs px-3 py-1 bg-primary text-white rounded-full font-semibold hover:bg-primary-dark transition shrink-0">
+        <Link href="/skills" className="ml-auto text-xs px-3 py-1 bg-white border border-primary/30 text-primary rounded-full font-semibold hover:bg-primary/10 transition shrink-0">
+          🧠 Skills Library →
+        </Link>
+        <Link href="/create" className="text-xs px-3 py-1 bg-primary text-white rounded-full font-semibold hover:bg-primary-dark transition shrink-0">
           ✨ Create Studio →
         </Link>
       </div>
