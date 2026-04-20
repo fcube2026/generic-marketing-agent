@@ -128,7 +128,7 @@ export class PharmacyJobScheduler implements OnModuleInit, OnModuleDestroy {
 
     // Schedule follow-up reminder (1 day before refill date)
     const followupDelay = Math.max(0, followupDate.getTime() - now.getTime());
-    if (followupDelay > initialDelay) {
+    if (followupDelay > 0 && followupDate > reminderDate) {
       await this.refillReminderQueue.add(
         PHARMACY_JOB_NAMES.REFILL_REMINDER_FOLLOWUP,
         { ...jobData, reminderDate: followupDate, isFollowup: true },
