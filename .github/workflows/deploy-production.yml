@@ -165,12 +165,34 @@ jobs:
       name: production
       url: https://api.curex24.com
     steps:
+      # Required secrets (set in GitHub repo → Settings → Secrets):
+      #   RAILWAY_TOKEN              – Railway API token with access to the production service
+      #   PRODUCTION_DATABASE_URL    – pooled Supabase/Postgres connection string
+      #   PRODUCTION_DIRECT_URL      – direct (non-pooled) Postgres connection string used by Prisma migrations
+      # If any of the above are unset the entire deploy job is skipped cleanly
+      # (the workflow stays green) instead of failing partway through.
       - name: Check if production secrets are configured
         id: check-secrets
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          PRODUCTION_DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
         run: |
-          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+          missing=()
+          if [ -z "$RAILWAY_TOKEN" ]; then missing+=("RAILWAY_TOKEN"); fi
+          if [ -z "$PRODUCTION_DATABASE_URL" ]; then missing+=("PRODUCTION_DATABASE_URL"); fi
+          if [ -z "$PRODUCTION_DIRECT_URL" ]; then missing+=("PRODUCTION_DIRECT_URL"); fi
+          if [ ${#missing[@]} -gt 0 ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "⚠️ RAILWAY_TOKEN not configured — skipping production deploy"
+            echo "⚠️ Skipping production deploy — missing secrets: ${missing[*]}"
+            {
+              echo "## ⚠️ Production deploy skipped"
+              echo ""
+              echo "The following GitHub Actions secrets are not configured:"
+              for s in "${missing[@]}"; do echo "- \`$s\`"; done
+              echo ""
+              echo "Configure them in **Settings → Secrets and variables → Actions** and re-run."
+            } >> $GITHUB_STEP_SUMMARY
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
@@ -202,11 +224,25 @@ jobs:
           DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
 
       - name: Apply database migrations
+        id: migrate
         if: steps.check-secrets.outputs.skip != 'true'
+        continue-on-error: true
         run: cd packages/database && pnpm exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
           DIRECT_URL: ${{ secrets.PRODUCTION_DIRECT_URL }}
+
+      - name: Report migration result
+        if: steps.check-secrets.outputs.skip != 'true' && steps.migrate.outcome == 'failure'
+        run: |
+          echo "::warning::Database migration failed. The API will still deploy — migrations will be retried automatically when the Railway container starts (see apps/api/docker-entrypoint.sh)."
+          echo "Common causes: invalid DATABASE_URL / DIRECT_URL (check port number, special characters), or DB not reachable from GitHub Actions runner."
+          {
+            echo "## ⚠️ Migration Warning"
+            echo "Database migration failed during CI. The API container will retry migrations on startup via \`apps/api/docker-entrypoint.sh\`."
+            echo ""
+            echo "**Action required:** Verify \`PRODUCTION_DIRECT_URL\` secret is a valid PostgreSQL connection string (e.g. \`postgresql://postgres:PASSWORD@db.XXX.supabase.co:5432/postgres\`)."
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Install Railway CLI
         if: steps.check-secrets.outputs.skip != 'true'
