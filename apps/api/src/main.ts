@@ -26,7 +26,11 @@ async function bootstrap() {
           // Allow if explicitly listed in CORS_ORIGINS
           if (allowedOrigins.includes(origin)) return callback(null, true);
           // Allow any *.curex24.com subdomain (admin, doctor, app, etc.)
-          if (/^https:\/\/([a-z0-9-]+\.)*curex24\.com$/.test(origin))
+          if (
+            /^https:\/\/([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*curex24\.com$/i.test(
+              origin,
+            )
+          )
             return callback(null, true);
           callback(new Error('Not allowed by CORS'));
         },
