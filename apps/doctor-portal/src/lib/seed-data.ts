@@ -5,7 +5,7 @@
  * Set USE_SEED = false and remove imports when connecting to real API.
  */
 
-export const USE_SEED = true;
+export const USE_SEED = false;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -34,6 +34,11 @@ export class AdminController {
     return this.adminService.getProviderById(providerId);
   }
 
+  @Get('providers/:id/patients')
+  getProviderPatients(@Param('id') providerId: string) {
+    return this.adminService.getProviderPatients(providerId);
+  }
+
   @Put('providers/:id/verify')
   verifyProvider(
     @Param('id') providerId: string,
