@@ -3,6 +3,11 @@ import { getOpenAIClient, IMAGE_MODEL } from '@/lib/ai/openai-client';
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
 import { pickClosestSize } from '@/lib/ai/image-sizes';
+import {
+  pollinationsImage,
+  POLLINATIONS_IMAGE_MODEL,
+  PollinationsError,
+} from '@/lib/ai/pollinations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,16 +64,38 @@ export async function POST(req: NextRequest) {
   const height = asPositiveInt(body.height, 1024);
   const size = pickClosestSize(width, height);
 
-  // 4. Call OpenAI
+  // 4. Call OpenAI — or fall back to the free Pollinations provider when no
+  //    OPENAI_API_KEY is configured. Returned shape matches the OpenAI path
+  //    so the client is unaffected.
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'OpenAI client unavailable';
-    return NextResponse.json(
-      { error: message, code: 'provider_not_configured' },
-      { status: 503 },
-    );
+  } catch {
+    try {
+      const { dataUrl } = await pollinationsImage({ prompt, width, height });
+      // eslint-disable-next-line no-console
+      console.log(
+        `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (fallback) requested=${width}x${height}`,
+      );
+      return NextResponse.json({
+        dataUrl,
+        model: POLLINATIONS_IMAGE_MODEL,
+        size,
+        requestedWidth: width,
+        requestedHeight: height,
+      });
+    } catch (fallbackErr) {
+      const status =
+        fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
+      const message =
+        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
+      // eslint-disable-next-line no-console
+      console.error('[ai/image] Pollinations fallback failed', { status, message });
+      return NextResponse.json(
+        { error: message, code: 'provider_error' },
+        { status: 502 },
+      );
+    }
   }
 
   try {
