@@ -1,7 +1,13 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
-import Badge from '@/components/ui/Badge';
 import { StatusBadge } from '@/components/ui/Badge';
-import { keywordClusters, seoPages } from '@/lib/data';
+import {
+  listKeywordClusters,
+  listSeoPages,
+} from '@/lib/services/marketingService';
+import type { KeywordCluster, SeoPage } from '@/lib/types';
 
 const typeColors: Record<string, string> = {
   transactional: 'bg-green-100 text-green-700',
@@ -30,6 +36,38 @@ const pageTypeColors: Record<string, string> = {
 };
 
 export default function SeoPage() {
+  const [keywordClusters, setKeywordClusters] = useState<KeywordCluster[]>([]);
+  const [seoPages, setSeoPages] = useState<SeoPage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listKeywordClusters(), listSeoPages()])
+      .then(([clusters, pages]) => {
+        if (cancelled) return;
+        setKeywordClusters(clusters);
+        setSeoPages(pages);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load SEO data');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+  if (error)
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
+
   const totalKeywords = keywordClusters.reduce((sum, c) => sum + c.keywords.length, 0);
   const livePages = seoPages.filter((p) => p.status === 'live').length;
   const inProgressPages = seoPages.filter((p) => p.status === 'in-progress').length;

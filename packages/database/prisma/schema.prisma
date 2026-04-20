@@ -818,3 +818,166 @@ model PrescriptionReviewLog {
   @@index([prescriptionId])
   @@map("prescription_review_logs")
 }
+
+// =======================
+// MARKETING MODELS
+// =======================
+
+model MarketingBusinessProfile {
+  id                      String   @id @default(cuid())
+  primaryGrowthFocus      String   @default("both") // 'patients' | 'providers' | 'both'
+  biggestBottleneck       String   @default("demand") // 'supply' | 'demand' | 'activation'
+  monthlyBudget           Int      @default(0)
+  allocatedBudget         Int      @default(0)
+  targetCities            String[] @default([])
+  bestPerforming          String   @default("")
+  topPatientPersona       String   @default("")
+  topReasonPatientChooses String   @default("")
+  topReasonProviderJoins  String   @default("")
+  competitors             String[] @default([])
+  founderLedBrand         Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("marketing_business_profiles")
+}
+
+model MarketingCampaign {
+  id          String   @id @default(cuid())
+  name        String
+  objective   String
+  channel     String
+  audience    String
+  budget      String
+  duration    String
+  kpi         String
+  status      String   @default("planned") // 'active' | 'planned' | 'completed' | 'paused'
+  headline    String[] @default([])
+  description String[] @default([])
+  spend       Float    @default(0)
+  impressions Int      @default(0)
+  conversions Int      @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@map("marketing_campaigns")
+}
+
+model MarketingExperiment {
+  id         String   @id @default(cuid())
+  name       String
+  hypothesis String
+  channel    String
+  control    String
+  variant    String
+  metric     String
+  startDate  String
+  endDate    String
+  result     String?
+  winner     String? // 'control' | 'variant' | 'no-difference'
+  status     String   @default("planned") // 'running' | 'completed' | 'planned' | 'paused'
+  lift       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@map("marketing_experiments")
+}
+
+model MarketingContentItem {
+  id        String   @id @default(cuid())
+  week      Int
+  day       String
+  platform  String
+  pillar    String // 'patient-education' | 'provider-spotlight' | 'product-education' | 'social-proof' | 'local-health'
+  title     String
+  format    String
+  status    String   @default("planned") // 'planned' | 'in-progress' | 'ready' | 'published'
+  scheduledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([week])
+  @@index([status])
+  @@map("marketing_content_items")
+}
+
+model MarketingSeoPage {
+  id            String   @id @default(cuid())
+  url           String   @unique
+  type          String // 'city-specialty' | 'condition' | 'blog' | 'comparison'
+  title         String
+  status        String   @default("planned") // 'live' | 'in-progress' | 'planned'
+  targetKeyword String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("marketing_seo_pages")
+}
+
+model MarketingKeywordCluster {
+  id       String   @id @default(cuid())
+  cluster  String
+  type     String // 'transactional' | 'informational' | 'comparison' | 'provider-side'
+  priority String // 'high' | 'medium' | 'low'
+  keywords Json     @default("[]") // Array<{ keyword, volume, difficulty }>
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("marketing_keyword_clusters")
+}
+
+model MarketingLifecycleFlow {
+  id        String                   @id @default(cuid())
+  name      String
+  segment   String // 'patient' | 'provider'
+  trigger   String
+  status    String                   @default("draft") // 'active' | 'draft' | 'paused'
+  steps     MarketingLifecycleStep[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  @@map("marketing_lifecycle_flows")
+}
+
+model MarketingLifecycleStep {
+  id      String @id @default(cuid())
+  flowId  String
+  day     Int
+  channel String
+  message String
+  goal    String
+  order   Int    @default(0)
+
+  flow MarketingLifecycleFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@index([flowId])
+  @@map("marketing_lifecycle_steps")
+}
+
+model MarketingPlanItem {
+  id        String   @id @default(cuid())
+  phase     String // '1-30' | '31-60' | '61-90'
+  category  String
+  task      String
+  owner     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phase])
+  @@map("marketing_plan_items")
+}
+
+model MarketingIntakeResponse {
+  id         String   @id @default(cuid())
+  questionId String   @unique
+  value      Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("marketing_intake_responses")
+}

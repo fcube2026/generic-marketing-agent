@@ -1,19 +1,23 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { StatCard } from '@/components/ui/Card';
 import Card from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import {
-  northStarKpis,
-  acquisitionKpis,
-  ninetyDayPlan,
-  experiments,
-} from '@/lib/data';
+  getNorthStarKpis,
+  getAcquisitionKpis,
+  listExperiments,
+  listPlanItems,
+} from '@/lib/services/marketingService';
+import type { Experiment, KpiMetric, PlanItem } from '@/lib/types';
 
 const quickActions = [
   { href: '/intake', label: 'Complete Intake', icon: '📝', desc: 'Answer business questions to personalise strategy' },
   { href: '/campaigns', label: 'View Campaigns', icon: '📣', desc: 'See active campaigns and generate new briefs' },
-  { href: '/content-calendar', label: 'Content Calendar', icon: '📅', desc: 'Plan this week\'s content across platforms' },
+  { href: '/content-calendar', label: 'Content Calendar', icon: '📅', desc: "Plan this week's content across platforms" },
   { href: '/create', label: 'Create Content', icon: '✨', desc: 'Generate posts, visuals, and ad creatives with AI' },
   { href: '/agent', label: 'Ask Marketing Agent', icon: '🤖', desc: 'Get instant strategic or copy recommendations' },
 ];
@@ -31,6 +35,56 @@ const phaseLabels: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const [northStarKpis, setNorthStarKpis] = useState<KpiMetric[]>([]);
+  const [acquisitionKpis, setAcquisitionKpis] = useState<KpiMetric[]>([]);
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [ninetyDayPlan, setNinetyDayPlan] = useState<PlanItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      getNorthStarKpis(),
+      getAcquisitionKpis(),
+      listExperiments(),
+      listPlanItems(),
+    ])
+      .then(([ns, acq, exp, plan]) => {
+        if (cancelled) return;
+        setNorthStarKpis(ns);
+        setAcquisitionKpis(acq);
+        setExperiments(exp);
+        setNinetyDayPlan(plan);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+        <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+        <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
+  }
+
   const runningExperiments = experiments.filter((e) => e.status === 'running');
   const completedTasks = ninetyDayPlan.filter((t) => t.done).length;
   const totalTasks = ninetyDayPlan.length;
@@ -116,7 +170,9 @@ export default function DashboardPage() {
               </div>
             ))}
             {runningExperiments.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4">No experiments running. <Link href="/experiments" className="text-primary underline">Start one →</Link></p>
+              <p className="text-sm text-gray-500 text-center py-4">
+                No experiments running. <Link href="/experiments" className="text-primary underline">Start one →</Link>
+              </p>
             )}
           </div>
         </Card>
@@ -125,38 +181,19 @@ export default function DashboardPage() {
       {/* 90-Day Plan Progress */}
       <Card title="90-Day Plan Progress" subtitle={`${completedTasks} of ${totalTasks} tasks completed`}>
         <div className="space-y-4">
-          <ProgressBar value={completedTasks} max={totalTasks} label="Overall progress" />
+          <ProgressBar value={completedTasks} max={Math.max(totalTasks, 1)} label="Overall progress" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             {(Object.keys(phaseProgress) as Array<keyof typeof phaseProgress>).map((phase) => {
               const { done, total } = phaseProgress[phase];
               return (
                 <div key={phase} className={`rounded-lg border p-4 ${phaseColors[phase]}`}>
                   <p className="text-sm font-semibold text-gray-700 mb-2">{phaseLabels[phase]}</p>
-                  <ProgressBar value={done} max={total} showPercent />
+                  <ProgressBar value={done} max={Math.max(total, 1)} showPercent />
                   <p className="text-xs text-gray-500 mt-1">{done} / {total} tasks done</p>
                 </div>
               );
             })}
           </div>
-        </div>
-      </Card>
-
-      {/* This Week's Priorities */}
-      <Card title="This Week's Priorities" subtitle="Recommended by your Marketing Agent">
-        <div className="space-y-3">
-          {[
-            { priority: '🔴 Critical', title: 'Launch LinkedIn provider recruitment campaign', detail: 'Active provider count at 148 vs target 200 — supply is the #1 growth constraint.' },
-            { priority: '🟡 At Risk', title: 'Activate Day 3 onboarding incentive email A/B test', detail: 'Signup → first booking rate is 28% vs 35% target. Day 3 email has the highest leverage.' },
-            { priority: '🟢 Quick Win', title: 'Add referral CTA to post-booking confirmation screen', detail: 'Referrals at 9% vs 15% target. 1-day engineering task, high long-term ROI.' },
-          ].map((item) => (
-            <div key={item.title} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-              <span className="text-sm mt-0.5 shrink-0">{item.priority}</span>
-              <div>
-                <p className="text-sm font-semibold text-gray-800">{item.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{item.detail}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </Card>
     </div>
