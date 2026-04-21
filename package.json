@@ -4,7 +4,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "pnpm db:generate && turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
     "db:generate": "pnpm --filter @curex24/database db:generate",

@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "build": "node ../../node_modules/@nestjs/cli/bin/nest.js build",
+    "predev": "pnpm --filter @curex24/database db:generate",
     "dev": "node ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start": "node dist/main",
-    "start:dev": "node --max-old-space-size=4096 ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "start:dev": "pnpm --filter @curex24/database db:generate && node --max-old-space-size=4096 ../../node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start:debug": "node ../../node_modules/@nestjs/cli/bin/nest.js start --debug --watch",
     "format:check": "prettier --check \"{src,apps,libs,test}/**/*.ts\"",
     "format:fix": "prettier --write \"{src,apps,libs,test}/**/*.ts\"",
