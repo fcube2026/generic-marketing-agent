@@ -1132,7 +1132,7 @@ function AgentPageInner() {
       {/* AI Skills Banner */}
       <div className="bg-gradient-to-r from-primary/10 to-purple-50 border border-primary/20 rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-2 mb-3 shrink-0">
         <span className="text-xs font-semibold text-primary uppercase tracking-wide">Powered by</span>
-        {['OpenAI GPT-4o', 'OpenAI gpt-image-1', 'Google Imagen 3'].map((tool) => (
+        {['OpenAI GPT-4o', 'OpenAI gpt-image-1', 'Google Nano Banana'].map((tool) => (
           <span key={tool} className="text-xs px-2 py-0.5 bg-white border border-gray-200 rounded-full text-gray-700 font-medium">
             {tool}
           </span>

@@ -21,8 +21,8 @@ pnpm --filter @curex24/marketing-agent dev
 | `OPENAI_TEXT_MODEL` | No | Chat/completion model. Defaults to `gpt-4o-mini`. Use `gpt-4o` for higher quality. |
 | `OPENAI_IMAGE_MODEL` | No | Image model. Defaults to `gpt-image-1` (DALL-E 3 successor). |
 | `OPENAI_BASE_URL` | No | Override the OpenAI base URL (e.g. for Azure OpenAI or a self-hosted proxy). |
-| `GOOGLE_AI_API_KEY` | No (recommended for Imagen) | Server-side Google AI Studio key. Powers the "Google · Imagen 3" option in `/api/ai/image`. Get one at <https://aistudio.google.com/apikey>. Without it, "google" requests fall back to the free Pollinations provider. |
-| `GOOGLE_AI_IMAGE_MODEL` | No | Google image model. Defaults to `imagen-3.0-generate-002` (`:predict`, billing-enabled GCP project required). Set to `gemini-2.5-flash-image` ("Nano Banana") to use the Gemini image-generation family via `:generateContent` — works on free AI Studio keys. |
+| `GOOGLE_AI_API_KEY` | No (recommended for Nano Banana) | Server-side Google AI Studio key. Powers the "Google · Nano Banana" option in `/api/ai/image`. Get one at <https://aistudio.google.com/apikey>. Without it, "google" requests fall back to the free Pollinations provider. |
+| `GOOGLE_AI_IMAGE_MODEL` | No | Google image model. Defaults to `gemini-2.5-flash-image` ("Nano Banana") which uses `:generateContent` and works on free AI Studio keys. Set to `imagen-3.0-generate-002` to use Imagen 3 instead (`:predict`, billing-enabled GCP project required). |
 | `GOOGLE_AI_TEXT_MODEL` | No | Gemini model used by `getGoogleAIClient()` (reserved for future text routes). Defaults to `gemini-1.5-flash`. |
 | `GOOGLE_AI_BASE_URL` | No | Override the Generative Language API base URL (e.g. proxy / regional endpoint). |
 | `AI_IMAGE_PROVIDER` | No | Default image provider when the client does not specify one. `openai` (default) or `google`. The UI toggle always overrides this per request. |
@@ -35,7 +35,7 @@ pnpm --filter @curex24/marketing-agent dev
 The Visual Generator (`/create`) and the agent chat (`/agent`) both expose an **Image model** toggle in the header with two options:
 
 - **OpenAI · gpt-image-1** — uses `OPENAI_API_KEY` + `OPENAI_IMAGE_MODEL`.
-- **Google · Imagen 3** — uses `GOOGLE_AI_API_KEY` + `GOOGLE_AI_IMAGE_MODEL`.
+- **Google · Nano Banana** — uses `GOOGLE_AI_API_KEY` + `GOOGLE_AI_IMAGE_MODEL` (default `gemini-2.5-flash-image`).
 
 The selection is persisted in `localStorage` under the key `marketing_image_provider` and is sent to `/api/ai/image` as `{ provider: 'openai' | 'google' }`.
 
@@ -53,8 +53,8 @@ Create `apps/marketing-agent/.env.local` (git-ignored) and add the key in plain 
 
 ```bash
 GOOGLE_AI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-GOOGLE_AI_IMAGE_MODEL=imagen-3.0-generate-002
-AI_IMAGE_PROVIDER=openai            # default; users can flip in the UI
+GOOGLE_AI_IMAGE_MODEL=gemini-2.5-flash-image   # "Nano Banana" — free AI Studio tier
+AI_IMAGE_PROVIDER=openai                       # default; users can flip in the UI
 ```
 
 Restart the Next.js dev server after editing — env vars are only read at boot.

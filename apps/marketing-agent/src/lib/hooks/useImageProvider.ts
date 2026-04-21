@@ -9,7 +9,7 @@ export const IMAGE_PROVIDER_CHANGE_EVENT = 'marketing_image_provider:change';
 
 export const IMAGE_PROVIDER_LABELS: Record<ImageProvider, string> = {
   openai: 'OpenAI · gpt-image-1',
-  google: 'Google · Imagen 3',
+  google: 'Google · Nano Banana',
 };
 
 export const DEFAULT_IMAGE_PROVIDER: ImageProvider = 'openai';
