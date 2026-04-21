@@ -8,7 +8,7 @@ export const IMAGE_PROVIDER_STORAGE_KEY = 'marketing_image_provider';
 export const IMAGE_PROVIDER_CHANGE_EVENT = 'marketing_image_provider:change';
 
 export const IMAGE_PROVIDER_LABELS: Record<ImageProvider, string> = {
-  openai: 'OpenAI · gpt-image-1',
+  openai: 'OpenAI · dall-e-3',
   google: 'Google · Nano Banana',
 };
 

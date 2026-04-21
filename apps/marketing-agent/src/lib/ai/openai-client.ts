@@ -27,4 +27,4 @@ export function getOpenAIClient(): OpenAI {
 }
 
 export const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4o-mini';
-export const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+export const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
