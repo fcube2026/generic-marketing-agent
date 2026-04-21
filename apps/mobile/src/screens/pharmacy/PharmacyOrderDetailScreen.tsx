@@ -16,7 +16,7 @@ import { pharmacyService } from '../../services/pharmacyService';
 import { PharmacyOrder } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
-import { canCancelPharmacyOrder } from '../../utils/pharmacy';
+import { canCancelPharmacyOrder, getPharmacyDisplayPricing } from '../../utils/pharmacy';
 
 type Route = RouteProp<PatientStackParamList, 'PharmacyOrderDetail'>;
 
@@ -83,6 +83,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
 
   const canCancel = canCancelPharmacyOrder(order.status);
   const statusColor = STATUS_COLORS[order.status] ?? Colors.textMuted;
+  const pricing = getPharmacyDisplayPricing(order);
 
   return (
     <ScrollView
@@ -132,7 +133,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
         </View>
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Delivery Fee</Text>
-          <Text style={styles.priceValue}>{formatCurrency(order.deliveryFee)}</Text>
+          <Text style={styles.priceValue}>{formatCurrency(pricing.deliveryFee)}</Text>
         </View>
         {order.discount > 0 && (
           <View style={styles.priceRow}>
@@ -144,7 +145,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
         )}
         <View style={[styles.priceRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatCurrency(order.totalAmount)}</Text>
+          <Text style={styles.totalValue}>{formatCurrency(pricing.totalAmount)}</Text>
         </View>
       </View>
 

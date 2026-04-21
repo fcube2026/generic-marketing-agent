@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -56,7 +56,6 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const { cartItems } = route.params;
   const queryClient = useQueryClient();
 
-  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
@@ -124,6 +123,14 @@ export const PharmacyCheckoutScreen: React.FC = () => {
     queryFn: pharmacyService.getPartners,
   });
 
+  const selectedPartnerId = partners?.[0]?.id ?? null;
+
+  useEffect(() => {
+    if (!loadingPartners && (!partners || partners.length === 0)) {
+      Alert.alert('Pharmacy unavailable', 'No pharmacy partner is available right now.');
+    }
+  }, [loadingPartners, partners]);
+
   const { data: prescriptionOptions = [], isLoading: loadingPrescriptions } = useQuery<PrescriptionOption[]>({
     queryKey: ['patient-prescriptions'],
     queryFn: async () => {
@@ -180,6 +187,11 @@ export const PharmacyCheckoutScreen: React.FC = () => {
     0,
   );
 
+  const DELIVERY_FEE = subtotal >= 500 ? 0 : 40;
+  const GST_RATE = 0.05; // 5% GST on medicines
+  const gstAmount = Math.round(subtotal * GST_RATE);
+  const totalAmount = subtotal + DELIVERY_FEE + gstAmount;
+
   const prescriptionRequired = useMemo(
     () => cartItems.some((item) => requiresPrescriptionForMedicine(item.medicine)),
     [cartItems],
@@ -192,7 +204,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     if (!selectedPartnerId) {
-      Alert.alert('Please select a pharmacy partner');
+      Alert.alert('Pharmacy unavailable', 'No pharmacy partner is available right now.');
       return;
     }
     if (!addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
@@ -268,6 +280,27 @@ export const PharmacyCheckoutScreen: React.FC = () => {
           <Text style={styles.subtotalLabel}>Subtotal</Text>
           <Text style={styles.subtotalValue}>{formatCurrency(subtotal)}</Text>
         </View>
+        <View style={styles.subtotalRow}>
+          <Text style={styles.feeLabel}>GST (5%)</Text>
+          <Text style={styles.feeValue}>{formatCurrency(gstAmount)}</Text>
+        </View>
+        <View style={styles.subtotalRow}>
+          <Text style={styles.feeLabel}>
+            Delivery Fee{subtotal >= 500 ? ' 🎉' : ''}
+          </Text>
+          <Text style={[styles.feeValue, DELIVERY_FEE === 0 && styles.freeText]}>
+            {DELIVERY_FEE === 0 ? 'FREE' : formatCurrency(DELIVERY_FEE)}
+          </Text>
+        </View>
+        {DELIVERY_FEE > 0 && (
+          <Text style={styles.freeDeliveryHint}>
+            Add {formatCurrency(500 - subtotal)} more for free delivery
+          </Text>
+        )}
+        <View style={[styles.subtotalRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -327,41 +360,16 @@ export const PharmacyCheckoutScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Select Partner */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Pharmacy Partner</Text>
-        {!partners || partners.length === 0 ? (
-          <Text style={styles.noDataText}>No pharmacy partners available</Text>
-        ) : (
-          partners.map((partner) => (
-            <TouchableOpacity
-              key={partner.id}
-              style={[
-                styles.partnerCard,
-                selectedPartnerId === partner.id && styles.selectedCard,
-              ]}
-              onPress={() => setSelectedPartnerId(partner.id)}
-            >
-              <View style={styles.partnerInfo}>
-                <Text style={styles.partnerName}>{partner.displayName || partner.name}</Text>
-                {partner.description && (
-                  <Text style={styles.partnerDesc}>{partner.description}</Text>
-                )}
-              </View>
-              <View
-                style={[
-                  styles.radioBtn,
-                  selectedPartnerId === partner.id && styles.radioBtnSelected,
-                ]}
-              />
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
-
       {/* Delivery Address */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Delivery Address</Text>
+        {selectedPartnerId ? (
+          <Text style={styles.helperText}>
+            Pharmacy partner is assigned automatically during checkout.
+          </Text>
+        ) : (
+          <Text style={styles.noDataText}>No pharmacy partners available</Text>
+        )}
         <TouchableOpacity
           style={[styles.locationBtn, locating && { opacity: 0.6 }]}
           onPress={useCurrentLocation}
@@ -426,7 +434,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
 
       <View style={styles.placeOrderArea}>
         <Button
-          title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order - ${formatCurrency(subtotal)}`}
+          title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order - ${formatCurrency(totalAmount)}`}
           onPress={handlePlaceOrder}
           loading={placeOrderMutation.isPending}
           disabled={!selectedPartnerId || !addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim() || (prescriptionRequired && !selectedPrescriptionId)}
@@ -453,6 +461,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  helperText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
   orderItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -476,6 +490,24 @@ const styles = StyleSheet.create({
   },
   subtotalLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
   subtotalValue: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  feeLabel: { fontSize: 14, color: Colors.textMuted },
+  feeValue: { fontSize: 14, color: Colors.textMuted },
+  freeText: { color: Colors.success ?? '#16a34a', fontWeight: '700' },
+  freeDeliveryHint: {
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: 2,
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    marginTop: 8,
+    paddingTop: 10,
+  },
+  totalLabel: { fontSize: 16, fontWeight: '800', color: Colors.text },
+  totalValue: { fontSize: 18, fontWeight: '900', color: Colors.primary },
   complianceCard: {
     borderRadius: 10,
     backgroundColor: Colors.background,

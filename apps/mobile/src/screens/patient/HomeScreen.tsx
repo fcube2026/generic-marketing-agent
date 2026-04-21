@@ -164,6 +164,19 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.videoCardArrow}>→</Text>
       </TouchableOpacity>
 
+      {/* OTC Medicine Order Quick Access */}
+      <TouchableOpacity
+        style={styles.videoCard}
+        onPress={() => navigation.navigate('MedicineSearch')}
+      >
+        <Text style={styles.videoCardIcon}>🛒</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Order Without Prescription</Text>
+          <Text style={styles.videoCardSub}>Search & order OTC medicines directly</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>

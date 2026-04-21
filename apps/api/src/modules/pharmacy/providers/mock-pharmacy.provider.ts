@@ -141,10 +141,10 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
     this.maybeSimulateFailure('searchMedicines');
 
     const lower = query.toLowerCase();
-    // Prefix match (case-insensitive) — matches autocomplete UX semantics.
+    // If query is empty, return full catalog. Otherwise prefix-match.
     // Cap to first 10 results so the dropdown stays usable.
     const finalResults: MedicineResult[] = MEDICINE_CATALOG.filter((m) =>
-      m.name.toLowerCase().startsWith(lower),
+      lower.length === 0 ? true : m.name.toLowerCase().startsWith(lower),
     ).slice(0, 10);
 
     this.logger.log(

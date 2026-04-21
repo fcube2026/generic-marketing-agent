@@ -9,6 +9,7 @@ import { pharmacyService } from '../../services/pharmacyService';
 import { PharmacyOrder } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
+import { getPharmacyDisplayPricing } from '../../utils/pharmacy';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
@@ -50,31 +51,35 @@ export const PharmacyOrdersScreen: React.FC = () => {
           contentContainerStyle={styles.list}
           onRefresh={refetch}
           refreshing={isRefetching}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.orderCard}
-              onPress={() => navigation.navigate('PharmacyOrderDetail', { orderId: item.id })}
-            >
-              <View style={styles.orderHeader}>
-                <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
-                <Text
-                  style={[styles.statusBadge, { color: STATUS_COLORS[item.status] ?? Colors.textMuted }]}
-                >
-                  {item.status.replace(/_/g, ' ')}
+          renderItem={({ item }) => {
+            const pricing = getPharmacyDisplayPricing(item);
+
+            return (
+              <TouchableOpacity
+                style={styles.orderCard}
+                onPress={() => navigation.navigate('OrderTracking', { orderId: item.id })}
+              >
+                <View style={styles.orderHeader}>
+                  <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
+                  <Text
+                    style={[styles.statusBadge, { color: STATUS_COLORS[item.status] ?? Colors.textMuted }]}
+                  >
+                    {item.status.replace(/_/g, ' ')}
+                  </Text>
+                </View>
+                <Text style={styles.partnerName}>{item.partnerName}</Text>
+                <Text style={styles.itemsCount}>
+                  {item.items?.length ?? 0} item{(item.items?.length ?? 0) !== 1 ? 's' : ''}
                 </Text>
-              </View>
-              <Text style={styles.partnerName}>{item.partnerName}</Text>
-              <Text style={styles.itemsCount}>
-                {item.items?.length ?? 0} item{(item.items?.length ?? 0) !== 1 ? 's' : ''}
-              </Text>
-              <View style={styles.orderFooter}>
-                <Text style={styles.deliveryAddress} numberOfLines={1}>
-                  📍 {item.deliveryAddress}
-                </Text>
-                <Text style={styles.totalAmount}>{formatCurrency(item.totalAmount)}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
+                <View style={styles.orderFooter}>
+                  <Text style={styles.deliveryAddress} numberOfLines={1}>
+                    📍 {item.deliveryAddress}
+                  </Text>
+                  <Text style={styles.totalAmount}>{formatCurrency(pricing.totalAmount)}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </View>

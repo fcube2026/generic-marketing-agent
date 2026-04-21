@@ -77,8 +77,8 @@ export const usePharmacyOrderStore = create<PharmacyOrderState>((set) => ({
     set({
       prescriptionUrl: url,
       uploadError: null,
-      // Populate mock medicines when a prescription is provided
-      medicines: MOCK_MEDICINES.map((m) => ({ ...m })),
+      // Do NOT auto-populate mock medicines; real medicines come from the
+      // consultation API (useRecentConsultation) or are added manually.
     }),
 
   clearPrescription: () =>

@@ -18,7 +18,7 @@ import { pharmacyService } from '../../services/pharmacyService';
 import { PharmacyOrder } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency, formatDate, formatTime } from '../../utils/format';
-import { canCancelPharmacyOrder } from '../../utils/pharmacy';
+import { canCancelPharmacyOrder, getPharmacyDisplayPricing } from '../../utils/pharmacy';
 
 type Route = RouteProp<PatientStackParamList, 'OrderTracking'>;
 
@@ -259,6 +259,19 @@ export const OrderTrackingScreen: React.FC = () => {
   }
 
   if (isError) {
+    const httpStatus = (error as any)?.response?.status;
+    if (httpStatus === 404) {
+      return (
+        <View style={styles.centerState}>
+          <Text style={styles.stateIcon}>📦</Text>
+          <Text style={styles.stateTitle}>Order Not Found</Text>
+          <Text style={styles.stateMessage}>
+            We couldn't find an order with this ID. It may have been removed.
+          </Text>
+          <Button title="Refresh" onPress={() => refetch()} />
+        </View>
+      );
+    }
     return (
       <View style={styles.centerState}>
         <Text style={styles.stateIcon}>⚠️</Text>
@@ -292,6 +305,7 @@ export const OrderTrackingScreen: React.FC = () => {
   const canCancel = canCancelPharmacyOrder(order.status);
   const eta = formatEstimatedDelivery(order.estimatedDeliveryAt);
   const delivered = order.status === 'DELIVERED';
+  const pricing = getPharmacyDisplayPricing(order);
 
   return (
     <ScrollView
@@ -370,7 +384,7 @@ export const OrderTrackingScreen: React.FC = () => {
         </View>
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Delivery Fee</Text>
-          <Text style={styles.priceValue}>{formatCurrency(order.deliveryFee)}</Text>
+          <Text style={styles.priceValue}>{formatCurrency(pricing.deliveryFee)}</Text>
         </View>
         {order.discount > 0 && (
           <View style={styles.priceRow}>
@@ -382,7 +396,7 @@ export const OrderTrackingScreen: React.FC = () => {
         )}
         <View style={[styles.priceRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatCurrency(order.totalAmount)}</Text>
+          <Text style={styles.totalValue}>{formatCurrency(pricing.totalAmount)}</Text>
         </View>
       </View>
 
