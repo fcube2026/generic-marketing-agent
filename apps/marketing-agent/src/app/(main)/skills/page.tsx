@@ -109,8 +109,7 @@ export default function SkillsPage() {
   }, [showNotApplicable, query, notApplicableSkills]);
 
   function useSkill(skill: MarketingSkill) {
-    const params = new URLSearchParams({ skill: skill.id });
-    router.push(`/agent?${params.toString()}`);
+    router.push(`/skills/${encodeURIComponent(skill.id)}`);
   }
 
   const counts = useMemo(() => {
@@ -129,9 +128,10 @@ export default function SkillsPage() {
           {relevantSkills.length} marketing skills your AI agent can run
         </h1>
         <p className="text-sm text-gray-500 max-w-2xl">
-          Each skill is a specialised workflow — frameworks, prompts, and best practices — your AI Marketing
-          Agent uses to handle a specific marketing task. Browse, search, or click <strong>Use skill</strong>{' '}
-          to launch it in the agent with a ready-to-go prompt.
+          Each skill is a <strong>structured workflow</strong> with typed inputs, live curex24 KPI
+          context, multi-tab artifacts (markdown, JSON spec, visual), and an automatic critic pass
+          that scores the output against a rubric. Click <strong>Use skill</strong> to open the
+          Brief → Run → Artifact runner.
           {notApplicableSkills.length > 0 && (
             <>
               {' '}
