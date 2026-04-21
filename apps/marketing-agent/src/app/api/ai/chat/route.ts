@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
   // its API key it cleanly returns a `retry` outcome so we fall through to
   // the alternative without surfacing an error to the user. Pollinations is
   // always last as a free no-key fallback for dev/preview environments.
-  const order: TextProvider[] = preferred === 'openai' ? ['openai', 'google', 'pollinations'] : ['google', 'openai', 'pollinations'];
+  const order: TextProvider[] = [preferred, preferred === 'openai' ? 'google' : 'openai', 'pollinations'];
 
   let lastRetry: { provider: TextProvider; status: number; message: string } | null = null;
   for (const provider of order) {
