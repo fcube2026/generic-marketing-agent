@@ -44,11 +44,27 @@ export class PharmacyOrderService {
       throw new BadRequestException('Pharmacy partner not found or inactive');
     }
 
-    const address = await this.prisma.address.findFirst({
-      where: { id: dto.deliveryAddressId, userId },
-    });
-    if (!address) {
-      throw new NotFoundException('Delivery address not found');
+    let address;
+    if (dto.deliveryAddressId) {
+      address = await this.prisma.address.findFirst({
+        where: { id: dto.deliveryAddressId, userId },
+      });
+      if (!address) {
+        throw new NotFoundException('Delivery address not found');
+      }
+    } else if (dto.deliveryAddress) {
+      address = await this.prisma.address.create({
+        data: {
+          userId,
+          label: 'Delivery',
+          addressLine: dto.deliveryAddress.addressLine,
+          city: dto.deliveryAddress.city,
+          state: dto.deliveryAddress.state,
+          pincode: dto.deliveryAddress.pincode,
+        },
+      });
+    } else {
+      throw new BadRequestException('Delivery address is required');
     }
 
     if (dto.prescriptionId) {

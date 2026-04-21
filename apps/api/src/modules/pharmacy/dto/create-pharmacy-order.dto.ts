@@ -10,6 +10,20 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class InlineAddressDto {
+  @IsString()
+  addressLine: string;
+
+  @IsString()
+  city: string;
+
+  @IsString()
+  state: string;
+
+  @IsString()
+  pincode: string;
+}
+
 export class OrderItemDto {
   @IsString()
   medicineCode: string;
@@ -42,8 +56,14 @@ export class CreatePharmacyOrderDto {
   @IsString()
   partnerId: string;
 
+  @IsOptional()
   @IsString()
-  deliveryAddressId: string;
+  deliveryAddressId?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InlineAddressDto)
+  deliveryAddress?: InlineAddressDto;
 
   @IsOptional()
   @IsString()

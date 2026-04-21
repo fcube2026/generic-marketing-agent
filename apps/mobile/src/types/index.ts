@@ -208,7 +208,13 @@ export interface CreatePharmacyOrderPayload {
   bookingId?: string;
   prescriptionId?: string;
   partnerId: string;
-  deliveryAddressId: string;
+  deliveryAddressId?: string;
+  deliveryAddress?: {
+    addressLine: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
   notes?: string;
   items: {
     medicineCode: string;
