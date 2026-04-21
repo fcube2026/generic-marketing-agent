@@ -216,7 +216,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'programmatic-seo',
     name: 'Programmatic SEO',
-    category: 'SEO & Discovery',
+    category: 'Not Applicable',
     icon: '🧬',
     description: 'Create SEO-driven pages at scale using templates and structured data.',
     examplePrompt: 'Design a programmatic SEO template for "[doctor type] in [city]" landing pages for curex24.',
@@ -224,7 +224,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'site-architecture',
     name: 'Site Architecture',
-    category: 'SEO & Discovery',
+    category: 'Not Applicable',
     icon: '🗺️',
     description: 'Plan, map, or restructure page hierarchy, navigation, URL structure, and internal linking.',
     examplePrompt: 'Propose an information architecture for curex24.com that supports patients, providers, and SEO long-tail.',
@@ -240,7 +240,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'schema-markup',
     name: 'Schema Markup',
-    category: 'SEO & Discovery',
+    category: 'Not Applicable',
     icon: '🏷️',
     description: 'Add, fix, or optimize schema markup and structured data on a site.',
     examplePrompt: 'Generate JSON-LD schema for a curex24 doctor profile page (Physician + Service + AggregateRating).',
@@ -342,7 +342,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'popup-cro',
     name: 'Popup CRO',
-    category: 'Conversion Optimization',
+    category: 'Not Applicable',
     icon: '🪟',
     description: 'Create or optimize popups, modals, overlays, slide-ins, or banners for conversion.',
     examplePrompt: 'Design an exit-intent popup for the curex24 pricing page that captures email + offers ₹100 off.',
@@ -350,7 +350,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'paywall-upgrade-cro',
     name: 'Paywall / Upgrade CRO',
-    category: 'Conversion Optimization',
+    category: 'Not Applicable',
     icon: '🔓',
     description: 'Create or optimize in-app paywalls, upgrade screens, upsell modals, or feature gates.',
     examplePrompt: 'Design an in-app upgrade screen prompting curex24 patients to subscribe to the annual care plan.',
@@ -368,7 +368,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'content-strategy',
     name: 'Content Strategy',
-    category: 'Strategy & Monetization',
+    category: 'Not Applicable',
     icon: '🧱',
     description: 'Plan a content strategy, decide what content to create, or figure out what topics to cover.',
     examplePrompt: 'Build a 90-day content strategy for the curex24 blog — pillars, topics, and distribution plan.',
@@ -376,7 +376,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'launch-strategy',
     name: 'Launch Strategy',
-    category: 'Strategy & Monetization',
+    category: 'Not Applicable',
     icon: '🚀',
     description: 'Plan a product launch, feature announcement, or release strategy.',
     examplePrompt: 'Plan a launch for curex24’s new mental-health home-visit service — channels, sequence, and assets.',
@@ -384,7 +384,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'marketing-ideas',
     name: 'Marketing Ideas',
-    category: 'Strategy & Monetization',
+    category: 'Not Applicable',
     icon: '💡',
     description: 'Get marketing ideas, inspiration, or strategies for a SaaS or software product.',
     examplePrompt: 'Give me 20 unconventional growth ideas for curex24 — specifically for the Mumbai market.',
@@ -392,7 +392,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'marketing-psychology',
     name: 'Marketing Psychology',
-    category: 'Strategy & Monetization',
+    category: 'Not Applicable',
     icon: '🎭',
     description: 'Apply psychological principles, mental models, or behavioural science to marketing.',
     examplePrompt: 'Apply behavioural-science principles to lift curex24 referral participation from 9% to 15%.',
