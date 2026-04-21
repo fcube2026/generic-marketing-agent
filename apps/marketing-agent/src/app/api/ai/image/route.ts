@@ -8,6 +8,7 @@ import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
 import { pickClosestSize } from '@/lib/ai/image-sizes';
 import { getErrorStatus } from '@/lib/ai/error-utils';
+import { pollinationsImage, POLLINATIONS_IMAGE_MODEL, PollinationsError } from '@/lib/ai/pollinations';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
 const MAX_PROMPT_CHARS = 4000;
 const MIN_PROMPT_CHARS = 3;
 
-type ImageProvider = 'openai' | 'google';
+type ImageProvider = 'openai' | 'google' | 'pollinations';
 
 interface ImageRequestBody {
   prompt?: unknown;
@@ -99,15 +100,18 @@ export async function POST(req: NextRequest) {
 
   // Try preferred provider first, then the other. If a provider is missing
   // its API key it's still attempted (the helper returns a `retry` outcome
-  // immediately) so we cleanly fall through to the alternative.
-  const order: ImageProvider[] = preferred === 'openai' ? ['openai', 'google'] : ['google', 'openai'];
+  // immediately) so we cleanly fall through to the alternative. Pollinations
+  // is always last as a free no-key fallback for dev/preview environments.
+  const order: ImageProvider[] = [preferred, preferred === 'openai' ? 'google' : 'openai', 'pollinations'];
 
   let lastRetry: { provider: ImageProvider; status: number; message: string } | null = null;
   for (const provider of order) {
     const outcome =
       provider === 'openai'
         ? await tryOpenAI({ prompt, width, height, size })
-        : await tryGoogle({ prompt, width, height, size });
+        : provider === 'google'
+          ? await tryGoogle({ prompt, width, height, size })
+          : await tryPollinations({ prompt, width, height, size });
 
     if (outcome.kind === 'success' || outcome.kind === 'fatal') {
       return outcome.response;
@@ -147,7 +151,7 @@ async function tryOpenAI(args: {
     const result = await client.images.generate({
       model: IMAGE_MODEL,
       prompt,
-      size: size as '1024x1024' | '1024x1536' | '1536x1024',
+      size: size as '1024x1024' | '1024x1792' | '1792x1024',
       n: 1,
     });
 
@@ -212,6 +216,34 @@ async function tryGoogle(args: {
     return { kind: 'success', response: NextResponse.json(payload) };
   } catch (err) {
     return classifyError('google', err);
+  }
+}
+
+async function tryPollinations(args: {
+  prompt: string;
+  width: number;
+  height: number;
+  size: string;
+}): Promise<ProviderOutcome> {
+  const { prompt, width, height, size } = args;
+  try {
+    const { dataUrl } = await pollinationsImage({ prompt, width, height });
+    // eslint-disable-next-line no-console
+    console.log(`[ai/image] model=${POLLINATIONS_IMAGE_MODEL} size=${size} requested=${width}x${height} (pollinations fallback)`);
+    const payload: SuccessPayload = {
+      dataUrl,
+      model: POLLINATIONS_IMAGE_MODEL,
+      size,
+      requestedWidth: width,
+      requestedHeight: height,
+    };
+    return { kind: 'success', response: NextResponse.json(payload) };
+  } catch (err) {
+    const status = err instanceof PollinationsError ? err.status : 502;
+    const message = err instanceof Error ? err.message : 'Pollinations image failed';
+    // eslint-disable-next-line no-console
+    console.error('[ai/image] pollinations error', { status, message });
+    return { kind: 'retry', status, message };
   }
 }
 

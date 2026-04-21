@@ -108,7 +108,7 @@ export interface AdvancedSkillConfig {
   /** Critic rubric used by `/api/ai/critique`. */
   successCriteria?: SkillRubricCriterion[];
   /** Model recommendation surfaced in the UI. */
-  model?: 'gpt-4o-mini' | 'gpt-4o' | 'gpt-image-1';
+  model?: 'gpt-4o-mini' | 'gpt-4o' | 'dall-e-3';
   tier?: SkillTier;
   /**
    * If set, after the main run we generate a visual at this aspect ratio.

@@ -7,6 +7,7 @@ import {
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
 import { getErrorStatus } from '@/lib/ai/error-utils';
+import { pollinationsChat, POLLINATIONS_TEXT_MODEL, PollinationsError } from '@/lib/ai/pollinations';
 
 // We talk to OpenAI from the route handler — keep us on the Node.js runtime.
 export const runtime = 'nodejs';
@@ -42,7 +43,7 @@ interface ChatMessage {
   content: string;
 }
 
-type TextProvider = 'openai' | 'google';
+type TextProvider = 'openai' | 'google' | 'pollinations';
 
 interface ChatRequestBody {
   messages?: unknown;
@@ -154,15 +155,18 @@ export async function POST(req: NextRequest) {
 
   // Try preferred provider first, then the other. If a provider is missing
   // its API key it cleanly returns a `retry` outcome so we fall through to
-  // the alternative without surfacing an error to the user.
-  const order: TextProvider[] = preferred === 'openai' ? ['openai', 'google'] : ['google', 'openai'];
+  // the alternative without surfacing an error to the user. Pollinations is
+  // always last as a free no-key fallback for dev/preview environments.
+  const order: TextProvider[] = [preferred, preferred === 'openai' ? 'google' : 'openai', 'pollinations'];
 
   let lastRetry: { provider: TextProvider; status: number; message: string } | null = null;
   for (const provider of order) {
     const outcome =
       provider === 'openai'
         ? await tryOpenAI({ systemPrompt, messages })
-        : await tryGoogle({ systemPrompt, messages });
+        : provider === 'google'
+          ? await tryGoogle({ systemPrompt, messages })
+          : await tryPollinations({ systemPrompt, messages });
 
     if (outcome.kind === 'success' || outcome.kind === 'fatal') {
       return outcome.response;
@@ -268,6 +272,33 @@ async function tryGoogle({
     return { kind: 'success', response: NextResponse.json({ reply, model, usage }) };
   } catch (err) {
     return classifyError('google', err);
+  }
+}
+
+async function tryPollinations({
+  systemPrompt,
+  messages,
+}: {
+  systemPrompt: string;
+  messages: ChatMessage[];
+}): Promise<ProviderOutcome> {
+  try {
+    const reply = await pollinationsChat({ system: systemPrompt, messages });
+    if (!reply) {
+      return { kind: 'retry', status: 502, message: 'Pollinations returned an empty reply' };
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[ai/chat] model=${POLLINATIONS_TEXT_MODEL} (pollinations fallback)`);
+    return {
+      kind: 'success',
+      response: NextResponse.json({ reply, model: POLLINATIONS_TEXT_MODEL }),
+    };
+  } catch (err) {
+    const status = err instanceof PollinationsError ? err.status : 502;
+    const message = err instanceof Error ? err.message : 'Pollinations chat failed';
+    // eslint-disable-next-line no-console
+    console.error('[ai/chat] pollinations error', { status, message });
+    return { kind: 'retry', status, message };
   }
 }
 
