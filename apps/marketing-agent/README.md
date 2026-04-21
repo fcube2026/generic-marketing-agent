@@ -22,7 +22,7 @@ pnpm --filter @curex24/marketing-agent dev
 | `OPENAI_IMAGE_MODEL` | No | Image model. Defaults to `gpt-image-1` (DALL-E 3 successor). |
 | `OPENAI_BASE_URL` | No | Override the OpenAI base URL (e.g. for Azure OpenAI or a self-hosted proxy). |
 | `GOOGLE_AI_API_KEY` | No (recommended for Imagen) | Server-side Google AI Studio key. Powers the "Google · Imagen 3" option in `/api/ai/image`. Get one at <https://aistudio.google.com/apikey>. Without it, "google" requests fall back to the free Pollinations provider. |
-| `GOOGLE_AI_IMAGE_MODEL` | No | Imagen model. Defaults to `imagen-3.0-generate-002`. |
+| `GOOGLE_AI_IMAGE_MODEL` | No | Google image model. Defaults to `imagen-3.0-generate-002` (`:predict`, billing-enabled GCP project required). Set to `gemini-2.5-flash-image` ("Nano Banana") to use the Gemini image-generation family via `:generateContent` — works on free AI Studio keys. |
 | `GOOGLE_AI_TEXT_MODEL` | No | Gemini model used by `getGoogleAIClient()` (reserved for future text routes). Defaults to `gemini-1.5-flash`. |
 | `GOOGLE_AI_BASE_URL` | No | Override the Generative Language API base URL (e.g. proxy / regional endpoint). |
 | `AI_IMAGE_PROVIDER` | No | Default image provider when the client does not specify one. `openai` (default) or `google`. The UI toggle always overrides this per request. |

@@ -238,8 +238,11 @@ async function handleGoogle(args: {
     if (status === 404) {
       // Imagen models (e.g. imagen-3.0-generate-002) require a billing-enabled
       // Google Cloud project; free AI Studio keys get a 404 NOT_FOUND for the
-      // `:predict` endpoint. Treat this as "model unavailable on this key" and
-      // fall back to Pollinations rather than surfacing a 502 to the UI.
+      // `:predict` endpoint. Gemini image models (e.g. gemini-2.5-flash-image,
+      // a.k.a. "Nano Banana") are available on free keys — set
+      // GOOGLE_AI_IMAGE_MODEL=gemini-2.5-flash-image to use them. Until then,
+      // treat 404 as "model unavailable on this key" and fall back to
+      // Pollinations rather than surfacing a 502 to the UI.
       // eslint-disable-next-line no-console
       console.warn(
         '[ai/image] Google Imagen model unavailable for this API key (404), falling back to Pollinations',
