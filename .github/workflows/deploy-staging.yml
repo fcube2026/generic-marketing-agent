@@ -270,9 +270,11 @@ jobs:
           echo "✅ RAILWAY_STAGING_SERVICE_ID = $RAILWAY_STAGING_SERVICE_ID"
 
           # ── 4. Verify the token is accepted by Railway ────────────────────────
-          echo "Running 'railway whoami' to validate token scope..."
-          railway whoami || {
-            echo "::error::'railway whoami' failed. The token is either invalid, belongs to a different project, was created for the wrong environment (production vs staging), or is an account-level token (use RAILWAY_API_TOKEN for those — project tokens go in RAILWAY_TOKEN). Regenerate the token: Railway → open staging project → Settings (gear) → Tokens → Create Token → pick 'staging' environment."
+          # NOTE: 'railway whoami' only works with account-level RAILWAY_API_TOKEN.
+          # Project tokens (RAILWAY_TOKEN) must be validated with 'railway status'.
+          echo "Running 'railway status' to validate project token scope..."
+          railway status || {
+            echo "::error::'railway status' failed. The token is either invalid, scoped to a different project, or set to the wrong environment. Regenerate it: Railway → open staging project → Settings (gear) → Tokens → Create Token → pick 'staging' environment."
             exit 1
           }
         env:
