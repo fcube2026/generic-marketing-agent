@@ -20,4 +20,9 @@ export const verificationService = {
     const r = await api.get(`/verification/status/${bookingId}`);
     return r.data;
   },
+
+  getMyVerificationStatus: async () => {
+    const r = await api.get('/verification/my-status');
+    return r.data;
+  },
 };

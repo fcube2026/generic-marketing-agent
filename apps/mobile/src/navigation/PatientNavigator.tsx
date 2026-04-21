@@ -17,6 +17,7 @@ import { OnboardingScreen } from '../screens/patient/OnboardingScreen';
 import { ClinicalIntakeScreen } from '../screens/patient/ClinicalIntakeScreen';
 import { ConsentScreen } from '../screens/patient/ConsentScreen';
 import { VerificationStatusScreen } from '../screens/patient/VerificationStatusScreen';
+import { PatientKycScreen } from '../screens/patient/PatientKycScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
 import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
@@ -32,6 +33,7 @@ import type { VideoCallParams } from '../screens/common/VideoCallScreen';
 export type PatientStackParamList = {
   Tabs: undefined;
   Onboarding: undefined;
+  PatientKyc: undefined;
   SelectService: { category: ServiceCategory };
   ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
   Recommendation: { categorySlug: string; lat: number; lng: number };
@@ -83,6 +85,7 @@ export const PatientNavigator: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerBackTitle: 'Back' }}>
     <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
     <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Complete Profile' }} />
+    <Stack.Screen name="PatientKyc" component={PatientKycScreen} options={{ title: 'Identity Verification' }} />
     <Stack.Screen name="SelectService" component={SelectServiceScreen} options={{ title: 'Book Service' }} />
     <Stack.Screen name="ProviderList" component={ProviderListScreen} options={{ title: 'Nearby Providers' }} />
     <Stack.Screen name="Recommendation" component={RecommendationScreen} options={{ title: 'Recommendation' }} />
