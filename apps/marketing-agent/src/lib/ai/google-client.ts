@@ -81,6 +81,7 @@ export function pickClosestImagenRatio(width: number, height: number): GoogleIma
 }
 
 const GOOGLE_IMAGE_TIMEOUT_MS = 60_000;
+const GOOGLE_CHAT_TIMEOUT_MS = 60_000;
 
 export class GoogleImageError extends Error {
   status: number;
@@ -88,6 +89,160 @@ export class GoogleImageError extends Error {
     super(message);
     this.name = 'GoogleImageError';
     this.status = status;
+  }
+}
+
+export class GoogleChatError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'GoogleChatError';
+    this.status = status;
+  }
+}
+
+interface GoogleChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/**
+ * Call Gemini's text `:generateContent` endpoint. The SDK shape differs
+ * enough from the REST payload we already use for image generation that we
+ * call the REST endpoint directly here — same auth header, same base URL,
+ * and keeps all Google traffic going through one code path.
+ *
+ * Any `system` role message in `messages` is folded into the
+ * `systemInstruction` alongside the explicit `system` argument. Remaining
+ * `user` / `assistant` turns are mapped to Gemini's `user` / `model` roles.
+ */
+export async function googleChat(params: {
+  system: string;
+  messages: GoogleChatMessage[];
+  model?: string;
+  maxOutputTokens?: number;
+  temperature?: number;
+  signal?: AbortSignal;
+}): Promise<{ reply: string; model: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
+  const { system, messages, signal } = params;
+  const model = params.model || GOOGLE_TEXT_MODEL;
+  const maxOutputTokens = params.maxOutputTokens ?? 800;
+  const temperature = params.temperature ?? 0.7;
+
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    throw new GoogleChatError('GOOGLE_AI_API_KEY is not set', 401);
+  }
+
+  const baseUrl = (process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
+  const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+  const systemParts: string[] = [];
+  if (system.trim()) systemParts.push(system.trim());
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+  for (const m of messages) {
+    if (m.role === 'system') {
+      if (m.content.trim()) systemParts.push(m.content.trim());
+      continue;
+    }
+    contents.push({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    });
+  }
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), GOOGLE_CHAT_TIMEOUT_MS);
+  const onAbort = () => ac.abort();
+  signal?.addEventListener('abort', onAbort);
+
+  try {
+    const body: Record<string, unknown> = {
+      contents,
+      generationConfig: {
+        temperature,
+        maxOutputTokens,
+      },
+    };
+    if (systemParts.length > 0) {
+      body.systemInstruction = {
+        role: 'system',
+        parts: [{ text: systemParts.join('\n\n') }],
+      };
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+
+    if (!res.ok) {
+      const detail = await safeReadText(res);
+      throw new GoogleChatError(
+        `Google Gemini chat returned ${res.status}: ${detail}`,
+        res.status,
+      );
+    }
+
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+        finishReason?: string;
+      }>;
+      promptFeedback?: { blockReason?: string };
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    };
+
+    const blockReason = data.promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new GoogleChatError(
+        `Google Gemini chat blocked the prompt: ${blockReason}`,
+        400,
+      );
+    }
+
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    const reply = parts
+      .map((p) => (typeof p.text === 'string' ? p.text : ''))
+      .join('')
+      .trim();
+    if (!reply) {
+      throw new GoogleChatError('Google Gemini chat returned empty response', 502);
+    }
+
+    const usageMeta = data.usageMetadata;
+    const usage = usageMeta
+      ? {
+          promptTokens: usageMeta.promptTokenCount ?? 0,
+          completionTokens: usageMeta.candidatesTokenCount ?? 0,
+          totalTokens:
+            usageMeta.totalTokenCount ??
+            (usageMeta.promptTokenCount ?? 0) + (usageMeta.candidatesTokenCount ?? 0),
+        }
+      : undefined;
+
+    return { reply, model, usage };
+  } catch (err) {
+    if (err instanceof GoogleChatError) throw err;
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new GoogleChatError('Google Gemini chat request timed out', 504);
+    }
+    throw new GoogleChatError(
+      err instanceof Error ? err.message : 'Google Gemini chat request failed',
+      502,
+    );
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }
 

@@ -25,6 +25,11 @@ export interface GenerateChatReplyInput {
   messages: ChatTurn[];
   /** Optional extra brand/profile context appended to the default system prompt. */
   system?: string;
+  /**
+   * Choose the upstream text provider. When omitted the server falls back to
+   * the `AI_TEXT_PROVIDER` env var (default: `'openai'`).
+   */
+  provider?: 'openai' | 'google';
 }
 
 export interface GenerateChatReplyResult {

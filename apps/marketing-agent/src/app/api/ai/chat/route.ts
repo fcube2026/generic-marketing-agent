@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOpenAIClient, TEXT_MODEL } from '@/lib/ai/openai-client';
+import {
+  googleChat,
+  GoogleChatError,
+} from '@/lib/ai/google-client';
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
-import {
-  pollinationsChat,
-  POLLINATIONS_TEXT_MODEL,
-  PollinationsError,
-} from '@/lib/ai/pollinations';
 import { getErrorStatus } from '@/lib/ai/error-utils';
 
 // We talk to OpenAI from the route handler — keep us on the Node.js runtime.
@@ -43,9 +42,12 @@ interface ChatMessage {
   content: string;
 }
 
+type TextProvider = 'openai' | 'google';
+
 interface ChatRequestBody {
   messages?: unknown;
   system?: unknown;
+  provider?: unknown;
 }
 
 function badRequest(message: string, code: string) {
@@ -60,6 +62,19 @@ function isChatMessage(value: unknown): value is ChatMessage {
     typeof v.content === 'string'
   );
 }
+
+function resolveTextProvider(value: unknown): TextProvider {
+  if (value === 'openai' || value === 'google') return value;
+  const env = process.env.AI_TEXT_PROVIDER?.toLowerCase();
+  if (env === 'google') return 'google';
+  return 'openai';
+}
+
+/** Outcome of trying a single text provider. */
+type ProviderOutcome =
+  | { kind: 'success'; response: NextResponse }
+  | { kind: 'fatal'; response: NextResponse } // e.g. prompt rejected — don't try the other provider
+  | { kind: 'retry'; status: number; message: string };
 
 export async function POST(req: NextRequest) {
   // 1. Auth
@@ -128,29 +143,56 @@ export async function POST(req: NextRequest) {
     systemPrompt = `${DEFAULT_SYSTEM_PROMPT}\n\nAdditional context:\n${body.system.trim()}`;
   }
 
-  // 4. Call OpenAI — or fall back to the free Pollinations provider if no key
-  //    is configured. This keeps the agent usable in local/dev/preview
-  //    environments without a paid OPENAI_API_KEY.
+  if (
+    body.provider !== undefined &&
+    body.provider !== 'openai' &&
+    body.provider !== 'google'
+  ) {
+    return badRequest('`provider` must be "openai" or "google"', 'invalid_provider');
+  }
+  const preferred = resolveTextProvider(body.provider);
+
+  // Try preferred provider first, then the other. If a provider is missing
+  // its API key it cleanly returns a `retry` outcome so we fall through to
+  // the alternative without surfacing an error to the user.
+  const order: TextProvider[] = preferred === 'openai' ? ['openai', 'google'] : ['google', 'openai'];
+
+  let lastRetry: { provider: TextProvider; status: number; message: string } | null = null;
+  for (const provider of order) {
+    const outcome =
+      provider === 'openai'
+        ? await tryOpenAI({ systemPrompt, messages })
+        : await tryGoogle({ systemPrompt, messages });
+
+    if (outcome.kind === 'success' || outcome.kind === 'fatal') {
+      return outcome.response;
+    }
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[ai/chat] provider=${provider} failed (status=${outcome.status}); ${order.indexOf(provider) + 1 < order.length ? 'trying next provider' : 'no more providers'}`,
+    );
+    lastRetry = { provider, status: outcome.status, message: outcome.message };
+  }
+
+  return providerErrorResponse(lastRetry);
+}
+
+async function tryOpenAI({
+  systemPrompt,
+  messages,
+}: {
+  systemPrompt: string;
+  messages: ChatMessage[];
+}): Promise<ProviderOutcome> {
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
-  } catch {
-    try {
-      const reply = await pollinationsChat({ system: systemPrompt, messages });
-      // eslint-disable-next-line no-console
-      console.log(`[ai/chat] model=${POLLINATIONS_TEXT_MODEL} (fallback)`);
-      return NextResponse.json({ reply, model: POLLINATIONS_TEXT_MODEL });
-    } catch (fallbackErr) {
-      const status = fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
-      const message =
-        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
-      // eslint-disable-next-line no-console
-      console.error('[ai/chat] Pollinations fallback failed', { status, message });
-      return NextResponse.json(
-        { error: message, code: 'provider_error' },
-        { status: 502 },
-      );
-    }
+  } catch (err) {
+    return {
+      kind: 'retry',
+      status: 401,
+      message: err instanceof Error ? err.message : 'OpenAI key missing',
+    };
   }
 
   try {
@@ -163,10 +205,7 @@ export async function POST(req: NextRequest) {
 
     const reply = completion.choices?.[0]?.message?.content?.trim() ?? '';
     if (!reply) {
-      return NextResponse.json(
-        { error: 'Empty response from model', code: 'empty_reply' },
-        { status: 502 },
-      );
+      return { kind: 'retry', status: 502, message: 'OpenAI returned an empty reply' };
     }
 
     const usage = completion.usage;
@@ -178,68 +217,117 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      reply,
-      model: TEXT_MODEL,
-      usage: usage
-        ? {
-            promptTokens: usage.prompt_tokens,
-            completionTokens: usage.completion_tokens,
-            totalTokens: usage.total_tokens,
-          }
-        : undefined,
-    });
+    return {
+      kind: 'success',
+      response: NextResponse.json({
+        reply,
+        model: TEXT_MODEL,
+        usage: usage
+          ? {
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            }
+          : undefined,
+      }),
+    };
   } catch (err: unknown) {
-    // If OpenAI rejects our credentials (401/403), transparently fall back to
-    // the free Pollinations provider — same behaviour as when no key is set —
-    // so a stale/revoked OPENAI_API_KEY does not break the whole experience.
-    const status = getErrorStatus(err);
-    if (status === 401 || status === 403) {
-      // eslint-disable-next-line no-console
-      console.warn('[ai/chat] OpenAI rejected the API key, falling back to Pollinations');
-      try {
-        const reply = await pollinationsChat({ system: systemPrompt, messages });
-        // eslint-disable-next-line no-console
-        console.log(`[ai/chat] model=${POLLINATIONS_TEXT_MODEL} (auth-fallback)`);
-        return NextResponse.json({ reply, model: POLLINATIONS_TEXT_MODEL });
-      } catch (fallbackErr) {
-        const fbStatus =
-          fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
-        const message =
-          fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
-        // eslint-disable-next-line no-console
-        console.error('[ai/chat] Pollinations auth-fallback failed', { status: fbStatus, message });
-        // fall through to the original error handler
-      }
-    }
-    return handleOpenAIError(err);
+    return classifyError('openai', err);
   }
 }
 
-function handleOpenAIError(err: unknown) {
+async function tryGoogle({
+  systemPrompt,
+  messages,
+}: {
+  systemPrompt: string;
+  messages: ChatMessage[];
+}): Promise<ProviderOutcome> {
+  if (!process.env.GOOGLE_AI_API_KEY) {
+    return { kind: 'retry', status: 401, message: 'GOOGLE_AI_API_KEY is not set' };
+  }
+
+  try {
+    const { reply, model, usage } = await googleChat({
+      system: systemPrompt,
+      messages,
+      maxOutputTokens: MAX_TOKENS,
+      temperature: 0.7,
+    });
+
+    if (usage) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[ai/chat] model=${model} prompt=${usage.promptTokens} completion=${usage.completionTokens} total=${usage.totalTokens}`,
+      );
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(`[ai/chat] model=${model}`);
+    }
+
+    return { kind: 'success', response: NextResponse.json({ reply, model, usage }) };
+  } catch (err) {
+    return classifyError('google', err);
+  }
+}
+
+/**
+ * Map a thrown provider error to a `ProviderOutcome`. 400 (prompt rejected
+ * by safety) is `fatal` — the other provider would likely reject the same
+ * prompt and silently retrying could surface unsafe content. All other
+ * statuses (auth, quota, model unavailable, network, timeout, 5xx) are
+ * `retry` so the caller can try the alternative provider.
+ */
+function classifyError(provider: TextProvider, err: unknown): ProviderOutcome {
   const status =
-    typeof err === 'object' && err !== null && 'status' in err && typeof (err as { status: unknown }).status === 'number'
-      ? (err as { status: number }).status
-      : 500;
+    err instanceof GoogleChatError ? err.status : getErrorStatus(err);
   const message = err instanceof Error ? err.message : 'Unknown provider error';
 
   // eslint-disable-next-line no-console
-  console.error('[ai/chat] OpenAI error', { status, message });
+  console.error(`[ai/chat] ${provider} error`, { status, message });
 
+  if (status === 400) {
+    return {
+      kind: 'fatal',
+      response: NextResponse.json(
+        { error: 'Prompt rejected by provider', code: 'prompt_rejected', detail: message },
+        { status: 400 },
+      ),
+    };
+  }
+  return { kind: 'retry', status, message };
+}
+
+function providerErrorResponse(
+  last: { provider: TextProvider; status: number; message: string } | null,
+): NextResponse {
+  if (!last) {
+    return NextResponse.json(
+      { error: 'No AI text provider configured', code: 'no_provider' },
+      { status: 502 },
+    );
+  }
+  const { status, message } = last;
   if (status === 401 || status === 403) {
     return NextResponse.json(
-      { error: 'Provider rejected the API key', code: 'provider_auth_error' },
+      { error: 'All AI text providers rejected the API key', code: 'provider_auth_error', detail: message },
       { status: 502 },
     );
   }
   if (status === 429) {
     return NextResponse.json(
-      { error: 'Provider rate limit exceeded', code: 'provider_rate_limited' },
+      { error: 'All AI text providers are rate limited', code: 'provider_rate_limited', detail: message },
       { status: 502 },
     );
   }
+  if (status === 504) {
+    return NextResponse.json(
+      { error: 'AI text providers timed out', code: 'provider_timeout', detail: message },
+      { status: 504 },
+    );
+  }
   return NextResponse.json(
-    { error: 'AI provider error', code: 'provider_error', detail: message },
+    { error: 'All AI text providers failed', code: 'provider_error', detail: message },
     { status: 502 },
   );
 }
