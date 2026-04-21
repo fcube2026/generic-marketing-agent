@@ -28,6 +28,22 @@ export const ENDPOINTS = {
     DIGILOCKER_CONSENT: '/providers/me/verification/digilocker-consent',
     LOGS: '/providers/me/verification/logs',
   },
+  PATIENT_VERIFICATION: {
+    INITIATE: '/verification/initiate',
+    ID_UPLOAD: '/verification/id-upload',
+    ID_CONFIRM: '/verification/id-confirm',
+    STATUS: (bookingId: string) => `/verification/status/${bookingId}`,
+  },
+  CLINICAL_INTAKE: (bookingId: string) => `/clinical-intake/${bookingId}`,
+  CONSENT: {
+    ACCEPT: '/consent/accept',
+    TEXT: '/consent/text',
+    GET: (bookingId: string) => `/consent/${bookingId}`,
+  },
+  VISIT_OTP: {
+    SEND: '/visit-otp/send',
+    VERIFY: '/visit-otp/verify',
+  },
   SERVICES: '/services',
   BOOKINGS: '/bookings',
   RECOMMENDATION: '/recommendation',

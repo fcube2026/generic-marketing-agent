@@ -29,6 +29,10 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { PatientVerificationModule } from './modules/patient-verification/patient-verification.module';
+import { ClinicalIntakeModule } from './modules/clinical-intake/clinical-intake.module';
+import { ConsentModule } from './modules/consent/consent.module';
+import { VisitOtpModule } from './modules/visit-otp/visit-otp.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
 
@@ -67,6 +71,10 @@ import { HealthModule } from './common/health/health.module';
     VideoConsultationModule,
     WebhooksModule,
     MarketingModule,
+    PatientVerificationModule,
+    ClinicalIntakeModule,
+    ConsentModule,
+    VisitOtpModule,
   ],
   providers: [BootstrapService],
 })
