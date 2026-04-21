@@ -51,21 +51,21 @@ model PasswordResetToken {
 }
 
 model PatientProfile {
-  id                 String                    @id @default(cuid())
-  userId             String                    @unique
-  name               String
-  dateOfBirth        DateTime?
-  gender             String?
-  emergencyContact   String?
+  id                  String                    @id @default(cuid())
+  userId              String                    @unique
+  name                String
+  dateOfBirth         DateTime?
+  gender              String?
+  emergencyContact    String?
   // Verification extensions
-  verificationStatus PatientVerificationStatus @default(PENDING_OTP)
-  trustScore         Int                       @default(50)
-  totalBookings      Int                       @default(0)
-  flaggedBookings    Int                       @default(0)
-  isFlagged          Boolean                   @default(false)
-  flagReason         String?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  verificationStatus  PatientVerificationStatus @default(PENDING_OTP)
+  trustScore          Int                       @default(50)
+  totalBookings       Int                       @default(0)
+  flaggedBookings     Int                       @default(0)
+  isFlagged           Boolean                   @default(false)
+  flagReason          String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
   bookings            Booking[]
   pharmacyOrders      PharmacyOrder[]
   user                User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1092,7 +1092,7 @@ model PatientVerification {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
 
-  patient               PatientProfile          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient               PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
   idDocuments           PatientIdDocument[]
   verificationAuditLogs VerificationAuditLog[]
   manualReviewQueues    ManualReviewQueue[]
@@ -1103,15 +1103,15 @@ model PatientVerification {
 }
 
 model PatientIdDocument {
-  id               String   @id @default(cuid())
-  verificationId   String
-  documentType     String
-  storagePath      String
-  extractedName    String?
-  extractedDob     String?
+  id                String   @id @default(cuid())
+  verificationId    String
+  documentType      String
+  storagePath       String
+  extractedName     String?
+  extractedDob      String?
   extractedIdNumber String?
-  ocrRawResult     Json?
-  uploadedAt       DateTime @default(now())
+  ocrRawResult      Json?
+  uploadedAt        DateTime @default(now())
 
   verification PatientVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
