@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeAiError, generateImage } from '@/lib/services/aiService';
-import { useImageProvider } from '@/lib/hooks/useImageProvider';
+import { ImageProvider, useImageProvider } from '@/lib/hooks/useImageProvider';
 
 const BRAND_SUFFIX =
   ', curex24 healthcare brand, professional quality, clean composition, no watermark, no text overlay';
@@ -14,6 +14,11 @@ interface GeneratedImageProps {
   width?: number;
   height?: number;
   label?: string;
+  /**
+   * Optional explicit provider override. When set, this takes precedence over
+   * the user's globally-stored preference from `useImageProvider`.
+   */
+  provider?: ImageProvider;
 }
 
 interface ImageData {
@@ -22,9 +27,10 @@ interface ImageData {
   model: string;
 }
 
-export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: GeneratedImageProps) {
+export function GeneratedImage({ prompt, width = 1024, height = 1024, label, provider: providerOverride }: GeneratedImageProps) {
   const fullPrompt = useMemo(() => prompt + BRAND_SUFFIX, [prompt]);
-  const [provider] = useImageProvider();
+  const [storedProvider] = useImageProvider();
+  const provider = providerOverride ?? storedProvider;
 
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
