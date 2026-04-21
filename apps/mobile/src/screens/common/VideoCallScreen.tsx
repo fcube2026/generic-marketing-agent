@@ -57,6 +57,8 @@ const MOCK_QUALITY_SEQUENCE: ConnectionQuality[] = [
   'excellent',
 ];
 
+const MAX_ROOM_ID_DISPLAY_LENGTH = 20;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -159,8 +161,7 @@ export const VideoCallScreen: React.FC = () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (qualityRef.current) clearInterval(qualityRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigation]);
 
   // ── Handle network disconnection ────────────────────────────────────────
   useEffect(() => {
@@ -174,8 +175,7 @@ export const VideoCallScreen: React.FC = () => {
         ],
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionQuality]);
+  }, [connectionQuality, isConnected, handleEndCall]);
 
   const handleEndCall = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -252,7 +252,7 @@ export const VideoCallScreen: React.FC = () => {
       {/* ── Mock badge ── */}
       <View style={styles.badgeContainer}>
         <Text style={styles.mockBadge}>🧪 MOCK SESSION</Text>
-        <Text style={styles.roomIdText}>Room: {roomId.slice(0, 20)}{roomId.length > 20 ? '…' : ''}</Text>
+        <Text style={styles.roomIdText}>Room: {roomId.slice(0, MAX_ROOM_ID_DISPLAY_LENGTH)}{roomId.length > MAX_ROOM_ID_DISPLAY_LENGTH ? '…' : ''}</Text>
       </View>
 
       {/* ── Controls ── */}
