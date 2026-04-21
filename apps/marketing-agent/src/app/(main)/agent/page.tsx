@@ -989,7 +989,7 @@ const INTRO_MESSAGE: AgentMessage = {
   role: 'agent',
   content: `👋 I'm your AI Marketing Agent for curex24 — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI gpt-image-1** for on-demand visuals.
 
-I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`programmatic-seo\`, \`pricing-strategy\`, and \`referral-program\`.
+I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`ai-seo\`, \`pricing-strategy\`, and \`referral-program\`.
 
 Here's what I can do for you:
 
