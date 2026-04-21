@@ -25,7 +25,25 @@ export function getGoogleAIClient(): GoogleGenerativeAI {
 }
 
 export const GOOGLE_TEXT_MODEL = process.env.GOOGLE_AI_TEXT_MODEL || 'gemini-1.5-flash';
+/**
+ * Default image model. Two families are supported transparently:
+ *
+ * - **Imagen** (`imagen-3.0-*`, default) — uses the `:predict` REST endpoint.
+ *   Requires a billing-enabled GCP project; free AI Studio keys get 404.
+ * - **Gemini Image / "Nano Banana"** (`gemini-*-image*`, e.g.
+ *   `gemini-2.5-flash-image`) — uses `:generateContent` with
+ *   `responseModalities: ["IMAGE"]`. Available on free AI Studio keys.
+ */
 export const GOOGLE_IMAGE_MODEL = process.env.GOOGLE_AI_IMAGE_MODEL || 'imagen-3.0-generate-002';
+
+/**
+ * Returns true when the model name refers to a Gemini image-generation model
+ * ("Nano Banana" family) which uses the `:generateContent` endpoint instead
+ * of Imagen's `:predict`.
+ */
+export function isGeminiImageModel(model: string): boolean {
+  return /^gemini-.*image/i.test(model);
+}
 
 /**
  * Imagen aspect ratios supported by Google's Generative Language API.
@@ -96,9 +114,13 @@ export async function googleImagenGenerate(params: {
   }
 
   const baseUrl = (process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
-  const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:predict`;
-
   const aspectRatio = pickClosestImagenRatio(width, height);
+
+  if (isGeminiImageModel(model)) {
+    return geminiImageGenerate({ apiKey, baseUrl, model, prompt, aspectRatio, signal });
+  }
+
+  const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:predict`;
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), GOOGLE_IMAGE_TIMEOUT_MS);
@@ -156,6 +178,111 @@ export async function googleImagenGenerate(params: {
     }
     throw new GoogleImageError(
       err instanceof Error ? err.message : 'Google Imagen request failed',
+      502,
+    );
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+async function geminiImageGenerate(params: {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  prompt: string;
+  aspectRatio: GoogleImageAspectRatio;
+  signal?: AbortSignal;
+}): Promise<{ dataUrl: string; aspectRatio: GoogleImageAspectRatio; model: string }> {
+  const { apiKey, baseUrl, model, prompt, aspectRatio, signal } = params;
+  const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+  // Gemini image models do not currently accept a structured aspect ratio
+  // parameter; nudging via the prompt is the documented workaround.
+  const promptWithRatio = `${prompt}\n\nRender the image with a ${aspectRatio} aspect ratio.`;
+
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), GOOGLE_IMAGE_TIMEOUT_MS);
+  const onAbort = () => ac.abort();
+  signal?.addEventListener('abort', onAbort);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: promptWithRatio }] }],
+        generationConfig: {
+          responseModalities: ['IMAGE'],
+          candidateCount: 1,
+        },
+      }),
+      signal: ac.signal,
+    });
+
+    if (!res.ok) {
+      const detail = await safeReadText(res);
+      throw new GoogleImageError(
+        `Google Gemini image returned ${res.status}: ${detail}`,
+        res.status,
+      );
+    }
+
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            inlineData?: { mimeType?: string; data?: string };
+            inline_data?: { mime_type?: string; data?: string };
+          }>;
+        };
+        finishReason?: string;
+      }>;
+      promptFeedback?: { blockReason?: string };
+    };
+
+    const blockReason = data.promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new GoogleImageError(
+        `Google Gemini image blocked the prompt: ${blockReason}`,
+        400,
+      );
+    }
+
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    let b64: string | undefined;
+    let mime = 'image/png';
+    for (const part of parts) {
+      const inline = (part.inlineData ?? part.inline_data) as
+        | { mimeType?: string; mime_type?: string; data?: string }
+        | undefined;
+      const partMime = inline?.mimeType ?? inline?.mime_type;
+      if (inline?.data && (!partMime || partMime.startsWith('image/'))) {
+        b64 = inline.data;
+        if (partMime) mime = partMime;
+        break;
+      }
+    }
+
+    if (!b64) {
+      throw new GoogleImageError('Google Gemini image returned no image data', 502);
+    }
+
+    return {
+      dataUrl: `data:${mime};base64,${b64}`,
+      aspectRatio,
+      model,
+    };
+  } catch (err) {
+    if (err instanceof GoogleImageError) throw err;
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new GoogleImageError('Google Gemini image request timed out', 504);
+    }
+    throw new GoogleImageError(
+      err instanceof Error ? err.message : 'Google Gemini image request failed',
       502,
     );
   } finally {
