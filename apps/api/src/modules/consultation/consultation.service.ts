@@ -121,6 +121,58 @@ export class ConsultationService {
   }
 
   /**
+   * Return the most recent consultation summary for the authenticated patient,
+   * shaped for the "Use Recent Prescription" flow on the patient app.
+   *
+   * Response:
+   *   {
+   *     medicines: medicinesAdvised || [],
+   *     prescriptionUrl: latestPrescription?.fileUrl || null,
+   *     consultationId,
+   *     createdAt,
+   *   }
+   *
+   * If the patient has no consultation summary yet, returns null so the
+   * frontend can show a "No recent prescription found" hint.
+   */
+  async getLatestForPatient(userId: string) {
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!patientProfile) {
+      return null;
+    }
+
+    const summary = await this.prisma.consultationSummary.findFirst({
+      where: { booking: { patientId: patientProfile.id } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        prescriptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!summary) {
+      return null;
+    }
+
+    const latestPrescription = summary.prescriptions[0];
+    const medicines = Array.isArray(summary.medicinesAdvised)
+      ? summary.medicinesAdvised
+      : [];
+
+    return {
+      consultationId: summary.id,
+      createdAt: summary.createdAt,
+      medicines,
+      prescriptionUrl: latestPrescription?.fileUrl ?? null,
+    };
+  }
+
+  /**
    * Add a prescription to a consultation summary
    * Sends notification to the patient
    */

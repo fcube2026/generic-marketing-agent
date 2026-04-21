@@ -7,6 +7,11 @@ import { CurrentUser } from '../auth/decorators/roles.decorator';
 export class ConsultationController {
   constructor(private consultationService: ConsultationService) {}
 
+  @Get('latest')
+  getLatestForPatient(@CurrentUser() user: any) {
+    return this.consultationService.getLatestForPatient(user.id);
+  }
+
   @Get('patient/summaries')
   getPatientSummaries(
     @CurrentUser() user: any,
