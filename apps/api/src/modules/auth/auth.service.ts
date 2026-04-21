@@ -2,16 +2,21 @@ import {
   Injectable,
   Logger,
   OnModuleInit,
+  BadRequestException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
@@ -22,6 +27,20 @@ const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent 
 const WELL_KNOWN_STAGING_ADMIN_EMAIL = 'admin@curex24.com';
 const WELL_KNOWN_STAGING_ADMIN_PASSWORD = 'admin123';
 const WELL_KNOWN_STAGING_ADMIN_PHONE = '+0000000002';
+
+// Zoho team accounts — provisioned on boot in non-production so each member
+// can log in immediately. Initial password: Curex@2026 (share with team).
+// Members set their own password via "Forgot Password" after first login.
+const TEAM_ACCOUNTS = [
+  { email: 'chetana@curex24.com', phone: '+0000000003' },
+  { email: 'nandini@curex24.com', phone: '+0000000004' },
+  { email: 'sarayu@curex24.com', phone: '+0000000005' },
+  { email: 'sowmya@curex24.com', phone: '+0000000006' },
+  { email: 'srikanth@curex24.com', phone: '+0000000007' },
+  { email: 'sreekanth@curex24.com', phone: '+0000000008' },
+  { email: 'varshini@curex24.com', phone: '+0000000009' },
+];
+const TEAM_DEFAULT_PASSWORD = process.env.TEAM_DEFAULT_PASSWORD || 'Curex@2026';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -53,6 +72,13 @@ export class AuthService implements OnModuleInit {
         WELL_KNOWN_STAGING_ADMIN_PASSWORD,
         WELL_KNOWN_STAGING_ADMIN_PHONE,
       );
+    }
+
+    // 3. Provision all Zoho team accounts with the default password.
+    //    Only sets password if the account doesn't have one yet —
+    //    so existing custom passwords are never overwritten.
+    for (const member of TEAM_ACCOUNTS) {
+      await this.bootstrapTeamMember(member.email, member.phone);
     }
   }
 
@@ -114,6 +140,49 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  /**
+   * Provision a team (ADMIN) account for a Zoho email.
+   * Only sets the password if the account has no passwordHash yet,
+   * so a user who already changed their password keeps it.
+   */
+  private async bootstrapTeamMember(email: string, phonePlaceholder: string) {
+    try {
+      const existing = await this.prisma.user.findFirst({ where: { email } });
+      if (existing) {
+        // Already exists — only fix if no password hash at all
+        if (!existing.passwordHash) {
+          const passwordHash = await bcrypt.hash(TEAM_DEFAULT_PASSWORD, 10);
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { passwordHash, role: Role.ADMIN, isActive: true },
+          });
+          this.logger.log(
+            `[bootstrap] Set initial password for team member email=${email}`,
+          );
+        }
+        return;
+      }
+      // Create new account
+      const passwordHash = await bcrypt.hash(TEAM_DEFAULT_PASSWORD, 10);
+      await this.prisma.user.upsert({
+        where: { phone: phonePlaceholder },
+        create: {
+          phone: phonePlaceholder,
+          email,
+          role: Role.ADMIN,
+          passwordHash,
+          isActive: true,
+        },
+        update: { email, role: Role.ADMIN, passwordHash, isActive: true },
+      });
+      this.logger.log(`[bootstrap] Created team member account email=${email}`);
+    } catch (err) {
+      this.logger.warn(
+        `[bootstrap] Team member bootstrap skipped for email=${email}: ${err.message}`,
+      );
+    }
+  }
+
   /** Read credentials lazily so Railway env vars are guaranteed to be present */
   private get adminEmail() {
     return process.env.ADMIN_EMAIL || 'admin@curex24.com';
@@ -131,6 +200,7 @@ export class AuthService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
@@ -370,6 +440,92 @@ export class AuthService implements OnModuleInit {
         'Login service temporarily unavailable. Please try again shortly.',
       );
     }
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: dto.email,
+        role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
+        isActive: true,
+      },
+    });
+
+    // Always return the same message to prevent email enumeration
+    const safeResponse = {
+      message:
+        'If that email is registered, a password reset link has been sent to it.',
+    };
+
+    if (!user) return safeResponse;
+
+    // Invalidate previous unused tokens for this user
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, token, expiresAt },
+    });
+
+    const adminUrl =
+      process.env.ADMIN_URL ||
+      (process.env.APP_ENV === 'production'
+        ? 'https://admin.curex24.com'
+        : 'https://admin.staging.curex24.com');
+
+    const resetUrl = `${adminUrl}/reset-password?token=${token}`;
+    const displayName = (user.email || dto.email).split('@')[0];
+
+    try {
+      await this.emailService.sendPasswordResetEmail(
+        dto.email,
+        displayName,
+        resetUrl,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Could not send reset email to ${dto.email}: ${err.message}`,
+      );
+      // Still return safe response — don't expose that email send failed
+    }
+
+    return safeResponse;
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { token: dto.token },
+      include: { user: true },
+    });
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException(
+        'This reset link is invalid or has expired.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    this.logger.log(`Password reset completed for userId=${record.userId}`);
+    return {
+      message: 'Password has been reset successfully. You can now log in.',
+    };
   }
 
   private generateOtp(): string {
