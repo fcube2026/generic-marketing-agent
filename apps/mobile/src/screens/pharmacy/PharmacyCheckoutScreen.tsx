@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -64,6 +65,59 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
+  const [locating, setLocating] = useState(false);
+
+  const useCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Location permission required',
+          'Allow location access to auto-fill your delivery address.',
+        );
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = position.coords;
+
+      // Reverse-geocode (best-effort; falls back to coords if unavailable).
+      let resolved: Location.LocationGeocodedAddress | undefined;
+      try {
+        const results = await Location.reverseGeocodeAsync({ latitude, longitude });
+        resolved = results?.[0];
+      } catch {
+        resolved = undefined;
+      }
+
+      if (resolved) {
+        // De-duplicate name vs street: reverse-geocode often returns the
+        // same string in both fields.
+        const parts = [resolved.name, resolved.street].filter(
+          (part, idx, arr): part is string =>
+            !!part && arr.indexOf(part) === idx,
+        );
+        const street = parts.join(', ');
+        setAddressLine(
+          street || `Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}`,
+        );
+        if (resolved.city || resolved.subregion) {
+          setCity(resolved.city ?? resolved.subregion ?? '');
+        }
+        if (resolved.region) setState(resolved.region);
+        if (resolved.postalCode) setPincode(resolved.postalCode);
+      } else {
+        // Fall back to raw coordinates so the user can still proceed.
+        setAddressLine(`Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Location error', err?.message ?? 'Could not fetch your location.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const { data: partners, isLoading: loadingPartners } = useQuery<PharmacyPartner[]>({
     queryKey: ['pharmacy-partners'],
@@ -308,6 +362,20 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       {/* Delivery Address */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Delivery Address</Text>
+        <TouchableOpacity
+          style={[styles.locationBtn, locating && { opacity: 0.6 }]}
+          onPress={useCurrentLocation}
+          disabled={locating}
+        >
+          <Text style={styles.locationBtnText}>
+            {locating ? 'Fetching location…' : '📍  Use Current Location'}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR ENTER MANUALLY</Text>
+          <View style={styles.dividerLine} />
+        </View>
         <TextInput
           style={styles.addressInput}
           placeholder="Address line (House/Flat, Street, Area)"
@@ -501,4 +569,25 @@ const styles = StyleSheet.create({
   radioBtnSelected: { borderColor: Colors.primary, backgroundColor: Colors.primary },
   noDataText: { fontSize: 14, color: Colors.textMuted, fontStyle: 'italic' },
   placeOrderArea: { margin: 16, marginTop: 20 },
+  locationBtn: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  locationBtnText: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
 });

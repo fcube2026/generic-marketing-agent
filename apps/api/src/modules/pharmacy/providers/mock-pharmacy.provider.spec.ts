@@ -40,28 +40,39 @@ describe('MockPharmacyProvider', () => {
   // ---------------------------------------------------------------------------
 
   describe('searchMedicines', () => {
-    it('returns catalog entries matching the query', async () => {
+    it('returns catalog entries whose name starts with the query (case-insensitive)', async () => {
       noFailure();
 
-      const promise = provider.searchMedicines('paracetamol');
+      const promise = provider.searchMedicines('para');
       await flush();
       const results = await promise;
 
       expect(results.length).toBeGreaterThanOrEqual(1);
       expect(
-        results.every((r) => r.name.toLowerCase().includes('paracetamol')),
+        results.every((r) => r.name.toLowerCase().startsWith('para')),
       ).toBe(true);
     });
 
-    it('returns dynamic results for an unknown query', async () => {
+    it('returns an empty array when no catalog entry matches the prefix', async () => {
       noFailure();
 
       const promise = provider.searchMedicines('unknownXYZ');
       await flush();
       const results = await promise;
 
-      expect(results.length).toBeGreaterThanOrEqual(1);
-      expect(results[0].name.toLowerCase()).toContain('unknownxyz');
+      expect(results).toEqual([]);
+    });
+
+    it('caps results at 10 entries', async () => {
+      noFailure();
+
+      // Single-letter prefix is the broadest possible query and should still
+      // never exceed the documented top-10 cap.
+      const promise = provider.searchMedicines('p');
+      await flush();
+      const results = await promise;
+
+      expect(results.length).toBeLessThanOrEqual(10);
     });
 
     it('throws PharmacyTransientError on simulated failure', async () => {

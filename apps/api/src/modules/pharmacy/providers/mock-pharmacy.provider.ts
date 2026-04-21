@@ -141,32 +141,11 @@ export class MockPharmacyProvider implements PharmacyPartnerProvider {
     this.maybeSimulateFailure('searchMedicines');
 
     const lower = query.toLowerCase();
-    const results = MEDICINE_CATALOG.filter((m) =>
-      m.name.toLowerCase().includes(lower),
-    );
-
-    // Always return at least two generic results so callers always get data
-    const finalResults: MedicineResult[] =
-      results.length > 0
-        ? results
-        : [
-            {
-              id: `mock-dyn-${lower.replace(/\s+/g, '-')}-001`,
-              name: `${query} 500mg`,
-              manufacturer: 'Mock Pharma Ltd.',
-              price: 12.0,
-              unit: 'strip of 10',
-              requiresPrescription: false,
-            },
-            {
-              id: `mock-dyn-${lower.replace(/\s+/g, '-')}-002`,
-              name: `${query} 250mg`,
-              manufacturer: 'Mock Pharma Ltd.',
-              price: 7.5,
-              unit: 'strip of 10',
-              requiresPrescription: false,
-            },
-          ];
+    // Prefix match (case-insensitive) — matches autocomplete UX semantics.
+    // Cap to first 10 results so the dropdown stays usable.
+    const finalResults: MedicineResult[] = MEDICINE_CATALOG.filter((m) =>
+      m.name.toLowerCase().startsWith(lower),
+    ).slice(0, 10);
 
     this.logger.log(
       `[mock] searchMedicines returned ${finalResults.length} result(s) in ${Date.now() - start}ms`,

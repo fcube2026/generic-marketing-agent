@@ -23,14 +23,26 @@ import {
   usePharmacyOrderStore,
   MOCK_PHARMACIES,
   computeTotal,
+  PrescriptionMedicine,
 } from '../../store/pharmacyOrderStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 type Route = RouteProp<PatientStackParamList, 'PrescriptionOrder'>;
 
-/** Sample prescription image for the "From Recent Consultation" option */
-const MOCK_PRESCRIPTION_URL =
-  'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80';
+/** Shape returned by GET /consultation/latest */
+type LatestConsultationResponse = {
+  consultationId: string;
+  createdAt: string;
+  prescriptionUrl: string | null;
+  medicines: Array<{
+    name?: string;
+    dosage?: string;
+    frequency?: string;
+    duration?: string;
+    quantity?: number;
+    unitPrice?: number;
+  }> | null;
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -68,6 +80,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
     clearPrescription,
     setUploading,
     setUploadError,
+    setMedicines,
     updateMedicineQuantity,
     selectPharmacy,
     resetOrder,
@@ -159,9 +172,53 @@ export const PrescriptionOrderScreen: React.FC = () => {
     }
   }, [uploadPrescription]);
 
-  const useRecentConsultation = useCallback(() => {
-    setPrescription(MOCK_PRESCRIPTION_URL);
-  }, [setPrescription]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
+
+  const useRecentConsultation = useCallback(async () => {
+    setRecentLoading(true);
+    setRecentError(null);
+    try {
+      const res = await api.get<LatestConsultationResponse | null>(
+        '/consultation/latest',
+      );
+      const data = res.data;
+      if (!data || (!data.prescriptionUrl && (!data.medicines || data.medicines.length === 0))) {
+        setRecentError('No recent prescription found');
+        return;
+      }
+
+      // Pre-fill medicines from the doctor's structured prescription. Prices
+      // are not stored on the consultation summary (mock provider env), so we
+      // default unitPrice to 0; the patient can still adjust quantities and
+      // proceed through checkout.
+      const mappedMedicines: PrescriptionMedicine[] = (data.medicines ?? [])
+        .filter((m) => m && (m.name ?? '').trim().length > 0)
+        .map((m, i) => ({
+          // Use a numeric ID derived from the index to satisfy the existing
+          // store contract; cart operations key on this id and the list is
+          // not reordered after population.
+          id: i + 1,
+          name: m!.name as string,
+          quantity: typeof m!.quantity === 'number' && m!.quantity > 0 ? m!.quantity : 1,
+          unitPrice: typeof m!.unitPrice === 'number' ? m!.unitPrice : 0,
+        }));
+
+      if (data.prescriptionUrl) {
+        setPrescription(data.prescriptionUrl);
+      }
+      if (mappedMedicines.length > 0) {
+        setMedicines(mappedMedicines);
+      }
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message ?? 'Could not load your recent prescription.';
+      setRecentError(message);
+    } finally {
+      setRecentLoading(false);
+    }
+  }, [setPrescription, setMedicines]);
 
   // ---- Checkout validation -------------------------------------------------
   const subtotal = medicines.reduce(
@@ -222,18 +279,27 @@ export const PrescriptionOrderScreen: React.FC = () => {
         {!prescriptionUrl && !isUploading && (
           <>
             <TouchableOpacity
-              style={styles.sourceOption}
+              style={[styles.sourceOption, recentLoading && { opacity: 0.6 }]}
               onPress={useRecentConsultation}
+              disabled={recentLoading}
             >
               <Text style={styles.sourceIcon}>🩺</Text>
               <View style={styles.sourceTextWrap}>
-                <Text style={styles.sourceTitle}>From Recent Consultation</Text>
+                <Text style={styles.sourceTitle}>
+                  {recentLoading ? 'Loading recent prescription…' : 'Use Recent Prescription'}
+                </Text>
                 <Text style={styles.sourceSubtitle}>
                   Use your last doctor-issued prescription
                 </Text>
               </View>
               <Text style={styles.arrow}>→</Text>
             </TouchableOpacity>
+
+            {recentError && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>ℹ️ {recentError}</Text>
+              </View>
+            )}
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -28,9 +28,25 @@ export const MedicineSearchScreen: React.FC = () => {
   const [query, setQuery] = useState('');
   const [pincode, setPincode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [cart, setCart] = useState<Map<string, { medicine: MedicineResult; quantity: number }>>(
     new Map(),
   );
+
+  // ---- Debounced autocomplete: trigger search when query length >= 2 -------
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setSearchTerm('');
+      setShowSuggestions(false);
+      return;
+    }
+    const handle = setTimeout(() => {
+      setSearchTerm(trimmed);
+      setShowSuggestions(true);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [query]);
 
   const {
     data: medicines,
@@ -49,12 +65,15 @@ export const MedicineSearchScreen: React.FC = () => {
     ? 'Session expired. Please login again.'
     : 'Something went wrong. Please try again.';
 
-  const handleSearch = () => {
+  // Fallback for keyboard "Search" key — keeps current behaviour for users
+  // who prefer to confirm explicitly.
+  const handleSearchSubmit = () => {
     if (query.trim().length < 2) {
       Alert.alert('Please enter at least 2 characters to search');
       return;
     }
     setSearchTerm(query.trim());
+    setShowSuggestions(true);
   };
 
   const addToCart = (medicine: MedicineResult) => {
@@ -68,6 +87,13 @@ export const MedicineSearchScreen: React.FC = () => {
       }
       return next;
     });
+  };
+
+  const handleSuggestionPress = (medicine: MedicineResult) => {
+    addToCart(medicine);
+    setQuery('');
+    setSearchTerm('');
+    setShowSuggestions(false);
   };
 
   const removeFromCart = (medicineId: string) => {
@@ -85,6 +111,7 @@ export const MedicineSearchScreen: React.FC = () => {
 
   const cartItems = Array.from(cart.values());
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const cartList = cartItems.map((item) => item.medicine);
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
@@ -103,8 +130,10 @@ export const MedicineSearchScreen: React.FC = () => {
           placeholderTextColor={Colors.textMuted}
           value={query}
           onChangeText={setQuery}
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={handleSearchSubmit}
           returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
         />
         <TextInput
           style={[styles.searchInput, styles.pincodeInput]}
@@ -115,44 +144,85 @@ export const MedicineSearchScreen: React.FC = () => {
           keyboardType="numeric"
           maxLength={6}
         />
-        <Button title="Search" onPress={handleSearch} style={styles.searchBtn} fullWidth={false} />
       </View>
 
-      {isLoading && <LoadingSpinner message="Searching medicines..." />}
-
-      {!isLoading && isError && searchTerm.length >= 2 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
-          <Text style={styles.emptyTitle}>{errorMessage}</Text>
-          <Button
-            title="Retry"
-            onPress={() => refetch()}
-            style={styles.retryBtn}
-            fullWidth={false}
-          />
+      {/* Autocomplete suggestion dropdown */}
+      {showSuggestions && searchTerm.length >= 2 && (
+        <View style={styles.suggestionsWrap}>
+          {isLoading && (
+            <View style={styles.suggestionLoading}>
+              <LoadingSpinner message="Searching..." />
+            </View>
+          )}
+          {!isLoading && isError && (
+            <View style={styles.suggestionEmpty}>
+              <Text style={styles.suggestionEmptyText}>{errorMessage}</Text>
+              <Button
+                title="Retry"
+                onPress={() => refetch()}
+                style={styles.retryBtn}
+                fullWidth={false}
+              />
+            </View>
+          )}
+          {!isLoading && !isError && (!medicines || medicines.length === 0) && (
+            <View style={styles.suggestionEmpty}>
+              <Text style={styles.suggestionEmptyText}>No matches for "{searchTerm}"</Text>
+            </View>
+          )}
+          {!isLoading && !isError && medicines && medicines.length > 0 && (
+            <FlatList
+              data={medicines}
+              keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
+              style={styles.suggestionList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.suggestionRow}
+                  onPress={() => handleSuggestionPress(item)}
+                >
+                  <View style={styles.suggestionInfo}>
+                    <Text style={styles.suggestionName}>{item.name}</Text>
+                    {item.manufacturer && (
+                      <Text style={styles.suggestionMfg}>{item.manufacturer}</Text>
+                    )}
+                  </View>
+                  <View style={styles.suggestionMeta}>
+                    <Text style={styles.suggestionPrice}>
+                      {formatCurrency(item.price)}
+                    </Text>
+                    {requiresPrescriptionForMedicine(item) && (
+                      <Text style={styles.rxBadge}>Rx</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
       )}
 
-      {!isLoading && !isError && searchTerm.length >= 2 && (!medicines || medicines.length === 0) && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>💊</Text>
-          <Text style={styles.emptyTitle}>No medicines found</Text>
-          <Text style={styles.emptySubtitle}>Try a different search term</Text>
-        </View>
-      )}
-
-      {!searchTerm && (
+      {/* Idle state */}
+      {!showSuggestions && cartList.length === 0 && (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyTitle}>Search for medicines</Text>
-          <Text style={styles.emptySubtitle}>Enter a medicine name to get started</Text>
+          <Text style={styles.emptySubtitle}>
+            Start typing a medicine name to see suggestions
+          </Text>
         </View>
       )}
 
+      {/* Cart list */}
       <FlatList
-        data={medicines || []}
+        data={cartList}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          cartList.length > 0 ? (
+            <Text style={styles.cartHeader}>In your cart</Text>
+          ) : null
+        }
         renderItem={({ item }) => {
           const cartItem = cart.get(item.id);
           return (
@@ -232,7 +302,45 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   pincodeInput: { marginTop: 4 },
-  searchBtn: { marginTop: 4 },
+  suggestionsWrap: {
+    backgroundColor: Colors.white,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    maxHeight: 280,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  suggestionList: { maxHeight: 280 },
+  suggestionLoading: { padding: 16 },
+  suggestionEmpty: { padding: 16, alignItems: 'center' },
+  suggestionEmptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  suggestionInfo: { flex: 1 },
+  suggestionName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  suggestionMfg: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  suggestionMeta: { flexDirection: 'row', alignItems: 'center', marginLeft: 10 },
+  suggestionPrice: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  cartHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
   list: { padding: 16, paddingBottom: 100 },
   medicineCard: {
     flexDirection: 'row',
