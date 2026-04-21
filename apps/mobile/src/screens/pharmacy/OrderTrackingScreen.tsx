@@ -51,6 +51,12 @@ const isTerminalStatus = (status: string): boolean =>
   status === 'RETURNED' ||
   status === 'REFUNDED';
 
+const TERMINAL_STATUS_LABEL: Record<string, string> = {
+  CANCELLED: 'Order Cancelled',
+  RETURNED: 'Order Returned',
+  REFUNDED: 'Order Refunded',
+};
+
 const formatEstimatedDelivery = (iso?: string | null): string | null => {
   if (!iso) return null;
   const date = new Date(iso);
@@ -170,10 +176,18 @@ export const OrderTrackingScreen: React.FC = () => {
     error,
     refetch,
     isRefetching,
+    isFetching,
   } = useQuery<PharmacyOrder>({
     queryKey: ['pharmacy-order', orderId],
     queryFn: () => pharmacyService.getOrderById(orderId),
   });
+
+  // Keep latest fetching flag in a ref so the polling effect doesn't need
+  // to re-create the interval on every render.
+  const isFetchingRef = useRef(isFetching);
+  useEffect(() => {
+    isFetchingRef.current = isFetching;
+  }, [isFetching]);
 
   // Poll every 30s; stop polling once the order reaches a terminal state.
   useEffect(() => {
@@ -181,7 +195,10 @@ export const OrderTrackingScreen: React.FC = () => {
       return;
     }
     const interval = setInterval(() => {
-      refetch();
+      // Skip if a request is already in flight to avoid duplicates.
+      if (!isFetchingRef.current) {
+        refetch();
+      }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [order, refetch]);
@@ -226,7 +243,10 @@ export const OrderTrackingScreen: React.FC = () => {
           text: 'Call',
           onPress: () => {
             Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
-              Alert.alert('Unable to place the call from this device.'),
+              Alert.alert(
+                'Call Failed',
+                `Unable to place the call from this device. Please dial ${SUPPORT_PHONE} manually.`,
+              ),
             );
           },
         },
@@ -299,7 +319,7 @@ export const OrderTrackingScreen: React.FC = () => {
         {cancelled ? (
           <View style={[styles.etaBanner, { backgroundColor: Colors.error + '15' }]}>
             <Text style={[styles.etaText, { color: Colors.error }]}>
-              Order {order.status.toLowerCase()}
+              {TERMINAL_STATUS_LABEL[order.status] ?? 'Order Closed'}
             </Text>
           </View>
         ) : delivered ? (
