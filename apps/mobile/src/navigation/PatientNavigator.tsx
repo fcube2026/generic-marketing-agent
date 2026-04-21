@@ -19,6 +19,7 @@ import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderSc
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
 import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
+import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
 
@@ -38,6 +39,7 @@ export type PatientStackParamList = {
   PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };
+  OrderTracking: { orderId: string };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -83,5 +85,6 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PharmacyCheckout" component={PharmacyCheckoutScreen} options={{ title: 'Checkout' }} />
     <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
+    <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ title: 'Track Order' }} />
   </Stack.Navigator>
 );
