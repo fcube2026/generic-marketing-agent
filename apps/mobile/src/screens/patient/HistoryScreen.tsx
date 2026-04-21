@@ -42,7 +42,7 @@ export const HistoryScreen: React.FC = () => {
               style={styles.item}
               onPress={() => {
                 if (item.mode === 'VIDEO_CONSULTATION') {
-                  navigation.navigate('VideoConsultation', { bookingId: item.id });
+                  navigation.navigate('VideoLobby', { bookingId: item.id });
                 } else {
                   navigation.navigate('Tracking', { bookingId: item.id });
                 }

@@ -13,6 +13,7 @@ import { HistoryScreen } from '../screens/provider/HistoryScreen';
 import { EarningsScreen } from '../screens/provider/EarningsScreen';
 import { ProfileScreen } from '../screens/provider/ProfileScreen';
 import { VideoConsultationScreen } from '../screens/provider/VideoConsultationScreen';
+import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 import { Colors } from '../constants/colors';
 
 export type ProviderStackParamList = {
@@ -21,6 +22,7 @@ export type ProviderStackParamList = {
   Availability: undefined;
   IncomingBooking: undefined;
   BookingDetail: { bookingId: string };
+  VideoLobby: { bookingId: string };
   VideoConsultation: { bookingId: string };
   ConsultationForm: { bookingId: string };
   Kyc: undefined;
@@ -56,6 +58,7 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="Availability" component={AvailabilityScreen} options={{ title: 'Availability' }} />
     <Stack.Screen name="IncomingBooking" component={IncomingBookingScreen} options={{ title: 'New Booking' }} />
     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} options={{ title: 'Booking Details' }} />
+    <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Lobby', headerStyle: { backgroundColor: '#0F172A' }, headerTintColor: Colors.white }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
