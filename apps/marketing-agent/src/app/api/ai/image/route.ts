@@ -7,11 +7,6 @@ import {
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
 import { pickClosestSize } from '@/lib/ai/image-sizes';
-import {
-  pollinationsImage,
-  POLLINATIONS_IMAGE_MODEL,
-  PollinationsError,
-} from '@/lib/ai/pollinations';
 import { getErrorStatus } from '@/lib/ai/error-utils';
 
 export const runtime = 'nodejs';
@@ -56,41 +51,11 @@ interface SuccessPayload {
   requestedHeight: number;
 }
 
-function pollinationsFallback(
-  prompt: string,
-  width: number,
-  height: number,
-  size: string,
-  reason: string,
-): Promise<NextResponse> {
-  return pollinationsImage({ prompt, width, height })
-    .then(({ dataUrl }) => {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (${reason}) requested=${width}x${height}`,
-      );
-      const payload: SuccessPayload = {
-        dataUrl,
-        model: POLLINATIONS_IMAGE_MODEL,
-        size,
-        requestedWidth: width,
-        requestedHeight: height,
-      };
-      return NextResponse.json(payload);
-    })
-    .catch((fallbackErr: unknown) => {
-      const status =
-        fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
-      const message =
-        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
-      // eslint-disable-next-line no-console
-      console.error(`[ai/image] Pollinations ${reason} failed`, { status, message });
-      return NextResponse.json(
-        { error: message, code: 'provider_error' },
-        { status: 502 },
-      );
-    });
-}
+/** Outcome of trying a single provider. */
+type ProviderOutcome =
+  | { kind: 'success'; response: NextResponse }
+  | { kind: 'fatal'; response: NextResponse } // e.g. prompt rejected — don't try the other provider
+  | { kind: 'retry'; status: number; message: string }; // try next provider
 
 export async function POST(req: NextRequest) {
   // 1. Auth
@@ -130,28 +95,52 @@ export async function POST(req: NextRequest) {
   const width = asPositiveInt(body.width, 1024);
   const height = asPositiveInt(body.height, 1024);
   const size = pickClosestSize(width, height);
-  const provider = resolveProvider(body.provider);
+  const preferred = resolveProvider(body.provider);
 
-  if (provider === 'google') {
-    return handleGoogle({ prompt, width, height, size });
+  // Try preferred provider first, then the other. If a provider is missing
+  // its API key it's still attempted (the helper returns a `retry` outcome
+  // immediately) so we cleanly fall through to the alternative.
+  const order: ImageProvider[] = preferred === 'openai' ? ['openai', 'google'] : ['google', 'openai'];
+
+  let lastRetry: { provider: ImageProvider; status: number; message: string } | null = null;
+  for (const provider of order) {
+    const outcome =
+      provider === 'openai'
+        ? await tryOpenAI({ prompt, width, height, size })
+        : await tryGoogle({ prompt, width, height, size });
+
+    if (outcome.kind === 'success' || outcome.kind === 'fatal') {
+      return outcome.response;
+    }
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[ai/image] provider=${provider} failed (status=${outcome.status}); ${order.indexOf(provider) + 1 < order.length ? 'trying next provider' : 'no more providers'}`,
+    );
+    lastRetry = { provider, status: outcome.status, message: outcome.message };
   }
-  return handleOpenAI({ prompt, width, height, size });
+
+  // Both providers exhausted — surface the most informative error.
+  return providerErrorResponse(lastRetry);
 }
 
-async function handleOpenAI(args: {
+async function tryOpenAI(args: {
   prompt: string;
   width: number;
   height: number;
   size: string;
-}) {
+}): Promise<ProviderOutcome> {
   const { prompt, width, height, size } = args;
 
-  // Resolve client; on missing key fall back to Pollinations.
+  // No key → cleanly hand off to the next provider.
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
-  } catch {
-    return pollinationsFallback(prompt, width, height, size, 'openai-missing-key-fallback');
+  } catch (err) {
+    return {
+      kind: 'retry',
+      status: 401,
+      message: err instanceof Error ? err.message : 'OpenAI key missing',
+    };
   }
 
   try {
@@ -167,10 +156,11 @@ async function handleOpenAI(args: {
     const url = item?.url;
 
     if (!b64 && !url) {
-      return NextResponse.json(
-        { error: 'Empty response from image provider', code: 'empty_image' },
-        { status: 502 },
-      );
+      return {
+        kind: 'retry',
+        status: 502,
+        message: 'OpenAI returned an empty image',
+      };
     }
 
     // eslint-disable-next-line no-console
@@ -184,29 +174,22 @@ async function handleOpenAI(args: {
       requestedWidth: width,
       requestedHeight: height,
     };
-    return NextResponse.json(payload);
+    return { kind: 'success', response: NextResponse.json(payload) };
   } catch (err: unknown) {
-    const status = getErrorStatus(err);
-    if (status === 401 || status === 403) {
-      // eslint-disable-next-line no-console
-      console.warn('[ai/image] OpenAI rejected the API key, falling back to Pollinations');
-      return pollinationsFallback(prompt, width, height, size, 'openai-auth-fallback');
-    }
-    return handleProviderError('openai', err);
+    return classifyError('openai', err);
   }
 }
 
-async function handleGoogle(args: {
+async function tryGoogle(args: {
   prompt: string;
   width: number;
   height: number;
   size: string;
-}) {
+}): Promise<ProviderOutcome> {
   const { prompt, width, height, size } = args;
 
-  // No key configured → straight to Pollinations fallback (parity with OpenAI path).
   if (!process.env.GOOGLE_AI_API_KEY) {
-    return pollinationsFallback(prompt, width, height, size, 'google-missing-key-fallback');
+    return { kind: 'retry', status: 401, message: 'GOOGLE_AI_API_KEY is not set' };
   }
 
   try {
@@ -226,72 +209,70 @@ async function handleGoogle(args: {
       requestedWidth: width,
       requestedHeight: height,
     };
-    return NextResponse.json(payload);
+    return { kind: 'success', response: NextResponse.json(payload) };
   } catch (err) {
-    const status =
-      err instanceof GoogleImageError ? err.status : getErrorStatus(err);
-    if (status === 401 || status === 403) {
-      // eslint-disable-next-line no-console
-      console.warn('[ai/image] Google rejected the API key, falling back to Pollinations');
-      return pollinationsFallback(prompt, width, height, size, 'google-auth-fallback');
-    }
-    if (status === 404) {
-      // Imagen models (e.g. imagen-3.0-generate-002) require a billing-enabled
-      // Google Cloud project; free AI Studio keys get a 404 NOT_FOUND for the
-      // `:predict` endpoint. Gemini image models (e.g. gemini-2.5-flash-image,
-      // a.k.a. "Nano Banana") are available on free keys — set
-      // GOOGLE_AI_IMAGE_MODEL=gemini-2.5-flash-image to use them. Until then,
-      // treat 404 as "model unavailable on this key" and fall back to
-      // Pollinations rather than surfacing a 502 to the UI.
-      // eslint-disable-next-line no-console
-      console.warn(
-        '[ai/image] Google image model unavailable for this API key (404), falling back to Pollinations',
-      );
-      return pollinationsFallback(prompt, width, height, size, 'google-model-unavailable-fallback');
-    }
-    return handleProviderError('google', err);
+    return classifyError('google', err);
   }
 }
 
-function handleProviderError(provider: ImageProvider, err: unknown) {
+/**
+ * Map a thrown provider error to a `ProviderOutcome`. 400 (prompt rejected by
+ * safety) is `fatal` — the other provider would likely reject the same
+ * prompt, and silently retrying could surface unsafe content. Everything
+ * else (auth, quota, model unavailable, network, timeout, 5xx) is `retry` so
+ * the caller can try the other provider.
+ */
+function classifyError(provider: ImageProvider, err: unknown): ProviderOutcome {
   const status =
-    err instanceof GoogleImageError
-      ? err.status
-      : typeof err === 'object' && err !== null && 'status' in err && typeof (err as { status: unknown }).status === 'number'
-        ? (err as { status: number }).status
-        : 500;
+    err instanceof GoogleImageError ? err.status : getErrorStatus(err);
   const message = err instanceof Error ? err.message : 'Unknown provider error';
 
   // eslint-disable-next-line no-console
   console.error(`[ai/image] ${provider} error`, { status, message });
 
   if (status === 400) {
-    // Most common: prompt rejected by safety system.
+    return {
+      kind: 'fatal',
+      response: NextResponse.json(
+        { error: 'Prompt rejected by image provider', code: 'prompt_rejected', detail: message },
+        { status: 400 },
+      ),
+    };
+  }
+  return { kind: 'retry', status, message };
+}
+
+function providerErrorResponse(
+  last: { provider: ImageProvider; status: number; message: string } | null,
+): NextResponse {
+  if (!last) {
+    // Should not happen — order always has at least one provider — but be defensive.
     return NextResponse.json(
-      { error: 'Prompt rejected by image provider', code: 'prompt_rejected', detail: message },
-      { status: 400 },
+      { error: 'No AI image provider configured', code: 'no_provider' },
+      { status: 502 },
     );
   }
+  const { status, message } = last;
   if (status === 401 || status === 403) {
     return NextResponse.json(
-      { error: 'Provider rejected the API key', code: 'provider_auth_error' },
+      { error: 'All AI image providers rejected the API key', code: 'provider_auth_error', detail: message },
       { status: 502 },
     );
   }
   if (status === 429) {
     return NextResponse.json(
-      { error: 'Provider rate limit exceeded', code: 'provider_rate_limited' },
+      { error: 'All AI image providers are rate limited', code: 'provider_rate_limited', detail: message },
       { status: 502 },
     );
   }
   if (status === 504) {
     return NextResponse.json(
-      { error: 'Image provider timed out', code: 'provider_timeout', detail: message },
+      { error: 'AI image providers timed out', code: 'provider_timeout', detail: message },
       { status: 504 },
     );
   }
   return NextResponse.json(
-    { error: 'AI provider error', code: 'provider_error', detail: message },
+    { error: 'All AI image providers failed', code: 'provider_error', detail: message },
     { status: 502 },
   );
 }
