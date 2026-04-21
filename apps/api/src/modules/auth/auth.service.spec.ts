@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -151,12 +152,14 @@ describe('AuthService', () => {
     const mockMarketingUser = {
       id: 'marketing-user-id',
       phone: '+0000000001',
+      email: 'marketing@curex24.com',
       role: 'MARKETING_AGENT',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    it('should return token for valid credentials', async () => {
+    it('should return token for valid credentials via env-var fallback', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
       mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
 
       const result = await service.marketingLogin(validDto);
@@ -176,19 +179,84 @@ describe('AuthService', () => {
       });
     });
 
-    it('should upsert marketing agent user with MARKETING_AGENT role', async () => {
+    it('should upsert marketing agent user with email and MARKETING_AGENT role', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
       mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
 
       await service.marketingLogin(validDto);
 
       expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
         where: { phone: '+0000000001' },
-        create: { phone: '+0000000001', role: 'MARKETING_AGENT' },
+        create: {
+          phone: '+0000000001',
+          email: 'marketing@curex24.com',
+          role: 'MARKETING_AGENT',
+        },
         update: { role: 'MARKETING_AGENT' },
       });
     });
 
+    it('should authenticate via DB-stored passwordHash when user exists', async () => {
+      const hash = await bcrypt.hash('marketing123', 10);
+      const dbUser = {
+        ...mockMarketingUser,
+        passwordHash: hash,
+        isActive: true,
+      };
+      mockPrisma.user.findFirst.mockResolvedValue(dbUser);
+
+      const result = await service.marketingLogin(validDto);
+
+      expect(result.token).toBe('mock-jwt-token');
+      expect(result.user.role).toBe('MARKETING_AGENT');
+      // Should use DB path — upsert should NOT be called
+      expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when DB password does not match', async () => {
+      const hash = await bcrypt.hash('different-password', 10);
+      mockPrisma.user.findFirst.mockResolvedValue({
+        ...mockMarketingUser,
+        passwordHash: hash,
+        isActive: true,
+      });
+
+      await expect(
+        service.marketingLogin({
+          email: 'marketing@curex24.com',
+          password: 'marketing123',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException for deactivated DB user', async () => {
+      const hash = await bcrypt.hash('marketing123', 10);
+      mockPrisma.user.findFirst.mockResolvedValue({
+        ...mockMarketingUser,
+        passwordHash: hash,
+        isActive: false,
+      });
+
+      await expect(service.marketingLogin(validDto)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should fall back to env-var check when DB lookup fails', async () => {
+      mockPrisma.user.findFirst.mockRejectedValue(
+        new Error('column "email" does not exist'),
+      );
+      mockPrisma.user.upsert.mockResolvedValue(mockMarketingUser);
+
+      const result = await service.marketingLogin(validDto);
+
+      expect(result.token).toBe('mock-jwt-token');
+      expect(result.user.role).toBe('MARKETING_AGENT');
+    });
+
     it('should throw UnauthorizedException for wrong email', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+
       await expect(
         service.marketingLogin({
           email: 'wrong@email.com',
@@ -198,6 +266,8 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for wrong password', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+
       await expect(
         service.marketingLogin({
           email: 'marketing@curex24.com',
@@ -210,10 +280,12 @@ describe('AuthService', () => {
       const mockAdminUser = {
         id: 'admin-user-id',
         phone: '+0000000000',
+        email: 'admin@curex24.com',
         role: 'ADMIN',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      mockPrisma.user.findFirst.mockResolvedValue(null);
       mockPrisma.user.upsert.mockResolvedValue(mockAdminUser);
 
       const result = await service.marketingLogin({
@@ -237,6 +309,7 @@ describe('AuthService', () => {
     });
 
     it('should throw ServiceUnavailableException when DB upsert fails', async () => {
+      mockPrisma.user.findFirst.mockResolvedValue(null);
       mockPrisma.user.upsert.mockRejectedValue(new Error('DB connection lost'));
 
       await expect(service.marketingLogin(validDto)).rejects.toThrow(

@@ -20,6 +20,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
+const MARKETING_DEFAULT_PASSWORD =
+  process.env.MARKETING_PASSWORD || 'marketing123';
 
 // Well-known staging admin credentials, always provisioned on non-production
 // environments so the staging admin portal is reachable with the documented
@@ -80,6 +82,10 @@ export class AuthService implements OnModuleInit {
     for (const member of TEAM_ACCOUNTS) {
       await this.bootstrapTeamMember(member.email, member.phone);
     }
+
+    // 4. Provision the marketing agent account so the marketing-login
+    //    endpoint works reliably from the first deployment.
+    await this.bootstrapMarketing(this.marketingEmail, MARKETING_PHONE);
   }
 
   /**
@@ -179,6 +185,61 @@ export class AuthService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(
         `[bootstrap] Team member bootstrap skipped for email=${email}: ${err.message}`,
+      );
+    }
+  }
+
+  /**
+   * Provision the marketing agent account.
+   * Only sets the password if the account has no passwordHash yet,
+   * so a user who already changed their password keeps it.
+   */
+  private async bootstrapMarketing(email: string, phonePlaceholder: string) {
+    try {
+      const existing = await this.prisma.user.findFirst({ where: { email } });
+      if (existing) {
+        if (!existing.passwordHash) {
+          const passwordHash = await bcrypt.hash(
+            MARKETING_DEFAULT_PASSWORD,
+            10,
+          );
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              passwordHash,
+              role: Role.MARKETING_AGENT,
+              isActive: true,
+            },
+          });
+          this.logger.log(
+            `[bootstrap] Set initial password for marketing agent email=${email}`,
+          );
+        }
+        return;
+      }
+      const passwordHash = await bcrypt.hash(MARKETING_DEFAULT_PASSWORD, 10);
+      await this.prisma.user.upsert({
+        where: { phone: phonePlaceholder },
+        create: {
+          phone: phonePlaceholder,
+          email,
+          role: Role.MARKETING_AGENT,
+          passwordHash,
+          isActive: true,
+        },
+        update: {
+          email,
+          role: Role.MARKETING_AGENT,
+          isActive: true,
+          // Do not overwrite an existing passwordHash — preserve custom passwords
+        },
+      });
+      this.logger.log(
+        `[bootstrap] Created marketing agent account email=${email}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[bootstrap] Marketing agent bootstrap skipped for email=${email}: ${err.message}`,
       );
     }
   }
@@ -381,6 +442,46 @@ export class AuthService implements OnModuleInit {
   }
 
   async marketingLogin(dto: AdminLoginDto) {
+    // 1. Try DB-stored marketing user first (same pattern as adminLogin).
+    //    Only MARKETING_AGENT accounts are matched here; admin credentials
+    //    are handled by the env-var fallback below.
+    try {
+      const dbUser = await this.prisma.user.findFirst({
+        where: {
+          email: dto.email,
+          role: Role.MARKETING_AGENT,
+        },
+      });
+
+      if (dbUser && dbUser.passwordHash) {
+        const valid = await bcrypt.compare(dto.password, dbUser.passwordHash);
+        if (!valid)
+          throw new UnauthorizedException(
+            'Invalid marketing agent credentials',
+          );
+        if (!dbUser.isActive)
+          throw new UnauthorizedException('Account is deactivated');
+
+        const payload = {
+          sub: dbUser.id,
+          phone: dbUser.phone,
+          role: dbUser.role,
+        };
+        const token = this.jwtService.sign(payload);
+
+        return {
+          token,
+          user: { id: dbUser.id, email: dbUser.email, role: dbUser.role },
+        };
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.warn(
+        `Marketing DB user lookup failed (migration may be pending): ${err.message}`,
+      );
+    }
+
+    // 2. Fall back to hardcoded env-var credentials
     const isMarketingCredentials =
       dto.email === this.marketingEmail &&
       dto.password === this.marketingPassword;
@@ -416,7 +517,11 @@ export class AuthService implements OnModuleInit {
 
       const user = await this.prisma.user.upsert({
         where: { phone: MARKETING_PHONE },
-        create: { phone: MARKETING_PHONE, role: Role.MARKETING_AGENT },
+        create: {
+          phone: MARKETING_PHONE,
+          email: this.marketingEmail,
+          role: Role.MARKETING_AGENT,
+        },
         update: { role: Role.MARKETING_AGENT },
       });
 
