@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { GeneratedImage } from '@/components/ui/GeneratedImage';
+import { ImageProviderToggle } from '@/components/ui/ImageProviderToggle';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -704,11 +705,12 @@ export default function CreatePage() {
       {/* AI Skills Banner */}
       <div className="bg-gradient-to-r from-primary/10 to-purple-50 border border-primary/20 rounded-xl px-5 py-3 flex flex-wrap items-center gap-3">
         <span className="text-xs font-semibold text-primary uppercase tracking-wide">Powered by</span>
-        {['OpenAI GPT-4o', 'OpenAI gpt-image-1'].map((tool) => (
+        {['OpenAI GPT-4o', 'OpenAI gpt-image-1', 'Google Imagen 3'].map((tool) => (
           <span key={tool} className="text-xs px-2.5 py-1 bg-white border border-gray-200 rounded-full text-gray-700 font-medium shadow-sm">
             {tool}
           </span>
         ))}
+        <ImageProviderToggle className="ml-auto" />
       </div>
 
       {/* Tabs */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeAiError, generateImage } from '@/lib/services/aiService';
+import { useImageProvider } from '@/lib/hooks/useImageProvider';
 
 const BRAND_SUFFIX =
   ', curex24 healthcare brand, professional quality, clean composition, no watermark, no text overlay';
@@ -18,10 +19,12 @@ interface GeneratedImageProps {
 interface ImageData {
   src: string;
   size: string;
+  model: string;
 }
 
 export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: GeneratedImageProps) {
   const fullPrompt = useMemo(() => prompt + BRAND_SUFFIX, [prompt]);
+  const [provider] = useImageProvider();
 
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -41,7 +44,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
 
     (async () => {
       try {
-        const result = await generateImage({ prompt: fullPrompt, width, height });
+        const result = await generateImage({ prompt: fullPrompt, width, height, provider });
         if (cancelled || requestIdRef.current !== requestId) return;
         const src = result.dataUrl ?? result.url ?? '';
         if (!src) {
@@ -49,7 +52,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
           setStatus('error');
           return;
         }
-        setImage({ src, size: result.size });
+        setImage({ src, size: result.size, model: result.model });
         setStatus('loaded');
       } catch (err) {
         if (cancelled || requestIdRef.current !== requestId) return;
@@ -61,7 +64,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
     return () => {
       cancelled = true;
     };
-  }, [fullPrompt, width, height, attempt]);
+  }, [fullPrompt, width, height, attempt, provider]);
 
   function retry() {
     if (attempt + 1 < MAX_ATTEMPTS) {
@@ -131,6 +134,13 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label }: G
           </>
         )}
       </div>
+      {image && status === 'loaded' && (
+        <div className="px-3 py-1.5 border-t border-gray-200 bg-white">
+          <p className="text-[10px] text-gray-500 font-mono truncate" title={image.model}>
+            model: {image.model}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -53,6 +53,11 @@ export interface GenerateImageInput {
   height?: number;
   /** Optional client-side hint, currently informational only. */
   format?: string;
+  /**
+   * Choose the upstream image provider. When omitted the server falls back
+   * to the `AI_IMAGE_PROVIDER` env var (default: `'openai'`).
+   */
+  provider?: 'openai' | 'google';
 }
 
 export interface GenerateImageResult {
