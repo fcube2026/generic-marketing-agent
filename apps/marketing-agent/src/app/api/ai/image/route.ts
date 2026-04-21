@@ -235,6 +235,17 @@ async function handleGoogle(args: {
       console.warn('[ai/image] Google rejected the API key, falling back to Pollinations');
       return pollinationsFallback(prompt, width, height, size, 'google-auth-fallback');
     }
+    if (status === 404) {
+      // Imagen models (e.g. imagen-3.0-generate-002) require a billing-enabled
+      // Google Cloud project; free AI Studio keys get a 404 NOT_FOUND for the
+      // `:predict` endpoint. Treat this as "model unavailable on this key" and
+      // fall back to Pollinations rather than surfacing a 502 to the UI.
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[ai/image] Google Imagen model unavailable for this API key (404), falling back to Pollinations',
+      );
+      return pollinationsFallback(prompt, width, height, size, 'google-model-unavailable-fallback');
+    }
     return handleProviderError('google', err);
   }
 }
