@@ -234,7 +234,7 @@ export class PatientVerificationService {
   }
 
   async getMyVerificationStatus(userId: string) {
-    const patient = await this.prisma.patient.findUnique({
+    const patient = await this.prisma.patientProfile.findUnique({
       where: { userId },
     });
 
