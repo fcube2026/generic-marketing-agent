@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Role } from '@prisma/client';
+import { Role, PasswordResetToken, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -548,65 +548,88 @@ export class AuthService implements OnModuleInit {
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: dto.email,
-        role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
-        isActive: true,
-      },
-    });
-
     // Always return the same message to prevent email enumeration
     const safeResponse = {
       message:
         'If that email is registered, a password reset link has been sent to it.',
     };
 
-    if (!user) return safeResponse;
-
-    // Invalidate previous unused tokens for this user
-    await this.prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, usedAt: null },
-      data: { usedAt: new Date() },
-    });
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await this.prisma.passwordResetToken.create({
-      data: { userId: user.id, token, expiresAt },
-    });
-
-    const adminUrl =
-      process.env.ADMIN_URL ||
-      (process.env.APP_ENV === 'production'
-        ? 'https://admin.curex24.com'
-        : 'https://admin.staging.curex24.com');
-
-    const resetUrl = `${adminUrl}/reset-password?token=${token}`;
-    const displayName = (user.email || dto.email).split('@')[0];
-
+    let user: User | null;
     try {
-      await this.emailService.sendPasswordResetEmail(
-        dto.email,
-        displayName,
-        resetUrl,
-      );
+      user = await this.prisma.user.findFirst({
+        where: {
+          email: dto.email,
+          role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
+          isActive: true,
+        },
+      });
     } catch (err) {
       this.logger.error(
-        `Could not send reset email to ${dto.email}: ${err.message}`,
+        `forgotPassword DB lookup failed for email=${dto.email}: ${err.message}`,
       );
-      // Still return safe response — don't expose that email send failed
+      return safeResponse;
+    }
+
+    if (!user) return safeResponse;
+
+    try {
+      // Invalidate previous unused tokens for this user
+      await this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await this.prisma.passwordResetToken.create({
+        data: { userId: user.id, token, expiresAt },
+      });
+
+      const adminUrl =
+        process.env.ADMIN_URL ||
+        (process.env.APP_ENV === 'production'
+          ? 'https://admin.curex24.com'
+          : 'https://admin.staging.curex24.com');
+
+      const resetUrl = `${adminUrl}/reset-password?token=${token}`;
+      const displayName = (user.email || dto.email).split('@')[0];
+
+      try {
+        await this.emailService.sendPasswordResetEmail(
+          dto.email,
+          displayName,
+          resetUrl,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Could not send reset email to ${dto.email}: ${err.message}`,
+        );
+        // Still return safe response — don't expose that email send failed
+      }
+    } catch (err) {
+      this.logger.error(
+        `forgotPassword DB operation failed for email=${dto.email}: ${err.message}`,
+      );
+      // Return safe response regardless — don't expose internal errors
     }
 
     return safeResponse;
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    const record = await this.prisma.passwordResetToken.findUnique({
-      where: { token: dto.token },
-      include: { user: true },
-    });
+    // Look up the reset token — propagate any DB error as 503
+    let record: PasswordResetToken | null;
+    try {
+      record = await this.prisma.passwordResetToken.findUnique({
+        where: { token: dto.token },
+      });
+    } catch (err) {
+      this.logger.error(`resetPassword DB lookup failed: ${err.message}`);
+      throw new ServiceUnavailableException(
+        'Password reset service temporarily unavailable. Please try again shortly.',
+      );
+    }
 
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new BadRequestException(
@@ -616,16 +639,25 @@ export class AuthService implements OnModuleInit {
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: record.userId },
-        data: { passwordHash },
-      }),
-      this.prisma.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
-      }),
-    ]);
+    try {
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: record.userId },
+          data: { passwordHash },
+        }),
+        this.prisma.passwordResetToken.update({
+          where: { id: record.id },
+          data: { usedAt: new Date() },
+        }),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `resetPassword transaction failed for userId=${record.userId}: ${err.message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Password reset service temporarily unavailable. Please try again shortly.',
+      );
+    }
 
     this.logger.log(`Password reset completed for userId=${record.userId}`);
     return {
