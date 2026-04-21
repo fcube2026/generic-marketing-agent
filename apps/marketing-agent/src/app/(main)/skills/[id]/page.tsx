@@ -193,6 +193,8 @@ export default function SkillRunnerPage() {
     setPlanSaved(null);
   }, [config, skillId]);
 
+  const jsonBlock = useMemo(() => (result ? extractJsonBlock(result.reply) : null), [result]);
+
   if (!skillId || !skill || !config) {
     return (
       <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -203,8 +205,6 @@ export default function SkillRunnerPage() {
       </div>
     );
   }
-
-  const jsonBlock = result ? extractJsonBlock(result.reply) : null;
 
   async function onRun() {
     if (!skill || !config) return;
