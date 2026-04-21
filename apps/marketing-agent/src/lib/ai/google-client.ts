@@ -28,13 +28,13 @@ export const GOOGLE_TEXT_MODEL = process.env.GOOGLE_AI_TEXT_MODEL || 'gemini-1.5
 /**
  * Default image model. Two families are supported transparently:
  *
- * - **Imagen** (`imagen-3.0-*`, default) — uses the `:predict` REST endpoint.
- *   Requires a billing-enabled GCP project; free AI Studio keys get 404.
- * - **Gemini Image / "Nano Banana"** (`gemini-*-image*`, e.g.
+ * - **Gemini Image / "Nano Banana"** (`gemini-*-image*`, default — e.g.
  *   `gemini-2.5-flash-image`) — uses `:generateContent` with
  *   `responseModalities: ["IMAGE"]`. Available on free AI Studio keys.
+ * - **Imagen** (`imagen-3.0-*`) — uses the `:predict` REST endpoint.
+ *   Requires a billing-enabled GCP project; free AI Studio keys get 404.
  */
-export const GOOGLE_IMAGE_MODEL = process.env.GOOGLE_AI_IMAGE_MODEL || 'imagen-3.0-generate-002';
+export const GOOGLE_IMAGE_MODEL = process.env.GOOGLE_AI_IMAGE_MODEL || 'gemini-2.5-flash-image';
 
 /**
  * Returns true when the model name refers to a Gemini image-generation model

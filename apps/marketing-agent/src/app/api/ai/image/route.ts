@@ -245,7 +245,7 @@ async function handleGoogle(args: {
       // Pollinations rather than surfacing a 502 to the UI.
       // eslint-disable-next-line no-console
       console.warn(
-        '[ai/image] Google Imagen model unavailable for this API key (404), falling back to Pollinations',
+        '[ai/image] Google image model unavailable for this API key (404), falling back to Pollinations',
       );
       return pollinationsFallback(prompt, width, height, size, 'google-model-unavailable-fallback');
     }
