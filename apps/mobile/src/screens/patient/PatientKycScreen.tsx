@@ -10,84 +10,85 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
-import { verificationService } from '../../services/verificationService';
+import {
+  verificationService,
+  SelfServeStatus,
+  SelfServeStep,
+} from '../../services/verificationService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'PatientKyc'>;
 };
 
-interface VerificationStatusData {
-  verificationId: string | null;
-  status: string;
-  riskTier: string | null;
-  riskScore: number | null;
-  completedSteps: string[];
-  pendingSteps: string[];
-}
-
-const TIER_COLORS: Record<string, string> = {
-  LOW: Colors.success,
-  MEDIUM: Colors.warning,
-  HIGH: '#F97316',
-  CRITICAL: Colors.error,
+const STEP_LABELS: Record<SelfServeStep, string> = {
+  PERSONAL_DETAILS: 'Personal Details',
+  ADDRESS: 'Residential Address',
+  ID_UPLOAD: 'Upload Aadhaar',
+  FACE_CAPTURE: 'Face Verification',
+  GUARDIAN: 'Guardian Details',
+  REVIEW: 'Review & Submit',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING_OTP: 'Pending OTP',
-  OTP_VERIFIED: 'Phone Verified',
-  PROFILE_COMPLETE: 'Profile Complete',
-  INTAKE_COMPLETE: 'Intake Submitted',
-  CONSENT_GIVEN: 'Consent Accepted',
-  ID_UPLOAD_PENDING: 'ID Upload Pending',
-  ID_UNDER_REVIEW: 'ID Under Review',
-  ID_VERIFIED: 'ID Verified',
-  CONFIRMED: 'Verified ✓',
-  FLAGGED: 'Needs Review',
-  EMERGENCY_OVERRIDE: 'Override Applied',
-  NOT_STARTED: 'Not Started',
+type KycRoute =
+  | 'PatientKycPersonal'
+  | 'PatientKycAddress'
+  | 'PatientKycIdUpload'
+  | 'PatientKycFaceCapture'
+  | 'PatientKycGuardian'
+  | 'PatientKycReview';
+
+const STEP_TO_ROUTE: Record<SelfServeStep, KycRoute> = {
+  PERSONAL_DETAILS: 'PatientKycPersonal',
+  ADDRESS: 'PatientKycAddress',
+  ID_UPLOAD: 'PatientKycIdUpload',
+  FACE_CAPTURE: 'PatientKycFaceCapture',
+  GUARDIAN: 'PatientKycGuardian',
+  REVIEW: 'PatientKycReview',
 };
 
-const STATUS_ICONS: Record<string, string> = {
-  CONFIRMED: '✅',
-  FLAGGED: '⚠️',
-  ID_UNDER_REVIEW: '🔍',
-  ID_VERIFIED: '🪪',
-  NOT_STARTED: '📋',
-};
-
-const FALLBACK_STATUS: VerificationStatusData = {
-  verificationId: null,
-  status: 'NOT_STARTED',
-  riskTier: null,
-  riskScore: null,
-  completedSteps: [],
-  pendingSteps: [],
+/**
+ * Helper to navigate to one of the no-param KYC wizard routes. Centralised
+ * so the slightly-awkward `navigate(name)` overload (which requires the
+ * caller to pre-select a screen-name literal) is only suppressed in one
+ * place rather than at every call site.
+ */
+const navigateToKyc = (
+  navigation: NativeStackNavigationProp<PatientStackParamList, 'PatientKyc'>,
+  route: KycRoute,
+) => {
+  // Each KycRoute target has `undefined` params in PatientStackParamList,
+  // so this is type-safe at runtime; the cast is only needed because the
+  // navigate overload narrows on the literal `name` argument.
+  (navigation.navigate as (name: KycRoute) => void)(route);
 };
 
 export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
-  const [data, setData] = useState<VerificationStatusData | null>(null);
+  const [data, setData] = useState<SelfServeStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadStatus = useCallback(() => {
     setLoading(true);
     setLoadError(null);
+    // selfStart is idempotent — creates the verification row if missing,
+    // returns the current status either way.
     verificationService
-      .getMyVerificationStatus()
-      .then((res) => {
-        setData(res);
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn('[PatientKyc] Failed to load verification status', err);
-        // Degrade gracefully: still render the screen using a NOT_STARTED
-        // fallback so the user can see the verification information instead
-        // of a brick-wall error page.
-        setData(FALLBACK_STATUS);
-        setLoadError(
-          "We couldn't load your latest verification status. Showing default information.",
-        );
+      .selfStart()
+      .then((res) => setData(res))
+      .catch(() => {
+        // Fall back to plain status fetch if selfStart fails (e.g. profile
+        // not yet created — happens before onboarding).
+        verificationService
+          .getMyVerificationStatus()
+          .then((res) => setData(res))
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn('[PatientKyc] Failed to load verification status', err);
+            setLoadError(
+              "We couldn't load your verification status. Please complete your profile first.",
+            );
+          });
       })
       .finally(() => setLoading(false));
   }, []);
@@ -104,105 +105,161 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const status = data?.status ?? 'NOT_STARTED';
-  const tierColor = data?.riskTier ? TIER_COLORS[data.riskTier] ?? Colors.text : Colors.text;
-  const statusLabel = STATUS_LABELS[status] ?? status;
-  const statusIcon = STATUS_ICONS[status] ?? '📋';
-  const isVerified = status === 'CONFIRMED';
+  if (loadError || !data) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.bigIcon}>⚠️</Text>
+        <Text style={styles.title}>Identity Verification</Text>
+        <Text style={styles.subtitle}>
+          {loadError ?? 'Please complete your profile first.'}
+        </Text>
+        <Button title="Retry" onPress={loadStatus} variant="outline" />
+      </View>
+    );
+  }
+
+  const isVerified =
+    data.status === 'CONFIRMED' || data.status === 'EMERGENCY_OVERRIDE';
+  const isFlagged = data.status === 'FLAGGED';
+  const allSteps: SelfServeStep[] = data.isMinor
+    ? ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'GUARDIAN', 'REVIEW']
+    : ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'REVIEW'];
+  const completed = new Set(data.completedSteps);
+  const nextStep = data.nextStep;
+
+  const goToNext = () => {
+    if (!nextStep) return;
+    navigateToKyc(navigation, STEP_TO_ROUTE[nextStep]);
+  };
+
+  const goToStep = (step: SelfServeStep) => {
+    navigateToKyc(navigation, STEP_TO_ROUTE[step]);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.iconRow}>
-        <Text style={styles.bigIcon}>{statusIcon}</Text>
+        <Text style={styles.bigIcon}>{isVerified ? '✅' : isFlagged ? '⚠️' : '🪪'}</Text>
       </View>
-
       <Text style={styles.title}>Identity Verification</Text>
       <Text style={styles.subtitle}>
-        Your KYC (Know Your Customer) status is shown below.
+        {isVerified
+          ? 'Your identity is verified. You can book consultations freely.'
+          : isFlagged
+            ? 'Your verification is under manual review.'
+            : 'Complete the steps below to start booking consultations.'}
       </Text>
 
-      {loadError && (
-        <Card style={styles.warnCard}>
-          <Text style={styles.warnText}>{loadError}</Text>
-          <Button title="Retry" onPress={loadStatus} variant="outline" />
-        </Card>
-      )}
-
-      <Card style={styles.card}>
-        <Text style={styles.label}>Current Status</Text>
-        <Text style={[styles.status, { color: isVerified ? Colors.success : Colors.text }]}>
-          {statusLabel}
-        </Text>
-
-        {data?.riskTier && (
-          <View style={styles.tierRow}>
-            <Text style={styles.label}>Risk Level</Text>
-            <View style={[styles.tierBadge, { backgroundColor: tierColor }]}>
-              <Text style={styles.tierText}>{data.riskTier}</Text>
-            </View>
-          </View>
-        )}
-      </Card>
-
-      {data?.pendingSteps && data.pendingSteps.length > 0 && (
+      {!isVerified && !isFlagged && (
         <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>Required Steps</Text>
-          {data.pendingSteps.map((step: string) => (
-            <View key={step} style={styles.stepRow}>
-              <Text style={styles.stepDot}>○</Text>
-              <Text style={styles.stepText}>{step.replace(/_/g, ' ')}</Text>
-            </View>
-          ))}
-          <Text style={styles.hint}>
-            Complete a booking to proceed through the verification steps.
-          </Text>
+          <Text style={styles.section}>Verification Steps</Text>
+          {allSteps.map((step, idx) => {
+            const isDone = completed.has(step);
+            const isCurrent = nextStep === step;
+            return (
+              <View key={step} style={styles.stepRow}>
+                <View
+                  style={[
+                    styles.stepDot,
+                    isDone
+                      ? styles.stepDotDone
+                      : isCurrent
+                        ? styles.stepDotCurrent
+                        : styles.stepDotPending,
+                  ]}
+                >
+                  <Text style={styles.stepDotText}>
+                    {isDone ? '✓' : idx + 1}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.stepLabel,
+                    isDone && styles.stepLabelDone,
+                    isCurrent && styles.stepLabelCurrent,
+                  ]}
+                >
+                  {STEP_LABELS[step]}
+                </Text>
+                {isDone && !isVerified && (
+                  <Text style={styles.editLink} onPress={() => goToStep(step)}>
+                    Edit
+                  </Text>
+                )}
+              </View>
+            );
+          })}
         </Card>
       )}
 
       {isVerified && (
-        <Card style={styles.successCard}>
+        <Card style={{ ...styles.card, ...styles.successCard }}>
           <Text style={styles.successText}>
-            🎉 Your identity has been verified. You can now book consultations without additional verification steps.
+            🎉 You&apos;re all set. Your identity has been verified — no further
+            action is required.
           </Text>
         </Card>
       )}
 
-      {status === 'FLAGGED' && (
-        <Card style={styles.flagCard}>
+      {isFlagged && (
+        <Card style={{ ...styles.card, ...styles.flagCard }}>
           <Text style={styles.flagText}>
-            ⚠️ Your verification requires manual review. Our team will contact you shortly. If you have questions, please reach out to support.
+            ⚠️ Our team is reviewing your submission and will contact you
+            shortly. Please reach out to support if you have questions.
           </Text>
         </Card>
       )}
 
-      <Button title="Back to Profile" onPress={() => navigation.goBack()} variant="outline" />
+      {!isVerified && nextStep && (
+        <Button
+          title={
+            data.completedSteps.length === 0
+              ? 'Start verification'
+              : `Continue: ${STEP_LABELS[nextStep]}`
+          }
+          onPress={goToNext}
+        />
+      )}
+
+      <Button
+        title="Back to Profile"
+        onPress={() => navigation.goBack()}
+        variant="outline"
+        style={{ marginTop: 12 }}
+      />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 16, paddingBottom: 40 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  iconRow: { alignItems: 'center', marginBottom: 8, marginTop: 8 },
+  content: { padding: 20, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
+  iconRow: { alignItems: 'center', marginBottom: 8, marginTop: 4 },
   bigIcon: { fontSize: 56 },
-  title: { fontSize: 22, fontWeight: '700', color: Colors.text, textAlign: 'center', marginBottom: 6 },
+  title: { fontSize: 22, fontWeight: '800', color: Colors.text, textAlign: 'center', marginBottom: 6 },
   subtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
   card: { padding: 16, marginBottom: 16 },
-  label: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
-  status: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
-  tierRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tierBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
-  tierText: { color: Colors.white, fontWeight: '700', fontSize: 13 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: Colors.text, marginBottom: 10 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  stepDot: { fontSize: 16, color: Colors.primary, marginRight: 8 },
-  stepText: { fontSize: 14, color: Colors.text },
-  hint: { fontSize: 12, color: Colors.textMuted, marginTop: 8, fontStyle: 'italic' },
-  successCard: { padding: 16, marginBottom: 16, backgroundColor: '#F0FDF4' },
+  section: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  stepDotDone: { backgroundColor: Colors.success },
+  stepDotCurrent: { backgroundColor: Colors.primary },
+  stepDotPending: { backgroundColor: Colors.border },
+  stepDotText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+  stepLabel: { fontSize: 14, color: Colors.text, flex: 1 },
+  stepLabelDone: { color: Colors.textMuted },
+  stepLabelCurrent: { fontWeight: '700' },
+  editLink: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
+  successCard: { backgroundColor: '#F0FDF4' },
   successText: { fontSize: 14, color: '#166534', lineHeight: 20 },
-  flagCard: { padding: 16, marginBottom: 16, backgroundColor: '#FFFBEB' },
+  flagCard: { backgroundColor: '#FFFBEB' },
   flagText: { fontSize: 14, color: '#92400E', lineHeight: 20 },
-  warnCard: { padding: 16, marginBottom: 16, backgroundColor: '#FEF3C7', gap: 12 },
-  warnText: { fontSize: 13, color: '#92400E', lineHeight: 18 },
 });

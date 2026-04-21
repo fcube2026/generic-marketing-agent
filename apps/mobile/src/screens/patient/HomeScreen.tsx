@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { VerificationBanner } from '../../components/verification/VerificationBanner';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
@@ -103,6 +104,7 @@ export const HomeScreen: React.FC = () => {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
+      <VerificationBanner />
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello 👋</Text>

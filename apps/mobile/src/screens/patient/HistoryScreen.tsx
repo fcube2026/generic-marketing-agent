@@ -5,6 +5,7 @@ import { Colors } from '../../constants/colors';
 import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge';
 import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { VerificationBanner } from '../../components/verification/VerificationBanner';
 import { bookingService } from '../../services/bookingService';
 import { Booking, BookingStatus, PaymentStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
@@ -25,6 +26,7 @@ export const HistoryScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <VerificationBanner />
       <Text style={styles.header}>Booking History</Text>
       {(!bookings || bookings.length === 0) ? (
         <View style={styles.empty}>

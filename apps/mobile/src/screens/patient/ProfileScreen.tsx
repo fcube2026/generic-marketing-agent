@@ -7,6 +7,7 @@ import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { VerificationBanner } from '../../components/verification/VerificationBanner';
 import { useAuthStore } from '../../store/authStore';
 import { patientService } from '../../services/patientService';
 import { Address, PatientProfile } from '../../types';
@@ -52,6 +53,7 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
+      <VerificationBanner />
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>

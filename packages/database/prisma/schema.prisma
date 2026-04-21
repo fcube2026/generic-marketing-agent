@@ -1085,6 +1085,23 @@ model PatientVerification {
   guardianRelationship String?
   guardianPhone        String?
   guardianIdTokenRef   String?
+  guardianAadhaarLast4 String?
+  // Self-serve KYC (profile-launched wizard) fields
+  fullName             String?
+  dateOfBirth          DateTime?
+  gender               String?
+  addressLine          String?
+  city                 String?
+  state                String?
+  pincode              String?
+  addressLat           Float?
+  addressLng           Float?
+  addressSource        String?
+  selfieStoragePath    String?
+  faceMatchPassed      Boolean?
+  ocrMatchPassed       Boolean?
+  submittedAt          DateTime?
+  autoApprovedAt       DateTime?
   emergencyOverride    Boolean                   @default(false)
   overrideReason       String?
   overrideBy           String?

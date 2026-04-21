@@ -4,6 +4,8 @@ import { BookingsService } from './bookings.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
+import { PatientVerificationService } from '../patient-verification/patient-verification.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('BookingsService', () => {
   let service: BookingsService;
@@ -54,6 +56,17 @@ describe('BookingsService', () => {
     cancelReminders: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockPatientVerification = {
+    isPatientVerified: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockConfig = {
+    get: jest.fn((key: string, defaultValue?: any) => {
+      if (key === 'PATIENT_VERIFICATION_REQUIRED') return 'false';
+      return defaultValue;
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -64,6 +77,11 @@ describe('BookingsService', () => {
           provide: VideoConsultationReminderService,
           useValue: mockVideoReminder,
         },
+        {
+          provide: PatientVerificationService,
+          useValue: mockPatientVerification,
+        },
+        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
