@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -9,6 +10,8 @@ import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
+import { PatientVerificationService } from '../patient-verification/patient-verification.service';
+import { ConfigService } from '@nestjs/config';
 
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -31,6 +34,8 @@ export class BookingsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private videoReminderService: VideoConsultationReminderService,
+    private patientVerificationService: PatientVerificationService,
+    private config: ConfigService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -50,6 +55,26 @@ export class BookingsService {
       throw new NotFoundException(
         'Patient profile not found. Please complete your profile first.',
       );
+
+    // KYC gate: when PATIENT_VERIFICATION_REQUIRED=true, block booking
+    // creation unless the patient's KYC is CONFIRMED (or has an admin
+    // emergency override). Defaults to false in staging so the rest of the
+    // booking flow remains testable while the verification pipeline is
+    // being completed.
+    const kycRequired =
+      String(
+        this.config.get('PATIENT_VERIFICATION_REQUIRED', 'false'),
+      ).toLowerCase() === 'true';
+    if (kycRequired) {
+      const verified = await this.patientVerificationService.isPatientVerified(
+        patientProfile.id,
+      );
+      if (!verified) {
+        throw new ForbiddenException(
+          'VERIFICATION_REQUIRED: Please complete identity verification (KYC) from your Profile before booking.',
+        );
+      }
+    }
 
     const provider = await this.prisma.providerProfile.findUnique({
       where: { id: dto.providerId },

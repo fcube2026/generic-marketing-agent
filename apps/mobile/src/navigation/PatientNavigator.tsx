@@ -18,6 +18,12 @@ import { ClinicalIntakeScreen } from '../screens/patient/ClinicalIntakeScreen';
 import { ConsentScreen } from '../screens/patient/ConsentScreen';
 import { VerificationStatusScreen } from '../screens/patient/VerificationStatusScreen';
 import { PatientKycScreen } from '../screens/patient/PatientKycScreen';
+import { PatientKycPersonalScreen } from '../screens/patient/kyc/PatientKycPersonalScreen';
+import { PatientKycAddressScreen } from '../screens/patient/kyc/PatientKycAddressScreen';
+import { PatientKycIdUploadScreen } from '../screens/patient/kyc/PatientKycIdUploadScreen';
+import { PatientKycFaceCaptureScreen } from '../screens/patient/kyc/PatientKycFaceCaptureScreen';
+import { PatientKycGuardianScreen } from '../screens/patient/kyc/PatientKycGuardianScreen';
+import { PatientKycReviewScreen } from '../screens/patient/kyc/PatientKycReviewScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
 import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
@@ -34,6 +40,12 @@ export type PatientStackParamList = {
   Tabs: undefined;
   Onboarding: undefined;
   PatientKyc: undefined;
+  PatientKycPersonal: undefined;
+  PatientKycAddress: undefined;
+  PatientKycIdUpload: undefined;
+  PatientKycFaceCapture: undefined;
+  PatientKycGuardian: undefined;
+  PatientKycReview: undefined;
   SelectService: { category: ServiceCategory };
   ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
   Recommendation: { categorySlug: string; lat: number; lng: number };
@@ -86,6 +98,12 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
     <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ title: 'Complete Profile' }} />
     <Stack.Screen name="PatientKyc" component={PatientKycScreen} options={{ title: 'Identity Verification' }} />
+    <Stack.Screen name="PatientKycPersonal" component={PatientKycPersonalScreen} options={{ title: 'Your Details' }} />
+    <Stack.Screen name="PatientKycAddress" component={PatientKycAddressScreen} options={{ title: 'Your Address' }} />
+    <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar' }} />
+    <Stack.Screen name="PatientKycFaceCapture" component={PatientKycFaceCaptureScreen} options={{ title: 'Face Verification' }} />
+    <Stack.Screen name="PatientKycGuardian" component={PatientKycGuardianScreen} options={{ title: 'Guardian Details' }} />
+    <Stack.Screen name="PatientKycReview" component={PatientKycReviewScreen} options={{ title: 'Review & Submit' }} />
     <Stack.Screen name="SelectService" component={SelectServiceScreen} options={{ title: 'Book Service' }} />
     <Stack.Screen name="ProviderList" component={ProviderListScreen} options={{ title: 'Nearby Providers' }} />
     <Stack.Screen name="Recommendation" component={RecommendationScreen} options={{ title: 'Recommendation' }} />

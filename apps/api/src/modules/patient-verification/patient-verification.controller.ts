@@ -27,6 +27,12 @@ import { IdConfirmDto } from './dto/id-confirm.dto';
 import { AdminApproveDto } from './dto/admin-approve.dto';
 import { AdminRejectDto } from './dto/admin-reject.dto';
 import { AdminOverrideDto } from './dto/admin-override.dto';
+import { SelfPersonalDetailsDto } from './dto/self-personal-details.dto';
+import { SelfAddressDto } from './dto/self-address.dto';
+import { SelfIdUploadDto } from './dto/self-id-upload.dto';
+import { SelfIdConfirmDto } from './dto/self-id-confirm.dto';
+import { SelfFaceCaptureDto } from './dto/self-face-capture.dto';
+import { SelfGuardianDto } from './dto/self-guardian.dto';
 
 @ApiTags('Patient Verification')
 @ApiBearerAuth()
@@ -81,6 +87,81 @@ export class PatientVerificationController {
   })
   getMyStatus(@CurrentUser() user: any) {
     return this.service.getMyVerificationStatus(user.id);
+  }
+
+  // ──────────────────────────────────────────
+  // Self-serve KYC (profile-launched wizard)
+  // ──────────────────────────────────────────
+
+  @Post('verification/self/start')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary: 'Start (or resume) self-serve KYC from the profile',
+  })
+  selfStart(@CurrentUser() user: any) {
+    return this.service.selfStart(user.id);
+  }
+
+  @Post('verification/self/personal-details')
+  @Roles('PATIENT')
+  @ApiOperation({ summary: 'Submit personal details (name, DOB, gender)' })
+  selfPersonalDetails(
+    @CurrentUser() user: any,
+    @Body() dto: SelfPersonalDetailsDto,
+  ) {
+    return this.service.selfSubmitPersonalDetails(user.id, dto);
+  }
+
+  @Post('verification/self/address')
+  @Roles('PATIENT')
+  @ApiOperation({ summary: 'Submit residential address (manual or from map)' })
+  selfAddress(@CurrentUser() user: any, @Body() dto: SelfAddressDto) {
+    return this.service.selfSubmitAddress(user.id, dto);
+  }
+
+  @Post('verification/self/id-upload')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary: 'Get signed URL for Aadhaar / ID upload (self-serve)',
+  })
+  selfIdUpload(@CurrentUser() user: any, @Body() dto: SelfIdUploadDto) {
+    return this.service.selfGetIdUploadUrl(
+      user.id,
+      dto.documentType,
+      dto.mimeType,
+    );
+  }
+
+  @Post('verification/self/id-confirm')
+  @Roles('PATIENT')
+  @ApiOperation({ summary: 'Confirm ID upload and run mock OCR match' })
+  selfIdConfirm(@CurrentUser() user: any, @Body() dto: SelfIdConfirmDto) {
+    return this.service.selfConfirmIdUpload(user.id, dto.documentId);
+  }
+
+  @Post('verification/self/face-capture')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary: 'Submit live selfie and run mock face/Aadhaar match',
+  })
+  selfFaceCapture(@CurrentUser() user: any, @Body() dto: SelfFaceCaptureDto) {
+    return this.service.selfSubmitFace(user.id, dto);
+  }
+
+  @Post('verification/self/guardian')
+  @Roles('PATIENT')
+  @ApiOperation({ summary: 'Submit guardian details (minors only)' })
+  selfGuardian(@CurrentUser() user: any, @Body() dto: SelfGuardianDto) {
+    return this.service.selfSubmitGuardian(user.id, dto);
+  }
+
+  @Post('verification/self/submit')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary: 'Submit completed wizard for approval (mock auto-approves)',
+  })
+  selfSubmit(@CurrentUser() user: any) {
+    return this.service.selfSubmitForApproval(user.id);
   }
 
   @Get('verification/status/:bookingId')
