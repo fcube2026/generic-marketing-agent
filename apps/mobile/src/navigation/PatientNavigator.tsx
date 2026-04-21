@@ -14,6 +14,9 @@ import { VideoConsultationScreen } from '../screens/patient/VideoConsultationScr
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
 import { OnboardingScreen } from '../screens/patient/OnboardingScreen';
+import { ClinicalIntakeScreen } from '../screens/patient/ClinicalIntakeScreen';
+import { ConsentScreen } from '../screens/patient/ConsentScreen';
+import { VerificationStatusScreen } from '../screens/patient/VerificationStatusScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
 import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
@@ -33,6 +36,9 @@ export type PatientStackParamList = {
   ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
   Recommendation: { categorySlug: string; lat: number; lng: number };
   BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION'; fee: number };
+  ClinicalIntake: { bookingId: string };
+  Consent: { bookingId: string };
+  VerificationStatus: { bookingId: string };
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
@@ -81,6 +87,9 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="ProviderList" component={ProviderListScreen} options={{ title: 'Nearby Providers' }} />
     <Stack.Screen name="Recommendation" component={RecommendationScreen} options={{ title: 'Recommendation' }} />
     <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} options={{ title: 'Confirm Booking' }} />
+    <Stack.Screen name="ClinicalIntake" component={ClinicalIntakeScreen} options={{ title: 'Health Information' }} />
+    <Stack.Screen name="Consent" component={ConsentScreen} options={{ title: 'Informed Consent' }} />
+    <Stack.Screen name="VerificationStatus" component={VerificationStatusScreen} options={{ title: 'Verification' }} />
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
