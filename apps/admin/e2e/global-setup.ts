@@ -5,6 +5,7 @@ import path from 'path';
 import type { FullConfig, Route } from '@playwright/test';
 import { chromium, expect } from '@playwright/test';
 import { AUTH_STATE_PATH, getAdminTestCredentials, mockAdminLoginPayload } from './helpers/auth.helper';
+import { mockCommonAdminApis } from './helpers/api-mock.helper';
 
 async function globalSetup(config: FullConfig): Promise<void> {
   const projectWithBaseUrl = config.projects.find((project: FullConfig['projects'][number]) => project.use?.baseURL);
@@ -35,6 +36,9 @@ async function globalSetup(config: FullConfig): Promise<void> {
   };
   await page.route('**/auth/admin-login', loginRouteHandler);
   await page.route('**/api/v1/auth/admin-login', loginRouteHandler);
+  // Mock dashboard API calls so the 401-redirect loop doesn't fire
+  // when global-setup navigates to /dashboard after mock login.
+  await mockCommonAdminApis(page);
 
   await page.goto('/login');
   // Wait up to 15s for the login form — if the page is behind Vercel protection
