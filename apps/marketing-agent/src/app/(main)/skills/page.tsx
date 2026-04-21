@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   marketingSkills,
   marketingSkillCategories,
+  notApplicableSkillCategory,
   type MarketingSkill,
   type MarketingSkillCategory,
 } from '@/lib/data';
@@ -21,6 +22,7 @@ const CATEGORY_ICON: Record<MarketingSkillCategory, string> = {
   'Growth Engineering': '🛠️',
   'Strategy & Monetization': '🎯',
   'Sales & RevOps': '🤝',
+  'Not Applicable': '🗂️',
 };
 
 function SkillCard({ skill, onUse }: { skill: MarketingSkill; onUse: (s: MarketingSkill) => void }) {
@@ -59,20 +61,35 @@ export default function SkillsPage() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('All');
+  const [showNotApplicable, setShowNotApplicable] = useState(false);
+
+  // Skills shown by default — everything except the "Not Applicable" bucket.
+  const relevantSkills = useMemo(
+    () => marketingSkills.filter((s) => s.category !== notApplicableSkillCategory),
+    [],
+  );
+  const notApplicableSkills = useMemo(
+    () => marketingSkills.filter((s) => s.category === notApplicableSkillCategory),
+    [],
+  );
+
+  function matchesQuery(s: MarketingSkill, q: string) {
+    if (!q) return true;
+    return (
+      s.id.toLowerCase().includes(q) ||
+      s.name.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q) ||
+      s.category.toLowerCase().includes(q)
+    );
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return marketingSkills.filter((s) => {
+    return relevantSkills.filter((s) => {
       if (activeCategory !== 'All' && s.category !== activeCategory) return false;
-      if (!q) return true;
-      return (
-        s.id.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.category.toLowerCase().includes(q)
-      );
+      return matchesQuery(s, q);
     });
-  }, [query, activeCategory]);
+  }, [query, activeCategory, relevantSkills]);
 
   const grouped = useMemo(() => {
     const map = new Map<MarketingSkillCategory, MarketingSkill[]>();
@@ -83,30 +100,47 @@ export default function SkillsPage() {
     return Array.from(map.entries()).filter(([, list]) => list.length > 0);
   }, [filtered]);
 
+  // Filter the Not Applicable bucket by the same search query so it stays
+  // useful when expanded, but it never appears in the category chips above.
+  const filteredNotApplicable = useMemo(() => {
+    if (!showNotApplicable) return [];
+    const q = query.trim().toLowerCase();
+    return notApplicableSkills.filter((s) => matchesQuery(s, q));
+  }, [showNotApplicable, query, notApplicableSkills]);
+
   function useSkill(skill: MarketingSkill) {
     const params = new URLSearchParams({ skill: skill.id });
     router.push(`/agent?${params.toString()}`);
   }
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { All: marketingSkills.length };
+    const c: Record<string, number> = { All: relevantSkills.length };
     for (const cat of marketingSkillCategories) {
-      c[cat] = marketingSkills.filter((s) => s.category === cat).length;
+      c[cat] = relevantSkills.filter((s) => s.category === cat).length;
     }
     return c;
-  }, []);
+  }, [relevantSkills]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <header className="space-y-2">
         <p className="text-xs font-semibold text-primary uppercase tracking-wide">Skills Library</p>
         <h1 className="text-2xl font-extrabold text-gray-900">
-          {marketingSkills.length} marketing skills your AI agent can run
+          {relevantSkills.length} marketing skills your AI agent can run
         </h1>
         <p className="text-sm text-gray-500 max-w-2xl">
           Each skill is a specialised workflow — frameworks, prompts, and best practices — your AI Marketing
           Agent uses to handle a specific marketing task. Browse, search, or click <strong>Use skill</strong>{' '}
           to launch it in the agent with a ready-to-go prompt.
+          {notApplicableSkills.length > 0 && (
+            <>
+              {' '}
+              <span className="text-gray-400">
+                ({notApplicableSkills.length} additional skills are hidden under{' '}
+                <strong>Not Applicable</strong> at the bottom — expand only if you need them.)
+              </span>
+            </>
+          )}
         </p>
       </header>
 
@@ -176,6 +210,59 @@ export default function SkillsPage() {
             </section>
           ))}
         </div>
+      )}
+
+      {/* Not Applicable — collapsed by default. Cards are only mounted/loaded
+          when the user explicitly expands the section. */}
+      {notApplicableSkills.length > 0 && (
+        <section className="pt-6 border-t border-dashed border-gray-200">
+          <button
+            type="button"
+            onClick={() => setShowNotApplicable((v) => !v)}
+            aria-expanded={showNotApplicable}
+            aria-controls="not-applicable-skills"
+            className="w-full flex items-center justify-between gap-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-left transition"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-base" aria-hidden="true">
+                {CATEGORY_ICON[notApplicableSkillCategory]}
+              </span>
+              <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Not Applicable
+              </span>
+              <span className="text-xs text-gray-400">({notApplicableSkills.length})</span>
+            </span>
+            <span className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="hidden sm:inline">
+                {showNotApplicable ? 'Hide' : 'Show'} skills not aligned with curex24&apos;s current focus
+              </span>
+              <span aria-hidden="true" className="text-gray-400">
+                {showNotApplicable ? '▾' : '▸'}
+              </span>
+            </span>
+          </button>
+
+          {showNotApplicable && (
+            <div id="not-applicable-skills" className="mt-4 space-y-3">
+              <p className="text-xs text-gray-500 max-w-2xl">
+                These skills are hidden by default because they don&apos;t fit curex24&apos;s current B2C
+                home-doctor / care-plan motion (B2B-only outreach, comparison pages, generic free tools, etc.).
+                Use them only if your situation changes.
+              </p>
+              {filteredNotApplicable.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500">
+                  No Not Applicable skills match your search.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredNotApplicable.map((s) => (
+                    <SkillCard key={s.id} skill={s} onUse={useSkill} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );

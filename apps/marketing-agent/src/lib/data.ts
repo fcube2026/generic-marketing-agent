@@ -147,7 +147,8 @@ export type MarketingSkillCategory =
   | 'Retention'
   | 'Growth Engineering'
   | 'Strategy & Monetization'
-  | 'Sales & RevOps';
+  | 'Sales & RevOps'
+  | 'Not Applicable';
 
 export interface MarketingSkill {
   id: string;
@@ -231,7 +232,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'competitor-alternatives',
     name: 'Competitor / Alternatives',
-    category: 'SEO & Discovery',
+    category: 'Not Applicable',
     icon: '⚔️',
     description: 'Create competitor comparison or alternative pages for SEO and sales enablement.',
     examplePrompt: 'Write a "curex24 vs Practo" comparison page optimised for SEO and bottom-of-funnel conversion.',
@@ -267,7 +268,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'cold-email',
     name: 'Cold Email',
-    category: 'Content & Copy',
+    category: 'Not Applicable',
     icon: '📧',
     description: 'Write B2B cold emails and follow-up sequences that get replies.',
     examplePrompt: 'Write a 4-step cold email sequence to corporate HR teams pitching curex24 employee health benefits.',
@@ -333,7 +334,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'form-cro',
     name: 'Form CRO',
-    category: 'Conversion Optimization',
+    category: 'Not Applicable',
     icon: '🧾',
     description: 'Optimize lead capture, contact, or non-signup forms for higher completion rates.',
     examplePrompt: 'Improve the curex24 corporate-enquiry form — 12 fields today, 4% completion rate.',
@@ -417,7 +418,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'free-tool-strategy',
     name: 'Free Tool Strategy',
-    category: 'Growth Engineering',
+    category: 'Not Applicable',
     icon: '🛠️',
     description: 'Plan, evaluate, or build a free tool for marketing — lead generation, SEO value, or virality.',
     examplePrompt: 'Design a free "BMI + home health risk" tool for curex24 to drive organic traffic and email signups.',
@@ -425,7 +426,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'lead-magnets',
     name: 'Lead Magnets',
-    category: 'Growth Engineering',
+    category: 'Not Applicable',
     icon: '🧲',
     description: 'Create, plan, or optimize a lead magnet for email capture or lead generation.',
     examplePrompt: 'Create a downloadable "Family Health Calendar" lead magnet for curex24 — outline + landing page copy.',
@@ -451,7 +452,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'revops',
     name: 'RevOps',
-    category: 'Sales & RevOps',
+    category: 'Not Applicable',
     icon: '🧮',
     description: 'Help with revenue operations, lead lifecycle, scoring, routing, and pipeline management.',
     examplePrompt: 'Design a lead-scoring + routing model for curex24’s corporate (B2B) pipeline.',
@@ -459,7 +460,7 @@ export const marketingSkills: MarketingSkill[] = [
   {
     id: 'sales-enablement',
     name: 'Sales Enablement',
-    category: 'Sales & RevOps',
+    category: 'Not Applicable',
     icon: '📑',
     description: 'Create sales collateral — pitch decks, one-pagers, objection handling docs, demo scripts.',
     examplePrompt: 'Create a 10-slide pitch deck for curex24 corporate-wellness sales calls.',
@@ -475,8 +476,14 @@ export const marketingSkillCategories: MarketingSkillCategory[] = [
   'Retention',
   'Growth Engineering',
   'Strategy & Monetization',
-  'Sales & RevOps',
 ];
+
+// Skills tagged with this category are hidden by default in the Skills Library
+// because they don't fit curex24's current B2C home-doctor / care-plan focus
+// (B2B-only motions, comparison pages, generic free tools, etc.). They are
+// surfaced behind an opt-in "Not Applicable" section so the agent's default
+// surface area stays focused without losing access to them.
+export const notApplicableSkillCategory: MarketingSkillCategory = 'Not Applicable';
 
 // ─── Sample Agent Conversation (placeholder) ─────────────────────────────────
 
