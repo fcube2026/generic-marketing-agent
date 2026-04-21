@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -56,32 +56,50 @@ const STATUS_ICONS: Record<string, string> = {
   NOT_STARTED: '📋',
 };
 
+const FALLBACK_STATUS: VerificationStatusData = {
+  verificationId: null,
+  status: 'NOT_STARTED',
+  riskTier: null,
+  riskScore: null,
+  completedSteps: [],
+  pendingSteps: [],
+};
+
 export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
   const [data, setData] = useState<VerificationStatusData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadStatus = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     verificationService
       .getMyVerificationStatus()
-      .then(setData)
-      .catch(() => setError('Failed to load verification status.'))
+      .then((res) => {
+        setData(res);
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn('[PatientKyc] Failed to load verification status', err);
+        // Degrade gracefully: still render the screen using a NOT_STARTED
+        // fallback so the user can see the verification information instead
+        // of a brick-wall error page.
+        setData(FALLBACK_STATUS);
+        setLoadError(
+          "We couldn't load your latest verification status. Showing default information.",
+        );
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={Colors.primary} size="large" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Button title="Go Back" onPress={() => navigation.goBack()} variant="outline" />
       </View>
     );
   }
@@ -102,6 +120,13 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
       <Text style={styles.subtitle}>
         Your KYC (Know Your Customer) status is shown below.
       </Text>
+
+      {loadError && (
+        <Card style={styles.warnCard}>
+          <Text style={styles.warnText}>{loadError}</Text>
+          <Button title="Retry" onPress={loadStatus} variant="outline" />
+        </Card>
+      )}
 
       <Card style={styles.card}>
         <Text style={styles.label}>Current Status</Text>
@@ -178,5 +203,6 @@ const styles = StyleSheet.create({
   successText: { fontSize: 14, color: '#166534', lineHeight: 20 },
   flagCard: { padding: 16, marginBottom: 16, backgroundColor: '#FFFBEB' },
   flagText: { fontSize: 14, color: '#92400E', lineHeight: 20 },
-  errorText: { fontSize: 15, color: Colors.error, marginBottom: 16, textAlign: 'center' },
+  warnCard: { padding: 16, marginBottom: 16, backgroundColor: '#FEF3C7', gap: 12 },
+  warnText: { fontSize: 13, color: '#92400E', lineHeight: 18 },
 });
