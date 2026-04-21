@@ -53,7 +53,7 @@ export const HomeScreen: React.FC = () => {
 
   const handleVideoConsultationPress = () => {
     if (activeVideoBookings.length > 0) {
-      navigation.navigate('VideoConsultation', { bookingId: activeVideoBookings[0].id });
+      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
     } else {
       Alert.alert(
         'Video Consultations',

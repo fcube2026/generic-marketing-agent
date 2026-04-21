@@ -81,7 +81,7 @@ export const BookingDetailScreen: React.FC = () => {
   const getNextAction = () => {
     if (isVideo) {
       switch (booking.status) {
-        case 'ACCEPTED': return { label: '🎥 Go to Video Session', nav: 'VideoConsultation' as const };
+        case 'ACCEPTED': return { label: '🎥 Go to Video Session', nav: 'VideoLobby' as const };
         default: return null;
       }
     }

@@ -20,6 +20,7 @@ import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScre
 import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
+import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 import { VideoCallScreen } from '../screens/common/VideoCallScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
@@ -35,6 +36,7 @@ export type PatientStackParamList = {
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
+  VideoLobby: { bookingId: string };
   VideoConsultation: { bookingId: string };
   VideoCall: VideoCallParams;
   MedicineSearch: undefined;
@@ -82,6 +84,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Lobby', headerStyle: { backgroundColor: '#0F172A' }, headerTintColor: Colors.white }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
     <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
     <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
