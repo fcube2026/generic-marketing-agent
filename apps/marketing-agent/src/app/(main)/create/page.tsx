@@ -38,7 +38,12 @@ const VISUAL_STYLES = [
   'Watercolour',
   'Neon / Dark Mode',
 ] as const;
-const AI_TOOLS = ['OpenAI gpt-image-1'] as const;
+const AI_TOOLS = ['OpenAI gpt-image-1', 'Google Imagen 3'] as const;
+
+const TOOL_TO_PROVIDER: Record<typeof AI_TOOLS[number], 'openai' | 'google'> = {
+  'OpenAI gpt-image-1': 'openai',
+  'Google Imagen 3': 'google',
+};
 
 const FORMAT_DIMENSIONS: Record<typeof FORMAT_TYPES[number], string> = {
   'Square Post (1:1)': '1080×1080 px, aspect ratio 1:1',
@@ -231,6 +236,8 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
   const toolGuide: Record<string, string> = {
     'OpenAI gpt-image-1':
       'Use descriptive, scene-based prompts. Specify subject, setting, lighting, mood, composition and style. gpt-image-1 follows long, explicit instructions closely. Avoid watermarks/text overlays in the prompt — add typography in your design tool.',
+    'Google Imagen 3':
+      'Imagen 3 excels at photorealistic detail, faces, hands and text fidelity. Lead with the subject, then setting, then style/lighting. Keep prompts concise and concrete; avoid contradictory style words. Add typography in your design tool, not the prompt.',
   };
 
   const stylePrompts: Record<string, string> = {
@@ -623,7 +630,13 @@ function VisualGeneratorTab() {
       </button>
 
       {imagePrompt && (
-        <GeneratedImage prompt={imagePrompt} width={pixels.w} height={pixels.h} label={`${format} — ${style}`} />
+        <GeneratedImage
+          prompt={imagePrompt}
+          width={pixels.w}
+          height={pixels.h}
+          label={`${format} — ${style}`}
+          provider={TOOL_TO_PROVIDER[tool]}
+        />
       )}
       {output && <OutputBox content={output} />}
     </div>
