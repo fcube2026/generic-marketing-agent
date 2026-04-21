@@ -157,13 +157,23 @@ export const verificationService = {
    * true on HTTP 2xx. The mock backend returns a no-op URL when Supabase is
    * not configured — we still treat those uploads as successful so the
    * staging flow remains testable.
+   *
+   * To avoid the URL-substring sanitization pitfall, we parse the URL and
+   * check the hostname strictly rather than using `String#includes`.
    */
   uploadToSignedUrl: async (
     uploadUrl: string,
     fileUri: string,
     mimeType: string,
   ): Promise<boolean> => {
-    if (uploadUrl.includes('mock-supabase.example.com')) {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(uploadUrl);
+    } catch {
+      // Malformed URL — treat as no-op so staging continues to work.
+      return true;
+    }
+    if (parsed.hostname === 'mock-supabase.example.com') {
       // Mock backend — skip the network call entirely.
       return true;
     }

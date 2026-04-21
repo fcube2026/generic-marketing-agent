@@ -104,7 +104,9 @@ export const PatientKycFaceCaptureScreen: React.FC<Props> = ({ navigation }) => 
     verifyMutation.mutate();
   };
 
-  const next = isMinor ? 'PatientKycGuardian' : 'PatientKycReview';
+  const next: 'PatientKycGuardian' | 'PatientKycReview' = isMinor
+    ? 'PatientKycGuardian'
+    : 'PatientKycReview';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -175,7 +177,7 @@ export const PatientKycFaceCaptureScreen: React.FC<Props> = ({ navigation }) => 
         <View style={styles.footer}>
           <Button
             title={isMinor ? 'Continue to guardian details' : 'Continue to review'}
-            onPress={() => navigation.navigate(next as any)}
+            onPress={() => navigation.navigate(next)}
           />
         </View>
       )}

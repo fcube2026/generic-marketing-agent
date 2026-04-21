@@ -100,10 +100,10 @@ export const PatientKycReviewScreen: React.FC<Props> = ({ navigation }) => {
         {status.address?.city && <Row label="City" value={status.address.city} />}
         {status.address?.state && <Row label="State" value={status.address.state} />}
         {status.address?.pincode && <Row label="Pincode" value={status.address.pincode} />}
-        {status.address?.lat != null && (
+        {status.address?.lat != null && status.address?.lng != null && (
           <Row
             label="Coordinates"
-            value={`${status.address.lat.toFixed(5)}, ${status.address.lng?.toFixed(5)}`}
+            value={`${status.address.lat.toFixed(5)}, ${status.address.lng.toFixed(5)}`}
           />
         )}
       </Card>

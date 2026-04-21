@@ -30,13 +30,37 @@ const STEP_LABELS: Record<SelfServeStep, string> = {
   REVIEW: 'Review & Submit',
 };
 
-const STEP_TO_ROUTE: Record<SelfServeStep, keyof PatientStackParamList> = {
+type KycRoute =
+  | 'PatientKycPersonal'
+  | 'PatientKycAddress'
+  | 'PatientKycIdUpload'
+  | 'PatientKycFaceCapture'
+  | 'PatientKycGuardian'
+  | 'PatientKycReview';
+
+const STEP_TO_ROUTE: Record<SelfServeStep, KycRoute> = {
   PERSONAL_DETAILS: 'PatientKycPersonal',
   ADDRESS: 'PatientKycAddress',
   ID_UPLOAD: 'PatientKycIdUpload',
   FACE_CAPTURE: 'PatientKycFaceCapture',
   GUARDIAN: 'PatientKycGuardian',
   REVIEW: 'PatientKycReview',
+};
+
+/**
+ * Helper to navigate to one of the no-param KYC wizard routes. Centralised
+ * so the slightly-awkward `navigate(name)` overload (which requires the
+ * caller to pre-select a screen-name literal) is only suppressed in one
+ * place rather than at every call site.
+ */
+const navigateToKyc = (
+  navigation: NativeStackNavigationProp<PatientStackParamList, 'PatientKyc'>,
+  route: KycRoute,
+) => {
+  // Each KycRoute target has `undefined` params in PatientStackParamList,
+  // so this is type-safe at runtime; the cast is only needed because the
+  // navigate overload narrows on the literal `name` argument.
+  (navigation.navigate as (name: KycRoute) => void)(route);
 };
 
 export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
@@ -105,11 +129,11 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
 
   const goToNext = () => {
     if (!nextStep) return;
-    navigation.navigate(STEP_TO_ROUTE[nextStep] as any);
+    navigateToKyc(navigation, STEP_TO_ROUTE[nextStep]);
   };
 
   const goToStep = (step: SelfServeStep) => {
-    navigation.navigate(STEP_TO_ROUTE[step] as any);
+    navigateToKyc(navigation, STEP_TO_ROUTE[step]);
   };
 
   return (
