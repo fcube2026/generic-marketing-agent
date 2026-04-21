@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOpenAIClient, IMAGE_MODEL } from '@/lib/ai/openai-client';
+import {
+  GoogleImageError,
+  googleImagenGenerate,
+} from '@/lib/ai/google-client';
 import { requireMarketingAuth } from '@/lib/ai/auth';
 import { checkRateLimit, getClientKey, rateLimitResponse } from '@/lib/ai/rate-limit';
 import { pickClosestSize } from '@/lib/ai/image-sizes';
@@ -16,11 +20,14 @@ export const dynamic = 'force-dynamic';
 const MAX_PROMPT_CHARS = 4000;
 const MIN_PROMPT_CHARS = 3;
 
+type ImageProvider = 'openai' | 'google';
+
 interface ImageRequestBody {
   prompt?: unknown;
   width?: unknown;
   height?: unknown;
   format?: unknown;
+  provider?: unknown;
 }
 
 function badRequest(message: string, code: string) {
@@ -31,6 +38,58 @@ function asPositiveInt(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.floor(n);
+}
+
+function resolveProvider(value: unknown): ImageProvider {
+  if (value === 'openai' || value === 'google') return value;
+  const env = process.env.AI_IMAGE_PROVIDER?.toLowerCase();
+  if (env === 'google') return 'google';
+  return 'openai';
+}
+
+interface SuccessPayload {
+  dataUrl?: string;
+  url?: string;
+  model: string;
+  size: string;
+  requestedWidth: number;
+  requestedHeight: number;
+}
+
+function pollinationsFallback(
+  prompt: string,
+  width: number,
+  height: number,
+  size: string,
+  reason: string,
+): Promise<NextResponse> {
+  return pollinationsImage({ prompt, width, height })
+    .then(({ dataUrl }) => {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (${reason}) requested=${width}x${height}`,
+      );
+      const payload: SuccessPayload = {
+        dataUrl,
+        model: POLLINATIONS_IMAGE_MODEL,
+        size,
+        requestedWidth: width,
+        requestedHeight: height,
+      };
+      return NextResponse.json(payload);
+    })
+    .catch((fallbackErr: unknown) => {
+      const status =
+        fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
+      const message =
+        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
+      // eslint-disable-next-line no-console
+      console.error(`[ai/image] Pollinations ${reason} failed`, { status, message });
+      return NextResponse.json(
+        { error: message, code: 'provider_error' },
+        { status: 502 },
+      );
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -60,50 +119,46 @@ export async function POST(req: NextRequest) {
   if (prompt.length > MAX_PROMPT_CHARS) {
     return badRequest(`\`prompt\` exceeds ${MAX_PROMPT_CHARS} characters`, 'prompt_too_long');
   }
+  if (
+    body.provider !== undefined &&
+    body.provider !== 'openai' &&
+    body.provider !== 'google'
+  ) {
+    return badRequest('`provider` must be "openai" or "google"', 'invalid_provider');
+  }
 
   const width = asPositiveInt(body.width, 1024);
   const height = asPositiveInt(body.height, 1024);
   const size = pickClosestSize(width, height);
+  const provider = resolveProvider(body.provider);
 
-  // 4. Call OpenAI — or fall back to the free Pollinations provider when no
-  //    OPENAI_API_KEY is configured. Returned shape matches the OpenAI path
-  //    so the client is unaffected.
+  if (provider === 'google') {
+    return handleGoogle({ prompt, width, height, size });
+  }
+  return handleOpenAI({ prompt, width, height, size });
+}
+
+async function handleOpenAI(args: {
+  prompt: string;
+  width: number;
+  height: number;
+  size: string;
+}) {
+  const { prompt, width, height, size } = args;
+
+  // Resolve client; on missing key fall back to Pollinations.
   let client: ReturnType<typeof getOpenAIClient>;
   try {
     client = getOpenAIClient();
   } catch {
-    try {
-      const { dataUrl } = await pollinationsImage({ prompt, width, height });
-      // eslint-disable-next-line no-console
-      console.log(
-        `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (fallback) requested=${width}x${height}`,
-      );
-      return NextResponse.json({
-        dataUrl,
-        model: POLLINATIONS_IMAGE_MODEL,
-        size,
-        requestedWidth: width,
-        requestedHeight: height,
-      });
-    } catch (fallbackErr) {
-      const status =
-        fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
-      const message =
-        fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
-      // eslint-disable-next-line no-console
-      console.error('[ai/image] Pollinations fallback failed', { status, message });
-      return NextResponse.json(
-        { error: message, code: 'provider_error' },
-        { status: 502 },
-      );
-    }
+    return pollinationsFallback(prompt, width, height, size, 'openai-missing-key-fallback');
   }
 
   try {
     const result = await client.images.generate({
       model: IMAGE_MODEL,
       prompt,
-      size,
+      size: size as '1024x1024' | '1024x1536' | '1536x1024',
       n: 1,
     });
 
@@ -121,60 +176,80 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line no-console
     console.log(`[ai/image] model=${IMAGE_MODEL} size=${size} requested=${width}x${height}`);
 
-    return NextResponse.json({
-      // gpt-image-1 returns b64 by default; older DALL-E models may return a URL.
-      // The client should prefer `dataUrl` when present.
+    const payload: SuccessPayload = {
       dataUrl: b64 ? `data:image/png;base64,${b64}` : undefined,
       url,
       model: IMAGE_MODEL,
       size,
       requestedWidth: width,
       requestedHeight: height,
-    });
+    };
+    return NextResponse.json(payload);
   } catch (err: unknown) {
-    // If OpenAI rejects our credentials (401/403), transparently fall back to
-    // the free Pollinations provider — same behaviour as when no key is set —
-    // so a stale/revoked OPENAI_API_KEY does not break the whole experience.
     const status = getErrorStatus(err);
     if (status === 401 || status === 403) {
       // eslint-disable-next-line no-console
       console.warn('[ai/image] OpenAI rejected the API key, falling back to Pollinations');
-      try {
-        const { dataUrl } = await pollinationsImage({ prompt, width, height });
-        // eslint-disable-next-line no-console
-        console.log(
-          `[ai/image] model=${POLLINATIONS_IMAGE_MODEL} (auth-fallback) requested=${width}x${height}`,
-        );
-        return NextResponse.json({
-          dataUrl,
-          model: POLLINATIONS_IMAGE_MODEL,
-          size,
-          requestedWidth: width,
-          requestedHeight: height,
-        });
-      } catch (fallbackErr) {
-        const fbStatus =
-          fallbackErr instanceof PollinationsError ? fallbackErr.status : 502;
-        const message =
-          fallbackErr instanceof Error ? fallbackErr.message : 'Fallback provider error';
-        // eslint-disable-next-line no-console
-        console.error('[ai/image] Pollinations auth-fallback failed', { status: fbStatus, message });
-        // fall through to the original error handler
-      }
+      return pollinationsFallback(prompt, width, height, size, 'openai-auth-fallback');
     }
-    return handleOpenAIError(err);
+    return handleProviderError('openai', err);
   }
 }
 
-function handleOpenAIError(err: unknown) {
+async function handleGoogle(args: {
+  prompt: string;
+  width: number;
+  height: number;
+  size: string;
+}) {
+  const { prompt, width, height, size } = args;
+
+  // No key configured → straight to Pollinations fallback (parity with OpenAI path).
+  if (!process.env.GOOGLE_AI_API_KEY) {
+    return pollinationsFallback(prompt, width, height, size, 'google-missing-key-fallback');
+  }
+
+  try {
+    const { dataUrl, model, aspectRatio } = await googleImagenGenerate({
+      prompt,
+      width,
+      height,
+    });
+    // eslint-disable-next-line no-console
+    console.log(
+      `[ai/image] model=${model} aspect=${aspectRatio} requested=${width}x${height}`,
+    );
+    const payload: SuccessPayload = {
+      dataUrl,
+      model,
+      size,
+      requestedWidth: width,
+      requestedHeight: height,
+    };
+    return NextResponse.json(payload);
+  } catch (err) {
+    const status =
+      err instanceof GoogleImageError ? err.status : getErrorStatus(err);
+    if (status === 401 || status === 403) {
+      // eslint-disable-next-line no-console
+      console.warn('[ai/image] Google rejected the API key, falling back to Pollinations');
+      return pollinationsFallback(prompt, width, height, size, 'google-auth-fallback');
+    }
+    return handleProviderError('google', err);
+  }
+}
+
+function handleProviderError(provider: ImageProvider, err: unknown) {
   const status =
-    typeof err === 'object' && err !== null && 'status' in err && typeof (err as { status: unknown }).status === 'number'
-      ? (err as { status: number }).status
-      : 500;
+    err instanceof GoogleImageError
+      ? err.status
+      : typeof err === 'object' && err !== null && 'status' in err && typeof (err as { status: unknown }).status === 'number'
+        ? (err as { status: number }).status
+        : 500;
   const message = err instanceof Error ? err.message : 'Unknown provider error';
 
   // eslint-disable-next-line no-console
-  console.error('[ai/image] OpenAI error', { status, message });
+  console.error(`[ai/image] ${provider} error`, { status, message });
 
   if (status === 400) {
     // Most common: prompt rejected by safety system.
@@ -193,6 +268,12 @@ function handleOpenAIError(err: unknown) {
     return NextResponse.json(
       { error: 'Provider rate limit exceeded', code: 'provider_rate_limited' },
       { status: 502 },
+    );
+  }
+  if (status === 504) {
+    return NextResponse.json(
+      { error: 'Image provider timed out', code: 'provider_timeout', detail: message },
+      { status: 504 },
     );
   }
   return NextResponse.json(

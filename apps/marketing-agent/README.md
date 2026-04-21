@@ -21,17 +21,52 @@ pnpm --filter @curex24/marketing-agent dev
 | `OPENAI_TEXT_MODEL` | No | Chat/completion model. Defaults to `gpt-4o-mini`. Use `gpt-4o` for higher quality. |
 | `OPENAI_IMAGE_MODEL` | No | Image model. Defaults to `gpt-image-1` (DALL-E 3 successor). |
 | `OPENAI_BASE_URL` | No | Override the OpenAI base URL (e.g. for Azure OpenAI or a self-hosted proxy). |
+| `GOOGLE_AI_API_KEY` | No (recommended for Imagen) | Server-side Google AI Studio key. Powers the "Google · Imagen 3" option in `/api/ai/image`. Get one at <https://aistudio.google.com/apikey>. Without it, "google" requests fall back to the free Pollinations provider. |
+| `GOOGLE_AI_IMAGE_MODEL` | No | Imagen model. Defaults to `imagen-3.0-generate-002`. |
+| `GOOGLE_AI_TEXT_MODEL` | No | Gemini model used by `getGoogleAIClient()` (reserved for future text routes). Defaults to `gemini-1.5-flash`. |
+| `GOOGLE_AI_BASE_URL` | No | Override the Generative Language API base URL (e.g. proxy / regional endpoint). |
+| `AI_IMAGE_PROVIDER` | No | Default image provider when the client does not specify one. `openai` (default) or `google`. The UI toggle always overrides this per request. |
 | `MARKETING_AGENT_SKIP_AUTH` | No | Set to `true` only in dev/test to skip the upstream JWT-validation hop on AI routes. **Never set this in production.** |
 
-> ⚠️ **Do not** prefix the OpenAI variables with `NEXT_PUBLIC_`. They are read only from server-side route handlers; prefixing would leak the key to the browser bundle.
+> ⚠️ **Do not** prefix the OpenAI **or** Google variables with `NEXT_PUBLIC_`. They are read only from server-side route handlers; prefixing would leak the key to the browser bundle.
 
-### AI provider switching
+### Switching image providers
 
-The default integration uses **OpenAI** for both text (`gpt-4o-mini`/`gpt-4o`) and images (`gpt-image-1`). To switch providers:
+The Visual Generator (`/create`) and the agent chat (`/agent`) both expose an **Image model** toggle in the header with two options:
 
-1. Replace the SDK import in `src/lib/ai/openai-client.ts` with the chosen vendor's SDK (e.g. `@anthropic-ai/sdk`, `@google/genai`, `@stability/sdk`, `replicate`).
-2. Update the model/size handling in `src/app/api/ai/chat/route.ts` and `src/app/api/ai/image/route.ts` to match the new SDK's contract.
-3. Keep the `{ reply }` / `{ dataUrl | url }` response shape so the client wrappers in `src/lib/services/aiService.ts` and the `<GeneratedImage />` component work unchanged.
+- **OpenAI · gpt-image-1** — uses `OPENAI_API_KEY` + `OPENAI_IMAGE_MODEL`.
+- **Google · Imagen 3** — uses `GOOGLE_AI_API_KEY` + `GOOGLE_AI_IMAGE_MODEL`.
+
+The selection is persisted in `localStorage` under the key `marketing_image_provider` and is sent to `/api/ai/image` as `{ provider: 'openai' | 'google' }`.
+
+Provider resolution precedence on the server:
+
+1. Explicit `provider` field in the request body (set by the UI toggle).
+2. `AI_IMAGE_PROVIDER` env var.
+3. Default: `openai`.
+
+If the selected provider's key is missing, or the upstream returns 401/403, the route transparently falls back to the free Pollinations provider so the UI keeps working. The returned `model` field (echoed back to the client and shown under each generated image) tells you which provider actually served the request.
+
+### Pasting your Google AI Studio key
+
+Create `apps/marketing-agent/.env.local` (git-ignored) and add the key in plain `KEY=VALUE` form, no quotes:
+
+```bash
+GOOGLE_AI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+GOOGLE_AI_IMAGE_MODEL=imagen-3.0-generate-002
+AI_IMAGE_PROVIDER=openai            # default; users can flip in the UI
+```
+
+Restart the Next.js dev server after editing — env vars are only read at boot.
+
+### Adding more AI providers
+
+Images already support **OpenAI** and **Google** out of the box — see "Switching image providers" above. To add a third image provider or to wire a new text provider:
+
+1. Add the vendor's SDK (e.g. `@anthropic-ai/sdk`, `@stability/sdk`, `replicate`) and create a thin lazy client wrapper in `src/lib/ai/<vendor>-client.ts`, mirroring `openai-client.ts` / `google-client.ts`.
+2. Branch on the `provider` field in `src/app/api/ai/image/route.ts` (and/or `chat/route.ts`) to dispatch to the new client.
+3. Keep the `{ reply }` / `{ dataUrl | url, model, size, ... }` response shape so the client wrappers in `src/lib/services/aiService.ts` and the `<GeneratedImage />` component work unchanged.
+4. Extend the `ImageProvider` union in `src/lib/hooks/useImageProvider.ts` and add a label to `IMAGE_PROVIDER_LABELS` so the toggle exposes the new option.
 
 > Note: **Midjourney has no public API** and was removed from the UI. Adobe Firefly and Canva AI are also not wired up — only providers actually called from the routes appear in the "Powered by" badges.
 
