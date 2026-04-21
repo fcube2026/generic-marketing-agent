@@ -108,6 +108,10 @@ export const ProfileScreen: React.FC = () => {
       </View>
 
       <View style={styles.footer}>
+        <Button title="Identity Verification (KYC)" onPress={() => navigation.navigate('PatientKyc')} variant="outline" />
+      </View>
+
+      <View style={styles.footer}>
         <Button title="Sign Out" onPress={logout} variant="outline" />
       </View>
     </ScrollView>

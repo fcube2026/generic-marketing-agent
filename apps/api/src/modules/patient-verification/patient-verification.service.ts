@@ -233,6 +233,48 @@ export class PatientVerificationService {
     };
   }
 
+  async getMyVerificationStatus(userId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { userId },
+    });
+
+    if (!patient) {
+      return {
+        verificationId: null,
+        status: 'NOT_STARTED',
+        riskTier: null,
+        riskScore: null,
+        completedSteps: [],
+        pendingSteps: [],
+      };
+    }
+
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { patientId: patient.id },
+    });
+
+    if (!verification) {
+      return {
+        verificationId: null,
+        status: 'NOT_STARTED',
+        riskTier: null,
+        riskScore: null,
+        completedSteps: [],
+        pendingSteps: [],
+      };
+    }
+
+    const steps = requiredSteps(verification.riskTier);
+    return {
+      verificationId: verification.id,
+      status: verification.status,
+      riskTier: verification.riskTier,
+      riskScore: verification.riskScore,
+      completedSteps: [] as string[],
+      pendingSteps: steps,
+    };
+  }
+
   async getVerificationStatus(userId: string, bookingId: string, role: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },

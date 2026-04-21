@@ -74,6 +74,15 @@ export class PatientVerificationController {
     );
   }
 
+  @Get('verification/my-status')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary: "Get the current patient's own verification status",
+  })
+  getMyStatus(@CurrentUser() user: any) {
+    return this.service.getMyVerificationStatus(user.id);
+  }
+
   @Get('verification/status/:bookingId')
   @Roles('PATIENT', 'PROVIDER', 'ADMIN')
   @ApiOperation({ summary: 'Get current verification status for a booking' })
