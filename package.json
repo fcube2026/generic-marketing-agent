@@ -32,7 +32,11 @@
   "packageManager": "pnpm@9.4.0",
   "lint-staged": {
     "apps/api/{src,apps,libs,test}/**/*.ts": [
-      "prettier --write --config apps/api/.prettierrc"
+      "prettier --write --config apps/api/.prettierrc",
+      "eslint --fix"
+    ],
+    "packages/database/prisma/schema.prisma": [
+      "prisma format --schema"
     ]
   },
   "dependencies": {
