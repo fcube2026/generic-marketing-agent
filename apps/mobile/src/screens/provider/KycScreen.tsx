@@ -155,10 +155,13 @@ export const KycScreen: React.FC = () => {
   const [showCouncilPicker, setShowCouncilPicker] = useState(false);
   const [councilSearch, setCouncilSearch] = useState('');
   const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
-  // Show document upload view after DigiLocker consent
+  // Show document upload view
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   // Show face-checking state after selfie is taken
   const [faceChecking, setFaceChecking] = useState(false);
+  // Staged document URIs before submission
+  const [pendingAadhaarUri, setPendingAadhaarUri] = useState<string | null>(null);
+  const [pendingCertUri, setPendingCertUri] = useState<string | null>(null);
 
   const [progress, setProgress] = useState<VerificationProgress>({
     nmc: 'pending',
@@ -230,7 +233,8 @@ export const KycScreen: React.FC = () => {
   const digilockerMutation = useMutation({
     mutationFn: () => providerService.recordDigilockerConsent(progress.licenseId),
     onMutate: () => setProgress((p) => ({ ...p, digilocker: 'processing' })),
-    onSuccess: () => setProgress((p) => ({ ...p, digilocker: 'done' })),
+    onSuccess: () =>
+      setProgress((p) => ({ ...p, digilocker: 'done', documents: 'done' })),
     onError: () => setProgress((p) => ({ ...p, digilocker: 'failed' })),
   });
 
@@ -244,8 +248,6 @@ export const KycScreen: React.FC = () => {
           text: 'I Agree',
           onPress: () => {
             digilockerMutation.mutate();
-            // Navigate to the document upload sub-view
-            setShowDocumentUpload(true);
           },
         },
       ],
@@ -301,29 +303,35 @@ export const KycScreen: React.FC = () => {
     ]);
   };
 
-  const handleDocumentUpload = useCallback(async () => {
+  const handlePickAadhaar = useCallback(async () => {
     const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     const camPerm = await ImagePicker.requestCameraPermissionsAsync();
-
     if (libPerm.status !== 'granted' && camPerm.status !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Camera or photo library access is needed to upload your verification documents. Please enable it in Settings.',
-      );
+      Alert.alert('Permission Required', 'Camera or photo library access is needed.');
       return;
     }
+    promptImageSource('Aadhaar Card', (uri) => setPendingAadhaarUri(uri));
+  }, []);
 
-    promptImageSource('Aadhaar Card (1 of 2)', (aadhaarUri) => {
-      promptImageSource('Medical Certificate (2 of 2)', (certUri) => {
-        setProgress((p) => ({ ...p, documents: 'processing' }));
-        documentsMutation.mutate({
-          aadhaarDocumentUrl: aadhaarUri,
-          medicalCertificateUrl: certUri,
-          licenseId: progress.licenseId,
-        });
-      });
+  const handlePickCert = useCallback(async () => {
+    const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+    if (libPerm.status !== 'granted' && camPerm.status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera or photo library access is needed.');
+      return;
+    }
+    promptImageSource('Medical Certificate', (uri) => setPendingCertUri(uri));
+  }, []);
+
+  const handleSubmitDocuments = useCallback(() => {
+    if (!pendingAadhaarUri || !pendingCertUri) return;
+    setProgress((p) => ({ ...p, documents: 'processing' }));
+    documentsMutation.mutate({
+      aadhaarDocumentUrl: pendingAadhaarUri,
+      medicalCertificateUrl: pendingCertUri,
+      licenseId: progress.licenseId,
     });
-  }, [progress.licenseId]);
+  }, [pendingAadhaarUri, pendingCertUri, progress.licenseId]);
 
   // ── Face Verification ──────────────────────────────────────────────────────
 
@@ -386,7 +394,6 @@ export const KycScreen: React.FC = () => {
     progress.nmc !== 'pending' && progress.nmc !== 'processing';
 
   const allStepsDone =
-    progress.digilocker === 'done' &&
     progress.documents === 'done' &&
     progress.face === 'done';
 
@@ -515,7 +522,6 @@ export const KycScreen: React.FC = () => {
                 [
                   { key: 'nmc' as keyof VerificationProgress, label: 'NMC\nCheck' },
                   { key: 'smc' as keyof VerificationProgress, label: 'SMC\nPortal' },
-                  { key: 'digilocker' as keyof VerificationProgress, label: 'DigiLocker' },
                   { key: 'documents' as keyof VerificationProgress, label: 'Documents' },
                   { key: 'face' as keyof VerificationProgress, label: 'Face\nCheck' },
                 ]
@@ -526,7 +532,7 @@ export const KycScreen: React.FC = () => {
                     label={item.label}
                     status={progress[item.key] as StepStatus}
                   />
-                  {index < 4 && <View style={styles.circleLine} />}
+                  {index < 3 && <View style={styles.circleLine} />}
                 </React.Fragment>
               ))}
             </View>
@@ -598,38 +604,8 @@ export const KycScreen: React.FC = () => {
               </>
             )}
 
-            {/* DigiLocker */}
-            {isAutomatedDone && progress.digilocker !== 'done' && (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>{'🔐 DigiLocker Consent'}</Text>
-                <Text style={styles.cardDesc}>
-                  Allow Curex24 to securely fetch your Aadhaar and medical certificate from
-                  DigiLocker to speed up verification.
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    digilockerMutation.isPending && styles.actionBtnDisabled,
-                  ]}
-                  onPress={handleDigilockerConsent}
-                  disabled={digilockerMutation.isPending}
-                >
-                  {digilockerMutation.isPending ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.actionBtnText}>Give Consent</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-            {progress.digilocker === 'done' && (
-              <View style={[styles.card, styles.doneCard]}>
-                <Text style={styles.doneCardText}>{'✅  DigiLocker consent recorded'}</Text>
-              </View>
-            )}
-
-            {/* Document Upload — shown as action card if not uploading via DigiLocker flow */}
-            {isAutomatedDone && progress.documents !== 'done' && progress.digilocker !== 'processing' && (
+            {/* Document Upload — shown as action card */}
+            {isAutomatedDone && progress.documents !== 'done' && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>{'📄 Upload Documents'}</Text>
                 <Text style={styles.cardDesc}>
@@ -753,49 +729,105 @@ export const KycScreen: React.FC = () => {
 
             <Text style={styles.stepTitle}>Upload Documents</Text>
             <Text style={styles.stepDesc}>
-              Please upload the following documents. Our OCR system will extract
-              and validate your details automatically.
+              Upload your verification documents manually, or fetch them automatically
+              from DigiLocker.
             </Text>
 
-            {/* Document upload action */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{'🪪 Aadhaar Card'}</Text>
-              <Text style={styles.cardDesc}>
-                Upload a clear photo or scan of your Aadhaar card (front side).
-              </Text>
-            </View>
+            {/* DigiLocker option */}
+            {progress.documents !== 'done' && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>{'🔐 Fetch from DigiLocker'}</Text>
+                <Text style={styles.cardDesc}>
+                  Allow Curex24 to securely fetch your Aadhaar and medical certificate from
+                  DigiLocker automatically — no manual upload needed.
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    digilockerMutation.isPending && styles.actionBtnDisabled,
+                  ]}
+                  onPress={handleDigilockerConsent}
+                  disabled={digilockerMutation.isPending}
+                >
+                  {digilockerMutation.isPending ? (
+                    <ActivityIndicator color={Colors.white} />
+                  ) : (
+                    <Text style={styles.actionBtnText}>{'🔐  Connect DigiLocker'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{'🎓 MBBS / Degree Certificate'}</Text>
-              <Text style={styles.cardDesc}>
-                Upload your MBBS or relevant medical degree certificate.
-              </Text>
-            </View>
+            {/* OR divider */}
+            {progress.documents !== 'done' && (
+              <View style={styles.orDivider}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
+              </View>
+            )}
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{'📋 Registration Certificate'}</Text>
-              <Text style={styles.cardDesc}>
-                Upload your state medical council registration certificate.
-              </Text>
-            </View>
+            {/* Manual upload */}
+            {progress.documents !== 'done' && (
+              <>
+                <Text style={[styles.label, { marginBottom: 12 }]}>Upload Manually</Text>
 
-            <TouchableOpacity
-              style={[
-                styles.primaryBtn,
-                documentsMutation.isPending && styles.primaryBtnDisabled,
-              ]}
-              onPress={handleDocumentUpload}
-              disabled={documentsMutation.isPending}
-            >
-              {documentsMutation.isPending ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator color={Colors.white} />
-                  <Text style={styles.primaryBtnText}>Uploading…</Text>
-                </View>
-              ) : (
-                <Text style={styles.primaryBtnText}>{'📷  Upload All Documents'}</Text>
-              )}
-            </TouchableOpacity>
+                {/* Aadhaar picker */}
+                <TouchableOpacity
+                  style={[styles.docPickerRow, pendingAadhaarUri && styles.docPickerRowDone]}
+                  onPress={handlePickAadhaar}
+                  disabled={documentsMutation.isPending}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.docPickerTitle}>{'🪪  Aadhaar Card'}</Text>
+                    <Text style={styles.docPickerSub}>
+                      {pendingAadhaarUri ? 'Photo selected ✓' : 'Tap to take photo or choose from gallery'}
+                    </Text>
+                  </View>
+                  <Text style={styles.docPickerChevron}>
+                    {pendingAadhaarUri ? '✓' : '›'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Medical certificate picker */}
+                <TouchableOpacity
+                  style={[styles.docPickerRow, pendingCertUri && styles.docPickerRowDone]}
+                  onPress={handlePickCert}
+                  disabled={documentsMutation.isPending}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.docPickerTitle}>{'🎓  Medical Certificate'}</Text>
+                    <Text style={styles.docPickerSub}>
+                      {pendingCertUri ? 'Photo selected ✓' : 'Tap to take photo or choose from gallery'}
+                    </Text>
+                  </View>
+                  <Text style={styles.docPickerChevron}>
+                    {pendingCertUri ? '✓' : '›'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Submit for verification */}
+                <TouchableOpacity
+                  style={[
+                    styles.primaryBtn,
+                    { marginTop: 8 },
+                    (!pendingAadhaarUri || !pendingCertUri || documentsMutation.isPending) &&
+                      styles.primaryBtnDisabled,
+                  ]}
+                  onPress={handleSubmitDocuments}
+                  disabled={!pendingAadhaarUri || !pendingCertUri || documentsMutation.isPending}
+                >
+                  {documentsMutation.isPending ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ActivityIndicator color={Colors.white} />
+                      <Text style={styles.primaryBtnText}>Uploading…</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.primaryBtnText}>{'📤  Submit for Verification'}</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
 
             {progress.documents === 'done' && (
               <View style={[styles.card, styles.doneCard, { marginTop: 16 }]}>
@@ -1219,4 +1251,35 @@ const styles = StyleSheet.create({
     color: '#92400E',
     textAlign: 'center',
   },
+
+  orDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  orLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  orText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+
+  docPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginBottom: 12,
+  },
+  docPickerRowDone: {
+    borderColor: '#22C55E',
+    backgroundColor: '#F0FDF4',
+  },
+  docPickerTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 4 },
+  docPickerSub: { fontSize: 12, color: Colors.textMuted },
+  docPickerChevron: { fontSize: 20, color: Colors.textMuted, marginLeft: 8 },
 });
