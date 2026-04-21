@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -19,6 +20,7 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         upsert: jest.fn(),
+        update: jest.fn(),
       },
       otpVerification: {
         create: jest.fn(),
@@ -26,6 +28,15 @@ describe('AuthService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      passwordResetToken: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      $transaction: jest
+        .fn()
+        .mockImplementation((ops: any[]) => Promise.all(ops)),
     };
 
     mockJwtService = {
@@ -37,6 +48,10 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService },
+        {
+          provide: EmailService,
+          useValue: { sendPasswordResetEmail: jest.fn() },
+        },
       ],
     }).compile();
 

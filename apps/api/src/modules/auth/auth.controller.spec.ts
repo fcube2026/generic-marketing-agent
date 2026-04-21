@@ -10,6 +10,8 @@ describe('AuthController', () => {
     verifyOtp: jest.fn(),
     adminLogin: jest.fn(),
     marketingLogin: jest.fn(),
+    forgotPassword: jest.fn(),
+    resetPassword: jest.fn(),
   };
 
   beforeEach(async () => {
