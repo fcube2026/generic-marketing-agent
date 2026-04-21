@@ -105,13 +105,7 @@ export const ProfileScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <Button title="Edit Profile" onPress={() => navigation.navigate('Onboarding')} />
-      </View>
-
-      <View style={styles.footer}>
         <Button title="Identity Verification (KYC)" onPress={() => navigation.navigate('PatientKyc')} variant="outline" />
-      </View>
-
-      <View style={styles.footer}>
         <Button title="Sign Out" onPress={logout} variant="outline" />
       </View>
     </ScrollView>
@@ -189,5 +183,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignSelf: 'flex-start',
   },
-  footer: { padding: 16, paddingTop: 20 },
+  footer: { padding: 16, paddingTop: 20, gap: 12 },
 });
