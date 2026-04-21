@@ -69,7 +69,8 @@ const MedicineAutocompleteInput: React.FC<{
         onChangeText={onChange}
         onFocus={() => setFocused(true)}
         onBlur={() => {
-          // Delay to allow tap on suggestion to register before dropdown closes.
+          // Brief delay so a tap on a suggestion (which fires after blur on
+          // Android) is processed before the dropdown is hidden.
           setTimeout(() => setFocused(false), 150);
         }}
         placeholder="Medicine name"

@@ -93,7 +93,13 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       }
 
       if (resolved) {
-        const street = [resolved.name, resolved.street].filter(Boolean).join(', ');
+        // De-duplicate name vs street: reverse-geocode often returns the
+        // same string in both fields.
+        const parts = [resolved.name, resolved.street].filter(
+          (part, idx, arr): part is string =>
+            !!part && arr.indexOf(part) === idx,
+        );
+        const street = parts.join(', ');
         setAddressLine(
           street || `Lat ${latitude.toFixed(5)}, Lng ${longitude.toFixed(5)}`,
         );

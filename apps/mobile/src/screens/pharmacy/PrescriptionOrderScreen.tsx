@@ -195,6 +195,9 @@ export const PrescriptionOrderScreen: React.FC = () => {
       const mappedMedicines: PrescriptionMedicine[] = (data.medicines ?? [])
         .filter((m) => m && (m.name ?? '').trim().length > 0)
         .map((m, i) => ({
+          // Use a numeric ID derived from the index to satisfy the existing
+          // store contract; cart operations key on this id and the list is
+          // not reordered after population.
           id: i + 1,
           name: m!.name as string,
           quantity: typeof m!.quantity === 'number' && m!.quantity > 0 ? m!.quantity : 1,
