@@ -14,6 +14,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@100mslive/react-native-hms": "1.10.9",
     "@curex24/design-tokens": "workspace:*",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
@@ -22,6 +23,8 @@
     "@tanstack/react-query": "^5.40.0",
     "axios": "^1.7.2",
     "expo": "~51.0.0",
+    "expo-av": "14.0.7",
+    "expo-camera": "14.0.6",
     "expo-device": "~6.0.2",
     "expo-document-picker": "~12.0.2",
     "expo-image-picker": "~15.0.7",

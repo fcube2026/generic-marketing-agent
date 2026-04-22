@@ -16,7 +16,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.curex24.mobile"
+      "bundleIdentifier": "com.curex24.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Curex24 needs camera access for video consultations.",
+        "NSMicrophoneUsageDescription": "Curex24 needs microphone access for audio during video consultations."
+      }
     },
     "android": {
       "icon": "./assets/icon.png",
@@ -24,7 +28,14 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0D9488"
       },
-      "package": "com.curex24.mobile"
+      "package": "com.curex24.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "web": {
       "favicon": "./assets/icon.png"

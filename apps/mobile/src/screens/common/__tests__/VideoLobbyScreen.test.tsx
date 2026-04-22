@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { VideoLobbyScreen } from '../VideoLobbyScreen';
 
 // ── AsyncStorage (required by services/api.ts) ────────────────────────────────
@@ -11,6 +11,27 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: jest.fn(() => Promise.resolve()),
   },
 }));
+
+// ── expo-camera ───────────────────────────────────────────────────────────────
+jest.mock('expo-camera', () => ({
+  Camera: {
+    requestCameraPermissionsAsync: jest.fn(() =>
+      Promise.resolve({ status: 'granted' }),
+    ),
+  },
+}));
+
+// ── expo-av ───────────────────────────────────────────────────────────────────
+jest.mock('expo-av', () => ({
+  Audio: {
+    requestPermissionsAsync: jest.fn(() =>
+      Promise.resolve({ status: 'granted' }),
+    ),
+  },
+}));
+
+// ── fetch (network check) ─────────────────────────────────────────────────────
+global.fetch = jest.fn(() => Promise.resolve({ ok: true } as Response));
 
 // ── bookingService ────────────────────────────────────────────────────────────
 jest.mock('../../../services/bookingService', () => ({
@@ -99,11 +120,6 @@ function setupQuery(booking: unknown, session: unknown, loading = false) {
 describe('VideoLobbyScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
   });
 
   it('shows loading spinner while data is fetching', () => {
@@ -149,23 +165,21 @@ describe('VideoLobbyScreen', () => {
     expect(screen.getByText('⏳ Running checks…')).toBeTruthy();
   });
 
-  it('enables Join button after checks complete', () => {
+  it('enables Join button after checks complete', async () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
+    await waitFor(() => {
+      expect(screen.getByText('🎥 Join Call')).toBeTruthy();
     });
-
-    expect(screen.getByText('🎥 Join Call')).toBeTruthy();
   });
 
-  it('navigates to VideoConsultation on join', () => {
+  it('navigates to VideoConsultation on join', async () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
+    await waitFor(() => {
+      expect(screen.getByText('🎥 Join Call')).toBeTruthy();
     });
 
     fireEvent.press(screen.getByText('🎥 Join Call'));
@@ -204,16 +218,14 @@ describe('VideoLobbyScreen', () => {
     expect(screen.getByText('Mic On')).toBeTruthy();
   });
 
-  it('shows "Session Not Ready" when session status is terminal', () => {
+  it('shows "Session Not Ready" when session status is terminal', async () => {
     const completedSession = { ...SESSION, status: 'COMPLETED' };
     setupQuery(BOOKING, completedSession);
     render(<VideoLobbyScreen />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
+    await waitFor(() => {
+      expect(screen.getByText('🔒 Session Not Ready')).toBeTruthy();
     });
-
-    expect(screen.getByText('🔒 Session Not Ready')).toBeTruthy();
   });
 
   it('shows booking details section title', () => {
