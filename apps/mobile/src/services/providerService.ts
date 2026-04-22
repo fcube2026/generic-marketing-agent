@@ -86,8 +86,8 @@ export const providerService = {
 
   // Patient-side: discover nearby providers
   getNearbyProviders: async (params: {
-    lat: number;
-    lng: number;
+    lat?: number;
+    lng?: number;
     serviceCategory?: string;
     mode?: string;
   }) => {

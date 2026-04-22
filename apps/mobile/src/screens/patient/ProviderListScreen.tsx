@@ -32,8 +32,9 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
   const isHomeVisit = mode === 'HOME_VISIT';
   const isClinicVisit = mode === 'DOCTOR_PLACE';
   const [sortBy, setSortBy] = useState<'distance' | 'fee'>(isVideoMode ? 'fee' : 'distance');
-  const [resolvedLat, setResolvedLat] = useState<number>(lat ?? 0);
-  const [resolvedLng, setResolvedLng] = useState<number>(lng ?? 0);
+  // For video mode, lat/lng are never needed — keep them undefined.
+  const [resolvedLat, setResolvedLat] = useState<number | undefined>(isVideoMode ? undefined : (lat ?? undefined));
+  const [resolvedLng, setResolvedLng] = useState<number | undefined>(isVideoMode ? undefined : (lng ?? undefined));
   const [locationReady, setLocationReady] = useState<boolean>(isVideoMode || (lat != null && lng != null));
   const { setSelectedProvider, setSelectedMode } = useBookingStore();
 
@@ -59,8 +60,8 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     enabled: locationReady,
     queryFn: () =>
       providerService.getNearbyProviders({
-        lat: resolvedLat,
-        lng: resolvedLng,
+        // Omit lat/lng for video mode — the backend does not require them
+        ...(isVideoMode ? {} : { lat: resolvedLat, lng: resolvedLng }),
         serviceCategory: categorySlug,
         mode,
       }),
@@ -204,18 +205,20 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.recommendBtn}
-          onPress={() =>
-            navigation.navigate('Recommendation', {
-              categorySlug: categorySlug ?? '',
-              lat: resolvedLat,
-              lng: resolvedLng,
-            })
-          }
-        >
-          <Text style={styles.recommendBtnText}>✨ Recommend</Text>
-        </TouchableOpacity>
+        {categorySlug && !isVideoMode && resolvedLat != null && resolvedLng != null && (
+          <TouchableOpacity
+            style={styles.recommendBtn}
+            onPress={() =>
+              navigation.navigate('Recommendation', {
+                categorySlug,
+                lat: resolvedLat,
+                lng: resolvedLng,
+              })
+            }
+          >
+            <Text style={styles.recommendBtnText}>✨ Recommend</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {sortedProviders.length === 0 ? (
