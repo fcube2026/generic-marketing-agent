@@ -60,6 +60,40 @@ export const BookingDetailScreen: React.FC = () => {
     }
   };
 
+  const handleAccept = async () => {
+    setUpdating(true);
+    try {
+      await bookingService.acceptBooking(bookingId);
+      setBooking((prev: any) => ({ ...prev, status: 'ACCEPTED' }));
+    } catch {
+      Alert.alert('Error', 'Failed to accept booking.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDecline = () => {
+    Alert.alert('Decline Booking', 'Are you sure you want to decline this booking?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setUpdating(true);
+          try {
+            await bookingService.declineBooking(bookingId);
+            setBooking((prev: any) => ({ ...prev, status: 'DECLINED' }));
+            navigation.goBack();
+          } catch {
+            Alert.alert('Error', 'Failed to decline booking.');
+          } finally {
+            setUpdating(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const openMaps = (address: string) => {
     const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
     Linking.openURL(url);
@@ -123,15 +157,21 @@ export const BookingDetailScreen: React.FC = () => {
         </View>
 
         {/* Address */}
-        {booking.mode === 'HOME_VISIT' && booking.address && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Patient Address</Text>
-            <Text style={styles.infoText}>{booking.address}</Text>
-            <TouchableOpacity style={styles.mapBtn} onPress={() => openMaps(booking.address)}>
-              <Text style={styles.mapBtnText}>🗺 Open in Maps</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {booking.mode === 'HOME_VISIT' && booking.address && (() => {
+          const addr: any = booking.address;
+          const addrText = typeof addr === 'string'
+            ? addr
+            : [addr.label, addr.addressLine, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ');
+          return (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Patient Address</Text>
+              <Text style={styles.infoText}>{addrText}</Text>
+              <TouchableOpacity style={styles.mapBtn} onPress={() => openMaps(addrText)}>
+                <Text style={styles.mapBtnText}>🗺 Open in Maps</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
 
         {/* Fee */}
         <View style={styles.card}>
@@ -141,6 +181,25 @@ export const BookingDetailScreen: React.FC = () => {
         </View>
 
         {/* Action Button */}
+        {booking.status === 'REQUESTED' && (
+          <View style={styles.acceptDeclineRow}>
+            <TouchableOpacity
+              style={[styles.declineBtn, updating && { opacity: 0.7 }]}
+              onPress={handleDecline}
+              disabled={updating}
+            >
+              <Text style={styles.declineBtnText}>Decline</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.acceptBtn, updating && { opacity: 0.7 }]}
+              onPress={handleAccept}
+              disabled={updating}
+            >
+              <Text style={styles.acceptBtnText}>{updating ? 'Working…' : 'Accept Booking'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {nextAction && (
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
@@ -181,4 +240,9 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  acceptDeclineRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  declineBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.error, borderRadius: 14, padding: 16, alignItems: 'center', backgroundColor: Colors.white },
+  declineBtnText: { color: Colors.error, fontSize: 15, fontWeight: '700' },
+  acceptBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 14, padding: 16, alignItems: 'center' },
+  acceptBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
 });

@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConsultationService } from './consultation.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -10,6 +12,7 @@ import {
 describe('ConsultationService', () => {
   let service: ConsultationService;
   let prisma: PrismaService;
+  let _notificationsService: NotificationsService;
 
   const mockBooking = {
     id: 'booking-1',
@@ -31,6 +34,10 @@ describe('ConsultationService', () => {
     updatedAt: new Date(),
   };
 
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({ success: true }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -45,8 +52,12 @@ describe('ConsultationService', () => {
             consultationSummary: {
               upsert: jest.fn(),
               findUnique: jest.fn(),
+              findFirst: jest.fn(),
               findMany: jest.fn(),
               count: jest.fn(),
+            },
+            prescription: {
+              create: jest.fn(),
             },
             bookingStatusHistory: {
               create: jest.fn(),
@@ -56,11 +67,29 @@ describe('ConsultationService', () => {
             },
           },
         },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
+        },
+        {
+          provide: PrescriptionStorageService,
+          useValue: {
+            uploadFile: jest.fn().mockResolvedValue('path/to/file'),
+            getSignedUrl: jest
+              .fn()
+              .mockImplementation((p: string) =>
+                Promise.resolve(`https://signed/${p}`),
+              ),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<ConsultationService>(ConsultationService);
     prisma = module.get<PrismaService>(PrismaService);
+    _notificationsService =
+      module.get<NotificationsService>(NotificationsService);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -276,6 +305,98 @@ describe('ConsultationService', () => {
       expect(prisma.consultationSummary.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 10, take: 10 }),
       );
+    });
+  });
+
+  describe('getLatestForPatient', () => {
+    const mockPatientProfile = { id: 'patient-1', userId: 'user-patient-1' };
+
+    it('returns the latest consultation shaped for "Use Recent Prescription"', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(
+        mockPatientProfile,
+      );
+      const createdAt = new Date('2025-01-15T10:00:00Z');
+      const medicines = [
+        {
+          name: 'Paracetamol 500mg',
+          dosage: '1 tab',
+          frequency: 'TID',
+          duration: '5 days',
+        },
+      ];
+      (prisma.consultationSummary.findFirst as jest.Mock).mockResolvedValue({
+        id: 'summary-9',
+        bookingId: 'booking-9',
+        medicinesAdvised: medicines,
+        createdAt,
+        prescriptions: [
+          { id: 'rx-1', fileUrl: 'https://files/x.pdf', createdAt },
+        ],
+      });
+
+      const result = await service.getLatestForPatient('user-patient-1');
+
+      expect(result).toEqual({
+        consultationId: 'summary-9',
+        createdAt,
+        medicines,
+        prescriptionUrl: 'https://files/x.pdf',
+      });
+      expect(prisma.consultationSummary.findFirst).toHaveBeenCalledWith({
+        where: { booking: { patientId: 'patient-1' } },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          prescriptions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+    });
+
+    it('returns null when patient profile does not exist', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const result = await service.getLatestForPatient('user-unknown');
+
+      expect(result).toBeNull();
+      expect(prisma.consultationSummary.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the patient has no consultation summaries yet', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(
+        mockPatientProfile,
+      );
+      (prisma.consultationSummary.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
+
+      const result = await service.getLatestForPatient('user-patient-1');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns medicines=[] and prescriptionUrl=null when none recorded', async () => {
+      (prisma.patientProfile.findUnique as jest.Mock).mockResolvedValue(
+        mockPatientProfile,
+      );
+      const createdAt = new Date('2025-01-15T10:00:00Z');
+      (prisma.consultationSummary.findFirst as jest.Mock).mockResolvedValue({
+        id: 'summary-1',
+        bookingId: 'booking-1',
+        medicinesAdvised: null,
+        createdAt,
+        prescriptions: [],
+      });
+
+      const result = await service.getLatestForPatient('user-patient-1');
+
+      expect(result).toEqual({
+        consultationId: 'summary-1',
+        createdAt,
+        medicines: [],
+        prescriptionUrl: null,
+      });
     });
   });
 });

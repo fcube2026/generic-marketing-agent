@@ -56,6 +56,40 @@ export const BookingDetailScreen: React.FC = () => {
     }
   };
 
+  const handleAcceptBooking = async () => {
+    setUpdating(true);
+    try {
+      await bookingService.acceptBooking(bookingId);
+      setBooking((prev: any) => ({ ...prev, status: 'ACCEPTED' }));
+    } catch {
+      Alert.alert('Error', 'Failed to accept booking.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeclineBooking = () => {
+    Alert.alert('Decline Booking', 'Are you sure you want to decline this booking?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setUpdating(true);
+          try {
+            await bookingService.declineBooking(bookingId);
+            setBooking((prev: any) => ({ ...prev, status: 'DECLINED' }));
+            navigation.goBack();
+          } catch {
+            Alert.alert('Error', 'Failed to decline booking.');
+          } finally {
+            setUpdating(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const openMaps = (address: string) => {
     const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
     Linking.openURL(url);
@@ -136,8 +170,28 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.payStatus}>Payment: {booking.paymentStatus}</Text>
         </View>
 
+        {/* Accept/Decline for REQUESTED bookings */}
+        {booking.status === 'REQUESTED' && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.declineBtn, updating && { opacity: 0.7 }]}
+              onPress={handleDeclineBooking}
+              disabled={updating}
+            >
+              <Text style={styles.declineBtnText}>{updating ? 'Updating…' : '❌ Decline'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, updating && { opacity: 0.7 }]}
+              onPress={handleAcceptBooking}
+              disabled={updating}
+            >
+              <Text style={styles.actionBtnText}>{updating ? 'Updating…' : '✅ Accept Booking'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Action Button */}
-        {nextAction && (
+        {nextAction && booking.status !== 'REQUESTED' && (
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
             onPress={() => updateStatus(nextAction.next)}
@@ -187,4 +241,7 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  actionRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  declineBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.error, borderRadius: 10, padding: 14, alignItems: 'center' },
+  declineBtnText: { color: Colors.error, fontWeight: '700', fontSize: 14 },
 });

@@ -1,18 +1,126 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, SafeAreaView, Switch, Alert,
+  TouchableOpacity, SafeAreaView, Switch, Alert, FlatList,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { consultationService } from '../../services/providerService';
+import { referralService, diagnosticsService } from '../../services/providerService';
+import { pharmacyService } from '../../services/pharmacyService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
+import type { MedicineResult } from '../../types';
 
 type Route = RouteProp<ProviderStackParamList, 'ConsultationForm'>;
 type Nav = NativeStackNavigationProp<ProviderStackParamList>;
 
-type Medicine = { name: string; dosage: string };
+type Medicine = {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+};
+
+type PrescriptionAsset = {
+  uri: string;
+  name?: string;
+  mimeType?: string;
+};
+
+/**
+ * Lightweight autocomplete input that reuses the patient-side pharmacy
+ * search so the doctor selects medicines from the same dataset (provider
+ * pattern preserves the abstraction).
+ */
+const MedicineAutocompleteInput: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ value, onChange }) => {
+  const [focused, setFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<MedicineResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!focused) return;
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const handle = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const results = await pharmacyService.searchMedicines(trimmed);
+        if (!cancelled) setSuggestions(results);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [value, focused]);
+
+  const showDropdown = focused && value.trim().length >= 2;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          // Brief delay so a tap on a suggestion (which fires after blur on
+          // Android) is processed before the dropdown is hidden.
+          setTimeout(() => setFocused(false), 150);
+        }}
+        placeholder="Medicine name"
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
+      {showDropdown && (
+        <View style={styles.suggestionDropdown}>
+          {loading && (
+            <Text style={styles.suggestionMuted}>Searching…</Text>
+          )}
+          {!loading && suggestions.length === 0 && (
+            <Text style={styles.suggestionMuted}>No matches</Text>
+          )}
+          {!loading && suggestions.length > 0 && (
+            <FlatList
+              data={suggestions}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.id}
+              style={{ maxHeight: 180 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.suggestionItem}
+                  onPress={() => {
+                    onChange(item.name);
+                    setFocused(false);
+                  }}
+                >
+                  <Text style={styles.suggestionItemText}>{item.name}</Text>
+                  {item.requiresPrescription && (
+                    <Text style={styles.rxBadge}>Rx</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
 
 export const ConsultationFormScreen: React.FC = () => {
   const route = useRoute<Route>();
@@ -22,7 +130,9 @@ export const ConsultationFormScreen: React.FC = () => {
   const [symptoms, setSymptoms] = useState('');
   const [observations, setObservations] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
-  const [medicines, setMedicines] = useState<Medicine[]>([{ name: '', dosage: '' }]);
+  const [medicines, setMedicines] = useState<Medicine[]>([
+    { name: '', dosage: '', frequency: '', duration: '' },
+  ]);
   const [nextSteps, setNextSteps] = useState('');
   const [followUpNeeded, setFollowUpNeeded] = useState(false);
   const [followUpNotes, setFollowUpNotes] = useState('');
@@ -31,8 +141,55 @@ export const ConsultationFormScreen: React.FC = () => {
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [prescriptionFile, setPrescriptionFile] = useState<PrescriptionAsset | null>(null);
+  const [prescriptionNotes, setPrescriptionNotes] = useState('');
 
-  const addMedicine = () => setMedicines(prev => [...prev, { name: '', dosage: '' }]);
+  const pickPrescriptionFile = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      if (!asset) return;
+      setPrescriptionFile({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+      });
+    } catch {
+      Alert.alert('Error', 'Could not pick file.');
+    }
+  };
+
+  const pickPrescriptionImage = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Allow photo library access to attach an image.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.85,
+      });
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      if (!asset) return;
+      setPrescriptionFile({
+        uri: asset.uri,
+        name: asset.fileName || `prescription_${Date.now()}.jpg`,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch {
+      Alert.alert('Error', 'Could not pick image.');
+    }
+  };
+
+  const addMedicine = () =>
+    setMedicines(prev => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
   const removeMedicine = (index: number) => setMedicines(prev => prev.filter((_, i) => i !== index));
   const updateMedicine = (index: number, field: keyof Medicine, value: string) => {
     setMedicines(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
@@ -52,9 +209,48 @@ export const ConsultationFormScreen: React.FC = () => {
         medicinesAdvised: medicines.filter(m => m.name.trim()),
         nextSteps,
         followUpRecommendation: followUpNeeded ? followUpNotes : undefined,
-        diagnosticTests: diagnosticNeeded ? diagnosticTests : undefined,
-        specialistReferral: referralNeeded ? specialistType : undefined,
       });
+
+      // Persist diagnostic test request via its own endpoint
+      if (diagnosticNeeded && diagnosticTests.trim()) {
+        try {
+          await diagnosticsService.createRequest({
+            bookingId,
+            testType: diagnosticTests.trim(),
+          });
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // Persist specialist referral via its own endpoint
+      if (referralNeeded && specialistType.trim()) {
+        try {
+          await referralService.createReferral({
+            bookingId,
+            specialistType: specialistType.trim(),
+          });
+        } catch {
+          // non-fatal
+        }
+      }
+
+      // Optional: upload prescription file/notes after summary is saved.
+      if (prescriptionFile || prescriptionNotes.trim()) {
+        try {
+          await consultationService.uploadPrescription(
+            bookingId,
+            prescriptionFile,
+            prescriptionNotes,
+          );
+        } catch {
+          Alert.alert(
+            'Prescription not uploaded',
+            'Summary was saved, but the prescription failed to upload. You can retry from the booking details.',
+          );
+        }
+      }
+
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('Tabs') },
       ]);
@@ -88,16 +284,38 @@ export const ConsultationFormScreen: React.FC = () => {
         {/* Medicines */}
         <Text style={styles.label}>Medicines Advised</Text>
         {medicines.map((m, i) => (
-          <View key={i} style={styles.medicineRow}>
-            <TextInput style={[styles.input, { flex: 1 }]} value={m.name}
-              onChangeText={v => updateMedicine(i, 'name', v)} placeholder="Medicine name" />
-            <TextInput style={[styles.input, { width: 110, marginLeft: 8 }]} value={m.dosage}
-              onChangeText={v => updateMedicine(i, 'dosage', v)} placeholder="Dosage" />
-            {medicines.length > 1 && (
-              <TouchableOpacity style={styles.removeBtn} onPress={() => removeMedicine(i)}>
-                <Text style={styles.removeBtnText}>✕</Text>
-              </TouchableOpacity>
-            )}
+          <View key={i} style={styles.medicineBlock}>
+            <View style={styles.medicineRow}>
+              <MedicineAutocompleteInput
+                value={m.name}
+                onChange={v => updateMedicine(i, 'name', v)}
+              />
+              {medicines.length > 1 && (
+                <TouchableOpacity style={styles.removeBtn} onPress={() => removeMedicine(i)}>
+                  <Text style={styles.removeBtnText}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.medicineDetailRow}>
+              <TextInput
+                style={[styles.input, styles.medicineDetail]}
+                value={m.dosage}
+                onChangeText={v => updateMedicine(i, 'dosage', v)}
+                placeholder="Dosage (e.g. 500mg)"
+              />
+              <TextInput
+                style={[styles.input, styles.medicineDetail]}
+                value={m.frequency}
+                onChangeText={v => updateMedicine(i, 'frequency', v)}
+                placeholder="Frequency (e.g. TID)"
+              />
+              <TextInput
+                style={[styles.input, styles.medicineDetail]}
+                value={m.duration}
+                onChangeText={v => updateMedicine(i, 'duration', v)}
+                placeholder="Duration (e.g. 5 days)"
+              />
+            </View>
           </View>
         ))}
         <TouchableOpacity style={styles.addMedBtn} onPress={addMedicine}>
@@ -139,6 +357,38 @@ export const ConsultationFormScreen: React.FC = () => {
             placeholder="e.g. Cardiologist, Orthopedic Surgeon" />
         )}
 
+        {/* Prescription upload (optional) */}
+        <Text style={styles.label}>Prescription (optional)</Text>
+        <Text style={styles.helperText}>
+          Attach a signed prescription image or PDF. The patient will see it under their recent consultation prescription.
+        </Text>
+        <View style={styles.prescriptionRow}>
+          <TouchableOpacity style={styles.prescBtn} onPress={pickPrescriptionImage}>
+            <Text style={styles.prescBtnText}>📷 Photo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.prescBtn} onPress={pickPrescriptionFile}>
+            <Text style={styles.prescBtnText}>📎 File / PDF</Text>
+          </TouchableOpacity>
+        </View>
+        {prescriptionFile && (
+          <View style={styles.prescPreview}>
+            <Text style={styles.prescPreviewText} numberOfLines={1}>
+              ✅ {prescriptionFile.name || 'Selected file'}
+            </Text>
+            <TouchableOpacity onPress={() => setPrescriptionFile(null)}>
+              <Text style={styles.prescRemoveText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <TextInput
+          style={styles.textarea}
+          value={prescriptionNotes}
+          onChangeText={setPrescriptionNotes}
+          placeholder="Prescription notes (e.g. Rx text, instructions)…"
+          multiline
+          numberOfLines={3}
+        />
+
         <TouchableOpacity
           style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
           onPress={handleSubmit}
@@ -158,11 +408,58 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 6, marginTop: 16 },
   input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12, backgroundColor: Colors.white, fontSize: 14, color: Colors.text },
   textarea: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12, backgroundColor: Colors.white, fontSize: 14, color: Colors.text, textAlignVertical: 'top', minHeight: 72 },
-  medicineRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  medicineBlock: {
+    marginBottom: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+  },
+  medicineRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  medicineDetailRow: { flexDirection: 'row', marginTop: 8, gap: 6 },
+  medicineDetail: { flex: 1, paddingVertical: 8, fontSize: 12 },
+  suggestionDropdown: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  suggestionItemText: { fontSize: 14, color: Colors.text, flex: 1 },
+  suggestionMuted: { padding: 12, color: Colors.textMuted, fontSize: 13 },
+  rxBadge: {
+    marginLeft: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.error,
+    borderWidth: 1,
+    borderColor: Colors.error,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
   removeBtn: { marginLeft: 8, padding: 10 },
   removeBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
   addMedBtn: { marginTop: 4, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, borderStyle: 'dashed' },
   addMedBtnText: { color: Colors.primary, fontWeight: '600' },
+  helperText: { fontSize: 12, color: Colors.textMuted, marginBottom: 8, marginTop: -2 },
+  prescriptionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  prescBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, backgroundColor: Colors.white },
+  prescBtnText: { color: Colors.primary, fontWeight: '700' },
+  prescPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
+  prescPreviewText: { color: Colors.primary, fontWeight: '600', flex: 1, marginRight: 10 },
+  prescRemoveText: { color: Colors.error, fontWeight: '700' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
   toggleLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
   submitBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },

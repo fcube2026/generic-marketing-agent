@@ -1,7 +1,27 @@
 import api from './api';
 import { ENDPOINTS } from '../constants/api';
 
+export interface NmcVerificationPayload {
+  fullName: string;
+  nmcRegistrationNumber: string;
+  stateCouncil: string;
+  yearOfAdmission: string;
+  licenseId?: string;
+}
+
+export interface FaceVerificationPayload {
+  liveFaceData: string;
+  referenceImageData?: string;
+}
+
+export interface VerificationDocumentsPayload {
+  aadhaarDocumentUrl: string;
+  medicalCertificateUrl: string;
+  licenseId?: string;
+}
+
 // Provider management service (used by provider screens)
+
 export const providerService = {
   getProfile: async () => {
     const r = await api.get('/providers/me');
@@ -31,6 +51,66 @@ export const providerService = {
     return r.data;
   },
 
+  /**
+   * Upload a prescription file and/or text details under a booking.
+   * Requires the consultation summary to already exist.
+   * @param file Optional document picker / image picker asset {uri, name, mimeType}
+   * @param details Optional prescription notes/text
+   */
+  uploadPrescription: async (
+    bookingId: string,
+    file?: { uri: string; name?: string; mimeType?: string } | null,
+    details?: string,
+  ) => {
+    const form = new FormData();
+    if (file?.uri) {
+      // React Native FormData file shape
+      form.append('file', {
+        uri: file.uri,
+        name: file.name || `prescription_${Date.now()}`,
+        type: file.mimeType || 'application/octet-stream',
+      } as any);
+    }
+    if (details && details.trim()) form.append('details', details.trim());
+    const r = await api.post(`/consultation/${bookingId}/prescription`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return r.data;
+  },
+
+  /** Submit NMC registration for automated multi-step verification. */
+  submitNmcVerification: async (data: NmcVerificationPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
+    return r.data;
+  },
+
+  /** Submit face verification data (base64 live selfie). */
+  submitFaceVerification: async (data: FaceVerificationPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_FACE, data);
+    return r.data;
+  },
+
+  /** Upload Aadhaar + medical certificate document URLs for OCR and admin review. */
+  submitVerificationDocuments: async (data: VerificationDocumentsPayload) => {
+    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_DOCUMENTS, data);
+    return r.data;
+  },
+
+  /** Record the doctor's DigiLocker consent for secure document fetch. */
+  recordDigilockerConsent: async (licenseId?: string) => {
+    const r = await api.post(
+      ENDPOINTS.VERIFICATION.DIGILOCKER_CONSENT,
+      licenseId ? { licenseId } : {},
+    );
+    return r.data;
+  },
+
+  /** Fetch all past verification log entries for the current provider. */
+  getVerificationLogs: async () => {
+    const r = await api.get(ENDPOINTS.VERIFICATION.LOGS);
+    return r.data;
+  },
+
   // Patient-side: discover nearby providers
   getNearbyProviders: async (params: {
     lat: number;
@@ -56,3 +136,25 @@ export const providerService = {
 
 // Alias used by ConsultationFormScreen
 export const consultationService = providerService;
+
+export const referralService = {
+  createReferral: async (data: {
+    bookingId: string;
+    specialistType: string;
+    notes?: string;
+  }) => {
+    const r = await api.post('/referrals', data);
+    return r.data;
+  },
+};
+
+export const diagnosticsService = {
+  createRequest: async (data: {
+    bookingId: string;
+    testType: string;
+    notes?: string;
+  }) => {
+    const r = await api.post('/diagnostics', data);
+    return r.data;
+  },
+};

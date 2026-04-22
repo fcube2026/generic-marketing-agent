@@ -117,6 +117,7 @@ describe('PatientsService', () => {
       expect(mockPrisma.patientProfile.create).toHaveBeenCalledWith({
         data: {
           ...createDto,
+          dateOfBirth: new Date(createDto.dateOfBirth),
           user: { connect: { id: userId } },
         },
       });
@@ -140,7 +141,10 @@ describe('PatientsService', () => {
       expect(result).toEqual(updatedProfile);
       expect(mockPrisma.patientProfile.update).toHaveBeenCalledWith({
         where: { userId },
-        data: createDto,
+        data: {
+          ...createDto,
+          dateOfBirth: new Date(createDto.dateOfBirth),
+        },
       });
       expect(mockPrisma.patientProfile.create).not.toHaveBeenCalled();
     });
@@ -164,6 +168,7 @@ describe('PatientsService', () => {
       expect(mockPrisma.patientProfile.create).toHaveBeenCalledWith({
         data: {
           ...dtoWithContact,
+          dateOfBirth: new Date(dtoWithContact.dateOfBirth),
           user: { connect: { id: userId } },
         },
       });

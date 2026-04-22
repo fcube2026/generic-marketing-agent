@@ -19,6 +19,7 @@ describe('ProvidersService', () => {
     providerService: {
       createMany: jest.fn(),
       deleteMany: jest.fn(),
+      count: jest.fn(),
     },
     providerLicense: {
       create: jest.fn(),
@@ -28,6 +29,7 @@ describe('ProvidersService', () => {
     },
     serviceCategory: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
@@ -124,7 +126,7 @@ describe('ProvidersService', () => {
       expect(result).toBeDefined();
     });
 
-    it('should create profile without service categories when none provided', async () => {
+    it('should create profile with fallback service category when none provided', async () => {
       const dtoWithoutCategories = {
         name: 'Dr. Jane',
         specialization: 'Dermatology',
@@ -148,10 +150,17 @@ describe('ProvidersService', () => {
         role: 'PROVIDER',
       });
       mockPrisma.providerProfile.create.mockResolvedValue(createdProfile);
+      mockPrisma.providerService.count.mockResolvedValue(0);
+      mockPrisma.serviceCategory.findFirst.mockResolvedValue({
+        id: 'cat-derm',
+      });
 
       await service.onboard(userId, dtoWithoutCategories);
 
-      expect(mockPrisma.providerService.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.providerService.createMany).toHaveBeenCalledWith({
+        data: [{ providerId: 'profile-2', serviceCategoryId: 'cat-derm' }],
+        skipDuplicates: true,
+      });
     });
 
     it('should throw BadRequestException when home visit enabled without fee', async () => {
@@ -604,20 +613,42 @@ describe('ProvidersService', () => {
       expect(result[0].id).toBe('near');
     });
 
-    it('should pass serviceCategory filter to query', async () => {
+    it('should pass serviceCategory filter to query for non-doctor categories', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(patientLat, patientLng, 'cardiology');
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              expect.objectContaining({
+                providerServices: {
+                  some: {
+                    serviceCategory: { slug: 'cardiology' },
+                  },
+                },
+              }),
+              expect.objectContaining({
+                specialization: {
+                  contains: 'cardiology',
+                  mode: 'insensitive',
+                },
+              }),
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('should not apply category filter for doctor service', async () => {
       mockPrisma.providerProfile.findMany.mockResolvedValue([]);
 
       await service.getNearbyProviders(patientLat, patientLng, 'doctor');
 
       expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            providerServices: {
-              some: {
-                serviceCategory: { slug: 'doctor' },
-              },
-            },
-          }),
+          where: expect.not.objectContaining({ OR: expect.anything() }),
         }),
       );
     });

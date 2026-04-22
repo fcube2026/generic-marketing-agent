@@ -9,6 +9,8 @@ import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
 import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
 
+const GENERIC_SERVICE_SLUGS = ['doctor', 'general-medicine'];
+
 function haversineDistance(
   lat1: number,
   lng1: number,
@@ -29,6 +31,96 @@ function haversineDistance(
 @Injectable()
 export class ProvidersService {
   constructor(private prisma: PrismaService) {}
+
+  private async findBestServiceCategory(specialization: string) {
+    if (!specialization || typeof specialization !== 'string') return null;
+
+    const normalizedSpecialization = specialization.trim().toLowerCase();
+    if (!normalizedSpecialization) return null;
+    const specializationSlug = normalizedSpecialization
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const directSlugMatch = await this.prisma.serviceCategory.findFirst({
+      where: { slug: specializationSlug },
+    });
+    if (directSlugMatch) return directSlugMatch;
+
+    const directNameMatch = await this.prisma.serviceCategory.findFirst({
+      where: {
+        name: {
+          equals: specialization,
+          mode: 'insensitive',
+        },
+      },
+    });
+    if (directNameMatch) return directNameMatch;
+
+    const categories = await this.prisma.serviceCategory.findMany();
+
+    const compactSpec = normalizedSpecialization.replace(/[^a-z0-9]/g, '');
+    const fuzzyMatch = categories.find((category) => {
+      if (!category.name || !category.slug) return false;
+      const compactName = category.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const compactSlug = category.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return (
+        compactSpec.includes(compactName) ||
+        compactSpec.includes(compactSlug) ||
+        compactName.includes(compactSpec) ||
+        compactSlug.includes(compactSpec)
+      );
+    });
+
+    return fuzzyMatch ?? null;
+  }
+
+  private async ensureProviderServiceLink(
+    providerId: string,
+    specialization: string,
+  ) {
+    const matchedCategory = await this.findBestServiceCategory(specialization);
+
+    if (matchedCategory) {
+      await this.prisma.providerService.createMany({
+        data: [{ providerId, serviceCategoryId: matchedCategory.id }],
+        skipDuplicates: true,
+      });
+
+      if (!GENERIC_SERVICE_SLUGS.includes(matchedCategory.slug)) {
+        await this.prisma.providerService.deleteMany({
+          where: {
+            providerId,
+            serviceCategory: {
+              slug: { in: GENERIC_SERVICE_SLUGS },
+            },
+            serviceCategoryId: { not: matchedCategory.id },
+          },
+        });
+      }
+
+      return;
+    }
+
+    const existingCount = await this.prisma.providerService.count({
+      where: { providerId },
+    });
+    if (existingCount > 0) return;
+
+    const fallbackCategory =
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'doctor' },
+      })) ||
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'general-medicine' },
+      }));
+
+    if (!fallbackCategory) return;
+
+    await this.prisma.providerService.createMany({
+      data: [{ providerId, serviceCategoryId: fallbackCategory.id }],
+      skipDuplicates: true,
+    });
+  }
 
   private validateServiceConfig(
     dto: CreateProviderProfileDto | UpdateProviderProfileDto,
@@ -105,6 +197,8 @@ export class ProvidersService {
       });
     }
 
+    await this.ensureProviderServiceLink(profile.id, profile.specialization);
+
     return this.prisma.providerProfile.findUnique({
       where: { id: profile.id },
       include: {
@@ -163,6 +257,11 @@ export class ProvidersService {
       }
     }
 
+    await this.ensureProviderServiceLink(
+      profile.id,
+      profileData.specialization ?? profile.specialization ?? '',
+    );
+
     return this.prisma.providerProfile.findUnique({
       where: { id: profile.id },
       include: { providerServices: { include: { serviceCategory: true } } },
@@ -179,8 +278,11 @@ export class ProvidersService {
       where: { userId },
       data: {
         isAvailable: dto.isAvailable,
-        ...(dto.currentLat && { currentLat: dto.currentLat }),
-        ...(dto.currentLng && { currentLng: dto.currentLng }),
+        ...(dto.currentLat !== undefined && { currentLat: dto.currentLat }),
+        ...(dto.currentLng !== undefined && { currentLng: dto.currentLng }),
+        ...(dto.serviceRadius !== undefined && {
+          serviceRadius: dto.serviceRadius,
+        }),
       },
     });
   }
@@ -226,6 +328,15 @@ export class ProvidersService {
     serviceCategory?: string,
     mode?: string,
   ) {
+    const normalizedCategorySlug = serviceCategory
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    const categoryLabel = normalizedCategorySlug?.replace(/-/g, ' ');
+    const shouldApplyCategoryFilter =
+      normalizedCategorySlug && normalizedCategorySlug !== 'doctor';
+
     const providers = await this.prisma.providerProfile.findMany({
       where: {
         isAvailable: true,
@@ -233,12 +344,28 @@ export class ProvidersService {
         isVerified: true,
         currentLat: { not: null },
         currentLng: { not: null },
-        ...(serviceCategory && {
-          providerServices: {
-            some: {
-              serviceCategory: { slug: serviceCategory },
+        ...(shouldApplyCategoryFilter && {
+          OR: [
+            {
+              providerServices: {
+                some: {
+                  serviceCategory: { slug: normalizedCategorySlug },
+                },
+              },
             },
-          },
+            {
+              specialization: {
+                contains: normalizedCategorySlug,
+                mode: 'insensitive',
+              },
+            },
+            {
+              specialization: {
+                contains: categoryLabel,
+                mode: 'insensitive',
+              },
+            },
+          ],
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),
         ...(mode === 'DOCTOR_PLACE' && { doctorPlaceVisitEnabled: true }),
@@ -251,14 +378,21 @@ export class ProvidersService {
 
     const withDistance = providers
       .map((provider) => {
-        if (!provider.currentLat || !provider.currentLng) return null;
+        if (provider.currentLat == null || provider.currentLng == null)
+          return null;
         const distance = haversineDistance(
           lat,
           lng,
           provider.currentLat,
           provider.currentLng,
         );
-        return { ...provider, distance };
+        const effectiveServiceRadius =
+          typeof provider.serviceRadius === 'number' &&
+          provider.serviceRadius > 0
+            ? provider.serviceRadius
+            : 10;
+
+        return { ...provider, distance, serviceRadius: effectiveServiceRadius };
       })
       .filter(Boolean)
       .filter((p: any) => p.distance <= p.serviceRadius)

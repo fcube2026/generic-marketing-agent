@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { bookingService } from '../../services/bookingService';
+import { patientService } from '../../services/patientService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useBookingStore } from '../../store/bookingStore';
 import { formatCurrency } from '../../utils/format';
+import { getCurrentLocation, MOCK_LOCATION } from '../../utils/location';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'BookingConfirm'>;
@@ -17,11 +19,59 @@ type Props = {
 
 export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => {
   const { providerId, mode, fee } = route.params;
-  const { selectedProvider, selectedService, selectedAddress, symptoms, setLastBookingId } = useBookingStore();
+  const { selectedProvider, selectedService, selectedAddress, symptoms, setLastBookingId, setSelectedAddress } = useBookingStore();
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addressMode, setAddressMode] = useState<'none' | 'manual'>('none');
+  const [addressBusy, setAddressBusy] = useState(false);
+  const [manualLine, setManualLine] = useState('');
+  const [manualCity, setManualCity] = useState('');
+  const [manualState, setManualState] = useState('');
+  const [manualPincode, setManualPincode] = useState('');
+
+  const saveAddress = async (payload: Parameters<typeof patientService.addAddress>[0]) => {
+    setAddressBusy(true);
+    try {
+      const created = await patientService.addAddress(payload);
+      setSelectedAddress(created);
+      setAddressMode('none');
+      setError(null);
+    } catch (e: any) {
+      Alert.alert('Could not save address', e?.response?.data?.message || 'Please try again.');
+    } finally {
+      setAddressBusy(false);
+    }
+  };
+
+  const handleUseMyLocation = async () => {
+    const coords = (await getCurrentLocation()) || MOCK_LOCATION;
+    await saveAddress({
+      label: 'Current Location',
+      addressLine: `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`,
+      city: 'Auto-detected',
+      state: 'Auto-detected',
+      pincode: '000000',
+      lat: coords.lat,
+      lng: coords.lng,
+      isDefault: false,
+    });
+  };
+
+  const handleSaveManualAddress = async () => {
+    if (!manualLine.trim() || !manualCity.trim() || !manualPincode.trim()) {
+      Alert.alert('Missing fields', 'Address line, city and pincode are required.');
+      return;
+    }
+    await saveAddress({
+      label: 'Home',
+      addressLine: manualLine.trim(),
+      city: manualCity.trim(),
+      state: manualState.trim() || manualCity.trim(),
+      pincode: manualPincode.trim(),
+    });
+  };
 
   const handleConfirm = async () => {
     if (mode === 'HOME_VISIT' && !selectedAddress) {
@@ -143,6 +193,68 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         </Card>
       )}
 
+      {mode === 'HOME_VISIT' && !selectedAddress && (
+        <Card style={styles.addressCard}>
+          <Text style={styles.sectionTitle}>Visit Address</Text>
+          <Text style={styles.helper}>Choose how you want to provide your address.</Text>
+          {addressMode === 'none' ? (
+            <View style={{ marginTop: 8 }}>
+              <Button
+                title="📍 Use My Location"
+                onPress={handleUseMyLocation}
+                loading={addressBusy}
+              />
+              <Button
+                title="✏️ Enter Address Manually"
+                onPress={() => setAddressMode('manual')}
+                variant="outline"
+                style={{ marginTop: 12 }}
+              />
+            </View>
+          ) : (
+            <View style={{ marginTop: 8 }}>
+              <TextInput
+                placeholder="Address line (house, street)"
+                value={manualLine}
+                onChangeText={setManualLine}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="City"
+                value={manualCity}
+                onChangeText={setManualCity}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="State"
+                value={manualState}
+                onChangeText={setManualState}
+                style={styles.input}
+              />
+              <TextInput
+                placeholder="Pincode"
+                value={manualPincode}
+                onChangeText={setManualPincode}
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+              <Button
+                title="Save Address"
+                onPress={handleSaveManualAddress}
+                loading={addressBusy}
+                style={{ marginTop: 8 }}
+              />
+              <Button
+                title="Back"
+                onPress={() => setAddressMode('none')}
+                variant="outline"
+                style={{ marginTop: 8 }}
+              />
+            </View>
+          )}
+        </Card>
+      )}
+
       <View style={styles.footer}>
         <Button title="Confirm & Proceed to Payment" onPress={handleConfirm} loading={loading} />
         <Button
@@ -178,6 +290,19 @@ const styles = StyleSheet.create({
   errorCard: { marginHorizontal: 16, marginBottom: 8, backgroundColor: '#FEF2F2', alignItems: 'center' },
   errorIcon: { fontSize: 28, marginBottom: 8 },
   errorText: { fontSize: 14, color: Colors.error, textAlign: 'center', lineHeight: 20 },
+  addressCard: { marginHorizontal: 16, marginBottom: 8 },
+  helper: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.text,
+    marginTop: 8,
+    backgroundColor: '#fff',
+  },
   successContainer: { flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 },
   successIcon: { marginBottom: 16 },
   successEmoji: { fontSize: 64 },
