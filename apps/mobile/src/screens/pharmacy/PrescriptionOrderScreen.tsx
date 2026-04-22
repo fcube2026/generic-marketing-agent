@@ -170,31 +170,30 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
+  // null = unknown / still probing; true = a recent prescription exists; false = none
+  const [hasRecentPrescription, setHasRecentPrescription] = useState<boolean | null>(null);
 
-  // ---- Load all medicines from mock DB -----------------------------------
-  const loadAllMedicines = useCallback(async () => {
-    try {
-      const results = await pharmacyService.searchMedicines('');
-      if (results && results.length > 0) {
-        const mapped: PrescriptionMedicine[] = results.map((m, i) => ({
-          id: i + 1,
-          name: m.name,
-          quantity: 1,
-          unitPrice: m.price,
-        }));
-        setMedicines(mapped);
-      }
-    } catch {
-      // silently ignore — user can still add manually
-    }
-  }, [setMedicines]);
-
-  // ---- Auto-load medicines on mount --------------------------------------
+  // ---- Probe whether a recent prescription actually exists ----------------
   useEffect(() => {
-    if (medicines.length === 0) {
-      loadAllMedicines();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get<LatestConsultationResponse | null>(
+          '/consultation/latest',
+        );
+        const data = res.data;
+        const exists = !!(
+          data &&
+          (data.prescriptionUrl || (data.medicines && data.medicines.length > 0))
+        );
+        if (!cancelled) setHasRecentPrescription(exists);
+      } catch {
+        if (!cancelled) setHasRecentPrescription(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ---- Shared: fetch medicines from latest consultation -------------------
@@ -257,9 +256,9 @@ export const PrescriptionOrderScreen: React.FC = () => {
           response.data?.status ?? null,
         );
 
-        // Try consultation medicines first, fall back to full mock catalog
-        const gotMeds = await fetchConsultationMedicines();
-        if (!gotMeds) await loadAllMedicines();
+        // Try to load medicines from the latest consultation, if any.
+        // Otherwise leave the medicines list as-is (user can search & add manually).
+        await fetchConsultationMedicines();
       } catch (err: unknown) {
         const message =
           (err as { response?: { data?: { message?: string } } })?.response
@@ -267,13 +266,12 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setPrescription(uri);
         setUploadedPrescriptionMeta(null, null);
         setUploadError(message);
-        const gotMeds = await fetchConsultationMedicines();
-        if (!gotMeds) await loadAllMedicines();
+        await fetchConsultationMedicines();
       } finally {
         setUploading(false);
       }
     },
-    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines, loadAllMedicines],
+    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines],
   );
 
   // ---- Image picker helpers ------------------------------------------------
@@ -405,24 +403,39 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
         {!prescriptionUrl && !isUploading && (
           <>
-            <TouchableOpacity
-              style={[styles.sourceOption, recentLoading && { opacity: 0.6 }]}
-              onPress={useRecentConsultation}
-              disabled={recentLoading}
-            >
-              <Text style={styles.sourceIcon}>🩺</Text>
-              <View style={styles.sourceTextWrap}>
-                <Text style={styles.sourceTitle}>
-                  {recentLoading ? 'Loading recent prescription…' : 'Use Recent Prescription'}
-                </Text>
-                <Text style={styles.sourceSubtitle}>
-                  Use your last doctor-issued prescription
+            {hasRecentPrescription !== false ? (
+              <TouchableOpacity
+                style={[
+                  styles.sourceOption,
+                  (recentLoading || hasRecentPrescription === null) && { opacity: 0.6 },
+                ]}
+                onPress={useRecentConsultation}
+                disabled={recentLoading || hasRecentPrescription === null}
+              >
+                <Text style={styles.sourceIcon}>🩺</Text>
+                <View style={styles.sourceTextWrap}>
+                  <Text style={styles.sourceTitle}>
+                    {recentLoading
+                      ? 'Loading recent prescription…'
+                      : hasRecentPrescription === null
+                        ? 'Checking for recent prescription…'
+                        : 'Use Recent Prescription'}
+                  </Text>
+                  <Text style={styles.sourceSubtitle}>
+                    Use your last doctor-issued prescription
+                  </Text>
+                </View>
+                <Text style={styles.arrow}>→</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.noRecentBanner}>
+                <Text style={styles.noRecentText}>
+                  ℹ️ No recent prescription found
                 </Text>
               </View>
-              <Text style={styles.arrow}>→</Text>
-            </TouchableOpacity>
+            )}
 
-            {recentError && (
+            {recentError && hasRecentPrescription !== false && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>ℹ️ {recentError}</Text>
               </View>
@@ -617,12 +630,6 @@ export const PrescriptionOrderScreen: React.FC = () => {
             <Text style={styles.summaryLabel}>Delivery fee{subtotal >= freeDeliveryThreshold ? ' 🎉' : ''}</Text>
             <Text style={styles.summaryValue}>{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</Text>
           </View>
-          {deliveryFee > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Free delivery unlock</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(freeDeliveryThreshold - subtotal)} away</Text>
-            </View>
-          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Estimated total</Text>
             <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
@@ -761,6 +768,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorText: { fontSize: 13, color: Colors.error },
+  noRecentBanner: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  noRecentText: { fontSize: 13, color: Colors.textMuted },
 
   // Preview
   previewWrap: { alignItems: 'center' },

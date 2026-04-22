@@ -247,6 +247,49 @@ export class BootstrapService implements OnApplicationBootstrap {
       });
     }
 
+    // Link providers to service categories so they appear under those
+    // services in the patient app. Mapping is by specialization → category
+    // slug; providers whose specialization has no matching category fall
+    // back to "general-medicine" so every provider is linked to at least
+    // one category. The (providerId, serviceCategoryId) unique constraint
+    // makes the linking idempotent across re-runs.
+    const specializationToSlug: Record<string, string> = {
+      'General Medicine': 'general-medicine',
+      Pediatrics: 'pediatrics',
+      Cardiology: 'cardiology',
+    };
+    const fallbackCategorySlug = 'general-medicine';
+    for (let i = 0; i < providerData.length; i++) {
+      const p = providerData[i];
+      const provider = providers[i];
+      const slug =
+        specializationToSlug[p.specialization] ?? fallbackCategorySlug;
+      const categoryId = categories[slug];
+      if (!categoryId) {
+        // Category missing — skip safely; do not crash the seed.
+        continue;
+      }
+      try {
+        await this.prisma.providerService.upsert({
+          where: {
+            providerId_serviceCategoryId: {
+              providerId: provider.id,
+              serviceCategoryId: categoryId,
+            },
+          },
+          update: {},
+          create: {
+            providerId: provider.id,
+            serviceCategoryId: categoryId,
+          },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Failed to link provider ${provider.id} to category ${slug}: ${(err as Error).message}`,
+        );
+      }
+    }
+
     // Patients
     const patientData = [
       {
