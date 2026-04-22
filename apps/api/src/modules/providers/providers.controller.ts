@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   Param,
+  BadRequestException,
 } from '@nestjs/common';
 import { ProvidersService } from './providers.service';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
@@ -88,9 +89,15 @@ export class ProvidersController {
   @Public()
   @Get('nearby')
   getNearbyProviders(@Query() query: SearchNearbyProvidersDto) {
+    const isVideoMode = query.mode === 'VIDEO_CONSULTATION';
+    if (!isVideoMode && (query.lat == null || query.lng == null)) {
+      throw new BadRequestException(
+        'lat and lng are required for HOME_VISIT and DOCTOR_PLACE modes',
+      );
+    }
     return this.providersService.getNearbyProviders(
-      query.lat,
-      query.lng,
+      query.lat ?? 0,
+      query.lng ?? 0,
       query.serviceCategory,
       query.mode,
     );

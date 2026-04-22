@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { ProviderWithDistance } from '../../types';
 import { useBookingStore } from '../../store/bookingStore';
 import { BookingMode } from '../../types';
 import { formatCurrency } from '../../utils/format';
+import { getCurrentLocation, MOCK_LOCATION } from '../../utils/location';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'ProviderList'>;
@@ -26,31 +27,80 @@ type Props = {
 };
 
 export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { categorySlug, lat, lng } = route.params;
-  const [sortBy, setSortBy] = useState<'distance' | 'fee'>('distance');
+  const { categorySlug, lat, lng, mode } = route.params;
+  const isVideoMode = mode === 'VIDEO_CONSULTATION';
+  const isHomeVisit = mode === 'HOME_VISIT';
+  const isClinicVisit = mode === 'DOCTOR_PLACE';
+  const [sortBy, setSortBy] = useState<'distance' | 'fee'>(isVideoMode ? 'fee' : 'distance');
+  // For video mode, lat/lng are never needed — keep them undefined.
+  const [resolvedLat, setResolvedLat] = useState<number | undefined>(isVideoMode ? undefined : (lat ?? undefined));
+  const [resolvedLng, setResolvedLng] = useState<number | undefined>(isVideoMode ? undefined : (lng ?? undefined));
+  const [locationReady, setLocationReady] = useState<boolean>(isVideoMode || (lat != null && lng != null));
   const { setSelectedProvider, setSelectedMode } = useBookingStore();
 
+  // For non-video modes, resolve location if not already provided
+  useEffect(() => {
+    if (!isVideoMode && lat == null) {
+      getCurrentLocation()
+        .then((loc) => {
+          const resolved = loc ?? MOCK_LOCATION;
+          setResolvedLat(resolved.lat);
+          setResolvedLng(resolved.lng);
+        })
+        .catch(() => {
+          setResolvedLat(MOCK_LOCATION.lat);
+          setResolvedLng(MOCK_LOCATION.lng);
+        })
+        .finally(() => setLocationReady(true));
+    }
+  }, [isVideoMode, lat]);
+
   const { data: providers, isLoading } = useQuery<ProviderWithDistance[]>({
-    queryKey: ['nearby-providers', categorySlug, lat, lng],
-    queryFn: () => providerService.getNearbyProviders({ lat, lng, serviceCategory: categorySlug }),
+    queryKey: ['nearby-providers', categorySlug, resolvedLat, resolvedLng, mode],
+    enabled: locationReady,
+    queryFn: () =>
+      providerService.getNearbyProviders({
+        // Omit lat/lng for video mode — the backend does not require them
+        ...(isVideoMode ? {} : { lat: resolvedLat, lng: resolvedLng }),
+        serviceCategory: categorySlug,
+        mode,
+      }),
   });
 
   const sortedProviders = [...(providers || [])].sort((a, b) => {
-    if (sortBy === 'distance') return a.distance - b.distance;
-    return a.consultationFeeHomeVisit - b.consultationFeeHomeVisit;
+    if (sortBy === 'fee') {
+      if (isVideoMode) return a.consultationFeeVideoConsultation - b.consultationFeeVideoConsultation;
+      if (isHomeVisit) return a.consultationFeeHomeVisit - b.consultationFeeHomeVisit;
+      return a.consultationFeeDoctorPlace - b.consultationFeeDoctorPlace;
+    }
+    return a.distance - b.distance;
   });
 
   const navigateToConfirm = (
     provider: ProviderWithDistance,
-    mode: BookingMode,
+    bookingMode: BookingMode,
     fee: number,
   ) => {
     setSelectedProvider(provider);
-    setSelectedMode(mode);
-    navigation.navigate('BookingConfirm', { providerId: provider.id, mode, fee });
+    setSelectedMode(bookingMode);
+    navigation.navigate('BookingConfirm', { providerId: provider.id, mode: bookingMode, fee });
   };
 
   const handleSelectProvider = (provider: ProviderWithDistance) => {
+    // If a mode was pre-selected (coming from HomeScreen service type tiles),
+    // navigate directly without asking the user again.
+    if (mode) {
+      const fee =
+        mode === 'VIDEO_CONSULTATION'
+          ? provider.consultationFeeVideoConsultation
+          : mode === 'HOME_VISIT'
+          ? provider.consultationFeeHomeVisit
+          : provider.consultationFeeDoctorPlace;
+      navigateToConfirm(provider, mode, fee);
+      return;
+    }
+
+    // Fallback: ask the user which mode to use (legacy behaviour when no mode preset)
     const modes: { label: string; mode: BookingMode; fee: number }[] = [];
 
     if (provider.homeVisitEnabled) {
@@ -86,28 +136,66 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
       'Select Booking Mode',
       `How would you like to consult Dr. ${provider.name}?`,
       [
-        ...modes.map(({ label, mode, fee }) => ({
+        ...modes.map(({ label, mode: m, fee }) => ({
           text: label,
-          onPress: () => navigateToConfirm(provider, mode, fee),
+          onPress: () => navigateToConfirm(provider, m, fee),
         })),
         { text: 'Cancel', style: 'cancel' as const },
       ],
     );
   };
 
-  if (isLoading) return <LoadingSpinner fullScreen message="Finding providers..." />;
+  const modeLabel = isVideoMode
+    ? '📹 Video Call Doctors'
+    : isHomeVisit
+    ? '🏠 Home Visit Doctors'
+    : isClinicVisit
+    ? '🏥 Clinic Visit Doctors'
+    : 'Nearby Providers';
+
+  const emptySubtitle = isVideoMode
+    ? 'No doctors available for video consultation right now.'
+    : isHomeVisit
+    ? 'No doctors available for home visits in your area.'
+    : isClinicVisit
+    ? 'No clinics found near your location.'
+    : 'No available providers in your area. Try expanding your search.';
+
+  if (!locationReady || isLoading) {
+    return <LoadingSpinner fullScreen message={isVideoMode ? 'Finding available doctors…' : 'Finding providers near you…'} />;
+  }
 
   return (
     <View style={styles.container}>
+      {/* Mode banner */}
+      {mode && (
+        <View style={[
+          styles.modeBanner,
+          isVideoMode && styles.modeBannerVideo,
+          isHomeVisit && styles.modeBannerHome,
+          isClinicVisit && styles.modeBannerClinic,
+        ]}>
+          <Text style={styles.modeBannerText}>{modeLabel}</Text>
+          {isVideoMode && (
+            <Text style={styles.modeBannerSub}>Distance is not a factor — all available doctors shown</Text>
+          )}
+          {(isHomeVisit || isClinicVisit) && (
+            <Text style={styles.modeBannerSub}>Sorted by distance from your location</Text>
+          )}
+        </View>
+      )}
+
       <View style={styles.filterBar}>
-        <TouchableOpacity
-          style={[styles.filterBtn, sortBy === 'distance' && styles.filterBtnActive]}
-          onPress={() => setSortBy('distance')}
-        >
-          <Text style={[styles.filterBtnText, sortBy === 'distance' && styles.filterBtnTextActive]}>
-            📍 Distance
-          </Text>
-        </TouchableOpacity>
+        {!isVideoMode && (
+          <TouchableOpacity
+            style={[styles.filterBtn, sortBy === 'distance' && styles.filterBtnActive]}
+            onPress={() => setSortBy('distance')}
+          >
+            <Text style={[styles.filterBtnText, sortBy === 'distance' && styles.filterBtnTextActive]}>
+              📍 Distance
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.filterBtn, sortBy === 'fee' && styles.filterBtnActive]}
           onPress={() => setSortBy('fee')}
@@ -117,27 +205,27 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.recommendBtn}
-          onPress={() =>
-            navigation.navigate('Recommendation', {
-              categorySlug,
-              lat,
-              lng,
-            })
-          }
-        >
-          <Text style={styles.recommendBtnText}>✨ Recommend</Text>
-        </TouchableOpacity>
+        {categorySlug && !isVideoMode && resolvedLat != null && resolvedLng != null && (
+          <TouchableOpacity
+            style={styles.recommendBtn}
+            onPress={() =>
+              navigation.navigate('Recommendation', {
+                categorySlug,
+                lat: resolvedLat,
+                lng: resolvedLng,
+              })
+            }
+          >
+            <Text style={styles.recommendBtnText}>✨ Recommend</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {sortedProviders.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyTitle}>No providers found</Text>
-          <Text style={styles.emptySubtitle}>
-            No available providers in your area. Try expanding your search.
-          </Text>
+          <Text style={styles.emptySubtitle}>{emptySubtitle}</Text>
         </View>
       ) : (
         <FlatList
@@ -186,4 +274,16 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  modeBanner: {
+    padding: 12,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.primaryLight,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modeBannerVideo: { backgroundColor: '#EFF6FF' },
+  modeBannerHome: { backgroundColor: '#ECFDF5' },
+  modeBannerClinic: { backgroundColor: '#F5F3FF' },
+  modeBannerText: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  modeBannerSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
 });
