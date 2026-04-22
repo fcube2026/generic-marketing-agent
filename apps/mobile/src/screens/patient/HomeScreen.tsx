@@ -69,15 +69,18 @@ export const HomeScreen: React.FC = () => {
       ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
   );
 
-  const handleVideoConsultationPress = () => {
-    if (activeVideoBookings.length > 0) {
+  const handleBookByType = (mode: 'VIDEO_CONSULTATION' | 'HOME_VISIT' | 'DOCTOR_PLACE') => {
+    if (mode === 'VIDEO_CONSULTATION' && activeVideoBookings.length > 0) {
       navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-    } else {
-      Alert.alert(
-        'Video Consultation',
-        'You have no active video sessions. Book a video consultation from the Services section.',
-      );
+      return;
     }
+    // For video, location is not required; for others, we pass 0,0 and let
+    // the user's GPS be used on the ProviderListScreen via getCurrentLocation.
+    navigation.navigate('ProviderList', { mode });
+  };
+
+  const handleVideoConsultationPress = () => {
+    handleBookByType('VIDEO_CONSULTATION');
   };
 
   if (profileLoading || (canUsePatientApp && isLoading)) {
@@ -120,6 +123,42 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.searchBannerSubtitle}>
           Book a doctor, nurse, or therapist at home or clinic
         </Text>
+      </View>
+
+      {/* ── Book by Service Type ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Book a Consultation</Text>
+        <View style={styles.bookingTypeRow}>
+          <TouchableOpacity
+            style={[styles.bookingTypeCard, { borderTopColor: '#3B82F6' }]}
+            onPress={() => handleBookByType('VIDEO_CONSULTATION')}
+            accessibilityLabel="Book video call consultation"
+          >
+            <Text style={styles.bookingTypeIcon}>📹</Text>
+            <Text style={styles.bookingTypeLabel}>Video Call</Text>
+            <Text style={styles.bookingTypeDesc}>Consult from anywhere</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.bookingTypeCard, { borderTopColor: '#10B981' }]}
+            onPress={() => handleBookByType('HOME_VISIT')}
+            accessibilityLabel="Book home visit"
+          >
+            <Text style={styles.bookingTypeIcon}>🏠</Text>
+            <Text style={styles.bookingTypeLabel}>Home Visit</Text>
+            <Text style={styles.bookingTypeDesc}>Doctor comes to you</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.bookingTypeCard, { borderTopColor: '#8B5CF6' }]}
+            onPress={() => handleBookByType('DOCTOR_PLACE')}
+            accessibilityLabel="Book clinic visit"
+          >
+            <Text style={styles.bookingTypeIcon}>🏥</Text>
+            <Text style={styles.bookingTypeLabel}>Clinic Visit</Text>
+            <Text style={styles.bookingTypeDesc}>Visit a nearby clinic</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -283,6 +322,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
+  bookingTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bookingTypeCard: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    borderTopWidth: 3,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  bookingTypeIcon: { fontSize: 28, marginBottom: 6 },
+  bookingTypeLabel: { fontSize: 13, fontWeight: '700', color: Colors.text, textAlign: 'center' },
+  bookingTypeDesc: { fontSize: 11, color: Colors.textMuted, textAlign: 'center', marginTop: 2 },
   bookingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',

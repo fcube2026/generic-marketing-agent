@@ -441,13 +441,19 @@ export class ProvidersService {
     serviceCategory?: string,
     mode?: string,
   ) {
+    const isVideoMode = mode === 'VIDEO_CONSULTATION';
+
     const providers = await this.prisma.providerProfile.findMany({
       where: {
         isAvailable: true,
         isActive: true,
         isVerified: true,
-        currentLat: { not: null },
-        currentLng: { not: null },
+        // For video consultations location is irrelevant — skip the
+        // lat/lng requirement so all available doctors are returned.
+        ...(!isVideoMode && {
+          currentLat: { not: null },
+          currentLng: { not: null },
+        }),
         ...(serviceCategory && {
           providerServices: {
             some: {
@@ -457,12 +463,25 @@ export class ProvidersService {
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),
         ...(mode === 'DOCTOR_PLACE' && { doctorPlaceVisitEnabled: true }),
+        ...(isVideoMode && { videoConsultationEnabled: true }),
       },
       include: {
         providerServices: { include: { serviceCategory: true } },
         user: true,
       },
     });
+
+    if (isVideoMode) {
+      // Return all video-capable providers without distance filtering,
+      // sorted by fee (ascending).
+      return providers
+        .map((provider) => ({ ...provider, distance: 0 }))
+        .sort(
+          (a, b) =>
+            a.consultationFeeVideoConsultation -
+            b.consultationFeeVideoConsultation,
+        );
+    }
 
     const withDistance = providers
       .map((provider) => {

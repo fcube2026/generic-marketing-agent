@@ -89,8 +89,8 @@ export class ProvidersController {
   @Get('nearby')
   getNearbyProviders(@Query() query: SearchNearbyProvidersDto) {
     return this.providersService.getNearbyProviders(
-      query.lat,
-      query.lng,
+      query.lat ?? 0,
+      query.lng ?? 0,
       query.serviceCategory,
       query.mode,
     );

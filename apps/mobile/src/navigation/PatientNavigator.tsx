@@ -47,7 +47,7 @@ export type PatientStackParamList = {
   PatientKycGuardian: undefined;
   PatientKycReview: undefined;
   SelectService: { category: ServiceCategory };
-  ProviderList: { categoryId: string; categorySlug: string; lat: number; lng: number };
+  ProviderList: { categoryId?: string; categorySlug?: string; lat?: number; lng?: number; mode?: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION' };
   Recommendation: { categorySlug: string; lat: number; lng: number };
   BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION'; fee: number };
   ClinicalIntake: { bookingId: string };
