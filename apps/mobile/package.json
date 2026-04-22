@@ -14,6 +14,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@curex24/design-tokens": "workspace:*",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",

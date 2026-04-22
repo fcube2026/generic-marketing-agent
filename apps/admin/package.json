@@ -16,6 +16,7 @@
     "test:coverage-check": "node scripts/validate-test-coverage.mjs"
   },
   "dependencies": {
+    "@curex24/design-tokens": "workspace:*",
     "axios": "^1.7.2",
     "date-fns": "^3.6.0",
     "next": "14.2.35",

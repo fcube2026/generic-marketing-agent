@@ -1,6 +1,14 @@
+@import '@curex24/design-tokens/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes curex-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 body {
   @apply bg-gray-50 text-gray-900;

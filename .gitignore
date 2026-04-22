@@ -9,6 +9,11 @@ build
 .next
 out
 
+# Design tokens dist/ is generated but committed so consumers don't need
+# to run a build step before next build / Metro bundling.
+!packages/design-tokens/dist
+!packages/design-tokens/dist/**
+
 # Expo
 .expo
 *.jks

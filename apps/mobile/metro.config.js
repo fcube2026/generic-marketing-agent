@@ -17,8 +17,11 @@ const blockPath = (targetPath) =>
 
 // Keep Metro watching the app itself only. Watching the monorepo-level
 // node_modules tree on Windows/OneDrive causes transform worker OOM.
+// Exception: the design-tokens package is a shared workspace dependency,
+// so Metro must watch it to pick up token changes during dev.
 config.watchFolders = [
   projectRoot,
+  path.resolve(monorepoRoot, 'packages/design-tokens'),
 ];
 
 // Windows + OneDrive tends to fail spawning many Metro transform workers.
@@ -37,7 +40,15 @@ config.resolver.nodeModulesPaths = [
 // node_modules folders. We provide the only allowed locations explicitly above.
 config.resolver.disableHierarchicalLookup = true;
 
-// Block unrelated workspace apps to speed up Metro on OneDrive
+// Block unrelated workspace apps to speed up Metro on OneDrive.
+// `packages/` is blocked wholesale, then we carve out the workspace packages
+// that mobile actually consumes (currently only @curex24/design-tokens).
+const packagesRoot = path.resolve(monorepoRoot, 'packages');
+const escapedPackagesRoot = escapePathForRegex(packagesRoot);
+const packagesBlockList = new RegExp(
+  `^${escapedPackagesRoot}[\\/\\\\](?!design-tokens([\\/\\\\]|$)).*`,
+);
+
 config.resolver.blockList = exclusionList([
   blockPath(path.resolve(monorepoRoot, 'apps/admin')),
   blockPath(path.resolve(monorepoRoot, 'apps/api')),
@@ -47,7 +58,7 @@ config.resolver.blockList = exclusionList([
   blockPath(path.resolve(monorepoRoot, 'apps/provider-app')),
   blockPath(path.resolve(monorepoRoot, 'docs')),
   blockPath(path.resolve(monorepoRoot, 'labels')),
-  blockPath(path.resolve(monorepoRoot, 'packages')),
+  packagesBlockList,
   blockPath(path.resolve(monorepoRoot, 'prisma')),
   blockPath(path.resolve(monorepoRoot, 'scripts')),
   blockPath(path.resolve(monorepoRoot, 'supabase')),
