@@ -121,7 +121,7 @@ export function Button({
                 color: palette.fg,
                 fontSize: sz.fontSize,
                 fontFamily: tokens.core.font.family.sans,
-                fontWeight: tokens.core.font.weight.semibold as '600',
+                fontWeight: parseInt(tokens.core.font.weight.semibold, 10),
               },
             ]}
             numberOfLines={1}

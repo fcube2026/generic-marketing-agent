@@ -104,7 +104,7 @@ export function Button({
         borderStyle: 'solid',
         borderRadius: 'var(--curex-components-button-primary-radius)',
         fontFamily: 'var(--curex-core-font-family-sans)',
-        fontWeight: 600,
+        fontWeight: 'var(--curex-core-font-weight-semibold)' as React.CSSProperties['fontWeight'],
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         opacity: isDisabled ? 0.5 : 1,
         width: fullWidth ? '100%' : undefined,
