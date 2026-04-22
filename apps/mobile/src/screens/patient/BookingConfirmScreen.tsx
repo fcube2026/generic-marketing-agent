@@ -25,7 +25,7 @@ const getModeLabel = (mode: string) => MODE_LABELS[mode] ?? mode;
 
 export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => {
   const { providerId, mode, fee } = route.params;
-  const { selectedProvider, selectedService, selectedAddress, symptoms, setLastBookingId } = useBookingStore();
+  const { selectedProvider, selectedService, selectedAddress, symptoms, scheduledAt, setLastBookingId } = useBookingStore();
   const [loading, setLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         serviceCategoryId: selectedService?.id || '',
         addressId: mode === 'HOME_VISIT' ? selectedAddress?.id : undefined,
         mode,
-        scheduledAt: new Date().toISOString(),
+        scheduledAt: (scheduledAt || new Date()).toISOString(),
         symptoms,
       });
 
@@ -124,7 +124,16 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         )}
         <View style={styles.row}>
           <Text style={styles.label}>Time</Text>
-          <Text style={styles.value}>Now</Text>
+          <Text style={styles.value}>
+            {scheduledAt 
+              ? scheduledAt.toLocaleString('en-IN', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }) 
+              : 'Now'}
+          </Text>
         </View>
         {symptoms ? (
           <View style={styles.row}>

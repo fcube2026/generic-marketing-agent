@@ -4,7 +4,7 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq';
 
 export const NOTIFICATION_QUEUE = 'notifications';
 export const FALLBACK_QUEUE = 'notification-fallback';
-export const REMINDER_QUEUE = 'appointment-reminders';
+export const REMINDER_QUEUE = 'consultation-reminders';
 export const QUEUES_ENABLED = Boolean(process.env.REDIS_URL);
 
 const logger = new Logger('QueueModule');

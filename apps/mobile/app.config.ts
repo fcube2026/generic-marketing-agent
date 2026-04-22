@@ -54,7 +54,6 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       backgroundColor: '#0D9488',
     },
     package: getBundleId(),
-    useNextNotificationsApi: true,
     permissions: [
       'android.permission.CAMERA',
       'android.permission.READ_EXTERNAL_STORAGE',

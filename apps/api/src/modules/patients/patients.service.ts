@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { CreatePatientProfileDto } from './dto/create-patient-profile.dto';
 import {
   UpdatePatientProfileDto,
@@ -9,7 +10,10 @@ import {
 
 @Injectable()
 export class PatientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly supabaseSync: SupabaseSyncService,
+  ) {}
 
   private normalizeProfilePayload(
     dto: CreatePatientProfileDto | UpdatePatientProfileDto,
@@ -27,7 +31,13 @@ export class PatientsService {
   async getMyProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        id: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
         patientProfile: true,
         addresses: true,
       },
@@ -53,18 +63,22 @@ export class PatientsService {
     });
 
     if (existing) {
-      return this.prisma.patientProfile.update({
+      const updated = await this.prisma.patientProfile.update({
         where: { userId },
         data: profileData,
       });
+      await this.supabaseSync.syncPatient(updated);
+      return updated;
     }
 
-    return this.prisma.patientProfile.create({
+    const created = await this.prisma.patientProfile.create({
       data: {
         ...(profileData as CreatePatientProfileDto),
         user: { connect: { id: userId } },
       },
     });
+    await this.supabaseSync.syncPatient(created);
+    return created;
   }
 
   async getAddresses(userId: string) {

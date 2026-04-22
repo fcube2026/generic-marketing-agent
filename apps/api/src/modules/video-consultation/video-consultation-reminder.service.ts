@@ -42,17 +42,25 @@ export class VideoConsultationReminderService {
     patientName: string,
   ): Promise<void> {
     if (!this.reminderQueue) {
-      this.logger.warn(
-        `Cannot schedule reminders for booking ${bookingId} — reminder queue not available.`,
-      );
+      this.logger.warn(`Cannot schedule reminders for booking ${bookingId} — queue unavailable.`);
       return;
     }
 
     const now = Date.now();
     const sessionStart = scheduledAt.getTime();
-    const delay5min = sessionStart - FIVE_MINUTES_MS - now;
-    const delay1min = sessionStart - ONE_MINUTE_MS - now;
+    const diffMs = sessionStart - now;
 
+    // RULE: If booking is scheduled for "NOW" (current time or within 30 seconds)
+    // or already started, skip all reminders.
+    if (diffMs < 30000) {
+      this.logger.log(`Skipping reminders for booking ${bookingId} — session is immediate or already started.`);
+      return;
+    }
+
+    const delay5min = diffMs - FIVE_MINUTES_MS;
+    const delay1min = diffMs - ONE_MINUTE_MS;
+
+    // Schedule 5-minute reminder ONLY if session is >= 5 minutes away
     if (delay5min > 0) {
       await this.reminderQueue.add(
         'video-reminder',
@@ -67,21 +75,15 @@ export class VideoConsultationReminderService {
         {
           delay: delay5min,
           jobId: `video-reminder-5min-${bookingId}`,
-          attempts: 2,
+          attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: true,
-          removeOnFail: 50,
         },
       );
-      this.logger.log(
-        `Scheduled 5-min video reminder for booking ${bookingId} in ${Math.round(delay5min / 1000)}s`,
-      );
-    } else {
-      this.logger.warn(
-        `Skipping 5-min reminder for booking ${bookingId} — session starts too soon or has already passed.`,
-      );
+      this.logger.log(`Scheduled 5-min reminder for ${bookingId} in ${Math.round(delay5min / 1000)}s`);
     }
 
+    // Schedule 1-minute reminder ONLY if session is >= 1 minute away
     if (delay1min > 0) {
       await this.reminderQueue.add(
         'video-reminder',
@@ -96,19 +98,12 @@ export class VideoConsultationReminderService {
         {
           delay: delay1min,
           jobId: `video-reminder-1min-${bookingId}`,
-          attempts: 2,
+          attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: true,
-          removeOnFail: 50,
         },
       );
-      this.logger.log(
-        `Scheduled 1-min video reminder for booking ${bookingId} in ${Math.round(delay1min / 1000)}s`,
-      );
-    } else {
-      this.logger.warn(
-        `Skipping 1-min reminder for booking ${bookingId} — session starts too soon or has already passed.`,
-      );
+      this.logger.log(`Scheduled 1-min reminder for ${bookingId} in ${Math.round(delay1min / 1000)}s`);
     }
   }
 

@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
@@ -28,7 +29,10 @@ function haversineDistance(
 
 @Injectable()
 export class ProvidersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly supabaseSync: SupabaseSyncService,
+  ) {}
 
   private validateServiceConfig(
     dto: CreateProviderProfileDto | UpdateProviderProfileDto,
@@ -111,6 +115,9 @@ export class ProvidersService {
         providerServices: { include: { serviceCategory: true } },
         user: true,
       },
+    }).then(async (full) => {
+      if (full) await this.supabaseSync.syncProvider(full);
+      return full;
     });
   }
 
@@ -166,6 +173,9 @@ export class ProvidersService {
     return this.prisma.providerProfile.findUnique({
       where: { id: profile.id },
       include: { providerServices: { include: { serviceCategory: true } } },
+    }).then(async (full) => {
+      if (full) await this.supabaseSync.syncProvider(full);
+      return full;
     });
   }
 
@@ -182,6 +192,9 @@ export class ProvidersService {
         ...(dto.currentLat && { currentLat: dto.currentLat }),
         ...(dto.currentLng && { currentLng: dto.currentLng }),
       },
+    }).then(async (updated) => {
+      await this.supabaseSync.syncProvider(updated);
+      return updated;
     });
   }
 
@@ -291,7 +304,6 @@ export class ProvidersService {
         id: string;
         name: string;
         phone: string;
-        email: string | null;
         gender: string | null;
         dateOfBirth: Date | null;
         visitCount: number;
@@ -308,7 +320,6 @@ export class ProvidersService {
           id: pid,
           name: booking.patient.name,
           phone: booking.patient.user.phone,
-          email: booking.patient.user.email ?? null,
           gender: booking.patient.gender ?? null,
           dateOfBirth: booking.patient.dateOfBirth ?? null,
           visitCount: 1,
@@ -352,7 +363,6 @@ export class ProvidersService {
       id: patient.id,
       name: patient.name,
       phone: patient.user.phone,
-      email: patient.user.email,
       gender: patient.gender,
       dateOfBirth: patient.dateOfBirth,
       emergencyContact: patient.emergencyContact,
@@ -440,6 +450,7 @@ export class ProvidersService {
     lng: number,
     serviceCategory?: string,
     mode?: string,
+    serviceId?: string,
   ) {
     const isVideoMode = mode === 'VIDEO_CONSULTATION';
 
@@ -454,10 +465,13 @@ export class ProvidersService {
           currentLat: { not: null },
           currentLng: { not: null },
         }),
-        ...(serviceCategory && {
+        ...((serviceCategory || serviceId) && {
           providerServices: {
             some: {
-              serviceCategory: { slug: serviceCategory },
+              serviceCategory: {
+                ...(serviceId && { id: serviceId }),
+                ...(serviceCategory && { slug: serviceCategory }),
+              },
             },
           },
         }),

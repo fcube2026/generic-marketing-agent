@@ -89,6 +89,7 @@ export const providerService = {
     lat?: number;
     lng?: number;
     serviceCategory?: string;
+    serviceId?: string;
     mode?: string;
   }) => {
     const response = await api.get(ENDPOINTS.PROVIDERS.NEARBY, { params });

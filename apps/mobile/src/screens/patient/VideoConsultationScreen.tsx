@@ -41,12 +41,18 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
   const { data: booking, isLoading: bookingLoading } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: () => bookingService.getBookingById(bookingId),
+    refetchInterval: 5000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
 
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['video-session', bookingId],
     queryFn: () => bookingService.getVideoSession(bookingId),
     retry: false,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
 
   if (bookingLoading || sessionLoading) {

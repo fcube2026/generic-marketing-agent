@@ -33,9 +33,9 @@ export class TrackingService {
     }
 
     if (!TRACKABLE_STATUSES.includes(booking.status)) {
-      throw new ForbiddenException(
-        'Location sharing is only available for active bookings',
-      );
+      // Silently ignore location updates for non-trackable bookings
+      // to avoid polluting logs with 403 errors from background tasks.
+      return { skipped: true, reason: 'Booking status not trackable' };
     }
 
     return this.prisma.providerLocation.create({

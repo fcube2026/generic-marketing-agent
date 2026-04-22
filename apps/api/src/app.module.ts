@@ -35,6 +35,7 @@ import { ConsentModule } from './modules/consent/consent.module';
 import { VisitOtpModule } from './modules/visit-otp/visit-otp.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
+import { SupabaseSyncModule } from './common/supabase/supabase-sync.module';
 
 @Module({
   controllers: [AppController],
@@ -45,6 +46,7 @@ import { HealthModule } from './common/health/health.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
+    SupabaseSyncModule,
     FeatureFlagsModule,
     QueueModule,
     SmsModule,

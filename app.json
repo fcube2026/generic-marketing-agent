@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "32ba7225-63f2-4092-95e5-1e24cb77d6a2"
+      }
+    },
+    "android": {
+      "package": "com.curex24.curex24"
+    }
+  }
+}

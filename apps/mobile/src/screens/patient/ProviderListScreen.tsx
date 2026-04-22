@@ -27,7 +27,7 @@ type Props = {
 };
 
 export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { categorySlug, lat, lng, mode } = route.params;
+  const { categorySlug, serviceId, lat, lng, mode } = route.params;
   const isVideoMode = mode === 'VIDEO_CONSULTATION';
   const isHomeVisit = mode === 'HOME_VISIT';
   const isClinicVisit = mode === 'DOCTOR_PLACE';
@@ -56,13 +56,14 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [isVideoMode, lat]);
 
   const { data: providers, isLoading } = useQuery<ProviderWithDistance[]>({
-    queryKey: ['nearby-providers', categorySlug, resolvedLat, resolvedLng, mode],
+    queryKey: ['nearby-providers', categorySlug, serviceId, resolvedLat, resolvedLng, mode],
     enabled: locationReady,
     queryFn: () =>
       providerService.getNearbyProviders({
         // Omit lat/lng for video mode — the backend does not require them
         ...(isVideoMode ? {} : { lat: resolvedLat, lng: resolvedLng }),
         serviceCategory: categorySlug,
+        serviceId,
         mode,
       }),
   });

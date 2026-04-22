@@ -34,22 +34,29 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
     } = job.data;
 
     const deepLink = `/consultation/lobby/${bookingId}`;
-    const metadata = { bookingId, deepLink };
+    // Mobile navigation expects 'VideoLobby' screen name in data payload
+    const data = { 
+      type: 'VIDEO_CONSULTATION_REMINDER',
+      bookingId,
+      screen: 'VideoLobby',
+      deepLink 
+    };
+
     const is5min = reminderType === '5min';
 
     const patientTitle = is5min
-      ? 'Video Consultation Starting Soon'
-      : 'Video Consultation Starting Now';
+      ? '🎥 Video Consultation in 5 Mins'
+      : '🎥 Join Video Consultation Now';
     const patientMessage = is5min
-      ? `Your video consultation with Dr. ${providerName} starts in 5 minutes. Make sure you have a stable internet connection.`
-      : 'Your video consultation is about to start. Tap to join the waiting room.';
+      ? `Your session with Dr. ${providerName} starts in 5 minutes. Tap to prepare.`
+      : `Dr. ${providerName} is ready. Tap to join the video lobby now. ➔`;
 
     const providerTitle = is5min
-      ? 'Video Consultation Starting Soon'
-      : 'Video Consultation Starting Now';
+      ? '🎥 Video Consultation in 5 Mins'
+      : '🎥 Join Video Consultation Now';
     const providerMessage = is5min
-      ? `Your video consultation with ${patientName} starts in 5 minutes.`
-      : `Your video consultation with ${patientName} is about to start.`;
+      ? `Your session with ${patientName} starts in 5 minutes.`
+      : `Your session with ${patientName} is ready. Tap to join now. ➔`;
 
     try {
       await this.notificationsService.sendNotification(
@@ -58,7 +65,7 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
           title: patientTitle,
           message: patientMessage,
           type: 'VIDEO_CONSULTATION_REMINDER',
-          metadata,
+          metadata: data,
         },
         {
           inApp: true,
@@ -67,9 +74,7 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
         },
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to send patient reminder for booking ${bookingId}: ${error}`,
-      );
+      this.logger.error(`Failed to notify patient for booking ${bookingId}: ${error}`);
     }
 
     try {
@@ -79,7 +84,7 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
           title: providerTitle,
           message: providerMessage,
           type: 'VIDEO_CONSULTATION_REMINDER',
-          metadata,
+          metadata: data,
         },
         {
           inApp: true,
@@ -88,13 +93,9 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
         },
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to send provider reminder for booking ${bookingId}: ${error}`,
-      );
+      this.logger.error(`Failed to notify provider for booking ${bookingId}: ${error}`);
     }
 
-    this.logger.log(
-      `Processed ${reminderType} video reminder for booking ${bookingId}`,
-    );
+    this.logger.log(`Processed ${reminderType} reminder for booking ${bookingId}`);
   }
 }
