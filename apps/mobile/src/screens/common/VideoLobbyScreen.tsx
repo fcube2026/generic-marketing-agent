@@ -31,6 +31,9 @@ interface PreCallCheck {
   status: CheckStatus;
 }
 
+/** URL used for the network connectivity check in the lobby pre-call flow */
+const NETWORK_CHECK_URL = 'https://www.google.com';
+
 const SESSION_STATUS_COLOR: Record<VideoSessionStatus, string> = {
   CREATED: Colors.textMuted,
   WAITING: '#F59E0B',
@@ -166,7 +169,7 @@ export const VideoLobbyScreen: React.FC = () => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        await fetch('https://www.google.com', { signal: controller.signal, method: 'HEAD' });
+        await fetch(NETWORK_CHECK_URL, { signal: controller.signal, method: 'HEAD' });
         clearTimeout(timeoutId);
         setCheck(2, 'ok');
       } catch {

@@ -298,7 +298,9 @@ const HMSCallScreen: React.FC<{
     const instance = hmsInstanceRef.current;
     if (instance) {
       instance.removeAllListeners();
-      instance.leave().catch(() => {/* ignore leave errors on cleanup */});
+      instance.leave().catch((err: unknown) => {
+        console.warn('[VideoCallScreen] leave() failed during cleanup:', err);
+      });
       hmsInstanceRef.current = null;
     }
   }, []);
@@ -319,7 +321,9 @@ const HMSCallScreen: React.FC<{
         audioTrack.setMute(newMuted);
         setIsMuted(newMuted);
       }
-    } catch {/* ignore */}
+    } catch (err) {
+      console.warn('[VideoCallScreen] Failed to toggle mute:', err);
+    }
   }, [isMuted]);
 
   const handleToggleCamera = useCallback(async () => {
@@ -333,7 +337,9 @@ const HMSCallScreen: React.FC<{
         videoTrack.setMute(newCameraOff);
         setIsCameraOff(newCameraOff);
       }
-    } catch {/* ignore */}
+    } catch (err) {
+      console.warn('[VideoCallScreen] Failed to toggle camera:', err);
+    }
   }, [isCameraOff]);
 
   const handleFlipCamera = useCallback(async () => {
@@ -345,7 +351,9 @@ const HMSCallScreen: React.FC<{
       if (videoTrack) {
         videoTrack.switchCamera();
       }
-    } catch {/* ignore */}
+    } catch (err) {
+      console.warn('[VideoCallScreen] Failed to flip camera:', err);
+    }
   }, []);
 
   // ── Connecting state ─────────────────────────────────────────────────────

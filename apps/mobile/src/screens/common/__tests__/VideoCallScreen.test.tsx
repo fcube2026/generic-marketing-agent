@@ -24,7 +24,7 @@ jest.mock('@100mslive/react-native-hms', () => ({
   HMSConfig: jest.fn().mockImplementation((params: object) => params),
   HMSUpdateListenerActions: {
     ON_JOIN: 'ON_JOIN',
-    ON_PEER_UPDATE: '3',
+    ON_PEER_UPDATE: '3', // HMS SDK enum value '3' = PEER_UPDATE event
     ON_TRACK_UPDATE: 'ON_TRACK_UPDATE',
     ON_ERROR: 'ON_ERROR',
     RECONNECTING: 'RECONNECTING',
