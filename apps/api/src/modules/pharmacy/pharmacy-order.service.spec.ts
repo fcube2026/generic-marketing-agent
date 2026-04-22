@@ -93,10 +93,10 @@ describe('PharmacyOrderService', () => {
       status: PharmacyOrderStatus.PENDING,
       deliveryAddressId: 'address-1',
       prescriptionImageUrl: null,
-      subtotal: 50,
-      deliveryFee: 0,
+      subtotal: 120,
+      deliveryFee: 40,
       discount: 0,
-      totalAmount: 50,
+      totalAmount: 160,
       estimatedDeliveryAt: null,
       deliveredAt: null,
       notes: null,
@@ -123,8 +123,8 @@ describe('PharmacyOrderService', () => {
           instructions: null,
           isSubstitute: false,
           quantity: 2,
-          unitPrice: 25,
-          totalPrice: 50,
+          unitPrice: 60,
+          totalPrice: 120,
           pharmacyOrderId: 'order-1',
         },
       ],
@@ -138,7 +138,7 @@ describe('PharmacyOrderService', () => {
           medicineCode: 'med-1',
           medicineName: 'Paracetamol',
           quantity: 2,
-          unitPrice: 25,
+          unitPrice: 60,
         },
       ],
     });
@@ -155,10 +155,199 @@ describe('PharmacyOrderService', () => {
           patientProfileId: 'patient-profile-1',
           pharmacyPartnerId: 'partner-1',
           deliveryAddressId: 'address-1',
+          subtotal: 120,
+          deliveryFee: 40,
+          totalAmount: 160,
         }),
       }),
     );
     expect(result.pharmacyPartnerId).toBe('partner-1');
+  });
+
+  it('uses free delivery for baskets at or above Rs 450', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'Mock',
+      displayName: 'Mock Partner',
+      isActive: true,
+    });
+    mockPrisma.address.findFirst.mockResolvedValue({
+      id: 'address-1',
+      userId: 'user-1',
+      addressLine: 'Street 1',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560001',
+    });
+    mockPrisma.pharmacyOrder.create.mockResolvedValue({
+      id: 'order-2',
+      orderNumber: 'PHARM-TEST-2',
+      patientProfileId: 'patient-profile-1',
+      bookingId: null,
+      prescriptionId: null,
+      pharmacyPartnerId: 'partner-1',
+      partnerOrderId: 'partner-order-1',
+      status: PharmacyOrderStatus.PENDING,
+      deliveryAddressId: 'address-1',
+      prescriptionImageUrl: null,
+      subtotal: 450,
+      deliveryFee: 0,
+      discount: 0,
+      totalAmount: 450,
+      estimatedDeliveryAt: null,
+      deliveredAt: null,
+      notes: null,
+      createdAt: new Date('2026-04-16T00:00:00Z'),
+      updatedAt: new Date('2026-04-16T00:00:00Z'),
+      deliveryAddress: {
+        addressLine: 'Street 1',
+        city: 'Bengaluru',
+        state: 'KA',
+        pincode: '560001',
+      },
+      pharmacyPartner: {
+        id: 'partner-1',
+        code: 'mock',
+        name: 'Mock',
+        displayName: 'Mock Partner',
+      },
+      items: [],
+    });
+
+    await service.placeOrder('user-1', {
+      partnerId: 'partner-1',
+      deliveryAddressId: 'address-1',
+      items: [
+        {
+          medicineCode: 'med-1',
+          medicineName: 'Paracetamol',
+          quantity: 5,
+          unitPrice: 90,
+        },
+      ],
+    });
+
+    expect(mockPrisma.pharmacyOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 450,
+          deliveryFee: 0,
+          totalAmount: 450,
+        }),
+      }),
+    );
+  });
+
+  it('charges Rs 25 delivery for baskets from Rs 250 to Rs 449', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'Mock',
+      displayName: 'Mock Partner',
+      isActive: true,
+    });
+    mockPrisma.address.findFirst.mockResolvedValue({
+      id: 'address-1',
+      userId: 'user-1',
+      addressLine: 'Street 1',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560001',
+    });
+    mockPrisma.pharmacyOrder.create.mockResolvedValue({
+      id: 'order-3',
+      orderNumber: 'PHARM-TEST-3',
+      patientProfileId: 'patient-profile-1',
+      bookingId: null,
+      prescriptionId: null,
+      pharmacyPartnerId: 'partner-1',
+      partnerOrderId: 'partner-order-1',
+      status: PharmacyOrderStatus.PENDING,
+      deliveryAddressId: 'address-1',
+      prescriptionImageUrl: null,
+      subtotal: 250,
+      deliveryFee: 25,
+      discount: 0,
+      totalAmount: 275,
+      estimatedDeliveryAt: null,
+      deliveredAt: null,
+      notes: null,
+      createdAt: new Date('2026-04-16T00:00:00Z'),
+      updatedAt: new Date('2026-04-16T00:00:00Z'),
+      deliveryAddress: {
+        addressLine: 'Street 1',
+        city: 'Bengaluru',
+        state: 'KA',
+        pincode: '560001',
+      },
+      pharmacyPartner: {
+        id: 'partner-1',
+        code: 'mock',
+        name: 'Mock',
+        displayName: 'Mock Partner',
+      },
+      items: [],
+    });
+
+    await service.placeOrder('user-1', {
+      partnerId: 'partner-1',
+      deliveryAddressId: 'address-1',
+      items: [
+        {
+          medicineCode: 'med-1',
+          medicineName: 'Paracetamol',
+          quantity: 5,
+          unitPrice: 50,
+        },
+      ],
+    });
+
+    expect(mockPrisma.pharmacyOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 250,
+          deliveryFee: 25,
+          totalAmount: 275,
+        }),
+      }),
+    );
+  });
+
+  it('rejects baskets below the Rs 120 minimum before calling the partner', async () => {
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'Mock',
+      displayName: 'Mock Partner',
+      isActive: true,
+    });
+    mockPrisma.address.findFirst.mockResolvedValue({
+      id: 'address-1',
+      userId: 'user-1',
+      addressLine: 'Street 1',
+      city: 'Bengaluru',
+      state: 'KA',
+      pincode: '560001',
+    });
+
+    await expect(
+      service.placeOrder('user-1', {
+        partnerId: 'partner-1',
+        deliveryAddressId: 'address-1',
+        items: [
+          {
+            medicineCode: 'med-1',
+            medicineName: 'Paracetamol',
+            quantity: 1,
+            unitPrice: 20,
+          },
+        ],
+      }),
+    ).rejects.toThrow('Minimum order amount is Rs 120');
+
+    expect(mockProvider.createOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.pharmacyOrder.create).not.toHaveBeenCalled();
   });
 
   it('enforces approval for uploaded prescriptions before creating an order', async () => {
@@ -189,10 +378,10 @@ describe('PharmacyOrderService', () => {
       status: PharmacyOrderStatus.PENDING,
       deliveryAddressId: 'address-1',
       prescriptionImageUrl: null,
-      subtotal: 50,
-      deliveryFee: 0,
+      subtotal: 120,
+      deliveryFee: 40,
       discount: 0,
-      totalAmount: 50,
+      totalAmount: 160,
       estimatedDeliveryAt: null,
       deliveredAt: null,
       notes: null,
@@ -222,7 +411,7 @@ describe('PharmacyOrderService', () => {
           medicineCode: 'med-1',
           medicineName: 'Paracetamol',
           quantity: 2,
-          unitPrice: 25,
+          unitPrice: 60,
         },
       ],
     });
@@ -245,9 +434,9 @@ describe('PharmacyOrderService', () => {
       deliveryAddressId: 'address-1',
       prescriptionImageUrl: null,
       subtotal: 50,
-      deliveryFee: 0,
+      deliveryFee: 20,
       discount: 0,
-      totalAmount: 50,
+      totalAmount: 70,
       estimatedDeliveryAt: null,
       deliveredAt: null,
       notes: null,
@@ -279,9 +468,9 @@ describe('PharmacyOrderService', () => {
       deliveryAddressId: 'address-1',
       prescriptionImageUrl: null,
       subtotal: 50,
-      deliveryFee: 0,
+      deliveryFee: 20,
       discount: 0,
-      totalAmount: 50,
+      totalAmount: 70,
       estimatedDeliveryAt: null,
       deliveredAt: null,
       notes: null,

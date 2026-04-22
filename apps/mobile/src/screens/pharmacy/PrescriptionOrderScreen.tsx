@@ -18,6 +18,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { formatCurrency } from '../../utils/format';
+import { calculateDeliveryFee, getFreeDeliveryThreshold } from '../../utils/pharmacy';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import api from '../../services/api';
 import { ENDPOINTS } from '../../constants/api';
@@ -25,7 +26,6 @@ import { pharmacyService } from '../../services/pharmacyService';
 import { MedicineResult } from '../../types';
 import {
   usePharmacyOrderStore,
-  MOCK_PHARMACIES,
   PrescriptionMedicine,
 } from '../../store/pharmacyOrderStore';
 
@@ -45,6 +45,13 @@ type LatestConsultationResponse = {
     quantity?: number;
     unitPrice?: number;
   }> | null;
+};
+
+type UploadPrescriptionResponse = {
+  prescriptionId: string;
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REUPLOAD_REQUIRED';
+  fileUrl?: string;
+  url?: string;
 };
 
 const getUploadMimeType = (filename: string): string => {
@@ -105,6 +112,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
     setUploading,
     setUploadError,
     setMedicines,
+    setUploadedPrescriptionMeta,
     updateMedicineQuantity,
     resetOrder,
   } = usePharmacyOrderStore();
@@ -156,8 +164,9 @@ export const PrescriptionOrderScreen: React.FC = () => {
     const incomingUrl = route.params?.prescriptionUrl;
     if (incomingUrl && !prescriptionUrl) {
       setPrescription(incomingUrl);
+      setUploadedPrescriptionMeta(null, null);
     }
-  }, [route.params?.prescriptionUrl, prescriptionUrl, setPrescription]);
+  }, [route.params?.prescriptionUrl, prescriptionUrl, setPrescription, setUploadedPrescriptionMeta]);
 
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
@@ -235,7 +244,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
           type: mimeType,
         } as unknown as Blob);
 
-        const response = await api.post(
+        const response = await api.post<UploadPrescriptionResponse>(
           ENDPOINTS.PHARMACY.PRESCRIPTIONS_UPLOAD,
           formData,
         );
@@ -243,6 +252,10 @@ export const PrescriptionOrderScreen: React.FC = () => {
         const uploadedUrl: string =
           response.data?.fileUrl ?? response.data?.url ?? uri;
         setPrescription(uploadedUrl);
+        setUploadedPrescriptionMeta(
+          response.data?.prescriptionId ?? null,
+          response.data?.status ?? null,
+        );
 
         // Try consultation medicines first, fall back to full mock catalog
         const gotMeds = await fetchConsultationMedicines();
@@ -252,6 +265,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
           (err as { response?: { data?: { message?: string } } })?.response
             ?.data?.message ?? 'Upload failed. Using local image.';
         setPrescription(uri);
+        setUploadedPrescriptionMeta(null, null);
         setUploadError(message);
         const gotMeds = await fetchConsultationMedicines();
         if (!gotMeds) await loadAllMedicines();
@@ -259,7 +273,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setUploading(false);
       }
     },
-    [setPrescription, setUploading, setUploadError, fetchConsultationMedicines, loadAllMedicines],
+    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines, loadAllMedicines],
   );
 
   // ---- Image picker helpers ------------------------------------------------
@@ -324,6 +338,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
       if (data.prescriptionUrl) {
         setPrescription(data.prescriptionUrl);
+        setUploadedPrescriptionMeta(null, null);
       }
       if (mappedMedicines.length > 0) {
         setMedicines(mappedMedicines);
@@ -336,15 +351,15 @@ export const PrescriptionOrderScreen: React.FC = () => {
     } finally {
       setRecentLoading(false);
     }
-  }, [setPrescription, setMedicines]);
+  }, [setPrescription, setMedicines, setUploadedPrescriptionMeta]);
 
   // ---- Checkout validation -------------------------------------------------
   const subtotal = medicines.reduce(
     (sum, m) => sum + m.unitPrice * m.quantity,
     0,
   );
-  const defaultPharmacy = MOCK_PHARMACIES[0] ?? null;
-  const deliveryFee = defaultPharmacy?.deliveryFee ?? 0;
+  const deliveryFee = calculateDeliveryFee(subtotal);
+  const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const total = subtotal + deliveryFee;
   const canProceed = medicines.length > 0 && !isUploading;
 
@@ -599,9 +614,15 @@ export const PrescriptionOrderScreen: React.FC = () => {
             <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Delivery fee</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(deliveryFee)}</Text>
+            <Text style={styles.summaryLabel}>Delivery fee{subtotal >= freeDeliveryThreshold ? ' 🎉' : ''}</Text>
+            <Text style={styles.summaryValue}>{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</Text>
           </View>
+          {deliveryFee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Free delivery unlock</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(freeDeliveryThreshold - subtotal)} away</Text>
+            </View>
+          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Estimated total</Text>
             <Text style={styles.totalValue}>{formatCurrency(total)}</Text>

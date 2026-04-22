@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const exclusionList = require('metro-config/src/defaults/exclusionList');
 const { resolve } = require('metro-resolver');
 const path = require('path');
 
@@ -7,6 +8,12 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 const upstreamResolveRequest = config.resolver.resolveRequest;
+
+const escapePathForRegex = (value) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const blockPath = (targetPath) =>
+  new RegExp(`^${escapePathForRegex(targetPath)}[\\/\\\\].*`);
 
 // Keep Metro watching the app itself only. Watching the monorepo-level
 // node_modules tree on Windows/OneDrive causes transform worker OOM.
@@ -26,15 +33,25 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// Prevent Metro from walking up parent directories looking for additional
+// node_modules folders. We provide the only allowed locations explicitly above.
+config.resolver.disableHierarchicalLookup = true;
+
 // Block unrelated workspace apps to speed up Metro on OneDrive
-config.resolver.blockList = [
-  /apps[\/\\]admin[\/\\].*/,
-  /apps[\/\\]api[\/\\].*/,
-  /apps[\/\\]patient-app[\/\\].*/,
-  /apps[\/\\]provider-app[\/\\].*/,
-  /packages[\/\\].*/,
-  /docs[\/\\].*/,
-];
+config.resolver.blockList = exclusionList([
+  blockPath(path.resolve(monorepoRoot, 'apps/admin')),
+  blockPath(path.resolve(monorepoRoot, 'apps/api')),
+  blockPath(path.resolve(monorepoRoot, 'apps/doctor-portal')),
+  blockPath(path.resolve(monorepoRoot, 'apps/marketing-agent')),
+  blockPath(path.resolve(monorepoRoot, 'apps/patient-app')),
+  blockPath(path.resolve(monorepoRoot, 'apps/provider-app')),
+  blockPath(path.resolve(monorepoRoot, 'docs')),
+  blockPath(path.resolve(monorepoRoot, 'labels')),
+  blockPath(path.resolve(monorepoRoot, 'packages')),
+  blockPath(path.resolve(monorepoRoot, 'prisma')),
+  blockPath(path.resolve(monorepoRoot, 'scripts')),
+  blockPath(path.resolve(monorepoRoot, 'supabase')),
+]);
 
 // Native modules that crash when two copies register the same ViewManager.
 // pnpm installs separate copies in nested node_modules — we force ONE copy

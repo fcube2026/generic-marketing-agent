@@ -21,7 +21,12 @@ import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
 import api from '../../services/api';
 import { ENDPOINTS } from '../../constants/api';
-import { requiresPrescriptionForMedicine } from '../../utils/pharmacy';
+import {
+  calculateDeliveryFee,
+  getFreeDeliveryThreshold,
+  requiresPrescriptionForMedicine,
+} from '../../utils/pharmacy';
+import { usePharmacyOrderStore } from '../../store/pharmacyOrderStore';
 
 type PrescriptionOption = {
   id: string;
@@ -55,6 +60,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const route = useRoute<Route>();
   const { cartItems } = route.params;
   const queryClient = useQueryClient();
+  const { uploadedPrescriptionId, uploadedPrescriptionStatus } = usePharmacyOrderStore();
 
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -187,7 +193,8 @@ export const PharmacyCheckoutScreen: React.FC = () => {
     0,
   );
 
-  const DELIVERY_FEE = subtotal >= 500 ? 0 : 40;
+  const DELIVERY_FEE = calculateDeliveryFee(subtotal);
+  const FREE_DELIVERY_THRESHOLD = getFreeDeliveryThreshold();
   const GST_RATE = 0.05; // 5% GST on medicines
   const gstAmount = Math.round(subtotal * GST_RATE);
   const totalAmount = subtotal + DELIVERY_FEE + gstAmount;
@@ -202,6 +209,13 @@ export const PharmacyCheckoutScreen: React.FC = () => {
     [prescriptionOptions, selectedPrescriptionId],
   );
 
+  const activeUploadedPrescriptionId = selectedPrescriptionId
+    ? null
+    : uploadedPrescriptionId;
+
+  const prescriptionRequirementSatisfied =
+    !prescriptionRequired || !!selectedPrescriptionId || !!activeUploadedPrescriptionId;
+
   const handlePlaceOrder = async () => {
     if (!selectedPartnerId) {
       Alert.alert('Pharmacy unavailable', 'No pharmacy partner is available right now.');
@@ -211,7 +225,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       Alert.alert('Incomplete address', 'Please fill in all delivery address fields');
       return;
     }
-    if (prescriptionRequired && !selectedPrescriptionId) {
+    if (!prescriptionRequirementSatisfied) {
       Alert.alert('Prescription required', 'Valid prescription required for selected medicines');
       return;
     }
@@ -233,6 +247,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
         deliveryAddressId,
         bookingId: selectedPrescription?.bookingId || undefined,
         prescriptionId: selectedPrescriptionId || undefined,
+        uploadedPrescriptionId: activeUploadedPrescriptionId || undefined,
         notes: notes.trim() || undefined,
         items: cartItems.map((item) => ({
           medicineCode: item.medicine.id,
@@ -286,7 +301,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
         </View>
         <View style={styles.subtotalRow}>
           <Text style={styles.feeLabel}>
-            Delivery Fee{subtotal >= 500 ? ' 🎉' : ''}
+            Delivery Fee{subtotal >= FREE_DELIVERY_THRESHOLD ? ' 🎉' : ''}
           </Text>
           <Text style={[styles.feeValue, DELIVERY_FEE === 0 && styles.freeText]}>
             {DELIVERY_FEE === 0 ? 'FREE' : formatCurrency(DELIVERY_FEE)}
@@ -294,7 +309,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
         </View>
         {DELIVERY_FEE > 0 && (
           <Text style={styles.freeDeliveryHint}>
-            Add {formatCurrency(500 - subtotal)} more for free delivery
+            Add {formatCurrency(FREE_DELIVERY_THRESHOLD - subtotal)} more for free delivery
           </Text>
         )}
         <View style={[styles.subtotalRow, styles.totalRow]}>
@@ -315,6 +330,18 @@ export const PharmacyCheckoutScreen: React.FC = () => {
               : 'These medicines can be ordered without a prescription, but you may still attach one.'}
           </Text>
         </View>
+
+        {activeUploadedPrescriptionId && (
+          <View style={styles.uploadedRxCard}>
+            <Text style={styles.uploadedRxTitle}>Uploaded prescription attached</Text>
+            <Text style={styles.uploadedRxText}>
+              Review status: {(uploadedPrescriptionStatus ?? 'PENDING_REVIEW').replace(/_/g, ' ')}
+            </Text>
+            <Text style={styles.uploadedRxSubtext}>
+              This uploaded prescription will be used for pharmacy verification if no doctor-issued prescription is selected below.
+            </Text>
+          </View>
+        )}
 
         {prescriptionOptions.length === 0 ? (
           <Text style={styles.noDataText}>
@@ -437,7 +464,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
           title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order - ${formatCurrency(totalAmount)}`}
           onPress={handlePlaceOrder}
           loading={placeOrderMutation.isPending}
-          disabled={!selectedPartnerId || !addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim() || (prescriptionRequired && !selectedPrescriptionId)}
+          disabled={!selectedPartnerId || !addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim() || !prescriptionRequirementSatisfied}
         />
       </View>
 
@@ -518,6 +545,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.warning,
   },
+  uploadedRxCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    padding: 12,
+    marginBottom: 12,
+  },
+  uploadedRxTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  uploadedRxText: { fontSize: 13, color: Colors.primary, fontWeight: '600', marginTop: 4 },
+  uploadedRxSubtext: { fontSize: 12, color: Colors.textMuted, marginTop: 6, lineHeight: 18 },
   complianceTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   complianceText: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
   partnerCard: {

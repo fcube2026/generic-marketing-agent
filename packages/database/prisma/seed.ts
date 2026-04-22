@@ -45,6 +45,23 @@ const serviceCategories = [
   },
 ];
 
+const pharmacyPartners = [
+  {
+    code: 'demo-pharmacy',
+    name: 'Demo Pharmacy',
+    displayName: 'Curex Demo Pharmacy',
+    description: 'Primary mock pharmacy partner for Curex24 local QA flows.',
+    priority: 1,
+  },
+  {
+    code: 'demo-pharmacy-express',
+    name: 'Demo Pharmacy Express',
+    displayName: 'Curex Demo Pharmacy Express',
+    description: 'Secondary mock pharmacy route for local QA verification.',
+    priority: 2,
+  },
+] as const;
+
 function daysAgo(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -65,6 +82,34 @@ async function main() {
     categories[category.slug] = cat;
   }
   console.log(`✅ Seeded ${serviceCategories.length} service categories`);
+
+  // ── Pharmacy partners ────────────────────────────────────────────────────
+  const providerApiBaseUrl =
+    process.env.PHARMACY_PARTNER_API_URL ?? 'https://mock-pharmacy.invalid';
+
+  for (const partner of pharmacyPartners) {
+    await prisma.pharmacyPartner.upsert({
+      where: { code: partner.code },
+      update: {
+        name: partner.name,
+        displayName: partner.displayName,
+        description: partner.description,
+        priority: partner.priority,
+        apiBaseUrl: providerApiBaseUrl,
+        isActive: true,
+      },
+      create: {
+        code: partner.code,
+        name: partner.name,
+        displayName: partner.displayName,
+        description: partner.description,
+        priority: partner.priority,
+        apiBaseUrl: providerApiBaseUrl,
+        isActive: true,
+      },
+    });
+  }
+  console.log(`✅ Seeded ${pharmacyPartners.length} pharmacy partners`);
 
   // ── Admin user ────────────────────────────────────────────────────────────
   const adminUser = await prisma.user.upsert({

@@ -26,6 +26,15 @@ type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
 export class PharmacyOrderService {
   private readonly logger = new Logger(PharmacyOrderService.name);
 
+  private static readonly MINIMUM_ORDER_SUBTOTAL = 120;
+
+  private static readonly FREE_DELIVERY_THRESHOLD = 450;
+
+  private static readonly DELIVERY_FEE_TIERS = [
+    { minSubtotal: 250, fee: 25 },
+    { minSubtotal: 120, fee: 40 },
+  ] as const;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
@@ -101,16 +110,19 @@ export class PharmacyOrderService {
       unitPrice: item.unitPrice,
     }));
 
+    const subtotal = dto.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+    this.assertMinimumOrderSubtotal(subtotal);
+    const deliveryFee = this.calculateDeliveryFee(subtotal);
+    const totalAmount = Math.max(0, subtotal + deliveryFee);
+
     const partnerResult = await provider.createOrder({
       patientId: patient.id,
       items: partnerItems,
       deliveryAddress: this.formatAddress(address),
     });
-
-    const subtotal = dto.items.reduce(
-      (sum, item) => sum + item.quantity * item.unitPrice,
-      0,
-    );
 
     const order = await this.prisma.pharmacyOrder.create({
       data: {
@@ -123,9 +135,9 @@ export class PharmacyOrderService {
         partnerOrderId: partnerResult.partnerOrderId,
         deliveryAddressId: address.id,
         subtotal,
-        deliveryFee: 0,
+        deliveryFee,
         discount: 0,
-        totalAmount: partnerResult.totalAmount,
+        totalAmount,
         status: this.mapPartnerStatus(partnerResult.status),
         notes: dto.notes ?? null,
         items: {
@@ -146,6 +158,26 @@ export class PharmacyOrderService {
     });
 
     return this.toResponseDto(order);
+  }
+
+  private assertMinimumOrderSubtotal(subtotal: number): void {
+    if (subtotal < PharmacyOrderService.MINIMUM_ORDER_SUBTOTAL) {
+      throw new BadRequestException('Minimum order amount is Rs 120');
+    }
+  }
+
+  private calculateDeliveryFee(subtotal: number): number {
+    this.assertMinimumOrderSubtotal(subtotal);
+
+    if (subtotal >= PharmacyOrderService.FREE_DELIVERY_THRESHOLD) {
+      return 0;
+    }
+
+    const tier = PharmacyOrderService.DELIVERY_FEE_TIERS.find(
+      ({ minSubtotal }) => subtotal >= minSubtotal,
+    );
+
+    return tier?.fee ?? 20;
   }
 
   async getOrder(

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { calculateDeliveryFee } from '../utils/pharmacy';
 
 /** A medicine item in the prescription order */
 export interface PrescriptionMedicine {
@@ -7,6 +8,12 @@ export interface PrescriptionMedicine {
   quantity: number;
   unitPrice: number;
 }
+
+export type UploadedPrescriptionStatus =
+  | 'PENDING_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'REUPLOAD_REQUIRED';
 
 /** A mock pharmacy option */
 export interface MockPharmacy {
@@ -25,6 +32,9 @@ interface PharmacyOrderState {
   uploadError: string | null;
   /** Parsed/mock medicines from the prescription */
   medicines: PrescriptionMedicine[];
+  /** Uploaded prescription record used for pharmacist verification */
+  uploadedPrescriptionId: string | null;
+  uploadedPrescriptionStatus: UploadedPrescriptionStatus | null;
   /** The pharmacy selected by the user */
   selectedPharmacy: MockPharmacy | null;
 
@@ -34,6 +44,10 @@ interface PharmacyOrderState {
   setUploading: (uploading: boolean) => void;
   setUploadError: (error: string | null) => void;
   setMedicines: (medicines: PrescriptionMedicine[]) => void;
+  setUploadedPrescriptionMeta: (
+    prescriptionId: string | null,
+    status: UploadedPrescriptionStatus | null,
+  ) => void;
   updateMedicineQuantity: (id: number, delta: number) => void;
   selectPharmacy: (pharmacy: MockPharmacy | null) => void;
   resetOrder: () => void;
@@ -67,6 +81,8 @@ const initialState = {
   isUploading: false,
   uploadError: null,
   medicines: [],
+  uploadedPrescriptionId: null,
+  uploadedPrescriptionStatus: null,
   selectedPharmacy: null,
 };
 
@@ -82,13 +98,25 @@ export const usePharmacyOrderStore = create<PharmacyOrderState>((set) => ({
     }),
 
   clearPrescription: () =>
-    set({ prescriptionUrl: null, medicines: [], uploadError: null }),
+    set({
+      prescriptionUrl: null,
+      medicines: [],
+      uploadError: null,
+      uploadedPrescriptionId: null,
+      uploadedPrescriptionStatus: null,
+    }),
 
   setUploading: (uploading) => set({ isUploading: uploading }),
 
   setUploadError: (error) => set({ uploadError: error }),
 
   setMedicines: (medicines) => set({ medicines }),
+
+  setUploadedPrescriptionMeta: (prescriptionId, status) =>
+    set({
+      uploadedPrescriptionId: prescriptionId,
+      uploadedPrescriptionStatus: status,
+    }),
 
   updateMedicineQuantity: (id, delta) =>
     set((state) => ({
@@ -113,5 +141,5 @@ export function computeTotal(
     (sum, m) => sum + m.unitPrice * m.quantity,
     0,
   );
-  return subtotal + (pharmacy?.deliveryFee ?? 0);
+  return subtotal + calculateDeliveryFee(subtotal);
 }

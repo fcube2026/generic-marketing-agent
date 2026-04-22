@@ -81,7 +81,11 @@ export class PrescriptionService {
   async handleUpload(
     userId: string,
     file: UploadedPrescriptionFile,
-  ): Promise<{ prescriptionId: string }> {
+  ): Promise<{
+    prescriptionId: string;
+    status: PrescriptionStatus;
+    fileUrl: string;
+  }> {
     this.logger.log('Prescription upload attempt', { userId });
 
     // Validate file type
@@ -143,12 +147,36 @@ export class PrescriptionService {
       },
     });
 
+    const fileUrl = await this.storage.getSignedUrl(filePath);
+
     this.logger.log('Prescription uploaded successfully', {
       userId,
       prescriptionId: prescription.id,
     });
 
-    return { prescriptionId: prescription.id };
+    void this.notificationsService
+      .createNotification({
+        userId,
+        title: 'Prescription Uploaded',
+        message:
+          'Your prescription has been uploaded and is pending pharmacist review.',
+        type: 'PRESCRIPTION_UPLOADED',
+        metadata: {
+          prescriptionId: prescription.id,
+          status: PrescriptionStatus.PENDING_REVIEW,
+        },
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to create upload notification for prescription ${prescription.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+
+    return {
+      prescriptionId: prescription.id,
+      status: PrescriptionStatus.PENDING_REVIEW,
+      fileUrl,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -340,7 +368,7 @@ export class PrescriptionService {
     });
 
     // Mock notification (simulates push/email to patient)
-    this.emitMockNotification(prescription.userId, prescriptionId, action);
+    this.emitReviewNotification(prescription.userId, prescriptionId, action);
 
     return updated;
   }
@@ -500,13 +528,10 @@ export class PrescriptionService {
   }
 
   /**
-   * Simulates a notification to the patient after a verification action.
-   *
-   * TODO: Replace with a real NotificationsService call once a provider
-   * (push/SMS/WhatsApp) is wired up. Notification copy below is a placeholder
-   * and should be localised for production use.
+   * Sends an in-app notification to the patient after a verification action.
+   * Notification copy below should be localised before production rollout.
    */
-  private emitMockNotification(
+  private emitReviewNotification(
     userId: string,
     prescriptionId: string,
     action: VerifyAction,

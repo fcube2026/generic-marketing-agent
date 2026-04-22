@@ -86,7 +86,7 @@ describe('PrescriptionService', () => {
       size: 1024,
     } as any;
 
-    it('stores a valid JPEG file and returns prescriptionId', async () => {
+    it('stores a valid JPEG file and returns upload metadata', async () => {
       mockPrisma.uploadedPrescription.create.mockResolvedValue({
         id: 'rx-1',
         userId: 'user-1',
@@ -127,7 +127,22 @@ describe('PrescriptionService', () => {
           },
         }),
       );
-      expect(result).toHaveProperty('prescriptionId', 'rx-1');
+      expect(mockStorage.getSignedUrl).toHaveBeenCalledWith('user-1/rx-1');
+      expect(result).toEqual({
+        prescriptionId: 'rx-1',
+        status: PrescriptionStatus.PENDING_REVIEW,
+        fileUrl: 'https://supabase.example.com/signed',
+      });
+      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          type: 'PRESCRIPTION_UPLOADED',
+          metadata: expect.objectContaining({
+            prescriptionId: 'rx-1',
+            status: PrescriptionStatus.PENDING_REVIEW,
+          }),
+        }),
+      );
     });
 
     it('accepts PNG files', async () => {

@@ -207,6 +207,7 @@ export interface PharmacyOrder {
 export interface CreatePharmacyOrderPayload {
   bookingId?: string;
   prescriptionId?: string;
+  uploadedPrescriptionId?: string;
   partnerId: string;
   deliveryAddressId?: string;
   deliveryAddress?: {
