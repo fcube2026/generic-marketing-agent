@@ -42,6 +42,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@curex24/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       axios:
         specifier: ^1.7.2
         version: 1.15.0
@@ -279,6 +282,9 @@ importers:
 
   apps/marketing-agent:
     dependencies:
+      '@curex24/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
@@ -334,6 +340,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@curex24/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
       '@react-native-async-storage/async-storage':
         specifier: 1.23.1
         version: 1.23.1(react-native@0.74.5(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(@types/react@18.2.79)(react@18.2.0))
@@ -563,6 +572,8 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
+
+  packages/design-tokens: {}
 
   packages/types:
     devDependencies:
@@ -13150,7 +13161,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.12.1(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.1))(eslint@8.57.1):
+  eslint-module-utils@2.12.1(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1))(eslint@8.57.1))(eslint@8.57.1):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
@@ -13172,7 +13183,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 8.57.1
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.12.1(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@8.57.1))(eslint@8.57.1)
+      eslint-module-utils: 2.12.1(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1))(eslint@8.57.1))(eslint@8.57.1)
       hasown: 2.0.2
       is-core-module: 2.16.1
       is-glob: 4.0.3
