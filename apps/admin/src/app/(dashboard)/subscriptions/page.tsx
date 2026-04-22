@@ -460,155 +460,225 @@ export default function SubscriptionsPage() {
                   </h2>
                 </div>
 
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    required
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                    placeholder="Service name (e.g. Vercel Pro)"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    required
-                    value={form.provider}
-                    onChange={(event) => setForm((prev) => ({ ...prev, provider: event.target.value }))}
-                    placeholder="Provider (e.g. Vercel)"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
+                <div className="p-6 space-y-6">
+                  {/* Section: Basic Info */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Basic Info</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Service Name *</label>
+                        <input
+                          required
+                          value={form.name}
+                          onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                          placeholder="e.g. Vercel Pro"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Provider *</label>
+                        <input
+                          required
+                          value={form.provider}
+                          onChange={(event) => setForm((prev) => ({ ...prev, provider: event.target.value }))}
+                          placeholder="e.g. Vercel"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                        <select
+                          value={form.category}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, category: event.target.value as SubscriptionCategory }))
+                          }
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="INFRASTRUCTURE">Infrastructure</option>
+                          <option value="AI">AI</option>
+                          <option value="COMMUNICATION">Communication</option>
+                          <option value="VERIFICATION">Verification</option>
+                          <option value="DEV_TOOLS">Dev Tools</option>
+                          <option value="PHARMACY">Pharmacy</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                        <select
+                          value={form.status}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, status: event.target.value as SubscriptionStatus }))
+                          }
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="TRIAL">Trial</option>
+                          <option value="PAUSED">Paused</option>
+                          <option value="CANCELLED">Cancelled</option>
+                          <option value="EXPIRED">Expired</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
-                  <select
-                    value={form.category}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, category: event.target.value as SubscriptionCategory }))
-                    }
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  >
-                    <option value="INFRASTRUCTURE">Infrastructure</option>
-                    <option value="AI">AI</option>
-                    <option value="COMMUNICATION">Communication</option>
-                    <option value="VERIFICATION">Verification</option>
-                    <option value="DEV_TOOLS">Dev Tools</option>
-                    <option value="PHARMACY">Pharmacy</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                  {/* Section: Cost & Billing */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Cost & Billing</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Billing Cycle</label>
+                        <select
+                          value={form.billingCycle}
+                          onChange={(event) =>
+                            setForm((prev) => ({ ...prev, billingCycle: event.target.value as BillingCycle }))
+                          }
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="MONTHLY">Monthly</option>
+                          <option value="QUARTERLY">Quarterly</option>
+                          <option value="YEARLY">Yearly</option>
+                          <option value="ONE_TIME">One Time</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Currency</label>
+                        <input
+                          value={form.currency}
+                          onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value.toUpperCase() }))}
+                          placeholder="INR, USD..."
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Planned Amount (per cycle)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.plannedAmount}
+                          onChange={(event) => setForm((prev) => ({ ...prev, plannedAmount: event.target.value }))}
+                          placeholder="e.g. 20"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Actual Amount (current cycle)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.actualAmount}
+                          onChange={(event) => setForm((prev) => ({ ...prev, actualAmount: event.target.value }))}
+                          placeholder="e.g. 24"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  <select
-                    value={form.status}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, status: event.target.value as SubscriptionStatus }))
-                    }
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="TRIAL">Trial</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="CANCELLED">Cancelled</option>
-                    <option value="EXPIRED">Expired</option>
-                  </select>
+                  {/* Section: Usage Tracking */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Usage Tracking (optional)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Usage Limit</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.usageLimit}
+                          onChange={(event) => setForm((prev) => ({ ...prev, usageLimit: event.target.value }))}
+                          placeholder="e.g. 1000"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Usage Consumed</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={form.usageConsumed}
+                          onChange={(event) => setForm((prev) => ({ ...prev, usageConsumed: event.target.value }))}
+                          placeholder="e.g. 780"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Usage Unit</label>
+                        <input
+                          value={form.usageUnit}
+                          onChange={(event) => setForm((prev) => ({ ...prev, usageUnit: event.target.value }))}
+                          placeholder="tokens, calls, GB-Hours, minutes..."
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  <select
-                    value={form.billingCycle}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, billingCycle: event.target.value as BillingCycle }))
-                    }
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  >
-                    <option value="MONTHLY">Monthly</option>
-                    <option value="QUARTERLY">Quarterly</option>
-                    <option value="YEARLY">Yearly</option>
-                    <option value="ONE_TIME">One Time</option>
-                  </select>
+                  {/* Section: Plan Dates & Alerts */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Plan Dates & Renewal Alerts</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Plan Start Date</label>
+                        <input
+                          type="date"
+                          value={form.planStartDate}
+                          onChange={(event) => setForm((prev) => ({ ...prev, planStartDate: event.target.value }))}
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Plan End Date</label>
+                        <input
+                          type="date"
+                          value={form.planEndDate}
+                          onChange={(event) => setForm((prev) => ({ ...prev, planEndDate: event.target.value }))}
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Renewal Date</label>
+                        <input
+                          type="date"
+                          value={form.renewalDate}
+                          onChange={(event) => setForm((prev) => ({ ...prev, renewalDate: event.target.value }))}
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Reminder Days Before Renewal</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={form.reminderDays}
+                          onChange={(event) => setForm((prev) => ({ ...prev, reminderDays: event.target.value }))}
+                          placeholder="e.g. 7"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Alert Email (Zoho inbox)</label>
+                        <input
+                          type="email"
+                          value={form.alertEmail}
+                          onChange={(event) => setForm((prev) => ({ ...prev, alertEmail: event.target.value }))}
+                          placeholder="alerts@curex24.com"
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                  <input
-                    value={form.currency}
-                    onChange={(event) => setForm((prev) => ({ ...prev, currency: event.target.value.toUpperCase() }))}
-                    placeholder="Currency (INR, USD...)"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.plannedAmount}
-                    onChange={(event) => setForm((prev) => ({ ...prev, plannedAmount: event.target.value }))}
-                    placeholder="Planned amount"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.actualAmount}
-                    onChange={(event) => setForm((prev) => ({ ...prev, actualAmount: event.target.value }))}
-                    placeholder="Actual amount"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.usageLimit}
-                    onChange={(event) => setForm((prev) => ({ ...prev, usageLimit: event.target.value }))}
-                    placeholder="Usage limit"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.usageConsumed}
-                    onChange={(event) => setForm((prev) => ({ ...prev, usageConsumed: event.target.value }))}
-                    placeholder="Usage consumed"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <input
-                    value={form.usageUnit}
-                    onChange={(event) => setForm((prev) => ({ ...prev, usageUnit: event.target.value }))}
-                    placeholder="Usage unit (tokens, calls, reqs)"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={form.reminderDays}
-                    onChange={(event) => setForm((prev) => ({ ...prev, reminderDays: event.target.value }))}
-                    placeholder="Reminder days"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <input
-                    type="date"
-                    value={form.planStartDate}
-                    onChange={(event) => setForm((prev) => ({ ...prev, planStartDate: event.target.value }))}
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="date"
-                    value={form.planEndDate}
-                    onChange={(event) => setForm((prev) => ({ ...prev, planEndDate: event.target.value }))}
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <input
-                    type="date"
-                    value={form.renewalDate}
-                    onChange={(event) => setForm((prev) => ({ ...prev, renewalDate: event.target.value }))}
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="email"
-                    value={form.alertEmail}
-                    onChange={(event) => setForm((prev) => ({ ...prev, alertEmail: event.target.value }))}
-                    placeholder="Alert email (Zoho inbox)"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-
-                  <textarea
-                    value={form.notes}
-                    onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
-                    placeholder="Notes"
-                    className="md:col-span-2 px-3 py-2 border rounded-lg text-sm min-h-24"
-                  />
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      value={form.notes}
+                      onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
+                      placeholder="Any internal notes, login info, owner..."
+                      className="w-full px-3 py-2 border rounded-lg text-sm min-h-24"
+                    />
+                  </div>
                 </div>
 
                 <div className="px-6 py-4 border-t flex justify-end gap-3">
@@ -643,82 +713,106 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    required
-                    type="date"
-                    value={usageForm.periodStart}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, periodStart: event.target.value }))
-                    }
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    required
-                    type="date"
-                    value={usageForm.periodEnd}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, periodEnd: event.target.value }))
-                    }
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Period Start *</label>
+                    <input
+                      required
+                      type="date"
+                      value={usageForm.periodStart}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, periodStart: event.target.value }))
+                      }
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Period End *</label>
+                    <input
+                      required
+                      type="date"
+                      value={usageForm.periodEnd}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, periodEnd: event.target.value }))
+                      }
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    min="0"
-                    value={usageForm.plannedAmount}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, plannedAmount: event.target.value }))
-                    }
-                    placeholder="Planned amount"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={usageForm.actualAmount}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, actualAmount: event.target.value }))
-                    }
-                    placeholder="Actual amount"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Planned Amount</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={usageForm.plannedAmount}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, plannedAmount: event.target.value }))
+                      }
+                      placeholder="e.g. 20"
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Actual Amount</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={usageForm.actualAmount}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, actualAmount: event.target.value }))
+                      }
+                      placeholder="e.g. 24"
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    min="0"
-                    value={usageForm.usageLimit}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, usageLimit: event.target.value }))
-                    }
-                    placeholder="Usage limit"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={usageForm.usageConsumed}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, usageConsumed: event.target.value }))
-                    }
-                    placeholder="Usage consumed"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Usage Limit</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={usageForm.usageLimit}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, usageLimit: event.target.value }))
+                      }
+                      placeholder="e.g. 1000"
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Usage Consumed</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={usageForm.usageConsumed}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, usageConsumed: event.target.value }))
+                      }
+                      placeholder="e.g. 780"
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
 
-                  <input
-                    value={usageForm.usageUnit}
-                    onChange={(event) =>
-                      setUsageForm((prev) => ({ ...prev, usageUnit: event.target.value }))
-                    }
-                    placeholder="Usage unit"
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  />
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Usage Unit</label>
+                    <input
+                      value={usageForm.usageUnit}
+                      onChange={(event) =>
+                        setUsageForm((prev) => ({ ...prev, usageUnit: event.target.value }))
+                      }
+                      placeholder="tokens, calls, GB-Hours..."
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
 
-                  <textarea
-                    value={usageForm.notes}
-                    onChange={(event) => setUsageForm((prev) => ({ ...prev, notes: event.target.value }))}
-                    placeholder="Notes"
-                    className="md:col-span-2 px-3 py-2 border rounded-lg text-sm min-h-20"
-                  />
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                    <textarea
+                      value={usageForm.notes}
+                      onChange={(event) => setUsageForm((prev) => ({ ...prev, notes: event.target.value }))}
+                      placeholder="Any context for this usage period..."
+                      className="w-full px-3 py-2 border rounded-lg text-sm min-h-20"
+                    />
+                  </div>
                 </div>
 
                 <div className="px-6 py-4 border-t flex justify-end gap-3">
