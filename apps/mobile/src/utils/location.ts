@@ -5,6 +5,11 @@ export interface LocationCoords {
   lng: number;
 }
 
+export const MOCK_LOCATION: LocationCoords = {
+  lat: 28.6139,
+  lng: 77.2090,
+};
+
 export const getCurrentLocation = async (): Promise<LocationCoords | null> => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();

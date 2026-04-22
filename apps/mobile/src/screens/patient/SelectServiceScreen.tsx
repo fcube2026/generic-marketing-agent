@@ -12,7 +12,7 @@ import { RouteProp } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { getCurrentLocation } from '../../utils/location';
+import { getCurrentLocation, MOCK_LOCATION } from '../../utils/location';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useBookingStore } from '../../store/bookingStore';
 
@@ -32,13 +32,7 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
     setLoading(true);
     try {
       const location = await getCurrentLocation();
-      if (!location) {
-        Alert.alert(
-          'Location Required',
-          'Please enable location services to find nearby providers.'
-        );
-        return;
-      }
+      const resolvedLocation = location ?? MOCK_LOCATION;
 
       setSelectedService(category);
       storeSetSymptoms(symptoms);
@@ -46,8 +40,8 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
       navigation.navigate('ProviderList', {
         categoryId: category.id,
         categorySlug: category.slug,
-        lat: location.lat,
-        lng: location.lng,
+        lat: resolvedLocation.lat,
+        lng: resolvedLocation.lng,
       });
     } catch {
       Alert.alert('Error', 'Failed to get your location. Please try again.');
@@ -117,13 +111,12 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
           title="Get Smart Recommendation"
           onPress={() => {
             getCurrentLocation().then((loc) => {
-              if (loc) {
-                navigation.navigate('Recommendation', {
-                  categorySlug: category.slug,
-                  lat: loc.lat,
-                  lng: loc.lng,
-                });
-              }
+              const resolvedLoc = loc ?? MOCK_LOCATION;
+              navigation.navigate('Recommendation', {
+                categorySlug: category.slug,
+                lat: resolvedLoc.lat,
+                lng: resolvedLoc.lng,
+              });
             });
           }}
           variant="outline"

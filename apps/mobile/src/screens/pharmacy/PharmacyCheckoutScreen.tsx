@@ -307,11 +307,6 @@ export const PharmacyCheckoutScreen: React.FC = () => {
             {DELIVERY_FEE === 0 ? 'FREE' : formatCurrency(DELIVERY_FEE)}
           </Text>
         </View>
-        {DELIVERY_FEE > 0 && (
-          <Text style={styles.freeDeliveryHint}>
-            Add {formatCurrency(FREE_DELIVERY_THRESHOLD - subtotal)} more for free delivery
-          </Text>
-        )}
         <View style={[styles.subtotalRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
@@ -520,13 +515,6 @@ const styles = StyleSheet.create({
   feeLabel: { fontSize: 14, color: Colors.textMuted },
   feeValue: { fontSize: 14, color: Colors.textMuted },
   freeText: { color: Colors.success ?? '#16a34a', fontWeight: '700' },
-  freeDeliveryHint: {
-    fontSize: 12,
-    color: Colors.primary,
-    marginTop: 2,
-    marginBottom: 4,
-    fontStyle: 'italic',
-  },
   totalRow: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
