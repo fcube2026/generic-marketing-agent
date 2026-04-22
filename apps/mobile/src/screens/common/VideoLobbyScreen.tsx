@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { Camera } from 'expo-camera';
+import { Audio } from 'expo-av';
 import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -27,6 +30,9 @@ interface PreCallCheck {
   icon: string;
   status: CheckStatus;
 }
+
+/** URL used for the network connectivity check in the lobby pre-call flow */
+const NETWORK_CHECK_URL = 'https://www.google.com';
 
 const SESSION_STATUS_COLOR: Record<VideoSessionStatus, string> = {
   CREATED: Colors.textMuted,
@@ -121,18 +127,61 @@ export const VideoLobbyScreen: React.FC = () => {
     });
   }, [cameraAnim, micBars]);
 
-  // Simulate permission/network checks
+  // Run real permission and network checks
   useEffect(() => {
-    const simulate = (idx: number, delay: number, status: CheckStatus) => {
-      setTimeout(() => {
+    let cancelled = false;
+
+    const setCheck = (idx: number, status: CheckStatus) => {
+      if (!cancelled) {
         setChecks((prev) =>
           prev.map((c, i) => (i === idx ? { ...c, status } : c)),
         );
-      }, delay);
+      }
     };
-    simulate(0, 800, 'ok');
-    simulate(1, 1400, 'ok');
-    simulate(2, 2000, 'ok');
+
+    const runChecks = async () => {
+      // Camera permission check
+      try {
+        // On web or environments where Camera module isn't available, fall back gracefully
+        if (Platform.OS !== 'web' && Camera?.requestCameraPermissionsAsync) {
+          const { status } = await Camera.requestCameraPermissionsAsync();
+          setCheck(0, status === 'granted' ? 'ok' : 'denied');
+        } else {
+          setCheck(0, 'ok');
+        }
+      } catch {
+        setCheck(0, 'error');
+      }
+
+      // Microphone permission check
+      try {
+        if (Platform.OS !== 'web' && Audio?.requestPermissionsAsync) {
+          const { status } = await Audio.requestPermissionsAsync();
+          setCheck(1, status === 'granted' ? 'ok' : 'denied');
+        } else {
+          setCheck(1, 'ok');
+        }
+      } catch {
+        setCheck(1, 'error');
+      }
+
+      // Network connectivity check
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        await fetch(NETWORK_CHECK_URL, { signal: controller.signal, method: 'HEAD' });
+        clearTimeout(timeoutId);
+        setCheck(2, 'ok');
+      } catch {
+        setCheck(2, 'error');
+      }
+    };
+
+    runChecks();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const { data: booking, isLoading: bookingLoading } = useQuery({
