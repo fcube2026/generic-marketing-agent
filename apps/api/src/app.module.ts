@@ -33,6 +33,7 @@ import { PatientVerificationModule } from './modules/patient-verification/patien
 import { ClinicalIntakeModule } from './modules/clinical-intake/clinical-intake.module';
 import { ConsentModule } from './modules/consent/consent.module';
 import { VisitOtpModule } from './modules/visit-otp/visit-otp.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
 
@@ -75,6 +76,7 @@ import { HealthModule } from './common/health/health.module';
     ClinicalIntakeModule,
     ConsentModule,
     VisitOtpModule,
+    SubscriptionsModule,
   ],
   providers: [BootstrapService],
 })

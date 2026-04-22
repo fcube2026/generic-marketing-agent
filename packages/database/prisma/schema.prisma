@@ -547,11 +547,91 @@ model NotificationLog {
   @@map("notification_logs")
 }
 
+model ServiceSubscription {
+  id                 String                   @id @default(cuid())
+  name               String
+  provider           String
+  category           SubscriptionCategory     @default(OTHER)
+  status             SubscriptionStatus       @default(ACTIVE)
+  billingCycle       SubscriptionBillingCycle @default(MONTHLY)
+  currency           String                   @default("INR")
+  plannedAmount      Float                    @default(0)
+  actualAmount       Float                    @default(0)
+  usageLimit         Float?
+  usageConsumed      Float?
+  usageUnit          String?
+  seatsPlanned       Int?
+  seatsUsed          Int?
+  planStartDate      DateTime?
+  planEndDate        DateTime?
+  renewalDate        DateTime?
+  reminderDays       Int                      @default(7)
+  alertEmail         String?
+  notes              String?
+  lastReminderSentAt DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  usageLogs SubscriptionUsageLog[]
+
+  @@index([status])
+  @@index([renewalDate])
+  @@index([planEndDate])
+  @@map("service_subscriptions")
+}
+
+model SubscriptionUsageLog {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  periodStart    DateTime
+  periodEnd      DateTime
+  plannedAmount  Float    @default(0)
+  actualAmount   Float    @default(0)
+  usageLimit     Float?
+  usageConsumed  Float?
+  usageUnit      String?
+  seatsPlanned   Int?
+  seatsUsed      Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  subscription ServiceSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([periodStart])
+  @@map("subscription_usage_logs")
+}
+
 enum NotificationChannel {
   PUSH
   SMS
   WHATSAPP
   EMAIL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+enum SubscriptionBillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_TIME
+}
+
+enum SubscriptionCategory {
+  INFRASTRUCTURE
+  AI
+  COMMUNICATION
+  VERIFICATION
+  DEV_TOOLS
+  PHARMACY
+  OTHER
 }
 
 enum NotificationDeliveryStatus {

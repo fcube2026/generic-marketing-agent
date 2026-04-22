@@ -11,6 +11,7 @@ const navItems = [
   { href: '/providers', label: 'Providers', icon: '👨‍⚕️' },
   { href: '/bookings', label: 'Bookings', icon: '📋' },
   { href: '/payouts', label: 'Payouts', icon: '💰' },
+  { href: '/subscriptions', label: 'Subscriptions', icon: '🧾' },
   { href: '/diagnostics', label: 'Diagnostics', icon: '🧪' },
   { href: '/referrals', label: 'Referrals', icon: '🏥' },
   { href: '/support', label: 'Support', icon: '💬' },
