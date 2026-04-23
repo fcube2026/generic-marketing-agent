@@ -6,7 +6,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` enables `req.rawBody` (Buffer) for endpoints that need
+  // the unmodified request body — required for webhook HMAC signature
+  // verification (e.g. pharmacy partner webhooks).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())

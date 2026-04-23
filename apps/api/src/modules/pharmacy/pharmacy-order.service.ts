@@ -11,6 +11,7 @@ import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { encrypt, decrypt } from '../../common/utils/encryption.util';
 
 type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
@@ -66,7 +67,9 @@ export class PharmacyOrderService {
         data: {
           userId,
           label: 'Delivery',
-          addressLine: dto.deliveryAddress.addressLine,
+          // Application-level PII encryption — address is sensitive and only
+          // ever read back through this service, which decrypts on response.
+          addressLine: encrypt(dto.deliveryAddress.addressLine),
           city: dto.deliveryAddress.city,
           state: dto.deliveryAddress.state,
           pincode: dto.deliveryAddress.pincode,
@@ -405,8 +408,10 @@ export class PharmacyOrderService {
     state: string;
     pincode: string;
   }): string {
+    // Decrypt is a no-op for legacy plain-text addresses thanks to the
+    // `enc:v1:` marker check inside the utility.
     return [
-      address.addressLine,
+      decrypt(address.addressLine),
       address.city,
       address.state,
       address.pincode,

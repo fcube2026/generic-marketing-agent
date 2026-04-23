@@ -17,6 +17,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { maskPhone } from '../../common/utils/masking.util';
 
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
@@ -284,7 +285,10 @@ export class AuthService implements OnModuleInit {
         },
       });
     } catch (err) {
-      this.logger.error(`Failed to create OTP for phone=${dto.phone}`, err);
+      this.logger.error(
+        `Failed to create OTP for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'OTP service temporarily unavailable. Please try again shortly.',
       );
@@ -297,7 +301,7 @@ export class AuthService implements OnModuleInit {
       process.env.APP_ENV === 'staging';
 
     if (showOtp) {
-      console.log(`OTP for ${dto.phone}: ${otp}`);
+      console.log(`OTP for ${maskPhone(dto.phone)}: ${otp}`);
     }
 
     return {
@@ -320,7 +324,10 @@ export class AuthService implements OnModuleInit {
         orderBy: { createdAt: 'desc' },
       });
     } catch (err) {
-      this.logger.error(`OTP lookup failed for phone=${dto.phone}`, err);
+      this.logger.error(
+        `OTP lookup failed for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Verification service temporarily unavailable. Please try again shortly.',
       );
@@ -364,7 +371,10 @@ export class AuthService implements OnModuleInit {
       };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      this.logger.error(`OTP verification failed for phone=${dto.phone}`, err);
+      this.logger.error(
+        `OTP verification failed for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Verification service temporarily unavailable. Please try again shortly.',
       );
@@ -432,7 +442,7 @@ export class AuthService implements OnModuleInit {
       };
     } catch (err) {
       this.logger.error(
-        `Admin login failed: DB upsert for phone=${ADMIN_PHONE}`,
+        `Admin login failed: DB upsert for phone=${maskPhone(ADMIN_PHONE)}`,
         err,
       );
       throw new ServiceUnavailableException(
