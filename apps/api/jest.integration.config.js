@@ -1,12 +1,12 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
-  rootDir: 'src',
+  rootDir: '.',
   testRegex: '.*\\.integration\\.spec\\.ts$',
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  collectCoverageFrom: ['**/*.(t|j)s'],
-  coverageDirectory: '../coverage-integration',
+  collectCoverageFrom: ['src/**/*.(t|j)s'],
+  coverageDirectory: './coverage-integration',
   testEnvironment: 'node',
   testTimeout: 30000,
 };
