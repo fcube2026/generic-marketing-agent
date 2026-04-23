@@ -160,6 +160,10 @@ export interface MedicineResult {
   unit?: string;
   requiresPrescription?: boolean;
   availability?: AvailabilityResult;
+  composition?: string;
+  description?: string;
+  usage?: string;
+  sideEffects?: string;
 }
 
 export interface PharmacyPartner {

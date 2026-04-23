@@ -69,34 +69,34 @@ export const MedicineDetailScreen: React.FC = () => {
         </View>
 
         {/* Composition */}
-        {(medicine as any).composition && (
+        {medicine.composition && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Composition</Text>
-            <Text style={styles.sectionText}>{(medicine as any).composition}</Text>
+            <Text style={styles.sectionText}>{medicine.composition}</Text>
           </View>
         )}
 
         {/* Description */}
-        {(medicine as any).description && (
+        {medicine.description && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About this medicine</Text>
-            <Text style={styles.sectionText}>{(medicine as any).description}</Text>
+            <Text style={styles.sectionText}>{medicine.description}</Text>
           </View>
         )}
 
         {/* Usage */}
-        {(medicine as any).usage && (
+        {medicine.usage && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>How to use</Text>
-            <Text style={styles.sectionText}>{(medicine as any).usage}</Text>
+            <Text style={styles.sectionText}>{medicine.usage}</Text>
           </View>
         )}
 
         {/* Side effects */}
-        {(medicine as any).sideEffects && (
+        {medicine.sideEffects && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Side Effects</Text>
-            <Text style={styles.sectionText}>{(medicine as any).sideEffects}</Text>
+            <Text style={styles.sectionText}>{medicine.sideEffects}</Text>
           </View>
         )}
 

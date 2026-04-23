@@ -40,7 +40,10 @@ const SkeletonRow: React.FC = () => {
       ]),
     );
     anim.start();
-    return () => anim.stop();
+    return () => {
+      anim.stop();
+      anim.reset();
+    };
   }, [opacity]);
   return (
     <Animated.View style={[styles.skeletonRow, { opacity }]}>
@@ -69,6 +72,7 @@ export const MedicineSearchScreen: React.FC = () => {
   // Pagination
   const [page, setPage] = useState(1);
   const [allResults, setAllResults] = useState<MedicineResult[]>([]);
+  const [fullResultCache, setFullResultCache] = useState<MedicineResult[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
@@ -109,10 +113,12 @@ export const MedicineSearchScreen: React.FC = () => {
       setPage(1);
       setHasMore(true);
       setAllResults([]);
+      setFullResultCache([]);
       try {
         const results = await pharmacyService.searchMedicines(term, pc || undefined);
-        setAllResults(results);
-        setHasMore(results.length >= PAGE_SIZE);
+        setFullResultCache(results);
+        setAllResults(results.slice(0, PAGE_SIZE));
+        setHasMore(results.length > PAGE_SIZE);
       } catch (err) {
         setIsError(true);
         setErrorMessage(
@@ -127,23 +133,17 @@ export const MedicineSearchScreen: React.FC = () => {
     [],
   );
 
-  // Load next page (client-side slice; real pagination ready when API supports it)
-  const fetchNextPage = useCallback(async () => {
+  // Load next page from cached full results
+  const fetchNextPage = useCallback(() => {
     if (!hasMore || loadingMore || isLoading) return;
     setLoadingMore(true);
-    try {
-      const nextPage = page + 1;
-      const results = await pharmacyService.searchMedicines(searchTerm, pincode || undefined);
-      const sliced = results.slice(0, nextPage * PAGE_SIZE);
-      setAllResults(sliced);
-      setPage(nextPage);
-      setHasMore(sliced.length < results.length);
-    } catch {
-      // fail silently on load-more
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [hasMore, loadingMore, isLoading, page, searchTerm, pincode]);
+    const nextPage = page + 1;
+    const sliced = fullResultCache.slice(0, nextPage * PAGE_SIZE);
+    setAllResults(sliced);
+    setPage(nextPage);
+    setHasMore(sliced.length < fullResultCache.length);
+    setLoadingMore(false);
+  }, [hasMore, loadingMore, isLoading, page, fullResultCache]);
 
   // ---- Debounced autocomplete -------
   useEffect(() => {
@@ -160,7 +160,7 @@ export const MedicineSearchScreen: React.FC = () => {
       saveRecentSearch(trimmed);
     }, 300);
     return () => clearTimeout(handle);
-  }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, pincode, fetchResults, saveRecentSearch]);
 
   const handleSearchSubmit = () => {
     if (query.trim().length < 2) {
