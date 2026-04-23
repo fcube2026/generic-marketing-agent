@@ -3,7 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { PharmacyPartnerProvider } from '../providers/pharmacy-partner.interface';
 import { PHARMACY_PROVIDERS_MAP } from '../pharmacy.constants';
-import { PharmacyJobService } from './pharmacy-job.service';
+import { PharmacyJobService, IRefillScheduler } from './pharmacy-job.service';
 import { OrderStatusProcessor } from './order-status.processor';
 import { RefillReminderProcessor } from './refill-reminder.processor';
 import { PharmacyJobScheduler } from './pharmacy-job.scheduler';
@@ -59,6 +59,10 @@ const logger = new Logger('PharmacyJobModule');
       ): Map<string, PharmacyPartnerProvider> => {
         const map = new Map<string, PharmacyPartnerProvider>();
         map.set('mock', mockProvider);
+        // Register the seeded demo partners so per-partner polling can resolve
+        // them without falling all the way back to the hardcoded 'mock' key.
+        map.set('demo-pharmacy', mockProvider);
+        map.set('demo-pharmacy-express', mockProvider);
         return map;
       },
       inject: [MockPharmacyProvider],
@@ -68,8 +72,14 @@ const logger = new Logger('PharmacyJobModule');
       useFactory: (
         prisma: PrismaService,
         providers: Map<string, PharmacyPartnerProvider>,
-      ): PharmacyJobService => new PharmacyJobService(prisma, providers),
-      inject: [PrismaService, PHARMACY_PROVIDERS_MAP],
+        scheduler: IRefillScheduler | null,
+      ): PharmacyJobService =>
+        new PharmacyJobService(prisma, providers, scheduler),
+      inject: [
+        PrismaService,
+        PHARMACY_PROVIDERS_MAP,
+        { token: PharmacyJobScheduler, optional: true },
+      ],
     },
     ...(QUEUES_ENABLED
       ? [OrderStatusProcessor, RefillReminderProcessor, PharmacyJobScheduler]
@@ -80,6 +90,8 @@ const logger = new Logger('PharmacyJobModule');
           return [];
         })()),
   ],
-  exports: [PharmacyJobService],
+  exports: QUEUES_ENABLED
+    ? [PharmacyJobService, PharmacyJobScheduler]
+    : [PharmacyJobService],
 })
 export class PharmacyJobModule {}
