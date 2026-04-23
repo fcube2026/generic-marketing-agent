@@ -117,9 +117,20 @@ export class LocalPharmacyProvider implements PharmacyPartnerProvider {
     const pharmacies =
       await this.pharmacyPartnersService.findActiveWithInventory();
 
+    if (pharmacies.length === 0) {
+      this.logger.warn(
+        '[local] createOrder — no active local pharmacies available',
+      );
+      // No active pharmacies; the system should fall back to the mock provider.
+      // Throw so PharmacyOrderService can handle the failure gracefully.
+      throw new Error(
+        'No active local pharmacies available to fulfil this order',
+      );
+    }
+
     // Pick the first active pharmacy as the fulfilling pharmacy (mock routing)
     const fulfillingPharmacy = pharmacies[0];
-    const pharmacyName = fulfillingPharmacy?.name ?? 'Local Pharmacy';
+    const pharmacyName = fulfillingPharmacy.name;
 
     const partnerOrderId = `LOCAL-ORD-${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
     const totalAmount = order.items.reduce(

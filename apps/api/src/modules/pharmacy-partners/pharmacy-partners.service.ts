@@ -86,6 +86,7 @@ export class PharmacyPartnersService {
   /**
    * Replace the full inventory for a pharmacy.
    * Deletes existing items then inserts the new list.
+   * Passing an empty items array clears the inventory.
    */
   async updateInventory(id: string, dto: UpdateInventoryDto) {
     await this.ensureExists(id);

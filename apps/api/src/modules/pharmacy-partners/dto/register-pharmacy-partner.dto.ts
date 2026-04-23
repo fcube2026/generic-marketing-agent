@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsArray, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  MinLength,
+  Matches,
+} from 'class-validator';
 
 export class RegisterPharmacyPartnerDto {
   @IsString()
@@ -6,6 +12,11 @@ export class RegisterPharmacyPartnerDto {
   name: string;
 
   @IsString()
+  @MinLength(3)
+  @Matches(/^[A-Za-z0-9\-\/]+$/, {
+    message:
+      'licenseNumber must contain only letters, digits, hyphens, or slashes',
+  })
   licenseNumber: string;
 
   @IsString()
