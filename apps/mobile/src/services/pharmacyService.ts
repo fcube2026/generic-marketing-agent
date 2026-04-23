@@ -2,6 +2,7 @@ import api from './api';
 import { ENDPOINTS } from '../constants/api';
 import {
   MedicineResult,
+  MedicinePriceComparison,
   PharmacyPartner,
   PharmacyOrder,
   CreatePharmacyOrderPayload,
@@ -44,5 +45,15 @@ export const pharmacyService = {
   cancelOrder: async (id: string): Promise<PharmacyOrder> => {
     const response = await api.post(`${ENDPOINTS.PHARMACY.ORDERS}/${id}/cancel`);
     return response.data;
+  },
+
+  compareMedicinePrices: async (
+    medicineId: string,
+    pincode?: string,
+  ): Promise<MedicinePriceComparison[]> => {
+    const params: Record<string, string> = { medicineId };
+    if (pincode) params.pincode = pincode;
+    const response = await api.get(ENDPOINTS.PHARMACY.MEDICINE_COMPARE, { params });
+    return Array.isArray(response.data) ? response.data : [];
   },
 };

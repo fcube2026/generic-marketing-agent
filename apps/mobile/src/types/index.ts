@@ -144,6 +144,14 @@ export interface AvailabilityResult {
   reason?: string;
 }
 
+export interface MedicinePriceComparison {
+  partnerId: string;
+  partnerName: string;
+  price: number;
+  available: boolean;
+  deliveryEta?: string;
+}
+
 export interface MedicineResult {
   id: string;
   name: string;
