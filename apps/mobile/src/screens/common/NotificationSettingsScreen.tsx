@@ -10,27 +10,47 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   NotificationPreference,
   getPreferences,
   updatePreferences,
 } from '../../services/notifications';
 
+const REFILL_REMINDERS_KEY = '@curex24/refill_reminders_enabled';
+
 export function NotificationSettingsScreen() {
   const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refillReminders, setRefillReminders] = useState(true);
 
   const loadPreferences = useCallback(async () => {
     try {
       setLoading(true);
-      const prefs = await getPreferences();
+      const [prefs, storedRefill] = await Promise.all([
+        getPreferences(),
+        AsyncStorage.getItem(REFILL_REMINDERS_KEY),
+      ]);
       setPreferences(prefs);
+      if (storedRefill !== null) {
+        setRefillReminders(storedRefill === 'true');
+      }
     } catch (error) {
       console.error('Failed to load notification preferences:', error);
       Alert.alert('Error', 'Failed to load notification settings');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const handleRefillToggle = useCallback(async (value: boolean) => {
+    setRefillReminders(value);
+    try {
+      await AsyncStorage.setItem(REFILL_REMINDERS_KEY, String(value));
+    } catch (error) {
+      console.error('Failed to save refill reminders preference:', error);
+      setRefillReminders(!value);
     }
   }, []);
 
@@ -187,6 +207,21 @@ export function NotificationSettingsScreen() {
                 onValueChange={(value) => handleToggle('marketingEnabled', value)}
                 trackColor={{ false: '#E5E7EB', true: '#5EEAD4' }}
                 thumbColor={preferences.marketingEnabled ? '#0D9488' : '#9CA3AF'}
+              />
+            </View>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Refill Reminders</Text>
+                <Text style={styles.settingDescription}>
+                  Reminders to reorder medicines when they may be running low
+                </Text>
+              </View>
+              <Switch
+                value={refillReminders}
+                onValueChange={handleRefillToggle}
+                trackColor={{ false: '#E5E7EB', true: '#5EEAD4' }}
+                thumbColor={refillReminders ? '#0D9488' : '#9CA3AF'}
               />
             </View>
           </View>

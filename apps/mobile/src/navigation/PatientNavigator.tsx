@@ -34,6 +34,7 @@ import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDeta
 import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
 import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 import { VideoCallScreen } from '../screens/common/VideoCallScreen';
+import { NotificationSettingsScreen } from '../screens/common/NotificationSettingsScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
 import type { VideoCallParams } from '../screens/common/VideoCallScreen';
@@ -69,6 +70,7 @@ export type PatientStackParamList = {
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };
   OrderTracking: { orderId: string };
+  NotificationSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -129,5 +131,6 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ title: 'Track Order' }} />
+    <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
   </Stack.Navigator>
 );
