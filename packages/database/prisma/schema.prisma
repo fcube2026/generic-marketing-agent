@@ -1326,3 +1326,50 @@ model ManualReviewQueue {
   @@index([createdAt])
   @@map("manual_review_queue")
 }
+
+// =======================
+// LOCAL PHARMACY ONBOARDING
+// =======================
+
+enum LocalPharmacyStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SUSPENDED
+}
+
+model LocalPharmacy {
+  id              String              @id @default(cuid())
+  name            String
+  licenseNumber   String              @unique
+  address         String
+  contact         String
+  operatingHours  String?
+  status          LocalPharmacyStatus @default(PENDING)
+  documents       Json                @default("[]")
+  licenseVerified Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  inventory LocalPharmacyInventory[]
+
+  @@index([status])
+  @@index([licenseNumber])
+  @@map("local_pharmacies")
+}
+
+model LocalPharmacyInventory {
+  id           String   @id @default(cuid())
+  pharmacyId   String
+  medicineName String
+  price        Float
+  stock        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pharmacy LocalPharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId])
+  @@index([medicineName])
+  @@map("local_pharmacy_inventory")
+}
