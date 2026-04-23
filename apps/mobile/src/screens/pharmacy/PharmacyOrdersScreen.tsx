@@ -93,20 +93,31 @@ export const PharmacyOrdersScreen: React.FC = () => {
       if (newOrders.length === 0) {
         setHasMore(false);
       } else {
-        setExtraOrders((prev) => [...prev, ...newOrders]);
+        // Deduplicate against already-loaded orders to handle backends that
+        // ignore pagination params and always return the full list.
+        const seenIds = new Set([...(firstPageOrders ?? []).map((o) => o.id)]);
+        setExtraOrders((prev) => {
+          prev.forEach((o) => seenIds.add(o.id));
+          const unique = newOrders.filter((o) => !seenIds.has(o.id));
+          if (unique.length === 0) {
+            setHasMore(false);
+            return prev;
+          }
+          return [...prev, ...unique];
+        });
         setPage(nextPage);
         if (newOrders.length < PAGE_SIZE) {
           setHasMore(false);
         }
       }
-    } catch {
-      // Silently ignore pagination errors — the existing list stays intact
+    } catch (err) {
+      console.error('[PharmacyOrdersScreen] Failed to load more orders:', err);
       setHasMore(false);
     } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [hasMore, page]);
+  }, [hasMore, page, firstPageOrders]);
 
   const handleRefresh = useCallback(async () => {
     setExtraOrders([]);
