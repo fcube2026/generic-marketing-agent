@@ -26,7 +26,7 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
   sdkVersion: '51.0.0',
   runtimeVersion: '51.0.0',
   updates: {
-    enabled: false,
+    url: 'https://u.expo.dev/32ba7225-63f2-4092-95e5-1e24cb77d6a2',
   },
   orientation: 'portrait',
   icon: './assets/icon.png',
@@ -54,7 +54,6 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       backgroundColor: '#0D9488',
     },
     package: getBundleId(),
-    useNextNotificationsApi: true,
     permissions: [
       'android.permission.CAMERA',
       'android.permission.READ_EXTERNAL_STORAGE',
