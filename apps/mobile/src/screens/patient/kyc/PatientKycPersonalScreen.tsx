@@ -14,6 +14,7 @@ import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { verificationService } from '../../../services/verificationService';
 import { PatientStackParamList } from '../../../navigation/PatientNavigator';
+import { usePatientKycDraft } from '../../../state/patientKycDraft';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList, 'PatientKycPersonal'>;
 type Props = { navigation: Nav };
@@ -26,9 +27,14 @@ const GENDERS: Array<{ key: 'MALE' | 'FEMALE' | 'OTHER'; label: string }> = [
 
 export const PatientKycPersonalScreen: React.FC<Props> = ({ navigation }) => {
   const qc = useQueryClient();
-  const [fullName, setFullName] = useState('');
-  const [dob, setDob] = useState(''); // YYYY-MM-DD
-  const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | null>(null);
+  // Pre-fill from the Aadhaar OCR draft (if the patient just came from
+  // Step 1). Every field stays editable — the draft is only a hint.
+  const ocrDraft = usePatientKycDraft((s) => s.ocr);
+  const [fullName, setFullName] = useState(ocrDraft?.fullName ?? '');
+  const [dob, setDob] = useState(ocrDraft?.dob ?? ''); // YYYY-MM-DD
+  const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | null>(
+    ocrDraft?.gender ?? null,
+  );
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -57,7 +63,7 @@ export const PatientKycPersonalScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.step}>Step 1 of 5</Text>
+      <Text style={styles.step}>Step 2 of 5</Text>
       <Text style={styles.title}>Your Details</Text>
       <Text style={styles.subtitle}>
         Enter your details exactly as they appear on your Aadhaar card.

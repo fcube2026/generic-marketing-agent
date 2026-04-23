@@ -28,11 +28,15 @@ const ID_DOCS_BUCKET = 'patient-ids';
  * Wizard step keys returned by `getMyVerificationStatus` for the
  * profile-launched self-serve KYC flow. Order is intentional — the first
  * non-completed step is treated as the "next" step by the mobile UI.
+ *
+ * `ID_UPLOAD` is intentionally first so that when the patient uploads their
+ * Aadhaar, the OCR-extracted name/DOB/gender/address can pre-fill the
+ * Personal Details and Address screens.
  */
 const SELF_SERVE_STEPS = [
+  'ID_UPLOAD',
   'PERSONAL_DETAILS',
   'ADDRESS',
-  'ID_UPLOAD',
   'FACE_CAPTURE',
   'GUARDIAN', // included only when isMinor === true
   'REVIEW',
@@ -1263,14 +1267,14 @@ export class PatientVerificationService {
   ): SelfServeStep[] {
     const all: SelfServeStep[] = isMinor
       ? [
+          'ID_UPLOAD',
           'PERSONAL_DETAILS',
           'ADDRESS',
-          'ID_UPLOAD',
           'FACE_CAPTURE',
           'GUARDIAN',
           'REVIEW',
         ]
-      : ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'REVIEW'];
+      : ['ID_UPLOAD', 'PERSONAL_DETAILS', 'ADDRESS', 'FACE_CAPTURE', 'REVIEW'];
     return all.filter((s) => !completed.includes(s));
   }
 

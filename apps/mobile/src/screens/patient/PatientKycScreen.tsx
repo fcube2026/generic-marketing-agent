@@ -34,6 +34,7 @@ type KycRoute =
   | 'PatientKycPersonal'
   | 'PatientKycAddress'
   | 'PatientKycIdUpload'
+  | 'PatientKycAadhaarUpload'
   | 'PatientKycFaceCapture'
   | 'PatientKycGuardian'
   | 'PatientKycReview';
@@ -41,7 +42,11 @@ type KycRoute =
 const STEP_TO_ROUTE: Record<SelfServeStep, KycRoute> = {
   PERSONAL_DETAILS: 'PatientKycPersonal',
   ADDRESS: 'PatientKycAddress',
-  ID_UPLOAD: 'PatientKycIdUpload',
+  // ID_UPLOAD now points at the new Aadhaar OCR screen. The legacy
+  // PatientKycIdUpload screen remains registered as a fallback that the new
+  // screen can navigate to via "Use manual entry" when the kyc-ml service
+  // is not available in the current environment.
+  ID_UPLOAD: 'PatientKycAadhaarUpload',
   FACE_CAPTURE: 'PatientKycFaceCapture',
   GUARDIAN: 'PatientKycGuardian',
   REVIEW: 'PatientKycReview',
