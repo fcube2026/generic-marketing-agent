@@ -417,13 +417,12 @@ export class PatientVerificationService {
    * booking. Idempotent — returns the existing row if one already exists.
    */
   async selfStart(userId: string) {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-    });
-    if (!patient)
-      throw new NotFoundException(
-        'Patient profile not found. Please complete your profile first.',
-      );
+    // The wizard collects all identity fields itself (name, DOB, gender,
+    // address, ID, face), so we don't require a pre-existing PatientProfile
+    // here — we lazily create a minimal one if missing. This prevents a
+    // dead-end "Please complete your profile first." error for users who
+    // signed up but never went through the onboarding form.
+    const patient = await this.ensurePatientProfileForUser(userId);
 
     const verification = await this.prisma.patientVerification.upsert({
       where: { patientId: patient.id },
@@ -1198,13 +1197,7 @@ export class PatientVerificationService {
   }
 
   private async getOrCreateForUser(userId: string) {
-    const patient = await this.prisma.patientProfile.findUnique({
-      where: { userId },
-    });
-    if (!patient)
-      throw new NotFoundException(
-        'Patient profile not found. Please complete your profile first.',
-      );
+    const patient = await this.ensurePatientProfileForUser(userId);
 
     return this.prisma.patientVerification.upsert({
       where: { patientId: patient.id },
@@ -1217,6 +1210,39 @@ export class PatientVerificationService {
         status: PatientVerificationStatus.OTP_VERIFIED,
       },
       include: { idDocuments: true },
+    });
+  }
+
+  /**
+   * Returns the patient's `PatientProfile`, creating a minimal placeholder
+   * record if one does not yet exist. Used by the self-serve KYC wizard so
+   * patients who signed up but never completed the standalone profile form
+   * can still start identity verification — the wizard collects name/DOB
+   * itself and patches the placeholder via `selfSubmitPersonalDetails`.
+   *
+   * Throws `NotFoundException` only when the underlying `User` row is
+   * missing (which would indicate an authentication problem, not a
+   * profile-completion one).
+   */
+  private async ensurePatientProfileForUser(userId: string) {
+    const existing = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (existing) return existing;
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.patientProfile.create({
+      data: {
+        // `name` is required on PatientProfile; leave empty so the wizard's
+        // Personal Details step can populate it. The mobile UI treats an
+        // empty name as "incomplete" and prompts accordingly.
+        name: '',
+        user: { connect: { id: userId } },
+      },
     });
   }
 
