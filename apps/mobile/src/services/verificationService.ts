@@ -42,7 +42,9 @@ export interface SelfServeStatus {
     captured: boolean;
     faceMatchPassed: boolean | null;
     faceMatchScore: number | null;
+    identityVerifiedAt?: string | null;
   } | null;
+  aadhaarLast4?: string | null;
   guardian: {
     guardianName: string;
     relationship: string | null;
@@ -149,6 +151,72 @@ export const verificationService = {
 
   selfSubmitForApproval: async (): Promise<SelfServeStatus> => {
     const r = await api.post('/verification/self/submit');
+    return r.data;
+  },
+
+  // ── ML-backed Aadhaar OCR + face match ───────────────────────────
+  // These call the new multipart endpoints backed by the apps/kyc-ml
+  // Python sidecar. The mobile UI uses these instead of the older
+  // signed-URL flow when the Aadhaar-first wizard runs.
+
+  /** Multipart upload of the Aadhaar image; returns extracted fields. */
+  selfProcessAadhaar: async (
+    fileUri: string,
+    mimeType: string = 'image/jpeg',
+  ): Promise<{
+    fullName: string | null;
+    dob: string | null;
+    gender: string | null;
+    address: string | null;
+    aadhaarLast4: string | null;
+    faceStored: boolean;
+    isMinor: boolean;
+  }> => {
+    const form = new FormData();
+    // React Native's FormData accepts the {uri, name, type} shape; the
+    // upstream Multer interceptor reads it as a normal multipart part.
+    form.append(
+      'image',
+      {
+        uri: fileUri,
+        name: 'aadhaar.jpg',
+        type: mimeType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    );
+    const r = await api.post('/verification/self/aadhaar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data, // axios must not JSON-stringify FormData
+      timeout: 60000,
+    });
+    return r.data;
+  },
+
+  /** Multipart upload of a live selfie; runs DeepFace match on the API. */
+  selfFaceMatch: async (
+    fileUri: string,
+    mimeType: string = 'image/jpeg',
+  ): Promise<{
+    matched: boolean;
+    similarity: number;
+    distance: number;
+    threshold: number;
+  }> => {
+    const form = new FormData();
+    form.append(
+      'selfie',
+      {
+        uri: fileUri,
+        name: 'selfie.jpg',
+        type: mimeType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    );
+    const r = await api.post('/verification/self/face-match', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data,
+      timeout: 60000,
+    });
     return r.data;
   },
 

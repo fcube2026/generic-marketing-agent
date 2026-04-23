@@ -6,6 +6,9 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
   Request,
   ParseIntPipe,
   DefaultValuePipe,
@@ -16,7 +19,11 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles, CurrentUser } from '../auth/decorators/roles.decorator';
@@ -146,6 +153,80 @@ export class PatientVerificationController {
   })
   selfFaceCapture(@CurrentUser() user: any, @Body() dto: SelfFaceCaptureDto) {
     return this.service.selfSubmitFace(user.id, dto);
+  }
+
+  // ──────────────────────────────────────────
+  // ML-backed Aadhaar OCR + face match (multipart)
+  //
+  // These two endpoints replace the JSON `id-upload` / `face-capture` flow
+  // when the Python `apps/kyc-ml` sidecar is deployed. The legacy JSON
+  // endpoints above stay registered so older mobile builds keep working.
+  // ──────────────────────────────────────────
+
+  @Post('verification/self/aadhaar')
+  @Roles('PATIENT')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      // Aadhaar JPEGs from a mobile camera are typically 1-3 MB; cap at 8.
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Upload an Aadhaar image; returns extracted fields and stores the cropped face',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { image: { type: 'string', format: 'binary' } },
+    },
+  })
+  selfAadhaarUpload(
+    @CurrentUser() user: any,
+    @UploadedFile()
+    file:
+      | { buffer: Buffer; mimetype: string; originalname?: string }
+      | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('image file is required');
+    }
+    return this.service.selfProcessAadhaar(user.id, file);
+  }
+
+  @Post('verification/self/face-match')
+  @Roles('PATIENT')
+  @UseInterceptors(
+    FileInterceptor('selfie', {
+      storage: memoryStorage(),
+      // A still-frame selfie from VisionCamera is well under 4 MB.
+      limits: { fileSize: 4 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Upload a live selfie; matches against the previously stored Aadhaar face',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { selfie: { type: 'string', format: 'binary' } },
+    },
+  })
+  selfFaceMatch(
+    @CurrentUser() user: any,
+    @UploadedFile()
+    file:
+      | { buffer: Buffer; mimetype: string; originalname?: string }
+      | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('selfie file is required');
+    }
+    return this.service.selfFaceMatch(user.id, file);
   }
 
   @Post('verification/self/guardian')

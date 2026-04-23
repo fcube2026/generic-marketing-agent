@@ -16,6 +16,7 @@ import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { verificationService } from '../../../services/verificationService';
 import { PatientStackParamList } from '../../../navigation/PatientNavigator';
+import { usePatientKycDraft } from '../../../state/patientKycDraft';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList, 'PatientKycAddress'>;
 type Props = { navigation: Nav };
@@ -25,7 +26,10 @@ type Mode = 'MANUAL' | 'MAP';
 export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>('MANUAL');
-  const [addressLine, setAddressLine] = useState('');
+  // Pre-fill address from the Aadhaar OCR draft when available — every
+  // field stays editable, the draft is only a hint.
+  const ocrDraft = usePatientKycDraft((s) => s.ocr);
+  const [addressLine, setAddressLine] = useState(ocrDraft?.address ?? '');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
   const [pincode, setPincode] = useState('');
@@ -110,7 +114,7 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.step}>Step 2 of 5</Text>
+      <Text style={styles.step}>Step 3 of 5</Text>
       <Text style={styles.title}>Your Address</Text>
       <Text style={styles.subtitle}>
         Enter your residential address manually or fetch it from your current

@@ -21,6 +21,7 @@ import { PatientKycScreen } from '../screens/patient/PatientKycScreen';
 import { PatientKycPersonalScreen } from '../screens/patient/kyc/PatientKycPersonalScreen';
 import { PatientKycAddressScreen } from '../screens/patient/kyc/PatientKycAddressScreen';
 import { PatientKycIdUploadScreen } from '../screens/patient/kyc/PatientKycIdUploadScreen';
+import { PatientKycAadhaarScreen } from '../screens/patient/kyc/PatientKycAadhaarScreen';
 import { PatientKycFaceCaptureScreen } from '../screens/patient/kyc/PatientKycFaceCaptureScreen';
 import { PatientKycGuardianScreen } from '../screens/patient/kyc/PatientKycGuardianScreen';
 import { PatientKycReviewScreen } from '../screens/patient/kyc/PatientKycReviewScreen';
@@ -43,6 +44,7 @@ export type PatientStackParamList = {
   PatientKycPersonal: undefined;
   PatientKycAddress: undefined;
   PatientKycIdUpload: undefined;
+  PatientKycAadhaarUpload: undefined;
   PatientKycFaceCapture: undefined;
   PatientKycGuardian: undefined;
   PatientKycReview: undefined;
@@ -100,7 +102,8 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PatientKyc" component={PatientKycScreen} options={{ title: 'Identity Verification' }} />
     <Stack.Screen name="PatientKycPersonal" component={PatientKycPersonalScreen} options={{ title: 'Your Details' }} />
     <Stack.Screen name="PatientKycAddress" component={PatientKycAddressScreen} options={{ title: 'Your Address' }} />
-    <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar' }} />
+    <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar (legacy)' }} />
+    <Stack.Screen name="PatientKycAadhaarUpload" component={PatientKycAadhaarScreen} options={{ title: 'Upload Aadhaar' }} />
     <Stack.Screen name="PatientKycFaceCapture" component={PatientKycFaceCaptureScreen} options={{ title: 'Face Verification' }} />
     <Stack.Screen name="PatientKycGuardian" component={PatientKycGuardianScreen} options={{ title: 'Guardian Details' }} />
     <Stack.Screen name="PatientKycReview" component={PatientKycReviewScreen} options={{ title: 'Review & Submit' }} />

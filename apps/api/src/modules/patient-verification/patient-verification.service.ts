@@ -4,11 +4,13 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  HttpException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RiskEngineService } from './risk-engine.service';
 import { SmsService } from '../sms/sms.service';
 import { ConfigService } from '@nestjs/config';
+import { KycMlClient, KycMlError, mapKycMlErrorStatus } from './kyc-ml.client';
 import {
   PatientVerificationStatus,
   ManualReviewReason,
@@ -26,11 +28,15 @@ const ID_DOCS_BUCKET = 'patient-ids';
  * Wizard step keys returned by `getMyVerificationStatus` for the
  * profile-launched self-serve KYC flow. Order is intentional — the first
  * non-completed step is treated as the "next" step by the mobile UI.
+ *
+ * `ID_UPLOAD` is intentionally first so that when the patient uploads their
+ * Aadhaar, the OCR-extracted name/DOB/gender/address can pre-fill the
+ * Personal Details and Address screens.
  */
 const SELF_SERVE_STEPS = [
+  'ID_UPLOAD',
   'PERSONAL_DETAILS',
   'ADDRESS',
-  'ID_UPLOAD',
   'FACE_CAPTURE',
   'GUARDIAN', // included only when isMinor === true
   'REVIEW',
@@ -64,6 +70,7 @@ export class PatientVerificationService {
     private readonly riskEngine: RiskEngineService,
     private readonly smsService: SmsService,
     private readonly config: ConfigService,
+    private readonly kycMl: KycMlClient,
   ) {
     this.supabaseUrl = this.config.get<string>('SUPABASE_URL', '');
     this.supabaseKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
@@ -267,6 +274,7 @@ export class PatientVerificationService {
         address: null,
         idDocument: null,
         faceCapture: null,
+        aadhaarLast4: null,
         guardian: null,
       };
     }
@@ -292,6 +300,7 @@ export class PatientVerificationService {
         address: null,
         idDocument: null,
         faceCapture: null,
+        aadhaarLast4: null,
         guardian: null,
       };
     }
@@ -339,13 +348,16 @@ export class PatientVerificationService {
             ocrMatchPassed: verification.ocrMatchPassed,
           }
         : null,
-      faceCapture: verification.selfieStoragePath
-        ? {
-            captured: true,
-            faceMatchPassed: verification.faceMatchPassed,
-            faceMatchScore: verification.faceMatchScore,
-          }
-        : null,
+      faceCapture:
+        verification.selfieStoragePath || verification.identityVerifiedAt
+          ? {
+              captured: true,
+              faceMatchPassed: verification.faceMatchPassed,
+              faceMatchScore: verification.faceMatchScore,
+              identityVerifiedAt: verification.identityVerifiedAt ?? null,
+            }
+          : null,
+      aadhaarLast4: verification.aadhaarLast4 ?? null,
       guardian: verification.guardianName
         ? {
             guardianName: verification.guardianName,
@@ -658,6 +670,229 @@ export class PatientVerificationService {
       storagePath,
       faceMatchPassed: true,
       faceMatchScore: 0.92,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // ML-backed Aadhaar OCR + face match (delegates to apps/kyc-ml).
+  //
+  // These two methods are the **production** path. They are only invoked by
+  // the new multipart endpoints on the controller — the older JSON endpoints
+  // above (`selfConfirmIdUpload`, `selfSubmitFace`) keep their mock behaviour
+  // for backward compatibility and for environments where the Python sidecar
+  // is not deployed (`KYC_ML_ENABLED=false`).
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Upload an Aadhaar image to the Python sidecar, persist the extracted
+   * fields onto the verification record, and return the same data to the
+   * mobile client so it can pre-fill the Personal Details and Address screens.
+   *
+   * Privacy invariants:
+   *  - Only the last 4 digits of the Aadhaar number are persisted.
+   *  - The cropped Aadhaar face lives in the private `verify_faces` Supabase
+   *    bucket and is removed by the sidecar after the face-match step runs.
+   */
+  async selfProcessAadhaar(
+    userId: string,
+    file: { buffer: Buffer; mimetype: string; originalname?: string },
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('No Aadhaar image was uploaded.');
+    }
+    if (!this.kycMl.isEnabled()) {
+      throw new BadRequestException(
+        'Aadhaar OCR is not enabled in this environment. Please use the manual entry flow.',
+      );
+    }
+
+    const verification = await this.getOrCreateForUser(userId);
+
+    let extraction;
+    try {
+      extraction = await this.kycMl.processAadhaar({
+        userId,
+        fileBuffer: file.buffer,
+        mimeType: file.mimetype,
+        filename: file.originalname,
+      });
+    } catch (err) {
+      if (err instanceof KycMlError) {
+        await this.writeAuditLog(
+          verification.id,
+          'KYC_ML_AADHAAR_FAILED',
+          userId,
+          { code: err.code },
+        );
+        // Re-raise with the mapped HTTP status so the mobile client sees
+        // both the status code and the structured `{ code, message }` body.
+        throw new HttpException(
+          { code: err.code, message: err.message },
+          mapKycMlErrorStatus(err.code),
+        );
+      }
+      throw err;
+    }
+
+    // Persist the extracted fields. Note: every field stays editable on
+    // the next screens — we just pre-fill so the patient does not retype.
+    const dob = extraction.dob ? new Date(extraction.dob) : null;
+    const isMinor = dob ? this.computeIsMinor(dob) : verification.isMinor;
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        fullName: extraction.full_name ?? verification.fullName ?? null,
+        dateOfBirth: dob ?? verification.dateOfBirth ?? null,
+        gender: extraction.gender ?? verification.gender ?? null,
+        addressLine: extraction.address ?? verification.addressLine ?? null,
+        aadhaarLast4: extraction.aadhaar_last4 ?? null,
+        aadhaarFaceStoragePath: extraction.storage_path ?? null,
+        idType: 'AADHAAR_FRONT',
+        idVerificationSource: 'KYC_ML',
+        ocrConfidenceScore: 0.95,
+        ocrMatchPassed: true,
+        isMinor,
+        status: PatientVerificationStatus.PROFILE_COMPLETE,
+      },
+    });
+
+    // Track an associated PatientIdDocument row for audit / admin review.
+    // The OCR free-text is **not** stored here — only structured fields.
+    await this.prisma.patientIdDocument.create({
+      data: {
+        verificationId: verification.id,
+        documentType: 'AADHAAR_FRONT',
+        storagePath: extraction.storage_path ?? '',
+        extractedName: extraction.full_name,
+        extractedDob: extraction.dob,
+        extractedIdNumber: extraction.aadhaar_last4
+          ? `XXXX XXXX ${extraction.aadhaar_last4}`
+          : null,
+        ocrRawResult: {
+          source: 'kyc-ml',
+          aadhaar_last4: extraction.aadhaar_last4,
+        },
+      },
+    });
+
+    await this.writeAuditLog(verification.id, 'KYC_ML_OCR_PROCESSED', userId, {
+      face_stored: extraction.face_stored,
+      has_name: !!extraction.full_name,
+      has_dob: !!extraction.dob,
+      has_address: !!extraction.address,
+      // Never log the full OCR text — it could contain the full Aadhaar.
+    });
+
+    return {
+      fullName: extraction.full_name,
+      dob: extraction.dob,
+      gender: extraction.gender,
+      address: extraction.address,
+      aadhaarLast4: extraction.aadhaar_last4,
+      faceStored: extraction.face_stored,
+      isMinor,
+    };
+  }
+
+  /**
+   * Upload a live selfie to the Python sidecar to be matched against the
+   * Aadhaar face stored during `selfProcessAadhaar`. On success we mark
+   * the verification as ID-verified and stamp `identityVerifiedAt`.
+   *
+   * The sidecar always cleans up the cropped Aadhaar face after this call
+   * (success or fail). We mirror that into our own audit log.
+   */
+  async selfFaceMatch(
+    userId: string,
+    file: { buffer: Buffer; mimetype: string; originalname?: string },
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('No selfie image was uploaded.');
+    }
+    if (!this.kycMl.isEnabled()) {
+      throw new BadRequestException(
+        'Face verification is not enabled in this environment.',
+      );
+    }
+
+    const verification = await this.getOrCreateForUser(userId);
+
+    let result;
+    try {
+      result = await this.kycMl.verifyPatientIdentity({
+        userId,
+        fileBuffer: file.buffer,
+        mimeType: file.mimetype,
+        filename: file.originalname,
+      });
+    } catch (err) {
+      if (err instanceof KycMlError) {
+        await this.writeAuditLog(
+          verification.id,
+          err.code === 'LOW_CONFIDENCE'
+            ? 'KYC_ML_FACE_REJECTED'
+            : 'KYC_ML_FACE_FAILED',
+          userId,
+          { code: err.code },
+        );
+        // Even on failure the sidecar cleared the stored face. Reflect that.
+        await this.prisma.patientVerification.update({
+          where: { id: verification.id },
+          data: {
+            aadhaarFaceStoragePath: null,
+            faceMatchPassed: false,
+          },
+        });
+        await this.writeAuditLog(
+          verification.id,
+          'KYC_ML_AADHAAR_FACE_CLEANED',
+          userId,
+          { reason: err.code },
+        );
+        throw new HttpException(
+          { code: err.code, message: err.message },
+          mapKycMlErrorStatus(err.code),
+        );
+      }
+      throw err;
+    }
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        faceMatchPassed: result.matched,
+        faceMatchScore: result.similarity,
+        aadhaarFaceStoragePath: null, // sidecar deleted the object
+        identityVerifiedAt: result.matched ? new Date() : null,
+        idVerifiedAt: result.matched ? new Date() : null,
+        status: result.matched
+          ? PatientVerificationStatus.ID_VERIFIED
+          : verification.status,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      result.matched ? 'KYC_ML_FACE_MATCHED' : 'KYC_ML_FACE_REJECTED',
+      userId,
+      {
+        distance: result.distance,
+        similarity: result.similarity,
+        threshold: result.threshold,
+      },
+    );
+    await this.writeAuditLog(
+      verification.id,
+      'KYC_ML_AADHAAR_FACE_CLEANED',
+      userId,
+      { reason: result.matched ? 'matched' : 'mismatched' },
+    );
+
+    return {
+      matched: result.matched,
+      similarity: result.similarity,
+      distance: result.distance,
+      threshold: result.threshold,
     };
   }
 
@@ -994,18 +1229,27 @@ export class PatientVerificationService {
     isMinor: boolean;
     status: PatientVerificationStatus;
     idDocuments?: Array<{ extractedName: string | null }>;
+    aadhaarLast4?: string | null;
+    identityVerifiedAt?: Date | null;
   }): SelfServeStep[] {
     const completed: SelfServeStep[] = [];
     if (verification.fullName) completed.push('PERSONAL_DETAILS');
     if (verification.addressLine || verification.addressLat != null)
       completed.push('ADDRESS');
+    // ID_UPLOAD is complete when either the legacy mock OCR ran (any
+    // PatientIdDocument with an extracted name) OR the new ML pipeline ran
+    // (aadhaarLast4 populated on the verification row).
     if (
-      verification.idDocuments &&
-      verification.idDocuments.some((d) => d.extractedName)
+      (verification.idDocuments &&
+        verification.idDocuments.some((d) => d.extractedName)) ||
+      verification.aadhaarLast4
     ) {
       completed.push('ID_UPLOAD');
     }
-    if (verification.selfieStoragePath) completed.push('FACE_CAPTURE');
+    // FACE_CAPTURE is complete when either a selfie was uploaded (legacy
+    // mock) OR the ML pipeline confirmed identity.
+    if (verification.selfieStoragePath || verification.identityVerifiedAt)
+      completed.push('FACE_CAPTURE');
     if (verification.isMinor && verification.guardianName)
       completed.push('GUARDIAN');
     if (
@@ -1023,14 +1267,14 @@ export class PatientVerificationService {
   ): SelfServeStep[] {
     const all: SelfServeStep[] = isMinor
       ? [
+          'ID_UPLOAD',
           'PERSONAL_DETAILS',
           'ADDRESS',
-          'ID_UPLOAD',
           'FACE_CAPTURE',
           'GUARDIAN',
           'REVIEW',
         ]
-      : ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'REVIEW'];
+      : ['ID_UPLOAD', 'PERSONAL_DETAILS', 'ADDRESS', 'FACE_CAPTURE', 'REVIEW'];
     return all.filter((s) => !completed.includes(s));
   }
 

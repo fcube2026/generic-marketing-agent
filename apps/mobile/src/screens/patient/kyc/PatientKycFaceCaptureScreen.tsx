@@ -77,13 +77,43 @@ export const PatientKycFaceCaptureScreen: React.FC<Props> = ({ navigation }) => 
   const verifyMutation = useMutation({
     mutationFn: async () => {
       if (!imageUri) throw new Error('No selfie captured');
-      const res = await verificationService.selfSubmitFace({
-        mimeType: MIME,
-        qualityHint: 'good',
-      });
-      // Best-effort upload of the actual selfie image to the signed URL.
-      await verificationService.uploadToSignedUrl(res.uploadUrl, imageUri, MIME);
-      return res;
+      // Prefer the new multipart endpoint (backed by the apps/kyc-ml
+      // DeepFace pipeline) when available. Fall back to the legacy
+      // signed-URL mock flow if the new endpoint returns 400 (which the
+      // API does when KYC_ML_ENABLED=false).
+      try {
+        const r = await verificationService.selfFaceMatch(imageUri, MIME);
+        return {
+          faceMatchPassed: r.matched,
+          faceMatchScore: r.similarity,
+          uploadUrl: '',
+          storagePath: '',
+        };
+      } catch (err: unknown) {
+        const e = err as {
+          response?: { status?: number; data?: { code?: string } };
+        };
+        const code = e?.response?.data?.code;
+        if (code === 'LOW_CONFIDENCE' || code === 'NO_FACE_SELFIE') {
+          // Bubble up — these are genuine match failures, not a missing
+          // sidecar. The onError handler shows a friendly message.
+          throw err;
+        }
+        if (e?.response?.status === 400) {
+          // Sidecar disabled in this environment — use the legacy mock.
+          const res = await verificationService.selfSubmitFace({
+            mimeType: MIME,
+            qualityHint: 'good',
+          });
+          await verificationService.uploadToSignedUrl(
+            res.uploadUrl,
+            imageUri,
+            MIME,
+          );
+          return res;
+        }
+        throw err;
+      }
     },
     onSuccess: (res) => {
       setMatched(res.faceMatchPassed);
@@ -91,10 +121,15 @@ export const PatientKycFaceCaptureScreen: React.FC<Props> = ({ navigation }) => 
       qc.invalidateQueries({ queryKey: ['patient-kyc-status'] });
     },
     onError: (err: any) => {
-      Alert.alert(
-        'Verification failed',
-        err?.response?.data?.message || 'Please retake your selfie and try again.',
-      );
+      const code = err?.response?.data?.code;
+      const friendly =
+        code === 'NO_FACE_SELFIE'
+          ? 'We could not detect a face in your selfie. Please try again with good lighting and your face centred.'
+          : code === 'LOW_CONFIDENCE'
+            ? 'Your selfie did not match the photo on your Aadhaar. Please retake it looking straight at the camera.'
+            : err?.response?.data?.message ||
+              'Please retake your selfie and try again.';
+      Alert.alert('Verification failed', friendly);
       setPhase('preview');
     },
   });
