@@ -81,9 +81,12 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
     verificationService
       .selfStart()
       .then((res) => setData(res))
-      .catch(() => {
+      .catch(() =>
         // Fall back to plain status fetch if selfStart fails (e.g. profile
-        // not yet created — happens before onboarding).
+        // not yet created — happens before onboarding). Returning the
+        // promise here ensures `.finally` waits for the fallback to settle
+        // before clearing the loading spinner, so we don't briefly render
+        // the "complete your profile" error UI in between.
         verificationService
           .getMyVerificationStatus()
           .then((res) => setData(res))
@@ -91,10 +94,10 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
             // eslint-disable-next-line no-console
             console.warn('[PatientKyc] Failed to load verification status', err);
             setLoadError(
-              "We couldn't load your verification status. Please complete your profile first.",
+              "We couldn't load your verification status. Please check your connection and try again.",
             );
-          });
-      })
+          }),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -116,7 +119,7 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.bigIcon}>⚠️</Text>
         <Text style={styles.title}>Identity Verification</Text>
         <Text style={styles.subtitle}>
-          {loadError ?? 'Please complete your profile first.'}
+          {loadError ?? "We couldn't load your verification status. Please try again."}
         </Text>
         <Button title="Retry" onPress={loadStatus} variant="outline" />
       </View>
