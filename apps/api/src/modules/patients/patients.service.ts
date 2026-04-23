@@ -11,6 +11,19 @@ import {
 export class PatientsService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeProfilePayload(
+    dto: CreatePatientProfileDto | UpdatePatientProfileDto,
+  ) {
+    if (!dto.dateOfBirth) {
+      return dto;
+    }
+
+    return {
+      ...dto,
+      dateOfBirth: new Date(dto.dateOfBirth),
+    };
+  }
+
   async getMyProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -33,6 +46,8 @@ export class PatientsService {
     userId: string,
     dto: CreatePatientProfileDto | UpdatePatientProfileDto,
   ) {
+    const profileData = this.normalizeProfilePayload(dto);
+
     const existing = await this.prisma.patientProfile.findUnique({
       where: { userId },
     });
@@ -40,13 +55,13 @@ export class PatientsService {
     if (existing) {
       return this.prisma.patientProfile.update({
         where: { userId },
-        data: dto,
+        data: profileData,
       });
     }
 
     return this.prisma.patientProfile.create({
       data: {
-        ...(dto as CreatePatientProfileDto),
+        ...(profileData as CreatePatientProfileDto),
         user: { connect: { id: userId } },
       },
     });
@@ -67,12 +82,29 @@ export class PatientsService {
       });
     }
 
-    return this.prisma.address.create({
+    const created = await this.prisma.address.create({
       data: {
         ...dto,
         userId,
       },
     });
+
+    // Keep only the 3 most recent addresses for this user.
+    const keep = await this.prisma.address.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { id: true },
+    });
+
+    await this.prisma.address.deleteMany({
+      where: {
+        userId,
+        id: { notIn: keep.map((a) => a.id) },
+      },
+    });
+
+    return created;
   }
 
   async updateAddress(

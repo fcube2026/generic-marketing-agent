@@ -59,6 +59,28 @@ check_no_prod_leak() {
   fi
 }
 
+check_supabase_service_key() {
+  local value="${SUPABASE_SERVICE_ROLE_KEY:-}"
+
+  if [ -z "$value" ]; then
+    return
+  fi
+
+  if echo "$value" | grep -q '^sb_publishable_'; then
+    echo -e "  ${RED}✗${NC} SUPABASE_SERVICE_ROLE_KEY is a publishable key — backend storage requires a service-role/secret key"
+    ERRORS=$((ERRORS + 1))
+    return
+  fi
+
+  if echo "$value" | grep -qi 'anon'; then
+    echo -e "  ${RED}✗${NC} SUPABASE_SERVICE_ROLE_KEY looks like an anon key — backend storage requires a service-role/secret key"
+    ERRORS=$((ERRORS + 1))
+    return
+  fi
+
+  echo -e "  ${GREEN}✓${NC} SUPABASE_SERVICE_ROLE_KEY — looks like a backend key"
+}
+
 echo "── Core ──────────────────────────────────────────"
 check_var "APP_ENV" false
 check_var "NODE_ENV" false
@@ -84,6 +106,7 @@ if [ "$ENV" = "staging" ] || [ "$ENV" = "production" ]; then
   echo "── Supabase ──────────────────────────────────────"
   check_var "SUPABASE_URL" false
   check_var "SUPABASE_SERVICE_ROLE_KEY" false
+  check_supabase_service_key
 fi
 
 echo ""

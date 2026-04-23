@@ -1,81 +1,83 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { bookingService } from '../../services/bookingService';
-import { patientService } from '../../services/patientService';
+import api from '../../services/api';
+import { ENDPOINTS } from '../../constants/api';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useBookingStore } from '../../store/bookingStore';
 import { formatCurrency } from '../../utils/format';
-import { getCurrentLocation, MOCK_LOCATION } from '../../utils/location';
+import { Address } from '../../types';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'BookingConfirm'>;
   route: RouteProp<PatientStackParamList, 'BookingConfirm'>;
 };
 
+const MODE_LABELS: Record<string, string> = {
+  HOME_VISIT: '🏠 Home Visit',
+  DOCTOR_PLACE: '🏥 Clinic Visit',
+  VIDEO_CONSULTATION: '📹 Video Consultation',
+};
+
+const getModeLabel = (mode: string) => MODE_LABELS[mode] ?? mode;
+
 export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => {
   const { providerId, mode, fee } = route.params;
-  const { selectedProvider, selectedService, selectedAddress, symptoms, setLastBookingId, setSelectedAddress } = useBookingStore();
+  const {
+    selectedProvider,
+    selectedService,
+    selectedAddress,
+    symptoms,
+    setLastBookingId,
+    setSelectedAddress,
+  } = useBookingStore();
   const [loading, setLoading] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [addressMode, setAddressMode] = useState<'none' | 'manual'>('none');
-  const [addressBusy, setAddressBusy] = useState(false);
-  const [manualLine, setManualLine] = useState('');
-  const [manualCity, setManualCity] = useState('');
-  const [manualState, setManualState] = useState('');
-  const [manualPincode, setManualPincode] = useState('');
 
-  const saveAddress = async (payload: Parameters<typeof patientService.addAddress>[0]) => {
-    setAddressBusy(true);
-    try {
-      const created = await patientService.addAddress(payload);
-      setSelectedAddress(created);
-      setAddressMode('none');
-      setError(null);
-    } catch (e: any) {
-      Alert.alert('Could not save address', e?.response?.data?.message || 'Please try again.');
-    } finally {
-      setAddressBusy(false);
-    }
-  };
+  useEffect(() => {
+    if (mode !== 'HOME_VISIT' || selectedAddress) return;
 
-  const handleUseMyLocation = async () => {
-    const coords = (await getCurrentLocation()) || MOCK_LOCATION;
-    await saveAddress({
-      label: 'Current Location',
-      addressLine: `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`,
-      city: 'Auto-detected',
-      state: 'Auto-detected',
-      pincode: '000000',
-      lat: coords.lat,
-      lng: coords.lng,
-      isDefault: false,
-    });
-  };
+    let cancelled = false;
+    const hydrateAddress = async () => {
+      setAddressLoading(true);
+      try {
+        const res = await api.get<Address[] | { data?: Address[] }>(
+          ENDPOINTS.PATIENTS.ADDRESSES,
+        );
+        const payload = res.data;
+        const addresses = Array.isArray(payload) ? payload : payload?.data ?? [];
+        const fallbackAddress =
+          addresses.find((item) => item.isDefault) ?? addresses[0] ?? null;
 
-  const handleSaveManualAddress = async () => {
-    if (!manualLine.trim() || !manualCity.trim() || !manualPincode.trim()) {
-      Alert.alert('Missing fields', 'Address line, city and pincode are required.');
-      return;
-    }
-    await saveAddress({
-      label: 'Home',
-      addressLine: manualLine.trim(),
-      city: manualCity.trim(),
-      state: manualState.trim() || manualCity.trim(),
-      pincode: manualPincode.trim(),
-    });
-  };
+        if (!cancelled && fallbackAddress) {
+          setSelectedAddress(fallbackAddress);
+        }
+      } catch {
+        // Keep null address and show inline guidance on confirm action.
+      } finally {
+        if (!cancelled) setAddressLoading(false);
+      }
+    };
+
+    hydrateAddress();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, selectedAddress, setSelectedAddress]);
 
   const handleConfirm = async () => {
+    if (addressLoading) return;
+
     if (mode === 'HOME_VISIT' && !selectedAddress) {
-      setError('Please select an address for home visit bookings.');
+      setError('No saved address found. Please complete Your Address first.');
       return;
     }
     setLoading(true);
@@ -154,7 +156,7 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Mode</Text>
-          <Text style={styles.value}>{mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.value}>{getModeLabel(mode)}</Text>
         </View>
         {mode === 'HOME_VISIT' && selectedAddress && (
           <View style={styles.row}>
@@ -184,79 +186,29 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         <Card style={styles.errorCard}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error}</Text>
+          {mode === 'HOME_VISIT' && !selectedAddress && (
+            <Button
+              title="Add Address"
+              onPress={() => navigation.navigate('PatientKycAddress')}
+              style={{ marginTop: 12 }}
+            />
+          )}
           <Button
             title="Dismiss"
             onPress={() => setError(null)}
             variant="outline"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: mode === 'HOME_VISIT' && !selectedAddress ? 8 : 12 }}
           />
         </Card>
       )}
 
-      {mode === 'HOME_VISIT' && !selectedAddress && (
-        <Card style={styles.addressCard}>
-          <Text style={styles.sectionTitle}>Visit Address</Text>
-          <Text style={styles.helper}>Choose how you want to provide your address.</Text>
-          {addressMode === 'none' ? (
-            <View style={{ marginTop: 8 }}>
-              <Button
-                title="📍 Use My Location"
-                onPress={handleUseMyLocation}
-                loading={addressBusy}
-              />
-              <Button
-                title="✏️ Enter Address Manually"
-                onPress={() => setAddressMode('manual')}
-                variant="outline"
-                style={{ marginTop: 12 }}
-              />
-            </View>
-          ) : (
-            <View style={{ marginTop: 8 }}>
-              <TextInput
-                placeholder="Address line (house, street)"
-                value={manualLine}
-                onChangeText={setManualLine}
-                style={styles.input}
-              />
-              <TextInput
-                placeholder="City"
-                value={manualCity}
-                onChangeText={setManualCity}
-                style={styles.input}
-              />
-              <TextInput
-                placeholder="State"
-                value={manualState}
-                onChangeText={setManualState}
-                style={styles.input}
-              />
-              <TextInput
-                placeholder="Pincode"
-                value={manualPincode}
-                onChangeText={setManualPincode}
-                keyboardType="number-pad"
-                style={styles.input}
-              />
-              <Button
-                title="Save Address"
-                onPress={handleSaveManualAddress}
-                loading={addressBusy}
-                style={{ marginTop: 8 }}
-              />
-              <Button
-                title="Back"
-                onPress={() => setAddressMode('none')}
-                variant="outline"
-                style={{ marginTop: 8 }}
-              />
-            </View>
-          )}
-        </Card>
-      )}
-
       <View style={styles.footer}>
-        <Button title="Confirm & Proceed to Payment" onPress={handleConfirm} loading={loading} />
+        <Button
+          title={addressLoading ? 'Loading address...' : 'Confirm & Proceed to Payment'}
+          onPress={handleConfirm}
+          loading={loading || addressLoading}
+          disabled={addressLoading}
+        />
         <Button
           title="Cancel"
           onPress={() => navigation.goBack()}
@@ -290,19 +242,6 @@ const styles = StyleSheet.create({
   errorCard: { marginHorizontal: 16, marginBottom: 8, backgroundColor: '#FEF2F2', alignItems: 'center' },
   errorIcon: { fontSize: 28, marginBottom: 8 },
   errorText: { fontSize: 14, color: Colors.error, textAlign: 'center', lineHeight: 20 },
-  addressCard: { marginHorizontal: 16, marginBottom: 8 },
-  helper: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: Colors.text,
-    marginTop: 8,
-    backgroundColor: '#fff',
-  },
   successContainer: { flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 },
   successIcon: { marginBottom: 16 },
   successEmoji: { fontSize: 64 },

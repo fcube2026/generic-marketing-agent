@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
-import Badge from '@/components/ui/Badge';
-import { contentCalendar, contentPillarMeta, type ContentPillar } from '@/lib/data';
+import { contentPillarMeta } from '@/lib/data';
+import type { ContentItem, ContentPillar } from '@/lib/types';
+import { listContentItems } from '@/lib/services/marketingService';
 
 const platforms = ['All', 'Instagram', 'LinkedIn', 'Blog', 'YouTube', 'WhatsApp'];
 const weeks = [1, 2, 3, 4];
@@ -12,6 +13,39 @@ const weeks = [1, 2, 3, 4];
 export default function ContentCalendarPage() {
   const [selectedWeek, setSelectedWeek] = useState<number | 'all'>('all');
   const [selectedPlatform, setSelectedPlatform] = useState('All');
+  const [contentCalendar, setContentCalendar] = useState<ContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listContentItems()
+      .then((items) => {
+        if (!cancelled) setContentCalendar(items);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load content calendar');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+  }
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        ⚠️ {error}
+      </div>
+    );
+  }
 
   const filtered = contentCalendar.filter((item) => {
     const weekMatch = selectedWeek === 'all' || item.week === selectedWeek;
@@ -142,7 +176,7 @@ export default function ContentCalendarPage() {
         <div className="space-y-2">
           {['Instagram', 'LinkedIn', 'Blog', 'YouTube', 'WhatsApp'].map((platform) => {
             const count = contentCalendar.filter((i) => i.platform === platform).length;
-            const pct = Math.round((count / contentCalendar.length) * 100);
+            const pct = contentCalendar.length === 0 ? 0 : Math.round((count / contentCalendar.length) * 100);
             return (
               <div key={platform} className="flex items-center gap-3">
                 <span className="w-24 text-xs text-gray-600">{platform}</span>

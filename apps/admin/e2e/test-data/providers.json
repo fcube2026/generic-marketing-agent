@@ -1,0 +1,66 @@
+{
+  "all": [
+    {
+      "id": "provider-1",
+      "name": "Dr. Priya Sharma",
+      "specialization": "General Physician",
+      "isVerified": false,
+      "isActive": true,
+      "isAvailable": true,
+      "serviceRadius": 10,
+      "createdAt": "2026-04-10T10:00:00.000Z",
+      "user": { "phone": "+91 9876543210" },
+      "providerServices": [
+        { "serviceCategory": { "name": "General Physician" } }
+      ]
+    },
+    {
+      "id": "provider-2",
+      "name": "Dr. Karan Mehta",
+      "specialization": "Dermatology",
+      "isVerified": true,
+      "isActive": true,
+      "isAvailable": true,
+      "serviceRadius": 8,
+      "createdAt": "2026-04-11T10:00:00.000Z",
+      "user": { "phone": "+91 9988776655" },
+      "providerServices": [
+        { "serviceCategory": { "name": "Dermatology" } }
+      ]
+    }
+  ],
+  "pending": [
+    {
+      "id": "provider-1",
+      "name": "Dr. Priya Sharma",
+      "bio": "Experienced GP",
+      "specialization": "General Physician",
+      "contactInfo": "clinic@curex24.com",
+      "licenseNumber": "LIC-123",
+      "isVerified": false,
+      "isActive": true,
+      "isAvailable": true,
+      "homeVisitEnabled": true,
+      "doctorPlaceVisitEnabled": true,
+      "serviceRadius": 10,
+      "consultationFeeHomeVisit": 4000,
+      "consultationFeeDoctorPlace": 3000,
+      "createdAt": "2026-04-10T10:00:00.000Z",
+      "user": { "phone": "+91 9876543210" },
+      "licenses": [
+        {
+          "id": "lic-1",
+          "type": "Medical License",
+          "documentUrl": "https://example.com/license.pdf",
+          "status": "PENDING",
+          "rejectionReason": null,
+          "expiresAt": "2027-04-10T10:00:00.000Z",
+          "verifiedAt": null
+        }
+      ],
+      "providerServices": [
+        { "serviceCategory": { "name": "General Physician" } }
+      ]
+    }
+  ]
+}

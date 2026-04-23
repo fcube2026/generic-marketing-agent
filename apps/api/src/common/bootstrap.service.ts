@@ -97,6 +97,13 @@ export class BootstrapService implements OnApplicationBootstrap {
       create: { phone: '+0000000000', role: Role.ADMIN },
     });
 
+    // Marketing agent user
+    await this.prisma.user.upsert({
+      where: { phone: '+0000000001' },
+      update: { role: Role.MARKETING_AGENT },
+      create: { phone: '+0000000001', role: Role.MARKETING_AGENT },
+    });
+
     // Providers
     const providerData = [
       {

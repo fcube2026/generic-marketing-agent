@@ -3,6 +3,9 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
+import { SmcScraperProvider } from './providers/smc-scraper.provider';
+import { FaceVerificationProvider } from './providers/face-verification.provider';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('DoctorVerificationService', () => {
   let service: DoctorVerificationService;
@@ -36,6 +39,22 @@ describe('DoctorVerificationService', () => {
     verify: jest.fn(),
   };
 
+  const mockSmcProvider = {
+    verify: jest.fn().mockResolvedValue({ found: false }),
+  };
+
+  const mockFaceProvider = {
+    verify: jest.fn(),
+  };
+
+  const mockNotificationsService = {
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: true,
+    }),
+  };
+
   const mockProfile = { id: 'provider-1', userId: 'user-1' };
   const mockLicense = {
     id: 'license-1',
@@ -58,6 +77,9 @@ describe('DoctorVerificationService', () => {
         DoctorVerificationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NmcApiProvider, useValue: mockNmcProvider },
+        { provide: SmcScraperProvider, useValue: mockSmcProvider },
+        { provide: FaceVerificationProvider, useValue: mockFaceProvider },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -73,6 +95,7 @@ describe('DoctorVerificationService', () => {
 
   describe('submitForVerification', () => {
     const dto = {
+      fullName: 'Dr. Test Doctor',
       nmcRegistrationNumber: 'MH-12345',
       stateCouncil: 'Maharashtra Medical Council',
       yearOfAdmission: '2010',
@@ -119,19 +142,14 @@ describe('DoctorVerificationService', () => {
       expect(mockNmcProvider.verify).not.toHaveBeenCalled();
     });
 
-    it('should call NMC API and auto-approve on success', async () => {
+    it('should call NMC API, find doctor, and route to admin approval', async () => {
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
       mockPrisma.providerLicense.create.mockResolvedValue(mockLicense);
-      mockPrisma.providerLicense.update.mockResolvedValue({
-        ...mockLicense,
-        verificationAttempts: 1,
-        lastAttemptAt: new Date(),
-      });
 
-      const approvedLicense = {
+      const pendingLicense = {
         ...mockLicense,
-        status: 'APPROVED',
-        verificationSource: 'NMC_API',
+        status: 'PENDING',
+        verificationSource: 'PIPELINE',
       };
       mockPrisma.providerLicense.update
         .mockResolvedValueOnce({
@@ -139,13 +157,12 @@ describe('DoctorVerificationService', () => {
           verificationAttempts: 1,
           lastAttemptAt: new Date(),
         })
-        .mockResolvedValueOnce(approvedLicense)
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce(pendingLicense);
 
       mockNmcProvider.verify.mockResolvedValue({
         found: true,
         registrationNumber: 'MH-12345',
-        name: 'Dr. Test',
+        name: 'Dr. Test Doctor',
         qualifications: ['MBBS'],
         stateCouncil: 'Maharashtra Medical Council',
         registrationDate: '2010-01-01',
@@ -157,22 +174,29 @@ describe('DoctorVerificationService', () => {
         ...mockProfile,
         userId: 'user-1',
       });
-      mockPrisma.notification.create.mockResolvedValue({});
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       const result = await service.submitForVerification('user-1', dto);
 
-      expect(result.status).toBe('SUCCESS');
+      // Pipeline should NOT auto-approve — status stays NOT_FOUND (pending admin)
+      expect(result.status).toBe('NOT_FOUND');
+      expect(result.issueCode).toBe(500); // PENDING_ADMIN_APPROVAL
       expect(result.cached).toBe(false);
       expect(mockNmcProvider.verify).toHaveBeenCalledWith({
         memberId: 'MH-12345',
         stateCouncil: 'Maharashtra Medical Council',
         yearOfAdmission: '2010',
       });
-      expect(mockPrisma.notification.create).toHaveBeenCalled();
+      // Doctor's profile should NOT be auto-approved
+      expect(mockPrisma.providerProfile.update).not.toHaveBeenCalled();
+      // Submission-received notification should fire
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'NMC_VERIFICATION_SUBMITTED' }),
+        expect.objectContaining({ inApp: true }),
+      );
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'SUCCESS' }),
+          data: expect.objectContaining({ status: 'NOT_FOUND' }),
         }),
       );
     });
@@ -229,7 +253,7 @@ describe('DoctorVerificationService', () => {
       );
     });
 
-    it('should log ERROR when NMC API throws', async () => {
+    it('should gracefully handle NMC API errors and fall back to NOT_FOUND', async () => {
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
       mockPrisma.providerLicense.create.mockResolvedValue(mockLicense);
       mockPrisma.providerLicense.update.mockResolvedValue({
@@ -239,16 +263,18 @@ describe('DoctorVerificationService', () => {
       mockPrisma.providerLicense.findUnique.mockResolvedValue(mockLicense);
 
       mockNmcProvider.verify.mockRejectedValue(new Error('API timeout'));
+      mockSmcProvider.verify.mockResolvedValue({ found: false });
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       const result = await service.submitForVerification('user-1', dto);
 
-      expect(result.status).toBe('ERROR');
+      // Pipeline gracefully degrades: NMC API error → SMC not found → NOT_FOUND status
+      expect(result.status).toBe('NOT_FOUND');
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            status: 'ERROR',
-            errorCode: 'API_ERROR',
+            status: 'NOT_FOUND',
+            errorCode: 'DOCTOR_NOT_FOUND',
           }),
         }),
       );
@@ -281,21 +307,25 @@ describe('DoctorVerificationService', () => {
     it('should create admin action and retry verification', async () => {
       mockPrisma.providerLicense.findUnique.mockResolvedValue(mockLicense);
       mockPrisma.adminAction.create.mockResolvedValue({});
-      mockPrisma.providerLicense.update.mockResolvedValue({
-        ...mockLicense,
-        verificationAttempts: 1,
-      });
+      mockPrisma.providerLicense.update
+        .mockResolvedValueOnce({
+          ...mockLicense,
+          verificationAttempts: 1,
+        })
+        .mockResolvedValueOnce({
+          ...mockLicense,
+          status: 'PENDING',
+          verificationSource: 'PIPELINE',
+        });
 
       mockNmcProvider.verify.mockResolvedValue({
         found: true,
         rawResponse: {},
       });
-      mockPrisma.providerProfile.update.mockResolvedValue({});
       mockPrisma.providerProfile.findUnique.mockResolvedValue({
         ...mockProfile,
         userId: 'user-1',
       });
-      mockPrisma.notification.create.mockResolvedValue({});
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       await service.retryVerification('license-1', 'admin-1');
@@ -310,6 +340,8 @@ describe('DoctorVerificationService', () => {
         }),
       );
       expect(mockNmcProvider.verify).toHaveBeenCalled();
+      // Pipeline still should NOT auto-approve
+      expect(mockPrisma.providerProfile.update).not.toHaveBeenCalled();
     });
   });
 

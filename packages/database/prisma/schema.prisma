@@ -10,59 +10,94 @@ datasource db {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  phone                 String                 @unique
-  role                  Role                   @default(PATIENT)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  addresses             Address[]
-  adminActions          AdminAction[]          @relation("AdminActions")
-  auditLogs             AuditLog[]
-  notifications         Notification[]
-  otpVerifications      OtpVerification[]
-  patientProfile        PatientProfile?
-  providerProfile       ProviderProfile?
-  questionnaireResponse QuestionnaireResponse?
+  id                          String                  @id @default(cuid())
+  phone                       String                  @unique
+  email                       String?                 @unique
+  passwordHash                String?
+  isActive                    Boolean                 @default(true)
+  role                        Role                    @default(PATIENT)
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  addresses                   Address[]
+  adminActions                AdminAction[]           @relation("AdminActions")
+  auditLogs                   AuditLog[]
+  deviceTokens                DeviceToken[]
+  notifications               Notification[]
+  notificationLogs            NotificationLog[]
+  notificationPreference      NotificationPreference?
+  otpVerifications            OtpVerification[]
+  patientProfile              PatientProfile?
+  providerProfile             ProviderProfile?
+  questionnaireResponse       QuestionnaireResponse?
+  uploadedPrescriptions       UploadedPrescription[]
+  assignedPrescriptionReviews UploadedPrescription[]  @relation("AssignedPrescriptionReviews")
+  passwordResetTokens         PasswordResetToken[]
 
   @@map("users")
 }
 
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 model PatientProfile {
-  id               String    @id @default(cuid())
-  userId           String    @unique
-  name             String
-  dateOfBirth      DateTime?
-  gender           String?
-  emergencyContact String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  bookings         Booking[]
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String                    @id @default(cuid())
+  userId              String                    @unique
+  name                String
+  dateOfBirth         DateTime?
+  gender              String?
+  emergencyContact    String?
+  // Verification extensions
+  verificationStatus  PatientVerificationStatus @default(PENDING_OTP)
+  trustScore          Int                       @default(50)
+  totalBookings       Int                       @default(0)
+  flaggedBookings     Int                       @default(0)
+  isFlagged           Boolean                   @default(false)
+  flagReason          String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  bookings            Booking[]
+  pharmacyOrders      PharmacyOrder[]
+  user                User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patientVerification PatientVerification?
+  consentRecords      ConsentRecord[]
 
   @@map("patient_profiles")
 }
 
 model ProviderProfile {
-  id                         String   @id @default(cuid())
-  userId                     String   @unique
-  name                       String
-  bio                        String?
-  specialization             String
-  contactInfo                String   @default("")
-  clinicAddress              String   @default("")
-  licenseNumber              String?
-  isVerified                 Boolean  @default(false)
-  isActive                   Boolean  @default(true)
-  homeVisitEnabled           Boolean  @default(false)
-  doctorPlaceVisitEnabled    Boolean  @default(false)
-  serviceRadius              Float    @default(10)
-  consultationFeeHomeVisit   Float    @default(0)
-  consultationFeeDoctorPlace Float    @default(0)
-  currentLat                 Float?
-  currentLng                 Float?
-  isAvailable                Boolean  @default(false)
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                               String   @id @default(cuid())
+  userId                           String   @unique
+  name                             String
+  bio                              String?
+  specialization                   String
+  contactInfo                      String   @default("")
+  clinicAddress                    String   @default("")
+  licenseNumber                    String?
+  isVerified                       Boolean  @default(false)
+  isActive                         Boolean  @default(true)
+  homeVisitEnabled                 Boolean  @default(false)
+  doctorPlaceVisitEnabled          Boolean  @default(false)
+  serviceRadius                    Float    @default(10)
+  consultationFeeHomeVisit         Float    @default(0)
+  consultationFeeDoctorPlace       Float    @default(0)
+  currentLat                       Float?
+  currentLng                       Float?
+  isAvailable                      Boolean  @default(false)
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+  videoConsultationEnabled         Boolean  @default(false) // ✅ restore
+  consultationFeeVideoConsultation Float    @default(0)
 
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenses          ProviderLicense[]
@@ -165,7 +200,7 @@ model AvailabilitySlot {
 }
 
 model Address {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   userId      String
   label       String
   addressLine String
@@ -174,40 +209,48 @@ model Address {
   pincode     String
   lat         Float?
   lng         Float?
-  isDefault   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookings    Booking[]
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  pharmacyOrders PharmacyOrder[] // ✅ ADD THIS LINE
 
   @@map("addresses")
 }
 
 model Booking {
-  id                  String                 @id @default(cuid())
-  patientId           String
-  providerId          String
-  serviceCategoryId   String
-  addressId           String?
-  mode                BookingMode
-  status              BookingStatus          @default(REQUESTED)
-  scheduledAt         DateTime
-  symptoms            String?
-  totalFee            Float
-  paymentStatus       PaymentStatus          @default(PENDING)
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  statusHistory       BookingStatusHistory[]
-  address             Address?               @relation(fields: [addressId], references: [id])
-  patient             PatientProfile         @relation(fields: [patientId], references: [id])
-  provider            ProviderProfile        @relation(fields: [providerId], references: [id])
-  serviceCategory     ServiceCategory        @relation(fields: [serviceCategoryId], references: [id])
-  consultationSummary ConsultationSummary?
-  diagnosticRequests  DiagnosticRequest[]
-  payment             Payment?
-  payout              Payout?
-  providerLocations   ProviderLocation[]
-  referrals           Referral[]
+  id                   String                 @id @default(cuid())
+  patientId            String
+  providerId           String
+  serviceCategoryId    String
+  addressId            String?
+  mode                 BookingMode
+  status               BookingStatus          @default(REQUESTED)
+  scheduledAt          DateTime
+  symptoms             String?
+  totalFee             Float
+  paymentStatus        PaymentStatus          @default(PENDING)
+  verificationSnapshot Json?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  statusHistory        BookingStatusHistory[]
+  address              Address?               @relation(fields: [addressId], references: [id])
+  patient              PatientProfile         @relation(fields: [patientId], references: [id])
+  provider             ProviderProfile        @relation(fields: [providerId], references: [id])
+  serviceCategory      ServiceCategory        @relation(fields: [serviceCategoryId], references: [id])
+  consultationSummary  ConsultationSummary?
+  diagnosticRequests   DiagnosticRequest[]
+  payment              Payment?
+  payout               Payout?
+  providerLocations    ProviderLocation[]
+  referrals            Referral[]
+  pharmacyOrders       PharmacyOrder[]
+  videoSession         VideoSession?
+  clinicalIntake       ClinicalIntake?
+  consentRecord        ConsentRecord?
+  visitOtp             VisitOtp?
 
   @@index([patientId])
   @@index([providerId])
@@ -252,6 +295,7 @@ model Prescription {
   fileUrl               String?
   createdAt             DateTime            @default(now())
   consultationSummary   ConsultationSummary @relation(fields: [consultationSummaryId], references: [id], onDelete: Cascade)
+  pharmacyOrders        PharmacyOrder[]
 
   @@map("prescriptions")
 }
@@ -447,15 +491,89 @@ model QuestionnaireResponse {
   @@map("questionnaire_responses")
 }
 
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String // "ios" | "android" | "web"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model NotificationPreference {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  pushEnabled      Boolean @default(true)
+  smsEnabled       Boolean @default(true)
+  whatsappEnabled  Boolean @default(true)
+  emailEnabled     Boolean @default(false)
+  // Granular preferences for different notification types
+  bookingUpdates   Boolean @default(true)
+  paymentUpdates   Boolean @default(true)
+  reminderEnabled  Boolean @default(true)
+  marketingEnabled Boolean @default(false)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id                String                     @id @default(cuid())
+  userId            String
+  eventType         String
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  providerMessageId String?
+  idempotencyKey    String?
+  metadata          Json?
+  errorMessage      String?
+  retryCount        Int                        @default(0)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([idempotencyKey])
+  @@index([channel, status])
+  @@index([createdAt])
+  @@map("notification_logs")
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  FALLBACK_TRIGGERED
+}
+
 enum Role {
   PATIENT
   PROVIDER
   ADMIN
+  PHARMACIST
+  MARKETING_AGENT
 }
 
 enum BookingMode {
   HOME_VISIT
   DOCTOR_PLACE
+  VIDEO_CONSULTATION // ✅ restore (prevents deletion)
 }
 
 enum BookingStatus {
@@ -500,4 +618,621 @@ enum LicenseStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// =======================
+// PHARMACY MODELS (UPDATED)
+// =======================
+model PharmacyPartner {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  displayName String
+  description String?
+  logoUrl     String?
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  apiBaseUrl  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders PharmacyOrder[]
+
+  @@map("pharmacy_partners")
+}
+
+model PharmacyOrder {
+  id                     String              @id @default(cuid())
+  orderNumber            String              @unique
+  patientProfileId       String
+  bookingId              String?
+  prescriptionId         String?
+  uploadedPrescriptionId String?
+  pharmacyPartnerId      String
+  partnerOrderId         String?
+  deliveryAddressId      String
+  prescriptionImageUrl   String?
+  subtotal               Float
+  deliveryFee            Float               @default(0)
+  discount               Float               @default(0)
+  totalAmount            Float
+  status                 PharmacyOrderStatus @default(PENDING)
+  estimatedDeliveryAt    DateTime?
+  deliveredAt            DateTime?
+  notes                  String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  items                PharmacyOrderItem[]
+  statusHistory        PharmacyOrderStatusHistory[]
+  booking              Booking?                     @relation(fields: [bookingId], references: [id])
+  deliveryAddress      Address                      @relation(fields: [deliveryAddressId], references: [id])
+  patientProfile       PatientProfile               @relation(fields: [patientProfileId], references: [id])
+  pharmacyPartner      PharmacyPartner              @relation(fields: [pharmacyPartnerId], references: [id])
+  prescription         Prescription?                @relation(fields: [prescriptionId], references: [id])
+  uploadedPrescription UploadedPrescription?        @relation(fields: [uploadedPrescriptionId], references: [id])
+
+  @@index([patientProfileId])
+  @@index([pharmacyPartnerId])
+  @@index([uploadedPrescriptionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("pharmacy_orders")
+}
+
+model PharmacyOrderItem {
+  id              String  @id @default(cuid())
+  pharmacyOrderId String
+  medicineName    String
+  medicineCode    String?
+  dosage          String?
+  instructions    String?
+  isSubstitute    Boolean @default(false)
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+
+  pharmacyOrder PharmacyOrder @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
+
+  @@map("pharmacy_order_items")
+}
+
+model PharmacyOrderStatusHistory {
+  id              String              @id @default(cuid())
+  pharmacyOrderId String
+  status          PharmacyOrderStatus
+  source          String? // e.g. "webhook:mock", "webhook:partner-xyz", "manual"
+  timestamp       DateTime            @default(now())
+
+  pharmacyOrder PharmacyOrder @relation(fields: [pharmacyOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyOrderId, status])
+  @@index([pharmacyOrderId])
+  @@index([timestamp])
+  @@map("pharmacy_order_status_history")
+}
+
+// =======================
+// UPDATED ENUM
+// =======================
+
+enum PharmacyOrderStatus {
+  PENDING
+  PRESCRIPTION_REVIEW
+  CONFIRMED
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+  REFUNDED
+}
+
+// =======================
+// DOCTOR ONBOARDING
+// =======================
+
+model doctor_onboarding_questionnaire {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at DateTime @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+
+  specialization String?
+  qualification  String?
+  experience     String?
+  hospital       String?
+  bio            String?
+  home_visits    String?
+
+  services          String[]
+  patient_groups    String[]
+  medical_equipment String[]
+
+  emergency_cases  String?
+  working_schedule String?
+  time_slots       String[]
+
+  travel_distance      String?
+  payment_preference   String?
+  app_comfort          String?
+  online_consultations String?
+
+  platform_expectations String[]
+  guidelines_agreement  String?
+
+  @@map("doctor_onboarding_questionnaire")
+}
+
+enum VideoSessionStatus {
+  CREATED
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model VideoSession {
+  id            String             @id @default(cuid())
+  bookingId     String?            @unique
+  roomId        String             @unique
+  sessionToken  String?
+  status        VideoSessionStatus @default(CREATED)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  duration      Int?
+  creatorUserId String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  booking       Booking?           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([creatorUserId])
+  @@map("video_sessions")
+}
+
+// =======================
+// PRESCRIPTION UPLOAD & VERIFICATION
+// =======================
+
+enum PrescriptionStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  REUPLOAD_REQUIRED
+}
+
+enum PrescriptionReviewAction {
+  APPROVED
+  REJECTED
+  REUPLOAD
+}
+
+model UploadedPrescription {
+  id                 String             @id @default(cuid())
+  userId             String
+  filePath           String
+  status             PrescriptionStatus @default(PENDING_REVIEW)
+  assignedReviewerId String?
+  assignedAt         DateTime?
+  reviewedBy         String?
+  reviewNotes        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedReviewer User?                   @relation("AssignedPrescriptionReviews", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
+  reviewLogs       PrescriptionReviewLog[]
+  pharmacyOrders   PharmacyOrder[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedReviewerId])
+  @@map("uploaded_prescriptions")
+}
+
+model PrescriptionReviewLog {
+  id             String                   @id @default(cuid())
+  prescriptionId String
+  action         PrescriptionReviewAction
+  performedBy    String
+  notes          String?
+  createdAt      DateTime                 @default(now())
+
+  prescription UploadedPrescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@map("prescription_review_logs")
+}
+
+// =======================
+// MARKETING MODELS
+// =======================
+
+model MarketingBusinessProfile {
+  id                      String   @id @default(cuid())
+  primaryGrowthFocus      String   @default("both") // 'patients' | 'providers' | 'both'
+  biggestBottleneck       String   @default("demand") // 'supply' | 'demand' | 'activation'
+  monthlyBudget           Int      @default(0)
+  allocatedBudget         Int      @default(0)
+  targetCities            String[] @default([])
+  bestPerforming          String   @default("")
+  topPatientPersona       String   @default("")
+  topReasonPatientChooses String   @default("")
+  topReasonProviderJoins  String   @default("")
+  competitors             String[] @default([])
+  founderLedBrand         Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("marketing_business_profiles")
+}
+
+model MarketingCampaign {
+  id          String    @id @default(cuid())
+  name        String
+  objective   String
+  channel     String
+  audience    String
+  budget      String
+  duration    String
+  kpi         String
+  status      String    @default("planned") // 'active' | 'planned' | 'completed' | 'paused'
+  headline    String[]  @default([])
+  description String[]  @default([])
+  spend       Float     @default(0)
+  impressions Int       @default(0)
+  conversions Int       @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@map("marketing_campaigns")
+}
+
+model MarketingExperiment {
+  id         String   @id @default(cuid())
+  name       String
+  hypothesis String
+  channel    String
+  control    String
+  variant    String
+  metric     String
+  startDate  String
+  endDate    String
+  result     String?
+  winner     String? // 'control' | 'variant' | 'no-difference'
+  status     String   @default("planned") // 'running' | 'completed' | 'planned' | 'paused'
+  lift       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@map("marketing_experiments")
+}
+
+model MarketingContentItem {
+  id          String    @id @default(cuid())
+  week        Int
+  day         String
+  platform    String
+  pillar      String // 'patient-education' | 'provider-spotlight' | 'product-education' | 'social-proof' | 'local-health'
+  title       String
+  format      String
+  status      String    @default("planned") // 'planned' | 'in-progress' | 'ready' | 'published'
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([week])
+  @@index([status])
+  @@map("marketing_content_items")
+}
+
+model MarketingSeoPage {
+  id            String   @id @default(cuid())
+  url           String   @unique
+  type          String // 'city-specialty' | 'condition' | 'blog' | 'comparison'
+  title         String
+  status        String   @default("planned") // 'live' | 'in-progress' | 'planned'
+  targetKeyword String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("marketing_seo_pages")
+}
+
+model MarketingKeywordCluster {
+  id        String   @id @default(cuid())
+  cluster   String
+  type      String // 'transactional' | 'informational' | 'comparison' | 'provider-side'
+  priority  String // 'high' | 'medium' | 'low'
+  keywords  Json     @default("[]") // Array<{ keyword, volume, difficulty }>
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("marketing_keyword_clusters")
+}
+
+model MarketingLifecycleFlow {
+  id        String                   @id @default(cuid())
+  name      String
+  segment   String // 'patient' | 'provider'
+  trigger   String
+  status    String                   @default("draft") // 'active' | 'draft' | 'paused'
+  steps     MarketingLifecycleStep[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  @@map("marketing_lifecycle_flows")
+}
+
+model MarketingLifecycleStep {
+  id      String @id @default(cuid())
+  flowId  String
+  day     Int
+  channel String
+  message String
+  goal    String
+  order   Int    @default(0)
+
+  flow MarketingLifecycleFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@index([flowId])
+  @@map("marketing_lifecycle_steps")
+}
+
+model MarketingPlanItem {
+  id        String   @id @default(cuid())
+  phase     String // '1-30' | '31-60' | '61-90'
+  category  String
+  task      String
+  owner     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phase])
+  @@map("marketing_plan_items")
+}
+
+model MarketingIntakeResponse {
+  id         String   @id @default(cuid())
+  questionId String   @unique
+  value      Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("marketing_intake_responses")
+}
+
+// =======================
+// PATIENT VERIFICATION (PHASE 1)
+// =======================
+
+enum PatientVerificationStatus {
+  PENDING_OTP
+  OTP_VERIFIED
+  PROFILE_COMPLETE
+  INTAKE_COMPLETE
+  CONSENT_GIVEN
+  ID_UPLOAD_PENDING
+  ID_UNDER_REVIEW
+  ID_VERIFIED
+  CONFIRMED
+  FLAGGED
+  EMERGENCY_OVERRIDE
+}
+
+enum RiskTier {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TriageLevel {
+  STANDARD
+  URGENT
+  EMERGENCY
+}
+
+enum ManualReviewReason {
+  HIGH_RISK_SCORE
+  OCR_MISMATCH
+  FACE_MATCH_FAILED
+  MINOR_PATIENT
+  PROVIDER_FLAGGED
+  SUSPICIOUS_ACTIVITY
+  EMERGENCY_OVERRIDE_REQUESTED
+  REPEAT_ADDRESS_MISMATCH
+}
+
+enum ReviewPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ReviewStatus {
+  OPEN
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+model PatientVerification {
+  id                   String                    @id @default(cuid())
+  patientId            String                    @unique
+  status               PatientVerificationStatus @default(PENDING_OTP)
+  riskScore            Int                       @default(0)
+  riskTier             RiskTier                  @default(LOW)
+  riskTriggers         String[]
+  idType               String?
+  idTokenRef           String?
+  idVerifiedAt         DateTime?
+  idVerificationSource String?
+  ocrConfidenceScore   Float?
+  faceMatchScore       Float?
+  isMinor              Boolean                   @default(false)
+  guardianName         String?
+  guardianRelationship String?
+  guardianPhone        String?
+  guardianIdTokenRef   String?
+  guardianAadhaarLast4 String?
+  // Self-serve KYC (profile-launched wizard) fields
+  fullName             String?
+  dateOfBirth          DateTime?
+  gender               String?
+  addressLine          String?
+  city                 String?
+  state                String?
+  pincode              String?
+  addressLat           Float?
+  addressLng           Float?
+  addressSource        String?
+  selfieStoragePath    String?
+  faceMatchPassed      Boolean?
+  ocrMatchPassed       Boolean?
+  submittedAt          DateTime?
+  autoApprovedAt       DateTime?
+  emergencyOverride    Boolean                   @default(false)
+  overrideReason       String?
+  overrideBy           String?
+  overrideAt           DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  patient               PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  idDocuments           PatientIdDocument[]
+  verificationAuditLogs VerificationAuditLog[]
+  manualReviewQueues    ManualReviewQueue[]
+
+  @@index([status])
+  @@index([riskTier])
+  @@map("patient_verifications")
+}
+
+model PatientIdDocument {
+  id                String   @id @default(cuid())
+  verificationId    String
+  documentType      String
+  storagePath       String
+  extractedName     String?
+  extractedDob      String?
+  extractedIdNumber String?
+  ocrRawResult      Json?
+  uploadedAt        DateTime @default(now())
+
+  verification PatientVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([verificationId])
+  @@map("patient_id_documents")
+}
+
+model VerificationAuditLog {
+  id             String   @id @default(cuid())
+  verificationId String
+  action         String
+  performedBy    String?
+  meta           Json?
+  createdAt      DateTime @default(now())
+
+  verification PatientVerification @relation(fields: [verificationId], references: [id])
+
+  @@index([verificationId])
+  @@index([createdAt])
+  @@map("verification_audit_logs")
+}
+
+model ClinicalIntake {
+  id                  String      @id @default(cuid())
+  bookingId           String      @unique
+  consultationReason  String
+  symptoms            String
+  allergies           String?
+  currentMedications  String?
+  medicalHistory      String?
+  hasPets             Boolean     @default(false)
+  petType             String?
+  gateCode            String?
+  floorNumber         Int?
+  patientAlone        Boolean     @default(false)
+  mobilityConstraint  Boolean     @default(false)
+  infectionRiskFlag   Boolean     @default(false)
+  specialInstructions String?
+  triageLevel         TriageLevel @default(STANDARD)
+  triageFlags         String[]
+  emergencyRedirected Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("clinical_intakes")
+}
+
+model ConsentRecord {
+  id                String   @id @default(cuid())
+  patientId         String
+  bookingId         String?  @unique
+  consentVersion    String
+  consentText       String
+  acceptedAt        DateTime @default(now())
+  ipAddress         String?
+  deviceId          String?
+  signatureArtifact String?
+  isGuardianConsent Boolean  @default(false)
+  guardianName      String?
+  guardianPhone     String?
+
+  patient PatientProfile @relation(fields: [patientId], references: [id])
+  booking Booking?       @relation(fields: [bookingId], references: [id])
+
+  @@index([patientId])
+  @@map("consent_records")
+}
+
+model VisitOtp {
+  id          String    @id @default(cuid())
+  bookingId   String    @unique
+  otp         String
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  providerLat Float?
+  providerLng Float?
+  createdAt   DateTime  @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("visit_otps")
+}
+
+model ManualReviewQueue {
+  id             String             @id @default(cuid())
+  verificationId String
+  reason         ManualReviewReason
+  priority       ReviewPriority     @default(NORMAL)
+  status         ReviewStatus       @default(OPEN)
+  assignedTo     String?
+  notes          String?
+  resolvedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  verification PatientVerification @relation(fields: [verificationId], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("manual_review_queue")
 }

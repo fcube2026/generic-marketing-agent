@@ -1,8 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '@/components/ui/Card';
 import { intakeQuestions } from '@/lib/data';
+import {
+  getIntakeResponses,
+  saveIntakeResponses,
+} from '@/lib/services/marketingService';
 
 const tierLabels: Record<number, { label: string; desc: string; color: string }> = {
   1: { label: 'Tier 1 — Mandatory', desc: 'Core business questions (must complete)', color: 'bg-red-50 border-red-200 text-red-700' },
@@ -11,8 +15,28 @@ const tierLabels: Record<number, { label: string; desc: string; color: string }>
 };
 
 export default function IntakePage() {
-  const [answers, setAnswers] = useState<Record<string, string | string[] | boolean>>({});
+  const [answers, setAnswers] = useState<Record<string, string | string[] | boolean | number>>({});
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getIntakeResponses()
+      .then((data) => {
+        if (!cancelled) setAnswers(data);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load intake responses');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const tier1 = intakeQuestions.filter((q) => q.tier === 1);
   const tier2 = intakeQuestions.filter((q) => q.tier === 2);
@@ -46,9 +70,19 @@ export default function IntakePage() {
     setAnswers((prev) => ({ ...prev, [id]: value }));
   }
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await saveIntakeResponses(answers);
+      setAnswers(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save answers');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function renderQuestion(q: (typeof intakeQuestions)[0]) {
@@ -184,21 +218,34 @@ export default function IntakePage() {
         <p className="mt-1">Answer these questions to personalise your full marketing strategy, channel recommendations, and content calendar. Tier 1 is mandatory; Tiers 2 and 3 add depth.</p>
       </div>
 
-      {renderSection(tier1, 1)}
-      {renderSection(tier2, 2)}
-      {renderSection(tier3, 3)}
+      {loading && <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />}
 
-      <div className="flex items-center justify-between py-2">
-        <p className="text-sm text-gray-500">
-          {allTier1Answered ? '✅ Tier 1 complete — strategy is personalised.' : '⚠️ Complete Tier 1 to unlock personalised strategy.'}
-        </p>
-        <button
-          onClick={handleSave}
-          className="px-6 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-dark transition"
-        >
-          {saved ? '✅ Saved!' : 'Save Answers'}
-        </button>
-      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          {renderSection(tier1, 1)}
+          {renderSection(tier2, 2)}
+          {renderSection(tier3, 3)}
+
+          <div className="flex items-center justify-between py-2">
+            <p className="text-sm text-gray-500">
+              {allTier1Answered ? '✅ Tier 1 complete — strategy is personalised.' : '⚠️ Complete Tier 1 to unlock personalised strategy.'}
+            </p>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-6 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-dark transition disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : saved ? '✅ Saved!' : 'Save Answers'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

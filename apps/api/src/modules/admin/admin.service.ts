@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DoctorVerificationService } from '../doctor-verification/doctor-verification.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
+import * as bcrypt from 'bcryptjs';
 
 const GENERIC_SERVICE_SLUGS = ['doctor', 'general-medicine'];
 
@@ -9,6 +17,7 @@ export class AdminService {
   constructor(
     private prisma: PrismaService,
     private verificationService: DoctorVerificationService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getAllProviders(status?: string) {
@@ -47,6 +56,63 @@ export class AdminService {
     });
     if (!provider) throw new NotFoundException('Provider not found');
     return provider;
+  }
+
+  async getProviderPatients(providerId: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    const bookings = await this.prisma.booking.findMany({
+      where: { providerId },
+      include: {
+        patient: { include: { user: true } },
+        consultationSummary: true,
+        serviceCategory: true,
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+
+    const patientMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        phone: string;
+        email: string | null;
+        gender: string | null;
+        dateOfBirth: Date | null;
+        visitCount: number;
+        lastVisit: Date;
+        lastStatus: string;
+        lastDiagnosis: string | null;
+        lastService: string;
+      }
+    >();
+
+    for (const booking of bookings) {
+      const pid = booking.patient.id;
+      if (!patientMap.has(pid)) {
+        patientMap.set(pid, {
+          id: pid,
+          name: booking.patient.name,
+          phone: booking.patient.user.phone,
+          email: booking.patient.user.email ?? null,
+          gender: booking.patient.gender ?? null,
+          dateOfBirth: booking.patient.dateOfBirth ?? null,
+          visitCount: 1,
+          lastVisit: booking.scheduledAt,
+          lastStatus: booking.status,
+          lastDiagnosis: booking.consultationSummary?.diagnosis ?? null,
+          lastService: booking.serviceCategory.name,
+        });
+      } else {
+        patientMap.get(pid)!.visitCount++;
+      }
+    }
+
+    return Array.from(patientMap.values());
   }
 
   async getPendingProviders() {
@@ -175,8 +241,9 @@ export class AdminService {
       },
     });
 
-    await this.prisma.notification.create({
-      data: {
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
         userId: provider.userId,
         title: 'Account Approved',
         message:
@@ -184,7 +251,14 @@ export class AdminService {
         type: 'PROVIDER_APPROVED',
         metadata: { providerId },
       },
-    });
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_APPROVED',
+        smsParams: {},
+      },
+    );
 
     return updated;
   }
@@ -215,8 +289,9 @@ export class AdminService {
       },
     });
 
-    await this.prisma.notification.create({
-      data: {
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
         userId: provider.userId,
         title: 'Account Rejected',
         message: reason
@@ -225,7 +300,14 @@ export class AdminService {
         type: 'PROVIDER_REJECTED',
         metadata: { providerId, reason },
       },
-    });
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_REJECTED',
+        smsParams: { reason: reason || '' },
+      },
+    );
 
     return updated;
   }
@@ -254,6 +336,26 @@ export class AdminService {
         notes,
       },
     });
+
+    // Send notification with push and SMS
+    await this.notificationsService.sendNotification(
+      {
+        userId: provider.userId,
+        title: 'Account Deactivated',
+        message: notes
+          ? `Your provider account has been deactivated. Reason: ${notes}`
+          : 'Your provider account has been deactivated. Please contact support for assistance.',
+        type: 'PROVIDER_DEACTIVATED',
+        metadata: { providerId, reason: notes },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PROVIDER_DEACTIVATED',
+        smsParams: { reason: notes || '' },
+      },
+    );
 
     return updated;
   }
@@ -514,6 +616,7 @@ export class AdminService {
   async processPayoutRecord(payoutId: string, adminId: string) {
     const payout = await this.prisma.payout.findUnique({
       where: { id: payoutId },
+      include: { provider: true },
     });
     if (!payout) throw new NotFoundException('Payout not found');
 
@@ -534,6 +637,24 @@ export class AdminService {
       },
     });
 
+    // Send notification to provider with push and SMS
+    await this.notificationsService.sendNotification(
+      {
+        userId: payout.provider.userId,
+        title: 'Payout Processed',
+        message: `Your payout of ₹${payout.amount} has been processed successfully.`,
+        type: 'PAYOUT_PROCESSED',
+        metadata: { payoutId, amount: payout.amount },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'PAYOUT_PROCESSED',
+        smsParams: { amount: String(payout.amount) },
+      },
+    );
+
     return updated;
   }
 
@@ -543,5 +664,199 @@ export class AdminService {
 
   async retryNmcVerification(licenseId: string, adminId: string) {
     return this.verificationService.retryVerification(licenseId, adminId);
+  }
+
+  async getProviderVerificationDetail(providerId: string) {
+    return this.verificationService.getProviderVerificationDetail(providerId);
+  }
+
+  async requestMoreInfo(providerId: string, adminId: string, message?: string) {
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    await this.prisma.adminAction.create({
+      data: {
+        adminId,
+        action: 'REQUEST_MORE_INFO',
+        targetId: providerId,
+        targetType: 'ProviderProfile',
+        notes: message,
+      },
+    });
+
+    await this.notificationsService.sendNotification(
+      {
+        userId: provider.userId,
+        title: 'Additional Information Required',
+        message: message
+          ? `Our team needs more information to complete your verification: ${message}`
+          : 'Our team needs additional information to complete your verification. Please check the app for details.',
+        type: 'VERIFICATION_MORE_INFO',
+        metadata: { providerId },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: false,
+      },
+    );
+
+    return { success: true, message: 'Request sent to provider successfully.' };
+  }
+
+  // ─── User Management ────────────────────────────────────────────
+
+  async getAdminUsers(page = 1, limit = 20, search?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {
+      role: { in: ['ADMIN', 'PHARMACIST', 'MARKETING_AGENT'] },
+    };
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async createAdminUser(dto: CreateAdminUserDto) {
+    const existing = await this.prisma.user.findFirst({
+      where: { email: dto.email },
+    });
+    if (existing)
+      throw new ConflictException('A user with this email already exists');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const phone = `+admin${Date.now()}`;
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        passwordHash,
+        phone,
+        role: dto.role || 'ADMIN',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return user;
+  }
+
+  async updateAdminUser(userId: string, dto: UpdateAdminUserDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const data: any = {};
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.role) data.role = dto.role;
+    if (dto.password) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async resetUserPassword(userId: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { success: true, message: 'Password reset successfully' };
+  }
+
+  async getAllUsers(page = 1, limit = 20, role?: string, search?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (role) where.role = role;
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          patientProfile: { select: { name: true } },
+          providerProfile: {
+            select: { name: true, specialization: true, isVerified: true },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      data: users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

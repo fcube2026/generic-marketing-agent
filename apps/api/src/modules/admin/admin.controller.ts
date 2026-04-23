@@ -1,6 +1,8 @@
 import { Controller, Get, Put, Post, Body, Param, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
+import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
 @Roles('ADMIN')
 @Controller('admin')
@@ -30,6 +32,11 @@ export class AdminController {
   @Get('providers/:id')
   getProviderById(@Param('id') providerId: string) {
     return this.adminService.getProviderById(providerId);
+  }
+
+  @Get('providers/:id/patients')
+  getProviderPatients(@Param('id') providerId: string) {
+    return this.adminService.getProviderPatients(providerId);
   }
 
   @Put('providers/:id/verify')
@@ -135,5 +142,70 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     return this.adminService.retryNmcVerification(licenseId, user.id);
+  }
+
+  @Get('verification/providers/:providerId')
+  getProviderVerificationDetail(@Param('providerId') providerId: string) {
+    return this.adminService.getProviderVerificationDetail(providerId);
+  }
+
+  @Post('verification/providers/:providerId/request-info')
+  requestMoreInfo(
+    @Param('providerId') providerId: string,
+    @CurrentUser() user: any,
+    @Body('message') message?: string,
+  ) {
+    return this.adminService.requestMoreInfo(providerId, user.id, message);
+  }
+
+  // ─── User Management ────────────────────────────────────────────
+
+  @Get('users')
+  getAdminUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getAdminUsers(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      search,
+    );
+  }
+
+  @Get('users/all')
+  getAllUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('role') role?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getAllUsers(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+      role,
+      search,
+    );
+  }
+
+  @Post('users')
+  createAdminUser(@Body() dto: CreateAdminUserDto) {
+    return this.adminService.createAdminUser(dto);
+  }
+
+  @Put('users/:id')
+  updateAdminUser(
+    @Param('id') userId: string,
+    @Body() dto: UpdateAdminUserDto,
+  ) {
+    return this.adminService.updateAdminUser(userId, dto);
+  }
+
+  @Put('users/:id/reset-password')
+  resetUserPassword(
+    @Param('id') userId: string,
+    @Body('password') password: string,
+  ) {
+    return this.adminService.resetUserPassword(userId, password);
   }
 }

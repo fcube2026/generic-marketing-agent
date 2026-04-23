@@ -161,3 +161,111 @@ export interface ReferralsResponse {
   page: number;
   limit: number;
 }
+
+// ========================
+// PHARMACY TYPES
+// ========================
+
+export interface MedicineResult {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  price: number;
+  unit?: string;
+  requiresPrescription?: boolean;
+}
+
+// Matches the object shape returned by GET /pharmacy/partners (or /pharmacy/providers)
+export interface PharmacyPartner {
+  id: string;
+  code: string;
+  name: string;
+  displayName: string;
+  description?: string | null;
+  logoUrl?: string | null;
+  priority: number;
+  providerKey: string;
+  registered: boolean;
+}
+
+export interface PharmacyOrderItem {
+  id: string;
+  // Backend returns medicineCode, not medicineId
+  medicineCode?: string | null;
+  medicineName: string;
+  dosage?: string | null;
+  instructions?: string | null;
+  isSubstitute: boolean;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+// Expanded to match all statuses from PharmacyOrderStatus enum on the backend
+export type PharmacyOrderStatus =
+  | 'PENDING'
+  | 'PRESCRIPTION_REVIEW'
+  | 'CONFIRMED'
+  | 'PACKED'
+  | 'SHIPPED'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'RETURNED'
+  | 'REFUNDED';
+
+export interface PharmacyOrder {
+  id: string;
+  orderNumber: string;
+  // Backend returns patientProfileId (not patientId)
+  patientProfileId: string;
+  bookingId?: string | null;
+  prescriptionId?: string | null;
+  // Backend returns pharmacyPartnerId (not partnerId)
+  pharmacyPartnerId: string;
+  partnerCode: string;
+  partnerName: string;
+  partnerOrderId?: string | null;
+  status: PharmacyOrderStatus | string;
+  // Backend returns both the address ID and formatted string
+  deliveryAddressId: string;
+  deliveryAddress: string;
+  prescriptionImageUrl?: string | null;
+  subtotal: number;
+  deliveryFee: number;
+  discount: number;
+  totalAmount: number;
+  estimatedDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PharmacyOrderItem[];
+}
+
+export interface PharmacyOrdersResponse {
+  data: PharmacyOrder[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreatePharmacyOrderPayload {
+  partnerId: string;
+  // Backend requires deliveryAddressId (the address record ID), not a free-text string
+  deliveryAddressId: string;
+  items: {
+    // Backend requires medicineCode (not medicineId)
+    medicineCode: string;
+    medicineName: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+  bookingId?: string;
+  prescriptionId?: string;
+  notes?: string;
+}
+
+export interface SelectedMedicine extends MedicineResult {
+  quantity: number;
+}

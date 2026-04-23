@@ -5,6 +5,7 @@ import { Colors } from '../../constants/colors';
 import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge';
 import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { VerificationBanner } from '../../components/verification/VerificationBanner';
 import { bookingService } from '../../services/bookingService';
 import { Booking, BookingStatus, PaymentStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
@@ -25,6 +26,7 @@ export const HistoryScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <VerificationBanner />
       <Text style={styles.header}>Booking History</Text>
       {(!bookings || bookings.length === 0) ? (
         <View style={styles.empty}>
@@ -40,13 +42,19 @@ export const HistoryScreen: React.FC = () => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
-              onPress={() => navigation.navigate('Tracking', { bookingId: item.id })}
+              onPress={() => {
+                if (item.mode === 'VIDEO_CONSULTATION') {
+                  navigation.navigate('VideoLobby', { bookingId: item.id });
+                } else {
+                  navigation.navigate('Tracking', { bookingId: item.id });
+                }
+              }}
             >
               <View style={styles.itemHeader}>
                 <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
                 <BookingStatusBadge status={item.status as BookingStatus} />
               </View>
-              <Text style={styles.service}>{item.serviceCategory?.name}</Text>
+              <Text style={styles.service}>{item.serviceCategory?.name}{item.mode === 'VIDEO_CONSULTATION' ? ' 🎥' : ''}</Text>
               <View style={styles.itemFooter}>
                 <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
                 <PaymentStatusBadge status={item.paymentStatus as PaymentStatus} />

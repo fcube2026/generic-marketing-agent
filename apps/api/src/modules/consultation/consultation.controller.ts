@@ -1,24 +1,29 @@
 import {
-  BadRequestException,
-  Body,
   Controller,
-  Get,
-  Param,
   Post,
+  Get,
+  Body,
+  Param,
   Query,
   UploadedFile,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ConsultationService } from './consultation.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
+import { AddConsultationPrescriptionDto } from './dto/add-consultation-prescription.dto';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
-import type { UploadedPrescriptionFile } from '../prescription/prescription.service';
 
 @Controller('consultation')
 export class ConsultationController {
   constructor(private consultationService: ConsultationService) {}
+
+  @Get('latest')
+  getLatestForPatient(@CurrentUser() user: any) {
+    return this.consultationService.getLatestForPatient(user.id);
+  }
 
   @Get('patient/summaries')
   getPatientSummaries(
@@ -47,30 +52,38 @@ export class ConsultationController {
     return this.consultationService.getSummary(bookingId);
   }
 
-  /**
-   * Provider uploads a prescription (image, PDF, and/or text details)
-   * for the patient under a booking. Requires the consultation summary
-   * to already exist.
-   */
   @Post(':bookingId/prescription')
+  addPrescription(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: any,
+    @Body() dto: AddConsultationPrescriptionDto,
+  ) {
+    return this.consultationService.addPrescription(bookingId, user.id, dto);
+  }
+
+  @Post(':bookingId/prescription/upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
-  uploadPrescription(
+  addPrescriptionFile(
     @Param('bookingId') bookingId: string,
     @CurrentUser() user: any,
-    @UploadedFile() file: UploadedPrescriptionFile | undefined,
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    },
     @Body('details') details?: string,
   ) {
-    if (!file && !details?.trim()) {
-      throw new BadRequestException(
-        'Provide a prescription file, details, or both.',
-      );
+    if (!file) {
+      throw new BadRequestException('No file provided.');
     }
-    return this.consultationService.uploadPrescriptionFile(
+    return this.consultationService.addPrescriptionWithFile(
       bookingId,
       user.id,
       file,

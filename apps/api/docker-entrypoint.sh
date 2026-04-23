@@ -15,14 +15,19 @@ export DIRECT_URL
 # resolve or download the package, eating up the healthcheck window.
 PRISMA_BIN="./node_modules/.bin/prisma"
 
-# The migration 20260412000000_add_doctor_verification may be recorded as
-# "failed" in _prisma_migrations if a previous deployment was killed mid-run.
-# Mark it as applied so that `migrate deploy` can proceed; the follow-up
-# idempotent migration (20260413000000_ensure_doctor_verification_schema)
-# will complete any columns/tables that were not actually created yet.
-FAILED_MIGRATION="20260412000000_add_doctor_verification"
-DATABASE_URL="$DIRECT_URL" timeout 30 "$PRISMA_BIN" migrate resolve --applied "$FAILED_MIGRATION" \
-  --schema=packages/database/prisma/schema.prisma 2>/dev/null || true
+# Resolve any migrations that may be recorded as "failed" in _prisma_migrations
+# due to a deployment being killed mid-run. Marking them as applied lets
+# `migrate deploy` proceed; follow-up idempotent migrations handle any gaps.
+
+FAILED_MIGRATIONS=(
+  "20260412000000_add_doctor_verification"
+  "20260419010000_remove_placed_from_pharmacy_status"
+)
+
+for FAILED_MIGRATION in "${FAILED_MIGRATIONS[@]}"; do
+  DATABASE_URL="$DIRECT_URL" timeout 30 "$PRISMA_BIN" migrate resolve --applied "$FAILED_MIGRATION" \
+    --schema=packages/database/prisma/schema.prisma 2>/dev/null || true
+done
 
 # Use DIRECT_URL for migrations (pooler connections don't support DDL migrations).
 # Timeout after 120s to avoid hanging indefinitely and exhausting the healthcheck window.

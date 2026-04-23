@@ -53,6 +53,23 @@ export const HomeScreen: React.FC = () => {
     .filter((b) => b.status === 'COMPLETED' || b.status === 'CLOSED')
     .reduce((sum, b) => sum + b.totalFee * 0.8, 0);
 
+  const activeVideoBookings = (bookings || []).filter(
+    (b) =>
+      b.mode === 'VIDEO_CONSULTATION' &&
+      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
+  );
+
+  const handleVideoConsultationPress = () => {
+    if (activeVideoBookings.length > 0) {
+      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
+    } else {
+      Alert.alert(
+        'Video Consultations',
+        'You have no active video bookings. Accept a video consultation booking to start a session.',
+      );
+    }
+  };
+
   if (profileLoading) return <LoadingSpinner fullScreen />;
 
   if (!profile) {
@@ -115,6 +132,20 @@ export const HomeScreen: React.FC = () => {
         </Card>
       </View>
 
+      {/* Video Consultation Quick Access */}
+      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
+        <Text style={styles.videoCardIcon}>📹</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Video Consultations</Text>
+          <Text style={styles.videoCardSub}>
+            {activeVideoBookings.length > 0
+              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
+              : 'View your video consultation bookings'}
+          </Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {pendingBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🔔 New Requests</Text>
@@ -125,6 +156,7 @@ export const HomeScreen: React.FC = () => {
               onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
             >
               <Text style={styles.bookingAlertText}>
+                {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
                 {booking.patient?.name || 'Patient'} — {booking.serviceCategory?.name}
               </Text>
               <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
@@ -143,7 +175,10 @@ export const HomeScreen: React.FC = () => {
               onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
             >
               <View style={styles.bookingItemLeft}>
-                <Text style={styles.bookingPatient}>{booking.patient?.name || 'Patient'}</Text>
+                <Text style={styles.bookingPatient}>
+                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
+                  {booking.patient?.name || 'Patient'}
+                </Text>
                 <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
               </View>
               <BookingStatusBadge status={booking.status as BookingStatus} />
@@ -179,6 +214,27 @@ const styles = StyleSheet.create({
   bookingItemLeft: {},
   bookingPatient: { fontSize: 15, fontWeight: '600', color: Colors.text },
   bookingService: { fontSize: 13, color: Colors.textMuted },
+  videoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  videoCardIcon: { fontSize: 28, marginRight: 14 },
+  videoCardContent: { flex: 1 },
+  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
   onboardingPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: Colors.background },
   onboardingIcon: { fontSize: 72, marginBottom: 20 },
   onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },

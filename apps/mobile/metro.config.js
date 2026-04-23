@@ -22,9 +22,9 @@ config.watchFolders = [
 ];
 
 // Windows + OneDrive tends to fail spawning many Metro transform workers.
-// Keep the worker pool at 1 to prevent OOM in transform worker child processes.
+// Keep the worker pool small for local dev stability.
 if (process.platform === 'win32') {
-  config.maxWorkers = 1;
+  config.maxWorkers = 2;
 }
 
 // Ensure node_modules resolve from both the app and monorepo root

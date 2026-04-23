@@ -6,23 +6,30 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
-import type { UploadedPrescriptionFile } from '../prescription/prescription.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 
-const ALLOWED_PRESCRIPTION_MIME = [
+interface UploadedConsultationPrescriptionFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
+const ALLOWED_PRESCRIPTION_MIME_TYPES = [
   'image/jpeg',
   'image/png',
   'application/pdf',
 ];
-const MAX_PRESCRIPTION_BYTES = 10 * 1024 * 1024;
+
+const MAX_PRESCRIPTION_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 @Injectable()
 export class ConsultationService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-    private storage: PrescriptionStorageService,
+    private prescriptionStorageService: PrescriptionStorageService,
   ) {}
 
   async createSummary(
@@ -174,24 +181,11 @@ export class ConsultationService {
       ? summary.medicinesAdvised
       : [];
 
-    let prescriptionUrl: string | null = null;
-    if (latestPrescription?.fileUrl) {
-      try {
-        // fileUrl stores the storage path; re-sign on each fetch.
-        prescriptionUrl = await this.storage.getSignedUrl(
-          latestPrescription.fileUrl,
-        );
-      } catch {
-        // If the value is already a public URL, fall back to it as-is.
-        prescriptionUrl = latestPrescription.fileUrl;
-      }
-    }
-
     return {
       consultationId: summary.id,
       createdAt: summary.createdAt,
       medicines,
-      prescriptionUrl,
+      prescriptionUrl: latestPrescription?.fileUrl ?? null,
     };
   }
 
@@ -227,11 +221,19 @@ export class ConsultationService {
       );
     }
 
+    const details = data.details?.trim();
+    const fileUrl = data.fileUrl?.trim();
+    if (!details && !fileUrl) {
+      throw new BadRequestException(
+        'Either prescription details or file URL is required',
+      );
+    }
+
     const prescription = await this.prisma.prescription.create({
       data: {
         consultationSummaryId: booking.consultationSummary.id,
-        details: data.details,
-        fileUrl: data.fileUrl,
+        details,
+        fileUrl,
       },
     });
 
@@ -264,33 +266,20 @@ export class ConsultationService {
     return prescription;
   }
 
-  /**
-   * Provider uploads a prescription file (image or PDF) and/or text details
-   * for a booking after the consultation summary has been submitted. Stored
-   * in the private prescriptions bucket; the patient app fetches the latest
-   * via /consultation/latest.
-   */
-  async uploadPrescriptionFile(
+  async addPrescriptionWithFile(
     bookingId: string,
     userId: string,
-    file: UploadedPrescriptionFile | undefined,
-    details: string | undefined,
+    file: UploadedConsultationPrescriptionFile,
+    details?: string,
   ) {
-    if (!file && !details?.trim()) {
+    if (!ALLOWED_PRESCRIPTION_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Provide a prescription file, details, or both.',
+        'Invalid file type. Only JPEG, PNG, and PDF are accepted.',
       );
     }
 
-    if (file) {
-      if (!ALLOWED_PRESCRIPTION_MIME.includes(file.mimetype)) {
-        throw new BadRequestException(
-          'Invalid file type. Only JPEG, PNG, and PDF are accepted.',
-        );
-      }
-      if (file.size > MAX_PRESCRIPTION_BYTES) {
-        throw new BadRequestException('File size exceeds the 10 MB limit.');
-      }
+    if (file.size > MAX_PRESCRIPTION_FILE_SIZE_BYTES) {
+      throw new BadRequestException('File size exceeds the 10 MB limit.');
     }
 
     const booking = await this.prisma.booking.findUnique({
@@ -298,75 +287,29 @@ export class ConsultationService {
       include: {
         provider: true,
         patient: { include: { user: true } },
-        consultationSummary: true,
       },
     });
 
     if (!booking) throw new NotFoundException('Booking not found');
+
     if (booking.provider.userId !== userId) {
       throw new ForbiddenException(
-        'Only the assigned provider can upload prescriptions',
-      );
-    }
-    if (!booking.consultationSummary) {
-      throw new BadRequestException(
-        'Submit the consultation summary before uploading a prescription.',
+        'Only the assigned provider can add prescriptions',
       );
     }
 
-    let storagePath: string | undefined;
-    let signedUrl: string | undefined;
+    const filePath = await this.prescriptionStorageService.uploadFile(
+      booking.patient.userId,
+      `consultation-${bookingId}-${Date.now()}`,
+      file.buffer,
+      file.mimetype,
+    );
+    const fileUrl =
+      await this.prescriptionStorageService.getSignedUrl(filePath);
 
-    if (file) {
-      // Reuse the prescriptions bucket; key by patient userId + summary id.
-      const tmpId = `${booking.consultationSummary.id}_${Date.now()}`;
-      storagePath = await this.storage.uploadFile(
-        booking.patient.userId,
-        tmpId,
-        file.buffer,
-        file.mimetype,
-      );
-      signedUrl = await this.storage.getSignedUrl(storagePath);
-    }
-
-    const prescription = await this.prisma.prescription.create({
-      data: {
-        consultationSummaryId: booking.consultationSummary.id,
-        details: details?.trim() || undefined,
-        // Persist the storage path so we can re-sign later. The signed URL
-        // returned in the response is short-lived (5 min).
-        fileUrl: storagePath,
-      },
+    return this.addPrescription(bookingId, userId, {
+      details,
+      fileUrl,
     });
-
-    await this.notificationsService
-      .sendNotification(
-        {
-          userId: booking.patient.userId,
-          title: 'Prescription Available',
-          message: `Dr. ${booking.provider.name} has uploaded your prescription. View it in the app.`,
-          type: 'PRESCRIPTION_UPLOADED',
-          metadata: { bookingId, prescriptionId: prescription.id },
-        },
-        {
-          inApp: true,
-          push: true,
-          whatsapp: true,
-          sms: false,
-          whatsappTemplate: 'PRESCRIPTION_UPLOADED',
-          smsTemplate: 'PRESCRIPTION_UPLOADED',
-          templateParams: { providerName: booking.provider.name },
-          idempotencyKey: `prescription_${prescription.id}`,
-        },
-      )
-      .catch(() => undefined);
-
-    return {
-      id: prescription.id,
-      details: prescription.details,
-      fileUrl: signedUrl ?? null,
-      storagePath,
-      createdAt: prescription.createdAt,
-    };
   }
 }

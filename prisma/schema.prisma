@@ -1,0 +1,28 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"  // Change this based on your database, e.g., "mysql", "sqlite"
+  url      = env("DATABASE_URL")  // Make sure to define the DATABASE_URL in your .env file
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())  // Unique identifier for the user
+  email     String   @unique  // Unique email field
+  password  String   // User's password
+  createdAt DateTime @default(now())  // Timestamp when the user was created
+  updatedAt DateTime @updatedAt  // Timestamp when the user was last updated
+  posts     Post[]   // Relation to Post model
+}
+
+model Post {
+  id        String   @id @default(cuid())  // Unique identifier for the post
+  title     String   // Title of the post
+  content   String?  // Optional content field
+  createdAt DateTime @default(now())  // Timestamp when the post was created
+  authorId  String   // Foreign key reference to the User model
+  author    User     @relation(fields: [authorId], references: [id])  // Relation to User
+}

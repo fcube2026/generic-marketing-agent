@@ -75,4 +75,26 @@ export const bookingService = {
     const r = await api.get(`/tracking/${bookingId}/location`);
     return r.data;
   },
+
+  getVideoSession: async (bookingId: string) => {
+    const r = await api.get(`/video-sessions/${bookingId}`);
+    return r.data;
+  },
+
+  createVideoRoom: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/create`);
+    return r.data;
+  },
+
+  getVideoToken: async (bookingId: string, role?: string) => {
+    const r = await api.get(`/video-sessions/${bookingId}/token`, {
+      params: role ? { role } : {},
+    });
+    return r.data as { token: string; roomId: string; role: string };
+  },
+
+  endVideoSession: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/end`);
+    return r.data;
+  },
 };

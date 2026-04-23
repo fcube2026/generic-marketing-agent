@@ -4,12 +4,11 @@ import {
   TouchableOpacity, SafeAreaView, Switch, Alert, FlatList,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { consultationService } from '../../services/providerService';
-import { referralService, diagnosticsService } from '../../services/providerService';
+import { bookingService } from '../../services/bookingService';
 import { pharmacyService } from '../../services/pharmacyService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import type { MedicineResult } from '../../types';
@@ -22,12 +21,6 @@ type Medicine = {
   dosage: string;
   frequency: string;
   duration: string;
-};
-
-type PrescriptionAsset = {
-  uri: string;
-  name?: string;
-  mimeType?: string;
 };
 
 /**
@@ -126,6 +119,7 @@ export const ConsultationFormScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { bookingId } = route.params;
+  const [booking, setBooking] = useState<any>(null);
 
   const [symptoms, setSymptoms] = useState('');
   const [observations, setObservations] = useState('');
@@ -140,59 +134,69 @@ export const ConsultationFormScreen: React.FC = () => {
   const [diagnosticTests, setDiagnosticTests] = useState('');
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
+  const [prescriptionDetails, setPrescriptionDetails] = useState('');
+  const [prescriptionFile, setPrescriptionFile] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [prescriptionFile, setPrescriptionFile] = useState<PrescriptionAsset | null>(null);
-  const [prescriptionNotes, setPrescriptionNotes] = useState('');
 
-  const pickPrescriptionFile = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png'],
-        copyToCacheDirectory: true,
-        multiple: false,
+  useEffect(() => {
+    let cancelled = false;
+    bookingService
+      .getBookingById(bookingId)
+      .then((data) => {
+        if (!cancelled) {
+          setBooking(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBooking(null);
+        }
       });
-      if (res.canceled) return;
-      const asset = res.assets?.[0];
-      if (!asset) return;
-      setPrescriptionFile({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType,
-      });
-    } catch {
-      Alert.alert('Error', 'Could not pick file.');
-    }
-  };
 
-  const pickPrescriptionImage = async () => {
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('Permission needed', 'Allow photo library access to attach an image.');
-        return;
-      }
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.85,
-      });
-      if (res.canceled) return;
-      const asset = res.assets?.[0];
-      if (!asset) return;
-      setPrescriptionFile({
-        uri: asset.uri,
-        name: asset.fileName || `prescription_${Date.now()}.jpg`,
-        mimeType: asset.mimeType || 'image/jpeg',
-      });
-    } catch {
-      Alert.alert('Error', 'Could not pick image.');
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
+
+  const patientName = booking?.patient?.name || 'Patient';
+  const uniquePatientId =
+    booking?.patient?.uniquePatientId ||
+    (booking?.patient?.id
+      ? `PT-${String(booking.patient.id).slice(-8).toUpperCase()}`
+      : '—');
 
   const addMedicine = () =>
     setMedicines(prev => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
   const removeMedicine = (index: number) => setMedicines(prev => prev.filter((_, i) => i !== index));
   const updateMedicine = (index: number, field: keyof Medicine, value: string) => {
     setMedicines(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
+  };
+
+  const pickPrescriptionFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      setPrescriptionFile({
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+        size: asset.size,
+      });
+    } catch {
+      Alert.alert('Error', 'Failed to pick prescription file.');
+    }
   };
 
   const handleSubmit = async () => {
@@ -209,46 +213,24 @@ export const ConsultationFormScreen: React.FC = () => {
         medicinesAdvised: medicines.filter(m => m.name.trim()),
         nextSteps,
         followUpRecommendation: followUpNeeded ? followUpNotes : undefined,
+        diagnosticTests: diagnosticNeeded ? diagnosticTests : undefined,
+        specialistReferral: referralNeeded ? specialistType : undefined,
       });
 
-      // Persist diagnostic test request via its own endpoint
-      if (diagnosticNeeded && diagnosticTests.trim()) {
-        try {
-          await diagnosticsService.createRequest({
-            bookingId,
-            testType: diagnosticTests.trim(),
-          });
-        } catch {
-          // non-fatal
-        }
-      }
-
-      // Persist specialist referral via its own endpoint
-      if (referralNeeded && specialistType.trim()) {
-        try {
-          await referralService.createReferral({
-            bookingId,
-            specialistType: specialistType.trim(),
-          });
-        } catch {
-          // non-fatal
-        }
-      }
-
-      // Optional: upload prescription file/notes after summary is saved.
-      if (prescriptionFile || prescriptionNotes.trim()) {
-        try {
-          await consultationService.uploadPrescription(
-            bookingId,
-            prescriptionFile,
-            prescriptionNotes,
-          );
-        } catch {
-          Alert.alert(
-            'Prescription not uploaded',
-            'Summary was saved, but the prescription failed to upload. You can retry from the booking details.',
-          );
-        }
+      if (prescriptionFile) {
+        await consultationService.addPrescriptionFile(
+          bookingId,
+          {
+            uri: prescriptionFile.uri,
+            name: prescriptionFile.name,
+            type: prescriptionFile.type,
+          },
+          prescriptionDetails.trim() || undefined,
+        );
+      } else if (prescriptionDetails.trim()) {
+        await consultationService.addPrescription(bookingId, {
+          details: prescriptionDetails.trim() || undefined,
+        });
       }
 
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
@@ -264,6 +246,12 @@ export const ConsultationFormScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.patientHeaderCard}>
+          <Text style={styles.patientHeaderLabel}>Patient</Text>
+          <Text style={styles.patientHeaderName}>{patientName}</Text>
+          <Text style={styles.patientHeaderId}>Patient ID: {uniquePatientId}</Text>
+        </View>
+
         <Text style={styles.intro}>Complete this mandatory summary to close the consultation.</Text>
 
         {/* Symptoms */}
@@ -357,37 +345,29 @@ export const ConsultationFormScreen: React.FC = () => {
             placeholder="e.g. Cardiologist, Orthopedic Surgeon" />
         )}
 
-        {/* Prescription upload (optional) */}
-        <Text style={styles.label}>Prescription (optional)</Text>
-        <Text style={styles.helperText}>
-          Attach a signed prescription image or PDF. The patient will see it under their recent consultation prescription.
-        </Text>
-        <View style={styles.prescriptionRow}>
-          <TouchableOpacity style={styles.prescBtn} onPress={pickPrescriptionImage}>
-            <Text style={styles.prescBtnText}>📷 Photo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.prescBtn} onPress={pickPrescriptionFile}>
-            <Text style={styles.prescBtnText}>📎 File / PDF</Text>
-          </TouchableOpacity>
-        </View>
-        {prescriptionFile && (
-          <View style={styles.prescPreview}>
-            <Text style={styles.prescPreviewText} numberOfLines={1}>
-              ✅ {prescriptionFile.name || 'Selected file'}
-            </Text>
-            <TouchableOpacity onPress={() => setPrescriptionFile(null)}>
-              <Text style={styles.prescRemoveText}>Remove</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Prescription */}
+        <Text style={styles.label}>Prescription (Optional)</Text>
         <TextInput
           style={styles.textarea}
-          value={prescriptionNotes}
-          onChangeText={setPrescriptionNotes}
-          placeholder="Prescription notes (e.g. Rx text, instructions)…"
+          value={prescriptionDetails}
+          onChangeText={setPrescriptionDetails}
+          placeholder="Write prescription details..."
           multiline
           numberOfLines={3}
         />
+        <TouchableOpacity style={styles.uploadBtn} onPress={pickPrescriptionFile}>
+          <Text style={styles.uploadBtnText}>Upload Prescription Image/PDF</Text>
+        </TouchableOpacity>
+        {prescriptionFile && (
+          <View style={styles.uploadInfoBox}>
+            <Text style={styles.uploadInfoText}>Selected: {prescriptionFile.name}</Text>
+            {!!prescriptionFile.size && (
+              <Text style={styles.uploadInfoMeta}>
+                {(prescriptionFile.size / (1024 * 1024)).toFixed(2)} MB
+              </Text>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
@@ -404,6 +384,23 @@ export const ConsultationFormScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 50 },
+  patientHeaderCard: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  patientHeaderLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
+  },
+  patientHeaderName: { fontSize: 16, color: Colors.text, fontWeight: '700', marginTop: 4 },
+  patientHeaderId: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
   intro: { fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 18 },
   label: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 6, marginTop: 16 },
   input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12, backgroundColor: Colors.white, fontSize: 14, color: Colors.text },
@@ -453,15 +450,28 @@ const styles = StyleSheet.create({
   removeBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
   addMedBtn: { marginTop: 4, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, borderStyle: 'dashed' },
   addMedBtnText: { color: Colors.primary, fontWeight: '600' },
-  helperText: { fontSize: 12, color: Colors.textMuted, marginBottom: 8, marginTop: -2 },
-  prescriptionRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  prescBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, backgroundColor: Colors.white },
-  prescBtnText: { color: Colors.primary, fontWeight: '700' },
-  prescPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
-  prescPreviewText: { color: Colors.primary, fontWeight: '600', flex: 1, marginRight: 10 },
-  prescRemoveText: { color: Colors.error, fontWeight: '700' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
   toggleLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  uploadBtn: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+  },
+  uploadBtnText: { color: Colors.primary, fontWeight: '700' },
+  uploadInfoBox: {
+    marginTop: 8,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    padding: 10,
+  },
+  uploadInfoText: { color: Colors.text, fontSize: 13, fontWeight: '600' },
+  uploadInfoMeta: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
   submitBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },
   submitBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });

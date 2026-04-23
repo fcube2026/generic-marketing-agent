@@ -3,6 +3,9 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
+import { PatientVerificationService } from '../patient-verification/patient-verification.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('BookingsService', () => {
   let service: BookingsService;
@@ -36,7 +39,32 @@ describe('BookingsService', () => {
   };
 
   const mockNotifications = {
-    createNotification: jest.fn(),
+    createNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    }),
+    sendNotification: jest.fn().mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    }),
+  };
+
+  const mockVideoReminder = {
+    scheduleReminders: jest.fn().mockResolvedValue(undefined),
+    cancelReminders: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockPatientVerification = {
+    isPatientVerified: jest.fn().mockResolvedValue(true),
+  };
+
+  const mockConfig = {
+    get: jest.fn((key: string, defaultValue?: any) => {
+      if (key === 'PATIENT_VERIFICATION_REQUIRED') return 'false';
+      return defaultValue;
+    }),
   };
 
   beforeEach(async () => {
@@ -45,6 +73,15 @@ describe('BookingsService', () => {
         BookingsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationsService, useValue: mockNotifications },
+        {
+          provide: VideoConsultationReminderService,
+          useValue: mockVideoReminder,
+        },
+        {
+          provide: PatientVerificationService,
+          useValue: mockPatientVerification,
+        },
+        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
 
@@ -100,18 +137,20 @@ describe('BookingsService', () => {
       mockPrisma.booking.create.mockResolvedValue(booking);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
       mockPrisma.payment.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.createBooking(userId, dto);
 
       expect(result).toEqual(booking);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith({
-        userId: 'provider-user-1',
-        title: 'New Booking Request',
-        message: 'You have a new home visit booking request.',
-        type: 'BOOKING_REQUEST',
-        metadata: { bookingId: 'booking-1' },
-      });
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'provider-user-1',
+          title: 'New Booking Request',
+          type: 'BOOKING_REQUEST',
+          metadata: { bookingId: 'booking-1' },
+        }),
+        expect.anything(),
+      );
     });
 
     it('should throw if patient profile not found', async () => {
@@ -220,7 +259,7 @@ describe('BookingsService', () => {
       mockPrisma.booking.create.mockResolvedValue(booking);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
       mockPrisma.payment.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.createBooking(userId, clinicDto);
       expect(result).toEqual(booking);
@@ -229,36 +268,115 @@ describe('BookingsService', () => {
 
   describe('acceptBooking', () => {
     it('should accept a REQUESTED booking and notify patient', async () => {
+      const scheduledAt = new Date('2024-01-01T10:00:00Z');
       const booking = {
         id: 'booking-1',
         status: 'REQUESTED',
         patientId: 'patient-1',
         providerId: 'provider-1',
+        scheduledAt,
       };
       const updated = { ...booking, status: 'ACCEPTED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1', name: 'John' },
         provider: { id: 'provider-1', name: 'Dr. Smith' },
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking) // for updateBookingStatus
-        .mockResolvedValueOnce(bookingWithRelations); // for notification lookup
+        .mockResolvedValueOnce(booking) // for updateBookingStatus status check
+        .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification
+        .mockResolvedValueOnce(bookingWithRelations); // for acceptBooking notification
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.acceptBooking('booking-1', 'user-1');
 
       expect(result).toEqual(updated);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith({
-        userId: 'patient-user-1',
-        title: 'Booking Accepted',
-        message: 'Your booking has been accepted by Dr. Smith.',
-        type: 'BOOKING_ACCEPTED',
-        metadata: { bookingId: 'booking-1' },
-      });
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'patient-user-1',
+          title: 'Booking Accepted',
+          type: 'BOOKING_ACCEPTED',
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('should schedule video reminders when accepting a VIDEO_CONSULTATION booking', async () => {
+      const scheduledAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      const booking = {
+        id: 'booking-video-1',
+        status: 'REQUESTED',
+        patientId: 'patient-1',
+        providerId: 'provider-1',
+        mode: 'VIDEO_CONSULTATION',
+        scheduledAt,
+      };
+      const updated = { ...booking, status: 'ACCEPTED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1', name: 'Jane' },
+        provider: {
+          id: 'provider-1',
+          userId: 'provider-user-1',
+          name: 'Dr. Smith',
+        },
+        scheduledAt,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
+
+      const result = await service.acceptBooking('booking-video-1', 'user-1');
+
+      expect(result).toEqual(updated);
+      expect(mockVideoReminder.scheduleReminders).toHaveBeenCalledWith(
+        'booking-video-1',
+        scheduledAt,
+        'patient-user-1',
+        'provider-user-1',
+        'Dr. Smith',
+        'Jane',
+      );
+    });
+
+    it('should not schedule video reminders for non-video bookings', async () => {
+      const scheduledAt = new Date('2024-01-01T10:00:00Z');
+      const booking = {
+        id: 'booking-1',
+        status: 'REQUESTED',
+        patientId: 'patient-1',
+        providerId: 'provider-1',
+        mode: 'HOME_VISIT',
+        scheduledAt,
+      };
+      const updated = { ...booking, status: 'ACCEPTED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1', name: 'John' },
+        provider: { id: 'provider-1', name: 'Dr. Smith' },
+        scheduledAt,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
+
+      await service.acceptBooking('booking-1', 'user-1');
+
+      expect(mockVideoReminder.scheduleReminders).not.toHaveBeenCalled();
     });
   });
 
@@ -278,11 +396,12 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce(bookingWithRelations);
+        .mockResolvedValueOnce(booking) // for updateBookingStatus status check
+        .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification (empty for DECLINED)
+        .mockResolvedValueOnce(bookingWithRelations); // for declineBooking notification
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.declineBooking(
         'booking-1',
@@ -291,14 +410,14 @@ describe('BookingsService', () => {
       );
 
       expect(result).toEqual(updated);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith({
-        userId: 'patient-user-1',
-        title: 'Booking Declined',
-        message:
-          'Your booking was declined by Dr. Smith. Reason: Not available',
-        type: 'BOOKING_DECLINED',
-        metadata: { bookingId: 'booking-1', reason: 'Not available' },
-      });
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'patient-user-1',
+          title: 'Booking Declined',
+          type: 'BOOKING_DECLINED',
+        }),
+        expect.anything(),
+      );
     });
 
     it('should decline without reason', async () => {
@@ -317,18 +436,22 @@ describe('BookingsService', () => {
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.declineBooking('booking-1', 'user-1');
 
       expect(result).toEqual(updated);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Your booking was declined by Dr. Smith.',
+          userId: 'patient-user-1',
+          title: 'Booking Declined',
+          type: 'BOOKING_DECLINED',
         }),
+        expect.anything(),
       );
     });
 
@@ -367,60 +490,113 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('getBooking', () => {
+    it('should include derived patient uniquePatientId in response', async () => {
+      const booking = {
+        id: 'booking-1',
+        patient: { id: 'abc123456789', name: 'John Doe' },
+        provider: { id: 'provider-1', user: { id: 'provider-user-1' } },
+        serviceCategory: null,
+        address: null,
+        statusHistory: [],
+        consultationSummary: null,
+        diagnosticRequests: [],
+        referrals: [],
+        payment: null,
+      };
+
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+      const result = await service.getBooking('booking-1', 'user-1');
+
+      expect(result.patient.uniquePatientId).toBe('PT-23456789');
+      expect(mockPrisma.booking.findUnique).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        include: {
+          patient: true,
+          provider: { include: { user: true } },
+          serviceCategory: true,
+          address: true,
+          statusHistory: { orderBy: { changedAt: 'asc' } },
+          consultationSummary: { include: { prescriptions: true } },
+          diagnosticRequests: { include: { labResults: true } },
+          referrals: true,
+          payment: true,
+        },
+      });
+    });
+
+    it('should throw NotFoundException when booking does not exist', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBooking('missing', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('cancelBooking', () => {
+    const scheduledAt = new Date('2024-01-01T10:00:00Z');
+
     it('should cancel a REQUESTED booking', async () => {
-      const booking = { id: 'booking-1', status: 'REQUESTED' };
+      const booking = { id: 'booking-1', status: 'REQUESTED', scheduledAt };
       const updated = { ...booking, status: 'CANCELLED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
         provider: { id: 'provider-1', userId: 'provider-user-1' },
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking) // for updateBookingStatus
-        .mockResolvedValueOnce(bookingWithRelations); // for cancel notification lookup
+        .mockResolvedValueOnce(booking) // for updateBookingStatus status check
+        .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification (no config for CANCELLED)
+        .mockResolvedValueOnce(bookingWithRelations); // for cancelBooking notification
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.cancelBooking('booking-1', 'patient-user-1');
       expect(result).toEqual(updated);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'provider-user-1',
           title: 'Booking Cancelled',
           type: 'BOOKING_CANCELLED',
         }),
+        expect.anything(),
       );
     });
 
     it('should cancel an ACCEPTED booking and notify patient when provider cancels', async () => {
-      const booking = { id: 'booking-1', status: 'ACCEPTED' };
+      const booking = { id: 'booking-1', status: 'ACCEPTED', scheduledAt };
       const updated = { ...booking, status: 'CANCELLED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
         provider: { id: 'provider-1', userId: 'provider-user-1' },
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.cancelBooking(
         'booking-1',
         'provider-user-1',
       );
       expect(result).toEqual(updated);
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'patient-user-1',
           title: 'Booking Cancelled',
         }),
+        expect.anything(),
       );
     });
 
@@ -445,21 +621,23 @@ describe('BookingsService', () => {
     });
 
     it('should trigger refund when cancelling a booking with PAID payment', async () => {
-      const booking = { id: 'booking-1', status: 'ACCEPTED' };
+      const booking = { id: 'booking-1', status: 'ACCEPTED', scheduledAt };
       const updated = { ...booking, status: 'CANCELLED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
         provider: { id: 'provider-1', userId: 'provider-user-1' },
         payment: { id: 'payment-1', status: 'PAID', amount: 500 },
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce(booking) // for updateBookingStatus
+        .mockResolvedValueOnce(booking) // for updateBookingStatus status check
+        .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification
         .mockResolvedValueOnce(bookingWithRelations); // for cancel with payment lookup
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
       mockPrisma.payment.update.mockResolvedValue({
         id: 'payment-1',
         status: 'REFUNDED',
@@ -478,21 +656,23 @@ describe('BookingsService', () => {
     });
 
     it('should not trigger refund when cancelling a booking with PENDING payment', async () => {
-      const booking = { id: 'booking-1', status: 'REQUESTED' };
+      const booking = { id: 'booking-1', status: 'REQUESTED', scheduledAt };
       const updated = { ...booking, status: 'CANCELLED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
         provider: { id: 'provider-1', userId: 'provider-user-1' },
         payment: { id: 'payment-1', status: 'PENDING', amount: 500 },
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       await service.cancelBooking('booking-1', 'patient-user-1');
 
@@ -500,153 +680,229 @@ describe('BookingsService', () => {
     });
 
     it('should not trigger refund when cancelling a booking with no payment', async () => {
-      const booking = { id: 'booking-1', status: 'REQUESTED' };
+      const booking = { id: 'booking-1', status: 'REQUESTED', scheduledAt };
       const updated = { ...booking, status: 'CANCELLED' };
       const bookingWithRelations = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
         provider: { id: 'provider-1', userId: 'provider-user-1' },
         payment: null,
+        scheduledAt,
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
       mockPrisma.booking.update.mockResolvedValue(updated);
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       await service.cancelBooking('booking-1', 'patient-user-1');
 
       expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
+
+    it('should cancel video reminders when cancelling a VIDEO_CONSULTATION booking', async () => {
+      const booking = {
+        id: 'booking-video-1',
+        status: 'ACCEPTED',
+        mode: 'VIDEO_CONSULTATION',
+        scheduledAt,
+      };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1', name: 'Jane' },
+        provider: {
+          id: 'provider-1',
+          userId: 'provider-user-1',
+          name: 'Dr. Smith',
+        },
+        payment: null,
+        scheduledAt,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
+
+      await service.cancelBooking('booking-video-1', 'patient-user-1');
+
+      expect(mockVideoReminder.cancelReminders).toHaveBeenCalledWith(
+        'booking-video-1',
+      );
+    });
+
+    it('should not cancel video reminders for non-video bookings', async () => {
+      const booking = {
+        id: 'booking-1',
+        status: 'ACCEPTED',
+        mode: 'HOME_VISIT',
+        scheduledAt,
+      };
+      const updated = { ...booking, status: 'CANCELLED' };
+      const bookingWithRelations = {
+        ...booking,
+        patient: { id: 'patient-1', userId: 'patient-user-1', name: 'John' },
+        provider: {
+          id: 'provider-1',
+          userId: 'provider-user-1',
+          name: 'Dr. Smith',
+        },
+        payment: null,
+        scheduledAt,
+      };
+
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce(booking)
+        .mockResolvedValueOnce(bookingWithRelations)
+        .mockResolvedValueOnce(bookingWithRelations);
+      mockPrisma.booking.update.mockResolvedValue(updated);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
+
+      await service.cancelBooking('booking-1', 'patient-user-1');
+
+      expect(mockVideoReminder.cancelReminders).not.toHaveBeenCalled();
+    });
   });
 
   describe('full lifecycle transitions', () => {
     const setupTransition = (fromStatus: string) => {
-      mockPrisma.booking.findUnique.mockResolvedValue({
+      // Include provider for all transitions that may need it
+      const bookingWithProvider = {
         id: 'booking-1',
         status: fromStatus,
-      });
+        patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { name: 'Dr. Test' },
+      };
+      mockPrisma.booking.findUnique.mockResolvedValue(bookingWithProvider);
       mockPrisma.booking.update.mockImplementation(({ data }) => ({
         id: 'booking-1',
         status: data.status,
       }));
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
     };
 
     it('should transition ACCEPTED → ON_THE_WAY and notify patient', async () => {
       const booking = { id: 'booking-1', status: 'ACCEPTED' };
-      const bookingWithPatient = {
+      const bookingWithPatientAndProvider = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { name: 'Dr. Test' },
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking) // for status check
-        .mockResolvedValueOnce(bookingWithPatient); // for notification
+        .mockResolvedValueOnce(bookingWithPatientAndProvider); // for notification
       mockPrisma.booking.update.mockResolvedValue({
         ...booking,
         status: 'ON_THE_WAY',
       });
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
 
       await service.updateBookingStatus('booking-1', 'user-1', {
         status: 'ON_THE_WAY' as any,
       });
 
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'patient-user-1',
-          message: 'Your provider is on the way.',
           type: 'BOOKING_STATUS_UPDATE',
         }),
+        expect.anything(),
       );
     });
 
     it('should transition ON_THE_WAY → ARRIVED and notify patient', async () => {
       const booking = { id: 'booking-1', status: 'ON_THE_WAY' };
-      const bookingWithPatient = {
+      const bookingWithPatientAndProvider = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { name: 'Dr. Test' },
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce(bookingWithPatient);
+        .mockResolvedValueOnce(bookingWithPatientAndProvider);
       mockPrisma.booking.update.mockResolvedValue({
         ...booking,
         status: 'ARRIVED',
       });
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
 
       await service.updateBookingStatus('booking-1', 'user-1', {
         status: 'ARRIVED' as any,
       });
 
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Your provider has arrived.',
+          userId: 'patient-user-1',
         }),
+        expect.anything(),
       );
     });
 
     it('should transition ARRIVED → IN_PROGRESS and notify patient', async () => {
       const booking = { id: 'booking-1', status: 'ARRIVED' };
-      const bookingWithPatient = {
+      const bookingWithPatientAndProvider = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { name: 'Dr. Test' },
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce(bookingWithPatient);
+        .mockResolvedValueOnce(bookingWithPatientAndProvider);
       mockPrisma.booking.update.mockResolvedValue({
         ...booking,
         status: 'IN_PROGRESS',
       });
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
 
       await service.updateBookingStatus('booking-1', 'user-1', {
         status: 'IN_PROGRESS' as any,
       });
 
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Your consultation is now in progress.',
+          title: 'Consultation Started',
         }),
+        expect.anything(),
       );
     });
 
     it('should transition IN_PROGRESS → COMPLETED and notify patient', async () => {
       const booking = { id: 'booking-1', status: 'IN_PROGRESS' };
-      const bookingWithPatient = {
+      const bookingWithPatientAndProvider = {
         ...booking,
         patient: { id: 'patient-1', userId: 'patient-user-1' },
+        provider: { name: 'Dr. Test' },
       };
 
       mockPrisma.booking.findUnique
         .mockResolvedValueOnce(booking)
-        .mockResolvedValueOnce(bookingWithPatient);
+        .mockResolvedValueOnce(bookingWithPatientAndProvider);
       mockPrisma.booking.update.mockResolvedValue({
         ...booking,
         status: 'COMPLETED',
       });
       mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
-      mockNotifications.createNotification.mockResolvedValue({});
 
       await service.updateBookingStatus('booking-1', 'user-1', {
         status: 'COMPLETED' as any,
       });
 
-      expect(mockNotifications.createNotification).toHaveBeenCalledWith(
+      expect(mockNotifications.sendNotification).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Your consultation has been completed.',
+          title: 'Consultation Completed',
         }),
+        expect.anything(),
       );
     });
 

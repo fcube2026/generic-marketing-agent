@@ -54,6 +54,14 @@ type ConsultationSummaryResponse = {
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 type Route = RouteProp<PatientStackParamList, 'PharmacyCheckout'>;
+type PaymentMethod = 'UPI' | 'COD' | 'CARD' | 'NETBANKING';
+
+const PAYMENT_METHOD_OPTIONS: Array<{ label: string; value: PaymentMethod }> = [
+  { label: 'UPI', value: 'UPI' },
+  { label: 'Cash on Delivery', value: 'COD' },
+  { label: 'Card', value: 'CARD' },
+  { label: 'Net Banking', value: 'NETBANKING' },
+];
 
 export const PharmacyCheckoutScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -63,16 +71,8 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const { uploadedPrescriptionId, uploadedPrescriptionStatus } = usePharmacyOrderStore();
 
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [notes, setNotes] = useState('');
-
-  type PaymentMethod = 'UPI' | 'COD' | 'CARD' | 'NETBANKING';
-  const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; emoji: string; hint: string }[] = [
-    { id: 'UPI', label: 'UPI', emoji: '📱', hint: 'GPay, PhonePe, Paytm' },
-    { id: 'COD', label: 'Cash on Delivery', emoji: '💵', hint: 'Pay when medicines arrive' },
-    { id: 'CARD', label: 'Credit / Debit Card', emoji: '💳', hint: 'Visa, Mastercard, RuPay' },
-    { id: 'NETBANKING', label: 'Net Banking', emoji: '🏦', hint: 'All major Indian banks' },
-  ];
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
 
   // Inline delivery address (no saved addresses)
   const [addressLine, setAddressLine] = useState('');
@@ -251,13 +251,20 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       });
       const deliveryAddressId: string = addrRes.data.id;
 
+      const mergedNotes = [
+        `Payment Method: ${paymentMethod}`,
+        notes.trim(),
+      ]
+        .filter((value) => value.length > 0)
+        .join(' | ');
+
       placeOrderMutation.mutate({
         partnerId: selectedPartnerId,
         deliveryAddressId,
         bookingId: selectedPrescription?.bookingId || undefined,
         prescriptionId: selectedPrescriptionId || undefined,
         uploadedPrescriptionId: activeUploadedPrescriptionId || undefined,
-        notes: [`Payment: ${paymentMethod}`, notes.trim()].filter(Boolean).join(' | '),
+        notes: mergedNotes || undefined,
         items: cartItems.map((item) => ({
           medicineCode: item.medicine.id,
           medicineName: item.medicine.name,
@@ -316,6 +323,11 @@ export const PharmacyCheckoutScreen: React.FC = () => {
             {DELIVERY_FEE === 0 ? 'FREE' : formatCurrency(DELIVERY_FEE)}
           </Text>
         </View>
+        {DELIVERY_FEE > 0 && (
+          <Text style={styles.freeDeliveryHint}>
+            Add {formatCurrency(FREE_DELIVERY_THRESHOLD - subtotal)} more for free delivery
+          </Text>
+        )}
         <View style={[styles.subtotalRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
@@ -451,25 +463,28 @@ export const PharmacyCheckoutScreen: React.FC = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Payment Method</Text>
-        {PAYMENT_OPTIONS.map((opt) => {
-          const selected = paymentMethod === opt.id;
-          return (
-            <TouchableOpacity
-              key={opt.id}
-              style={[styles.payOption, selected && styles.payOptionSelected]}
-              onPress={() => setPaymentMethod(opt.id)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.payEmoji}>{opt.emoji}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.payLabel}>{opt.label}</Text>
-                <Text style={styles.payHint}>{opt.hint}</Text>
-              </View>
-              <View style={[styles.radioBtn, selected && styles.radioBtnSelected]} />
-            </TouchableOpacity>
-          );
-        })}
-        <Text style={styles.payNote}>Mock payment — no charge will be made for testing.</Text>
+        <View style={styles.paymentMethodWrap}>
+          {PAYMENT_METHOD_OPTIONS.map((option) => {
+            const isSelected = paymentMethod === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.paymentOption, isSelected && styles.paymentOptionSelected]}
+                onPress={() => setPaymentMethod(option.value)}
+              >
+                <Text
+                  style={[
+                    styles.paymentOptionText,
+                    isSelected && styles.paymentOptionTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.helperText}>Selected: {paymentMethod}</Text>
       </View>
 
       <View style={styles.section}>
@@ -547,6 +562,13 @@ const styles = StyleSheet.create({
   feeLabel: { fontSize: 14, color: Colors.textMuted },
   feeValue: { fontSize: 14, color: Colors.textMuted },
   freeText: { color: Colors.success ?? '#16a34a', fontWeight: '700' },
+  freeDeliveryHint: {
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: 2,
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
   totalRow: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
@@ -637,6 +659,31 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '600',
   },
+  paymentMethodWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  paymentOption: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.background,
+  },
+  paymentOptionSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  paymentOptionText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  paymentOptionTextSelected: {
+    color: Colors.primary,
+  },
   notesInput: {
     borderWidth: 1.5,
     borderColor: Colors.border,
@@ -659,25 +706,6 @@ const styles = StyleSheet.create({
   radioBtnSelected: { borderColor: Colors.primary, backgroundColor: Colors.primary },
   noDataText: { fontSize: 14, color: Colors.textMuted, fontStyle: 'italic' },
   placeOrderArea: { margin: 16, marginTop: 20 },
-  payOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    marginBottom: 10,
-    backgroundColor: Colors.background,
-  },
-  payOptionSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-  },
-  payEmoji: { fontSize: 22, marginRight: 12 },
-  payLabel: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  payHint: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  payNote: { fontSize: 11, color: Colors.textMuted, fontStyle: 'italic', marginTop: 4 },
   locationBtn: {
     backgroundColor: Colors.primaryLight,
     borderRadius: 10,

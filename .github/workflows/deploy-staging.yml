@@ -2,7 +2,11 @@ name: Deploy Staging
 
 on:
   push:
-    branches: [develop]
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'labels/**'
   workflow_dispatch:
 
 concurrency:
@@ -49,6 +53,9 @@ jobs:
       - name: Lint admin panel
         run: pnpm --filter @curex24/admin lint
 
+      - name: Lint doctor portal
+        run: pnpm --filter @curex24/doctor-portal lint
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -85,6 +92,11 @@ jobs:
 
       - name: Build admin panel
         run: pnpm --filter @curex24/admin build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+
+      - name: Build doctor portal
+        run: pnpm --filter @curex24/doctor-portal build
         env:
           NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
 
@@ -132,7 +144,7 @@ jobs:
         run: pnpm --filter @curex24/database db:generate
 
       - name: Push schema to test DB
-        run: cd packages/database && npx prisma db push --skip-generate
+        run: cd packages/database && pnpm exec prisma db push --skip-generate
 
       - name: Run API tests
         run: pnpm --filter @curex24/api test -- --passWithNoTests --forceExit
@@ -150,9 +162,247 @@ jobs:
     needs: [build, test]
     permissions:
       contents: read
-    environment:
-      name: staging
-      url: https://api.staging.curex24.com
+    steps:
+      - name: Check if Railway secrets are configured
+        id: check-secrets
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ RAILWAY_TOKEN not configured — skipping Railway deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      # Secrets required (set in GitHub repo → Settings → Secrets):
+      #   STAGING_DATABASE_URL  – pooled Supabase connection string
+      #     e.g. postgresql://postgres.XXXX:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+      #   STAGING_DIRECT_URL    – direct (non-pooled) Supabase connection string
+      #     e.g. postgresql://postgres:PASSWORD@db.XXXX.supabase.co:5432/postgres
+      - name: Validate database secrets
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::STAGING_DATABASE_URL secret is not set. Configure it in GitHub repo settings."
+            exit 1
+          fi
+          if [ -z "$DIRECT_URL" ]; then
+            echo "::error::STAGING_DIRECT_URL secret is not set. Configure it in GitHub repo settings."
+            exit 1
+          fi
+          echo "✅ Database secrets are configured"
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Generate Prisma client
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm --filter @curex24/database db:generate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Apply database migrations
+        if: steps.check-secrets.outputs.skip != 'true'
+        id: migrate
+        continue-on-error: true
+        run: cd packages/database && pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
+      - name: Report migration result
+        if: steps.check-secrets.outputs.skip != 'true' && steps.migrate.outcome == 'failure'
+        run: |
+          echo "::warning::Database migration failed. The API will still deploy — migrations will be retried automatically when the Railway container starts (see apps/api/docker-entrypoint.sh)."
+          echo "Common causes: invalid DATABASE_URL / DIRECT_URL (check port number, special characters), or DB not reachable from GitHub Actions runner."
+          echo "## ⚠️ Migration Warning" >> $GITHUB_STEP_SUMMARY
+          echo "Database migration failed during CI. The API container will retry migrations on startup via \`apps/api/docker-entrypoint.sh\`." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action required:** Verify \`STAGING_DIRECT_URL\` secret is a valid PostgreSQL connection string (e.g. \`postgresql://postgres:PASSWORD@db.XXX.supabase.co:5432/postgres\`)." >> $GITHUB_STEP_SUMMARY
+
+      - name: Install Railway CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: npm install -g @railway/cli
+
+      - name: Validate Railway token and service ID
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          # ── 1. Confirm the token is actually set ───────────────────────────────
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN secret is empty. Go to GitHub Settings → Secrets and variables → Actions → Secrets tab and make sure a secret named exactly RAILWAY_TOKEN exists."
+            exit 1
+          fi
+          echo "✅ RAILWAY_TOKEN is present (length=${#RAILWAY_TOKEN})"
+
+          # ── 2. Check for hidden trailing characters ────────────────────────────
+          TRIMMED=$(printf '%s' "$RAILWAY_TOKEN" | tr -d '[:space:]')
+          if [ "${#TRIMMED}" != "${#RAILWAY_TOKEN}" ]; then
+            echo "::error::RAILWAY_TOKEN contains leading/trailing whitespace or newline characters — this will cause 'Invalid RAILWAY_TOKEN'. Delete the secret in GitHub and re-paste it carefully."
+            exit 1
+          fi
+
+          # ── 3. Confirm the service ID variable is set ─────────────────────────
+          if [ -z "$RAILWAY_STAGING_SERVICE_ID" ]; then
+            echo "::error::RAILWAY_STAGING_SERVICE_ID variable is empty. Go to GitHub Settings → Secrets and variables → Actions → Variables tab and set it to the Service ID from Railway → your staging API service → Settings."
+            exit 1
+          fi
+          echo "✅ RAILWAY_STAGING_SERVICE_ID = $RAILWAY_STAGING_SERVICE_ID"
+
+          # ── 4. Verify the token is accepted by Railway ────────────────────────
+          # NOTE: 'railway whoami' only works with account-level RAILWAY_API_TOKEN.
+          # Project tokens (RAILWAY_TOKEN) must be validated with 'railway status'.
+          echo "Running 'railway status' to validate project token scope..."
+          railway status || {
+            echo "::error::'railway status' failed. The token is either invalid, scoped to a different project, or set to the wrong environment. Regenerate it: Railway → open staging project → Settings (gear) → Tokens → Create Token → pick 'staging' environment."
+            exit 1
+          }
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_STAGING_SERVICE_ID: ${{ vars.RAILWAY_STAGING_SERVICE_ID }}
+
+      - name: Deploy to Railway
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: railway up --service ${{ vars.RAILWAY_STAGING_SERVICE_ID }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: sleep 30
+
+      - name: Verify staging API health
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -sf https://api.staging.curex24.com/ > /dev/null 2>&1; then
+              echo "✅ Staging API is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i — waiting 15s..."
+            sleep 15
+          done
+          echo "⚠️  Health check did not pass after 5 attempts"
+          exit 1
+
+      - name: Deployment summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | https://api.staging.curex24.com | Railway |" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────
+  # Deploy Admin Dashboard to Vercel (staging environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-admin:
+    name: Deploy Admin → Vercel (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test]
+    permissions:
+      contents: read
+    steps:
+      - name: Check if Vercel secrets are configured
+        id: check-secrets
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ADMIN_PROJECT_ID" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ VERCEL_TOKEN or VERCEL_ADMIN_PROJECT_ID not configured — skipping admin deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ADMIN_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: npm install -g vercel
+
+      - name: Pull Vercel environment
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Build with Vercel
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+
+      - name: Deploy to Vercel (staging)
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+
+      - name: Admin staging deploy summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## ✅ Admin Dashboard Deployed (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+
+  admin-ui-tests-staging:
+    name: Admin UI Tests (Staging - Smoke + Regression)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [deploy-admin, deploy-api]
+    permissions:
+      contents: read
+    env:
+      # Promoted to job level so it can be referenced from step-level `if`
+      # expressions (the `secrets` context is not available in `if`).
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -169,80 +419,144 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
-        run: pnpm --filter @curex24/database db:generate
-        env:
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+      - name: Install Playwright browsers
+        run: pnpm --filter @curex24/admin exec playwright install --with-deps
 
-      - name: Apply database migrations
-        run: cd packages/database && npx prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
-          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: railway up --service ${{ vars.RAILWAY_STAGING_SERVICE_ID }} --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Wait for deployment
-        run: sleep 30
-
-      - name: Verify staging API health
+      - name: Wait for staging admin to be available
+        id: wait-admin
         run: |
-          for i in 1 2 3 4 5; do
-            if curl -sf https://api.staging.curex24.com/ > /dev/null 2>&1; then
-              echo "✅ Staging API is healthy"
+          for i in $(seq 1 10); do
+            if curl -sf https://admin.staging.curex24.com > /dev/null 2>&1; then
+              echo "Staging admin is available"
+              echo "available=true" >> $GITHUB_OUTPUT
               exit 0
             fi
-            echo "⏳ Attempt $i — waiting 15s..."
+            echo "Waiting for staging deploy to propagate (attempt $i)..."
             sleep 15
           done
-          echo "⚠️  Health check did not pass after 5 attempts"
+          echo "⚠️ admin.staging.curex24.com never responded — skipping smoke/regression tests"
+          echo "available=false" >> $GITHUB_OUTPUT
 
-      - name: Deployment summary
+      - name: Run smoke tests (staging)
+        id: smoke
+        if: steps.wait-admin.outputs.available == 'true'
+        continue-on-error: true
+        run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @smoke --project=chromium
+        env:
+          ADMIN_BASE_URL: https://admin.staging.curex24.com
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Run regression tests (staging)
+        id: regression
+        if: steps.wait-admin.outputs.available == 'true'
+        continue-on-error: true
+        run: pnpm --filter @curex24/admin exec playwright test -c playwright.config.ts --grep @regression --project=chromium
+        env:
+          ADMIN_BASE_URL: https://admin.staging.curex24.com
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging-${{ github.run_id }}
+          path: apps/admin/playwright-report/
+          retention-days: 14
+
+      - name: Upload JSON test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-staging-${{ github.run_id }}
+          path: apps/admin/test-results/
+          retention-days: 14
+
+      - name: GitHub Step Summary
+        if: always()
         run: |
-          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Admin UI Tests - Staging" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| API | https://api.staging.curex24.com | Railway |" >> $GITHUB_STEP_SUMMARY
-          echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging (https://admin.staging.curex24.com)" >> $GITHUB_STEP_SUMMARY
+          echo "**Smoke tests:** ${{ steps.smoke.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Regression tests:** ${{ steps.regression.outcome }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** \`develop\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ -f apps/admin/test-results/results.json ]; then
+            PASSED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('expected', 0))" 2>/dev/null || echo "N/A")
+            FAILED=$(python3 -c "import json; print(json.load(open('apps/admin/test-results/results.json')).get('stats', {}).get('unexpected', 0))" 2>/dev/null || echo "N/A")
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passed | ${PASSED} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failed | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Report artifact: playwright-report-staging-${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Slack on failure
+        if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Admin UI Tests Failed - Staging",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Admin UI Tests Failed - Staging*\n*Smoke:* ${{ steps.smoke.outcome }}\n*Regression:* ${{ steps.regression.outcome }}\n*Branch:* `${{ github.ref_name }}`\n*Commit:* `${{ github.sha }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Check smoke test result
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "Smoke tests failed on staging. Marking job as failed."
+          exit 1
 
   # ────────────────────────────────────────────────────────────
-  # Deploy Admin Dashboard to Vercel (staging environment)
+  # Deploy Marketing Agent to Vercel (staging environment)
   # ────────────────────────────────────────────────────────────
-  deploy-admin:
-    name: Deploy Admin → Vercel (staging)
+  deploy-marketing-agent:
+    name: Deploy Marketing Agent → Vercel (staging)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [build, test]
     permissions:
       contents: read
-    environment:
-      name: staging
-      url: https://admin.staging.curex24.com
     steps:
       - name: Check if Vercel secrets are configured
         id: check-secrets
         run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_MARKETING_AGENT_PROJECT_ID" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
-            echo "⚠️ VERCEL_TOKEN not configured — skipping admin deploy"
+            echo "⚠️ VERCEL_TOKEN or VERCEL_MARKETING_AGENT_PROJECT_ID not configured — skipping marketing-agent deploy"
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_MARKETING_AGENT_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install Vercel CLI
         if: steps.check-secrets.outputs.skip != 'true'
@@ -251,33 +565,119 @@ jobs:
       - name: Pull Vercel environment
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
 
       - name: Build with Vercel
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+
+      - name: Deploy to Vercel (staging)
+        if: steps.check-secrets.outputs.skip != 'true'
+        id: deploy-marketing-agent
+        run: |
+          OUTPUT=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          echo "$OUTPUT"
+          DEPLOY_URL=$(echo "$OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1)
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "❌ Failed to extract deployment URL"
+            exit 1
+          fi
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $DEPLOY_URL"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
+
+      - name: Alias to staging domain
+        if: steps.check-secrets.outputs.skip != 'true'
+        continue-on-error: true
+        run: vercel alias set ${{ steps.deploy-marketing-agent.outputs.deploy_url }} growth.staging.curex24.com --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETING_AGENT_PROJECT_ID }}
+
+      - name: Marketing agent staging deploy summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## ✅ Marketing Agent Deployed (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Marketing Agent | https://growth.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────
+  # Deploy Doctor Portal to Vercel (staging environment)
+  # ────────────────────────────────────────────────────────────
+  deploy-doctor-portal:
+    name: Deploy Doctor Portal → Vercel (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test]
+    permissions:
+      contents: read
+    steps:
+      - name: Check if Vercel secrets are configured
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ VERCEL_TOKEN or VERCEL_DOCTOR_PORTAL_PROJECT_ID not configured — skipping doctor-portal deploy"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install Vercel CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: npm install -g vercel
+
+      - name: Pull Vercel environment
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
+
+      - name: Build with Vercel
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
           NEXT_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
 
       - name: Deploy to Vercel (staging)
         if: steps.check-secrets.outputs.skip != 'true'
         run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/admin
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCTOR_PORTAL_PROJECT_ID }}
 
-      - name: Admin staging deploy summary
+      - name: Doctor portal staging deploy summary
         if: steps.check-secrets.outputs.skip != 'true'
         run: |
-          echo "## ✅ Admin Dashboard Deployed (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Doctor Portal Deployed (Staging)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Admin | https://admin.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+          echo "| Doctor Portal | https://doctor.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY

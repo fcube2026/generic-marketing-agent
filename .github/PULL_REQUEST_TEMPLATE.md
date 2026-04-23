@@ -29,6 +29,15 @@
 - [ ] My changes don't introduce new warnings
 - [ ] All CI checks pass
 
+## Testing Checklist
+
+- [ ] No new admin pages were added, or the admin UI test assets were updated for new pages
+- [ ] New POM class created in `apps/admin/e2e/pages/` when required
+- [ ] Smoke spec created in `apps/admin/e2e/smoke/` when required
+- [ ] Regression spec created in `apps/admin/e2e/regression/` when required
+- [ ] `apps/admin/e2e/test-manifest.json` updated when admin routes changed
+- [ ] `pnpm --filter @curex24/admin test:coverage-check` passes locally
+
 ## Screenshots / Screen Recording
 
 <!-- If applicable, add screenshots or recordings -->

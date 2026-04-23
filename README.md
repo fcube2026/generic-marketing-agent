@@ -1,5 +1,7 @@
 # Curex24
 
+[![Admin UI Tests](https://github.com/fcube2026/curex24/actions/workflows/admin-ui-tests.yml/badge.svg)](https://github.com/fcube2026/curex24/actions/workflows/admin-ui-tests.yml)
+
 **Healthcare, anytime. Anywhere.**
 
 Curex24 is an on-demand healthcare platform connecting patients with nearby doctors and care providers in real time. Based on availability, distance, and convenience, it intelligently recommends the best care option — **Home Visit** or **Doctor's Place Visit**.

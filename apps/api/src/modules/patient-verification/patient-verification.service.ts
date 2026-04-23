@@ -1,0 +1,1110 @@
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { RiskEngineService } from './risk-engine.service';
+import { SmsService } from '../sms/sms.service';
+import { ConfigService } from '@nestjs/config';
+import {
+  PatientVerificationStatus,
+  ManualReviewReason,
+  ReviewPriority,
+  Prisma,
+} from '@prisma/client';
+
+/** Supabase signed upload URL TTL in seconds. */
+const UPLOAD_URL_EXPIRY = 600;
+
+/** Bucket used for patient ID documents. */
+const ID_DOCS_BUCKET = 'patient-ids';
+
+/**
+ * Wizard step keys returned by `getMyVerificationStatus` for the
+ * profile-launched self-serve KYC flow. Order is intentional — the first
+ * non-completed step is treated as the "next" step by the mobile UI.
+ */
+const SELF_SERVE_STEPS = [
+  'PERSONAL_DETAILS',
+  'ADDRESS',
+  'ID_UPLOAD',
+  'FACE_CAPTURE',
+  'GUARDIAN', // included only when isMinor === true
+  'REVIEW',
+] as const;
+type SelfServeStep = (typeof SELF_SERVE_STEPS)[number];
+
+/**
+ * Required steps per risk tier.
+ */
+function requiredSteps(tier: string): string[] {
+  switch (tier) {
+    case 'CRITICAL':
+      return ['CLINICAL_INTAKE', 'CONSENT', 'ID_REQUIRED', 'MANUAL_REVIEW'];
+    case 'HIGH':
+      return ['CLINICAL_INTAKE', 'CONSENT', 'ID_REQUIRED'];
+    case 'MEDIUM':
+      return ['CLINICAL_INTAKE', 'CONSENT', 'ID_OPTIONAL'];
+    default:
+      return ['CLINICAL_INTAKE', 'CONSENT'];
+  }
+}
+
+@Injectable()
+export class PatientVerificationService {
+  private readonly logger = new Logger(PatientVerificationService.name);
+  private readonly supabaseUrl: string;
+  private readonly supabaseKey: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly riskEngine: RiskEngineService,
+    private readonly smsService: SmsService,
+    private readonly config: ConfigService,
+  ) {
+    this.supabaseUrl = this.config.get<string>('SUPABASE_URL', '');
+    this.supabaseKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
+  }
+
+  // ──────────────────────────────────────────────────
+  // Patient-facing
+  // ──────────────────────────────────────────────────
+
+  async initiateVerification(patientUserId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.patient.userId !== patientUserId)
+      throw new ForbiddenException('Not your booking');
+
+    const { score, tier, triggers } = await this.riskEngine.computeRiskScore({
+      patientId: booking.patientId,
+      totalFee: booking.totalFee,
+      scheduledAt: booking.scheduledAt,
+    });
+
+    // Upsert verification record
+    const verification = await this.prisma.patientVerification.upsert({
+      where: { patientId: booking.patientId },
+      update: {
+        riskScore: score,
+        riskTier: tier,
+        riskTriggers: triggers,
+        status: PatientVerificationStatus.OTP_VERIFIED,
+      },
+      create: {
+        patientId: booking.patientId,
+        riskScore: score,
+        riskTier: tier,
+        riskTriggers: triggers,
+        status: PatientVerificationStatus.OTP_VERIFIED,
+      },
+    });
+
+    // Store risk snapshot on the booking
+    await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        verificationSnapshot: {
+          score,
+          tier,
+          triggers,
+          verificationId: verification.id,
+        },
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'VERIFICATION_INITIATED',
+      'SYSTEM',
+      {
+        score,
+        tier,
+        triggers,
+        bookingId,
+      },
+    );
+
+    // Auto-queue for manual review on CRITICAL
+    if (tier === 'CRITICAL') {
+      await this.queueManualReview(
+        verification.id,
+        ManualReviewReason.HIGH_RISK_SCORE,
+        ReviewPriority.HIGH,
+      );
+    }
+
+    return {
+      verificationId: verification.id,
+      riskScore: score,
+      riskTier: tier,
+      riskTriggers: triggers,
+      requiredSteps: requiredSteps(tier),
+    };
+  }
+
+  async getIdUploadUrl(
+    patientUserId: string,
+    verificationId: string,
+    documentType: string,
+    mimeType: string,
+  ) {
+    const verification = await this.findAndAuthorizeVerification(
+      patientUserId,
+      verificationId,
+    );
+
+    // Create a pending document record
+    const doc = await this.prisma.patientIdDocument.create({
+      data: {
+        verificationId: verification.id,
+        documentType,
+        storagePath: `${verification.patientId}/${verification.id}/${documentType.toLowerCase()}-${Date.now()}`,
+      },
+    });
+
+    const uploadUrl = await this.generateSignedUploadUrl(
+      doc.storagePath,
+      mimeType,
+    );
+
+    await this.prisma.patientVerification.update({
+      where: { id: verificationId },
+      data: { status: PatientVerificationStatus.ID_UPLOAD_PENDING },
+    });
+
+    await this.writeAuditLog(
+      verificationId,
+      'ID_UPLOAD_URL_GENERATED',
+      patientUserId,
+      { documentType, documentId: doc.id },
+    );
+
+    return { uploadUrl, documentId: doc.id, expiresIn: UPLOAD_URL_EXPIRY };
+  }
+
+  async confirmIdUpload(
+    patientUserId: string,
+    documentId: string,
+    verificationId: string,
+  ) {
+    const verification = await this.findAndAuthorizeVerification(
+      patientUserId,
+      verificationId,
+    );
+
+    const doc = await this.prisma.patientIdDocument.findFirst({
+      where: { id: documentId, verificationId },
+    });
+    if (!doc) throw new NotFoundException('Document record not found');
+
+    // Phase 1: stub OCR — return mock extracted fields
+    const mockOcr = {
+      extractedName: 'Name Pending OCR',
+      extractedDob: null,
+      maskedIdNumber: 'XXXX XXXX 0000',
+      confidence: 0.0,
+      stub: true,
+    };
+
+    await this.prisma.patientIdDocument.update({
+      where: { id: documentId },
+      data: {
+        ocrRawResult: mockOcr,
+        extractedName: mockOcr.extractedName,
+        extractedIdNumber: mockOcr.maskedIdNumber,
+      },
+    });
+
+    await this.prisma.patientVerification.update({
+      where: { id: verificationId },
+      data: { status: PatientVerificationStatus.ID_UNDER_REVIEW },
+    });
+
+    await this.writeAuditLog(
+      verificationId,
+      'OCR_STUB_PROCESSED',
+      patientUserId,
+      { documentId },
+    );
+
+    // Queue for manual review since OCR is a stub
+    await this.queueManualReview(
+      verification.id,
+      ManualReviewReason.OCR_MISMATCH,
+      ReviewPriority.NORMAL,
+    );
+
+    return {
+      ocrResult: mockOcr,
+      status: 'ID_UNDER_REVIEW',
+      nextStep: 'MANUAL_REVIEW',
+    };
+  }
+
+  async getMyVerificationStatus(userId: string) {
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!patient) {
+      return {
+        verificationId: null,
+        status: 'NOT_STARTED',
+        riskTier: null,
+        riskScore: null,
+        isMinor: false,
+        completedSteps: [] as string[],
+        pendingSteps: [...SELF_SERVE_STEPS] as string[],
+        nextStep: SELF_SERVE_STEPS[0] as string,
+        personalDetails: null,
+        address: null,
+        idDocument: null,
+        faceCapture: null,
+        guardian: null,
+      };
+    }
+
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { patientId: patient.id },
+      include: {
+        idDocuments: { orderBy: { uploadedAt: 'desc' } },
+      },
+    });
+
+    if (!verification) {
+      return {
+        verificationId: null,
+        status: 'NOT_STARTED',
+        riskTier: null,
+        riskScore: null,
+        isMinor: false,
+        completedSteps: [] as string[],
+        pendingSteps: [...SELF_SERVE_STEPS] as string[],
+        nextStep: SELF_SERVE_STEPS[0] as string,
+        personalDetails: null,
+        address: null,
+        idDocument: null,
+        faceCapture: null,
+        guardian: null,
+      };
+    }
+
+    const completed = this.computeCompletedSelfServeSteps(verification);
+    const pending = this.computePendingSelfServeSteps(
+      verification.isMinor,
+      completed,
+    );
+
+    return {
+      verificationId: verification.id,
+      status: verification.status,
+      riskTier: verification.riskTier,
+      riskScore: verification.riskScore,
+      isMinor: verification.isMinor,
+      completedSteps: completed,
+      pendingSteps: pending,
+      nextStep: pending[0] ?? null,
+      personalDetails: verification.fullName
+        ? {
+            fullName: verification.fullName,
+            dateOfBirth: verification.dateOfBirth,
+            gender: verification.gender,
+          }
+        : null,
+      address:
+        verification.addressLine || verification.addressLat != null
+          ? {
+              source: verification.addressSource,
+              addressLine: verification.addressLine,
+              city: verification.city,
+              state: verification.state,
+              pincode: verification.pincode,
+              lat: verification.addressLat,
+              lng: verification.addressLng,
+            }
+          : null,
+      idDocument: verification.idDocuments[0]
+        ? {
+            documentId: verification.idDocuments[0].id,
+            documentType: verification.idDocuments[0].documentType,
+            extractedName: verification.idDocuments[0].extractedName,
+            extractedIdNumber: verification.idDocuments[0].extractedIdNumber,
+            ocrMatchPassed: verification.ocrMatchPassed,
+          }
+        : null,
+      faceCapture: verification.selfieStoragePath
+        ? {
+            captured: true,
+            faceMatchPassed: verification.faceMatchPassed,
+            faceMatchScore: verification.faceMatchScore,
+          }
+        : null,
+      guardian: verification.guardianName
+        ? {
+            guardianName: verification.guardianName,
+            relationship: verification.guardianRelationship,
+            guardianPhone: verification.guardianPhone,
+            guardianAadhaarLast4: verification.guardianAadhaarLast4,
+          }
+        : null,
+      submittedAt: verification.submittedAt,
+      autoApprovedAt: verification.autoApprovedAt,
+    };
+  }
+
+  async getVerificationStatus(userId: string, bookingId: string, role: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const isPatient = booking.patient.userId === userId;
+    const isProvider = booking.provider.userId === userId;
+    if (!isPatient && !isProvider && role !== 'ADMIN')
+      throw new ForbiddenException('Access denied');
+
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { patientId: booking.patientId },
+    });
+
+    if (!verification) {
+      return {
+        verificationId: null,
+        status: 'NOT_STARTED',
+        riskTier: null,
+        completedSteps: [],
+        pendingSteps: [],
+      };
+    }
+
+    const steps = requiredSteps(verification.riskTier);
+    return {
+      verificationId: verification.id,
+      status: verification.status,
+      riskTier: verification.riskTier,
+      riskScore: verification.riskScore,
+      completedSteps: [] as string[],
+      pendingSteps: steps,
+    };
+  }
+
+  // ──────────────────────────────────────────────────
+  // Self-serve KYC (profile-launched wizard)
+  // ──────────────────────────────────────────────────
+
+  /**
+   * Create or fetch the patient's verification record without requiring a
+   * booking. Idempotent — returns the existing row if one already exists.
+   */
+  async selfStart(userId: string) {
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (!patient)
+      throw new NotFoundException(
+        'Patient profile not found. Please complete your profile first.',
+      );
+
+    const verification = await this.prisma.patientVerification.upsert({
+      where: { patientId: patient.id },
+      update: {},
+      create: {
+        patientId: patient.id,
+        riskScore: 0,
+        riskTier: 'LOW',
+        riskTriggers: [],
+        status: PatientVerificationStatus.OTP_VERIFIED,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_VERIFICATION_STARTED',
+      userId,
+      {},
+    );
+
+    return this.getMyVerificationStatus(userId);
+  }
+
+  async selfSubmitPersonalDetails(
+    userId: string,
+    dto: {
+      fullName: string;
+      dateOfBirth: string;
+      gender: string;
+    },
+  ) {
+    const verification = await this.getOrCreateForUser(userId);
+    const dob = new Date(dto.dateOfBirth);
+    if (Number.isNaN(dob.getTime()) || dob > new Date()) {
+      throw new BadRequestException('Invalid date of birth');
+    }
+
+    const isMinor = this.computeIsMinor(dob);
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        fullName: dto.fullName.trim(),
+        dateOfBirth: dob,
+        gender: dto.gender,
+        isMinor,
+        status: PatientVerificationStatus.PROFILE_COMPLETE,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_PERSONAL_DETAILS_SUBMITTED',
+      userId,
+      { isMinor },
+    );
+
+    return this.getMyVerificationStatus(userId);
+  }
+
+  async selfSubmitAddress(
+    userId: string,
+    dto: {
+      source: 'MANUAL' | 'MAP';
+      addressLine?: string;
+      city?: string;
+      state?: string;
+      pincode?: string;
+      lat?: number;
+      lng?: number;
+      formatted?: string;
+    },
+  ) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    const manualOk =
+      dto.source === 'MANUAL' &&
+      !!dto.addressLine?.trim() &&
+      !!dto.city?.trim() &&
+      !!dto.state?.trim() &&
+      !!dto.pincode?.trim();
+    const mapOk =
+      dto.source === 'MAP' &&
+      typeof dto.lat === 'number' &&
+      typeof dto.lng === 'number';
+    if (!manualOk && !mapOk) {
+      throw new BadRequestException(
+        'Either a complete manual address or map coordinates are required.',
+      );
+    }
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        addressSource: dto.source,
+        addressLine:
+          dto.source === 'MAP'
+            ? (dto.formatted ?? null)
+            : (dto.addressLine ?? null),
+        city: dto.city ?? null,
+        state: dto.state ?? null,
+        pincode: dto.pincode ?? null,
+        addressLat: dto.lat ?? null,
+        addressLng: dto.lng ?? null,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_ADDRESS_SUBMITTED',
+      userId,
+      { source: dto.source },
+    );
+
+    return this.getMyVerificationStatus(userId);
+  }
+
+  async selfGetIdUploadUrl(
+    userId: string,
+    documentType: string,
+    mimeType: string,
+  ) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    const doc = await this.prisma.patientIdDocument.create({
+      data: {
+        verificationId: verification.id,
+        documentType,
+        storagePath: `${verification.patientId}/${verification.id}/${documentType.toLowerCase()}-${Date.now()}`,
+      },
+    });
+
+    const uploadUrl = await this.generateSignedUploadUrl(
+      doc.storagePath,
+      mimeType,
+    );
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: { status: PatientVerificationStatus.ID_UPLOAD_PENDING },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_ID_UPLOAD_URL_GENERATED',
+      userId,
+      { documentType, documentId: doc.id },
+    );
+
+    return { uploadUrl, documentId: doc.id, expiresIn: UPLOAD_URL_EXPIRY };
+  }
+
+  /**
+   * Mock OCR confirmation: always succeeds and reports a match against the
+   * patient's `fullName` if available. No third-party provider is called.
+   * Returning success keeps the staging flow unblocked while the real OCR
+   * pipeline is being built.
+   */
+  async selfConfirmIdUpload(userId: string, documentId: string) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    const doc = await this.prisma.patientIdDocument.findFirst({
+      where: { id: documentId, verificationId: verification.id },
+    });
+    if (!doc) throw new NotFoundException('Document record not found');
+
+    const mockOcr = {
+      extractedName: verification.fullName ?? 'Mock Patient Name',
+      extractedDob: verification.dateOfBirth
+        ? verification.dateOfBirth.toISOString().slice(0, 10)
+        : null,
+      maskedIdNumber: 'XXXX XXXX 0000',
+      confidence: 0.95,
+      provider: 'mock',
+      stub: true,
+    };
+
+    await this.prisma.patientIdDocument.update({
+      where: { id: documentId },
+      data: {
+        ocrRawResult: mockOcr,
+        extractedName: mockOcr.extractedName,
+        extractedIdNumber: mockOcr.maskedIdNumber,
+        extractedDob: mockOcr.extractedDob,
+      },
+    });
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        ocrMatchPassed: true,
+        ocrConfidenceScore: mockOcr.confidence,
+        idType: doc.documentType,
+        status: PatientVerificationStatus.ID_VERIFIED,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_OCR_MOCK_PROCESSED',
+      userId,
+      { documentId, match: true },
+    );
+
+    return { ocrResult: mockOcr, ocrMatchPassed: true };
+  }
+
+  /**
+   * Mock face/Aadhaar match: always returns success. The actual selfie file
+   * upload is handled the same way as the ID document (signed URL → PUT) but
+   * is kept simple here — we just persist the storagePath placeholder so the
+   * UI can show "selfie captured ✓" on the review screen.
+   */
+  async selfSubmitFace(
+    userId: string,
+    dto: { mimeType: string; qualityHint?: string },
+  ) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    const storagePath = `${verification.patientId}/${verification.id}/selfie-${Date.now()}`;
+    const uploadUrl = await this.generateSignedUploadUrl(
+      storagePath,
+      dto.mimeType,
+    );
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        selfieStoragePath: storagePath,
+        faceMatchPassed: true,
+        faceMatchScore: 0.92,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_FACE_MOCK_VERIFIED',
+      userId,
+      { qualityHint: dto.qualityHint, match: true },
+    );
+
+    return {
+      uploadUrl,
+      storagePath,
+      faceMatchPassed: true,
+      faceMatchScore: 0.92,
+    };
+  }
+
+  async selfSubmitGuardian(
+    userId: string,
+    dto: {
+      guardianName: string;
+      relationship: string;
+      guardianPhone: string;
+      guardianAadhaarLast4: string;
+    },
+  ) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    if (!verification.isMinor) {
+      throw new BadRequestException(
+        'Guardian details are only required for minors (<18).',
+      );
+    }
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        guardianName: dto.guardianName.trim(),
+        guardianRelationship: dto.relationship.trim(),
+        guardianPhone: dto.guardianPhone.trim(),
+        guardianAadhaarLast4: dto.guardianAadhaarLast4,
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SELF_GUARDIAN_SUBMITTED',
+      userId,
+      {},
+    );
+
+    return this.getMyVerificationStatus(userId);
+  }
+
+  /**
+   * Finalize the wizard. With the mock OCR/face pipeline this auto-approves
+   * to `CONFIRMED` whenever all required wizard steps are complete (and, for
+   * minors, guardian details are present). When mandatory verification is
+   * later switched on we can tighten this rule without changing the UI.
+   */
+  async selfSubmitForApproval(userId: string) {
+    const verification = await this.getOrCreateForUser(userId);
+    const completed = this.computeCompletedSelfServeSteps(verification);
+    const pending = this.computePendingSelfServeSteps(
+      verification.isMinor,
+      completed,
+    ).filter((s) => s !== 'REVIEW');
+
+    if (pending.length > 0) {
+      throw new BadRequestException(
+        `Please complete these steps before submitting: ${pending.join(', ')}`,
+      );
+    }
+
+    const now = new Date();
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        submittedAt: now,
+        autoApprovedAt: now,
+        idVerifiedAt: now,
+        idVerificationSource: 'SELF_SERVE_MOCK',
+        status: PatientVerificationStatus.CONFIRMED,
+      },
+    });
+
+    await this.writeAuditLog(verification.id, 'SELF_AUTO_APPROVED', userId, {
+      mock: true,
+    });
+
+    return this.getMyVerificationStatus(userId);
+  }
+
+  /**
+   * True when the patient has a CONFIRMED or EMERGENCY_OVERRIDE verification.
+   * Used by the booking-creation gate.
+   */
+  async isPatientVerified(patientProfileId: string): Promise<boolean> {
+    const v = await this.prisma.patientVerification.findUnique({
+      where: { patientId: patientProfileId },
+      select: { status: true },
+    });
+    if (!v) return false;
+    return (
+      v.status === PatientVerificationStatus.CONFIRMED ||
+      v.status === PatientVerificationStatus.EMERGENCY_OVERRIDE
+    );
+  }
+
+  // ──────────────────────────────────────────────────
+
+  // ──────────────────────────────────────────────────
+  // Admin-facing
+  // ──────────────────────────────────────────────────
+
+  async getReviewQueue(page: number, limit: number) {
+    const skip = (page - 1) * limit;
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.manualReviewQueue.findMany({
+        where: { status: 'OPEN' },
+        skip,
+        take: limit,
+        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        include: {
+          verification: {
+            include: { patient: { select: { name: true } } },
+          },
+        },
+      }),
+      this.prisma.manualReviewQueue.count({ where: { status: 'OPEN' } }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        reviewId: item.id,
+        patientName: item.verification.patient.name,
+        reason: item.reason,
+        priority: item.priority,
+        riskScore: item.verification.riskScore,
+        createdAt: item.createdAt,
+        status: item.status,
+        verificationId: item.verificationId,
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async approveVerification(
+    adminId: string,
+    verificationId: string,
+    notes?: string,
+  ) {
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { id: verificationId },
+    });
+    if (!verification) throw new NotFoundException('Verification not found');
+
+    await this.prisma.$transaction([
+      this.prisma.patientVerification.update({
+        where: { id: verificationId },
+        data: { status: PatientVerificationStatus.CONFIRMED },
+      }),
+      this.prisma.manualReviewQueue.updateMany({
+        where: { verificationId, status: 'OPEN' },
+        data: {
+          status: 'APPROVED',
+          resolvedAt: new Date(),
+          assignedTo: adminId,
+          notes: notes ?? null,
+        },
+      }),
+    ]);
+
+    await this.writeAuditLog(verificationId, 'MANUAL_APPROVED', adminId, {
+      notes,
+    });
+    return { success: true, status: PatientVerificationStatus.CONFIRMED };
+  }
+
+  async rejectVerification(
+    adminId: string,
+    verificationId: string,
+    reason: string,
+    notifyPatient?: boolean,
+  ) {
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { id: verificationId },
+      include: { patient: { include: { user: { select: { phone: true } } } } },
+    });
+    if (!verification) throw new NotFoundException('Verification not found');
+
+    await this.prisma.$transaction([
+      this.prisma.patientVerification.update({
+        where: { id: verificationId },
+        data: { status: PatientVerificationStatus.FLAGGED },
+      }),
+      this.prisma.manualReviewQueue.updateMany({
+        where: { verificationId, status: 'OPEN' },
+        data: {
+          status: 'REJECTED',
+          resolvedAt: new Date(),
+          assignedTo: adminId,
+          notes: reason,
+        },
+      }),
+    ]);
+
+    if (notifyPatient && verification.patient.user?.phone) {
+      await this.smsService.sendSms({
+        to: verification.patient.user.phone,
+        body: `Your Curex24 identity verification was not approved: ${reason}. Please contact support.`,
+      });
+    }
+
+    await this.writeAuditLog(verificationId, 'MANUAL_REJECTED', adminId, {
+      reason,
+      notifyPatient,
+    });
+    return { success: true, status: PatientVerificationStatus.FLAGGED };
+  }
+
+  async emergencyOverride(
+    adminId: string,
+    verificationId: string,
+    reason: string,
+  ) {
+    if (!reason?.trim())
+      throw new BadRequestException('Override reason is required');
+
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { id: verificationId },
+    });
+    if (!verification) throw new NotFoundException('Verification not found');
+
+    await this.prisma.patientVerification.update({
+      where: { id: verificationId },
+      data: {
+        status: PatientVerificationStatus.EMERGENCY_OVERRIDE,
+        emergencyOverride: true,
+        overrideReason: reason,
+        overrideBy: adminId,
+        overrideAt: new Date(),
+      },
+    });
+
+    await this.writeAuditLog(
+      verificationId,
+      'EMERGENCY_OVERRIDE_APPLIED',
+      adminId,
+      { reason },
+    );
+    return {
+      success: true,
+      status: PatientVerificationStatus.EMERGENCY_OVERRIDE,
+    };
+  }
+
+  async getAuditLogs(
+    verificationId?: string,
+    patientId?: string,
+    page = 1,
+    limit = 50,
+  ) {
+    const skip = (page - 1) * limit;
+    const where: Record<string, unknown> = {};
+
+    if (verificationId) where['verificationId'] = verificationId;
+    if (patientId) {
+      const v = await this.prisma.patientVerification.findFirst({
+        where: { patientId },
+        select: { id: true },
+      });
+      if (v) where['verificationId'] = v.id;
+    }
+
+    const [logs, total] = await this.prisma.$transaction([
+      this.prisma.verificationAuditLog.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.verificationAuditLog.count({ where }),
+    ]);
+
+    return { logs, total, page, limit };
+  }
+
+  async getVerificationDetail(verificationId: string) {
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { id: verificationId },
+      include: {
+        patient: { select: { name: true, userId: true } },
+        idDocuments: true,
+        verificationAuditLogs: { orderBy: { createdAt: 'desc' } },
+        manualReviewQueues: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    });
+    if (!verification) throw new NotFoundException('Verification not found');
+    return verification;
+  }
+
+  // ──────────────────────────────────────────────────
+  // Helpers
+  // ──────────────────────────────────────────────────
+
+  private computeIsMinor(dob: Date): boolean {
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const monthDiff = now.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age < 18;
+  }
+
+  private async getOrCreateForUser(userId: string) {
+    const patient = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+    if (!patient)
+      throw new NotFoundException(
+        'Patient profile not found. Please complete your profile first.',
+      );
+
+    return this.prisma.patientVerification.upsert({
+      where: { patientId: patient.id },
+      update: {},
+      create: {
+        patientId: patient.id,
+        riskScore: 0,
+        riskTier: 'LOW',
+        riskTriggers: [],
+        status: PatientVerificationStatus.OTP_VERIFIED,
+      },
+      include: { idDocuments: true },
+    });
+  }
+
+  private computeCompletedSelfServeSteps(verification: {
+    fullName: string | null;
+    addressLine: string | null;
+    addressLat: number | null;
+    selfieStoragePath: string | null;
+    guardianName: string | null;
+    isMinor: boolean;
+    status: PatientVerificationStatus;
+    idDocuments?: Array<{ extractedName: string | null }>;
+  }): SelfServeStep[] {
+    const completed: SelfServeStep[] = [];
+    if (verification.fullName) completed.push('PERSONAL_DETAILS');
+    if (verification.addressLine || verification.addressLat != null)
+      completed.push('ADDRESS');
+    if (
+      verification.idDocuments &&
+      verification.idDocuments.some((d) => d.extractedName)
+    ) {
+      completed.push('ID_UPLOAD');
+    }
+    if (verification.selfieStoragePath) completed.push('FACE_CAPTURE');
+    if (verification.isMinor && verification.guardianName)
+      completed.push('GUARDIAN');
+    if (
+      verification.status === PatientVerificationStatus.CONFIRMED ||
+      verification.status === PatientVerificationStatus.EMERGENCY_OVERRIDE
+    ) {
+      completed.push('REVIEW');
+    }
+    return completed;
+  }
+
+  private computePendingSelfServeSteps(
+    isMinor: boolean,
+    completed: SelfServeStep[],
+  ): SelfServeStep[] {
+    const all: SelfServeStep[] = isMinor
+      ? [
+          'PERSONAL_DETAILS',
+          'ADDRESS',
+          'ID_UPLOAD',
+          'FACE_CAPTURE',
+          'GUARDIAN',
+          'REVIEW',
+        ]
+      : ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'REVIEW'];
+    return all.filter((s) => !completed.includes(s));
+  }
+
+  private async findAndAuthorizeVerification(
+    patientUserId: string,
+    verificationId: string,
+  ) {
+    const verification = await this.prisma.patientVerification.findUnique({
+      where: { id: verificationId },
+      include: { patient: { select: { userId: true } } },
+    });
+    if (!verification) throw new NotFoundException('Verification not found');
+    if (verification.patient.userId !== patientUserId)
+      throw new ForbiddenException('Not your verification');
+    return verification;
+  }
+
+  private async queueManualReview(
+    verificationId: string,
+    reason: ManualReviewReason,
+    priority: ReviewPriority,
+  ) {
+    const existing = await this.prisma.manualReviewQueue.findFirst({
+      where: { verificationId, status: 'OPEN', reason },
+    });
+    if (existing) return existing;
+
+    return this.prisma.manualReviewQueue.create({
+      data: { verificationId, reason, priority },
+    });
+  }
+
+  private async writeAuditLog(
+    verificationId: string,
+    action: string,
+    performedBy: string,
+    meta?: Record<string, unknown>,
+  ) {
+    await this.prisma.verificationAuditLog.create({
+      data: {
+        verificationId,
+        action,
+        performedBy,
+        meta: meta as Prisma.InputJsonValue | undefined,
+      },
+    });
+  }
+
+  private async generateSignedUploadUrl(
+    storagePath: string,
+    _mimeType: string,
+  ): Promise<string> {
+    if (!this.supabaseUrl || !this.supabaseKey) {
+      this.logger.warn('Supabase not configured — returning mock upload URL');
+      return `https://mock-supabase.example.com/${ID_DOCS_BUCKET}/${storagePath}?mock=true`;
+    }
+
+    const url = `${this.supabaseUrl}/storage/v1/object/sign/${ID_DOCS_BUCKET}/${storagePath}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: UPLOAD_URL_EXPIRY }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(
+        `Failed to generate Supabase upload URL: ${resp.statusText}`,
+      );
+    }
+
+    const data = (await resp.json()) as { signedURL: string };
+    return `${this.supabaseUrl}/storage/v1${data.signedURL}`;
+  }
+}

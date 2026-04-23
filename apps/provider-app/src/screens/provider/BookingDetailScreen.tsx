@@ -56,7 +56,12 @@ export const BookingDetailScreen: React.FC = () => {
     }
   };
 
-  const handleAcceptBooking = async () => {
+  const openMaps = (address: string) => {
+    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+    Linking.openURL(url);
+  };
+
+  const handleAccept = async () => {
     setUpdating(true);
     try {
       await bookingService.acceptBooking(bookingId);
@@ -68,7 +73,7 @@ export const BookingDetailScreen: React.FC = () => {
     }
   };
 
-  const handleDeclineBooking = () => {
+  const handleDecline = () => {
     Alert.alert('Decline Booking', 'Are you sure you want to decline this booking?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -79,7 +84,6 @@ export const BookingDetailScreen: React.FC = () => {
           try {
             await bookingService.declineBooking(bookingId);
             setBooking((prev: any) => ({ ...prev, status: 'DECLINED' }));
-            navigation.goBack();
           } catch {
             Alert.alert('Error', 'Failed to decline booking.');
           } finally {
@@ -88,11 +92,6 @@ export const BookingDetailScreen: React.FC = () => {
         },
       },
     ]);
-  };
-
-  const openMaps = (address: string) => {
-    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
-    Linking.openURL(url);
   };
 
   if (loading) {
@@ -106,6 +105,11 @@ export const BookingDetailScreen: React.FC = () => {
   const currentStep = STATUS_ORDER.indexOf(booking.status);
 
   const getNextAction = () => {
+    if (booking.mode === 'VIDEO_CONSULTATION') {
+      if (booking.status === 'ACCEPTED' || booking.status === 'IN_PROGRESS') {
+        return { label: '🎥 Go to Video Session', nav: 'VideoConsultation' as const };
+      }
+    }
     switch (booking.status) {
       case 'ACCEPTED': return { label: '🚗 Start Journey', next: 'ON_THE_WAY' };
       case 'ON_THE_WAY': return { label: '📍 Mark Arrived', next: 'ARRIVED' };
@@ -148,7 +152,7 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.infoText}>Name: {booking.patient?.name || 'Patient'}</Text>
           <Text style={styles.infoText}>Phone: {booking.patient?.phone ? `+91 ****${booking.patient.phone.slice(-4)}` : '—'}</Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
-          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '📹 Video Consultation' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
         </View>
 
@@ -156,8 +160,21 @@ export const BookingDetailScreen: React.FC = () => {
         {booking.mode === 'HOME_VISIT' && booking.address && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Patient Address</Text>
-            <Text style={styles.infoText}>{booking.address}</Text>
-            <TouchableOpacity style={styles.mapBtn} onPress={() => openMaps(booking.address)}>
+            <Text style={styles.infoText}>
+              {[booking.address.line1, booking.address.line2, booking.address.city, booking.address.state, booking.address.pincode]
+                .filter(Boolean)
+                .join(', ')}
+            </Text>
+            <TouchableOpacity
+              style={styles.mapBtn}
+              onPress={() =>
+                openMaps(
+                  [booking.address.line1, booking.address.line2, booking.address.city, booking.address.state, booking.address.pincode]
+                    .filter(Boolean)
+                    .join(', '),
+                )
+              }
+            >
               <Text style={styles.mapBtnText}>🗺 Open in Maps</Text>
             </TouchableOpacity>
           </View>
@@ -170,31 +187,36 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.payStatus}>Payment: {booking.paymentStatus}</Text>
         </View>
 
-        {/* Accept/Decline for REQUESTED bookings */}
         {booking.status === 'REQUESTED' && (
-          <View style={styles.actionRow}>
+          <View style={styles.rowActions}>
             <TouchableOpacity
-              style={[styles.declineBtn, updating && { opacity: 0.7 }]}
-              onPress={handleDeclineBooking}
+              style={[styles.secondaryBtn, updating && { opacity: 0.7 }]}
+              onPress={handleDecline}
               disabled={updating}
             >
-              <Text style={styles.declineBtnText}>{updating ? 'Updating…' : '❌ Decline'}</Text>
+              <Text style={styles.secondaryBtnText}>Decline</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, updating && { opacity: 0.7 }]}
-              onPress={handleAcceptBooking}
+              style={[styles.actionBtn, { flex: 1, marginTop: 0 }, updating && { opacity: 0.7 }]}
+              onPress={handleAccept}
               disabled={updating}
             >
-              <Text style={styles.actionBtnText}>{updating ? 'Updating…' : '✅ Accept Booking'}</Text>
+              <Text style={styles.actionBtnText}>Accept Booking</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Action Button */}
-        {nextAction && booking.status !== 'REQUESTED' && (
+        {nextAction && (
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
-            onPress={() => updateStatus(nextAction.next)}
+            onPress={() => {
+              if ('nav' in nextAction && nextAction.nav === 'VideoConsultation') {
+                navigation.navigate('VideoConsultation', { bookingId });
+              } else if ('next' in nextAction) {
+                updateStatus(nextAction.next);
+              }
+            }}
             disabled={updating}
           >
             <Text style={styles.actionBtnText}>{updating ? 'Updating…' : nextAction.label}</Text>
@@ -241,7 +263,14 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  declineBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.error, borderRadius: 10, padding: 14, alignItems: 'center' },
-  declineBtnText: { color: Colors.error, fontWeight: '700', fontSize: 14 },
+  rowActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  secondaryBtn: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
 });

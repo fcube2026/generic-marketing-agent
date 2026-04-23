@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@playwright/test": ["../../node_modules/@playwright/test"]
+    },
+    "noEmit": true
+  },
+  "include": ["playwright.config.ts", "e2e/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

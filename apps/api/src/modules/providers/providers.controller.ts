@@ -52,6 +52,34 @@ export class ProvidersController {
     return this.providersService.getMyBookings(user.id);
   }
 
+  @Get('me/dashboard')
+  getDashboard(@CurrentUser() user: any) {
+    return this.providersService.getDashboard(user.id);
+  }
+
+  @Get('me/consultations')
+  getConsultations(@CurrentUser() user: any) {
+    return this.providersService.getConsultations(user.id);
+  }
+
+  @Get('me/patients')
+  getPatients(@CurrentUser() user: any) {
+    return this.providersService.getPatients(user.id);
+  }
+
+  @Get('me/patients/:patientId')
+  getPatientConsultations(
+    @CurrentUser() user: any,
+    @Param('patientId') patientId: string,
+  ) {
+    return this.providersService.getPatientConsultations(user.id, patientId);
+  }
+
+  @Get('me/earnings')
+  getEarnings(@CurrentUser() user: any) {
+    return this.providersService.getEarnings(user.id);
+  }
+
   @Get('me/incoming-requests')
   getIncomingRequests(@CurrentUser() user: any) {
     return this.providersService.getIncomingRequests(user.id);

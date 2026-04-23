@@ -12,7 +12,13 @@ import { KycScreen } from '../screens/provider/KycScreen';
 import { HistoryScreen } from '../screens/provider/HistoryScreen';
 import { EarningsScreen } from '../screens/provider/EarningsScreen';
 import { ProfileScreen } from '../screens/provider/ProfileScreen';
+import { VideoConsultationScreen } from '../screens/provider/VideoConsultationScreen';
+import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
+import { VideoCallScreen } from '../screens/common/VideoCallScreen';
+import { SafetyChecklistScreen } from '../screens/provider/SafetyChecklistScreen';
+import { VisitOtpScreen } from '../screens/provider/VisitOtpScreen';
 import { Colors } from '../constants/colors';
+import type { VideoCallParams } from '../screens/common/VideoCallScreen';
 
 export type ProviderStackParamList = {
   Tabs: undefined;
@@ -20,6 +26,11 @@ export type ProviderStackParamList = {
   Availability: undefined;
   IncomingBooking: undefined;
   BookingDetail: { bookingId: string };
+  SafetyChecklist: { bookingId: string };
+  VisitOtp: { bookingId: string };
+  VideoLobby: { bookingId: string };
+  VideoConsultation: { bookingId: string };
+  VideoCall: VideoCallParams;
   ConsultationForm: { bookingId: string };
   Kyc: undefined;
 };
@@ -54,6 +65,11 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="Availability" component={AvailabilityScreen} options={{ title: 'Availability' }} />
     <Stack.Screen name="IncomingBooking" component={IncomingBookingScreen} options={{ title: 'New Booking' }} />
     <Stack.Screen name="BookingDetail" component={BookingDetailScreen} options={{ title: 'Booking Details' }} />
+    <Stack.Screen name="SafetyChecklist" component={SafetyChecklistScreen} options={{ title: 'Safety Checklist' }} />
+    <Stack.Screen name="VisitOtp" component={VisitOtpScreen} options={{ title: 'Visit Verification' }} />
+    <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Lobby', headerStyle: { backgroundColor: '#0F172A' }, headerTintColor: Colors.white }} />
+    <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
+    <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
   </Stack.Navigator>

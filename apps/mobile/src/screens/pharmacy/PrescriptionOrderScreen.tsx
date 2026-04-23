@@ -170,56 +170,67 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
-  // null = unknown / still probing; true = a recent prescription exists; false = none
-  const [hasRecentPrescription, setHasRecentPrescription] = useState<boolean | null>(null);
 
-  // ---- Probe whether a recent prescription actually exists ----------------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.get<LatestConsultationResponse | null>(
-          '/consultation/latest',
-        );
-        const data = res.data;
-        const exists = !!(
-          data &&
-          (data.prescriptionUrl || (data.medicines && data.medicines.length > 0))
-        );
-        if (!cancelled) setHasRecentPrescription(exists);
-      } catch {
-        if (!cancelled) setHasRecentPrescription(false);
+  // ---- Load all medicines from mock DB -----------------------------------
+  const loadAllMedicines = useCallback(async () => {
+    try {
+      const results = await pharmacyService.searchMedicines('');
+      if (results && results.length > 0) {
+        const mapped: PrescriptionMedicine[] = results.map((m, i) => ({
+          id: i + 1,
+          name: m.name,
+          quantity: 1,
+          unitPrice: m.price,
+        }));
+        setMedicines(mapped);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      // silently ignore — user can still add manually
+    }
+  }, [setMedicines]);
+
+  // ---- Resolve missing medicine prices -----------------------------------
+  const resolvePrices = useCallback(async (
+    inputMedicines: PrescriptionMedicine[],
+  ): Promise<PrescriptionMedicine[]> => {
+    if (inputMedicines.length === 0) return inputMedicines;
+
+    const resolved = await Promise.all(
+      inputMedicines.map(async (med) => {
+        if (med.unitPrice > 0) return med;
+        try {
+          const results = await pharmacyService.searchMedicines(med.name);
+          if (!results || results.length === 0) return med;
+          const nameLower = med.name.toLowerCase();
+          // 1. Exact match
+          const exact = results.find(
+            (item) => item.name.toLowerCase() === nameLower,
+          );
+          // 2. Catalog name starts with doctor-written name (e.g. "Paracetamol" → "Paracetamol 500mg")
+          const startsWith = results.find(
+            (item) => item.name.toLowerCase().startsWith(nameLower),
+          );
+          // 3. Doctor-written name starts with catalog name (reverse partial)
+          const reverse = results.find(
+            (item) => nameLower.startsWith(item.name.toLowerCase()),
+          );
+          const bestMatch = exact ?? startsWith ?? reverse ?? results[0];
+          if (bestMatch?.price && bestMatch.price > 0) {
+            return { ...med, unitPrice: bestMatch.price };
+          }
+        } catch {
+          // Keep original value if lookup fails.
+        }
+        return med;
+      }),
+    );
+
+    return resolved;
   }, []);
 
-  // ---- Resolve unit prices for medicines that don't have one -------------
-  const resolvePrices = useCallback(
-    async (items: PrescriptionMedicine[]): Promise<PrescriptionMedicine[]> => {
-      const resolved = await Promise.all(
-        items.map(async (m) => {
-          if (m.unitPrice && m.unitPrice > 0) return m;
-          try {
-            const results = await pharmacyService.searchMedicines(m.name);
-            const lower = m.name.toLowerCase();
-            const match =
-              results.find((r) => (r.name ?? '').toLowerCase() === lower) ||
-              results.find((r) => (r.name ?? '').toLowerCase().includes(lower)) ||
-              results[0];
-            const price = match && typeof (match as any).price === 'number' ? (match as any).price : 0;
-            return { ...m, unitPrice: price };
-          } catch {
-            return m;
-          }
-        }),
-      );
-      return resolved;
-    },
-    [],
-  );
+  // Medicines are intentionally NOT pre-loaded on mount.
+  // They populate only after the user uploads a prescription or taps
+  // "Use Recent Prescription".
 
   // ---- Shared: fetch medicines from latest consultation -------------------
   const fetchConsultationMedicines = useCallback(
@@ -241,8 +252,8 @@ export const PrescriptionOrderScreen: React.FC = () => {
             unitPrice: typeof m!.unitPrice === 'number' ? m!.unitPrice : 0,
           }));
         if (mappedMedicines.length > 0) {
-          const priced = await resolvePrices(mappedMedicines);
-          setMedicines(priced);
+          const pricedMedicines = await resolvePrices(mappedMedicines);
+          setMedicines(pricedMedicines);
           return true;
         }
         return false;
@@ -250,7 +261,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
         return false;
       }
     },
-    [setMedicines, resolvePrices],
+    [resolvePrices, setMedicines],
   );
 
   // ---- Prescription upload via API -----------------------------------------
@@ -282,8 +293,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
           response.data?.status ?? null,
         );
 
-        // Try to load medicines from the latest consultation, if any.
-        // Otherwise leave the medicines list as-is (user can search & add manually).
+        // Try to load consultation medicines for this upload
         await fetchConsultationMedicines();
       } catch (err: unknown) {
         const message =
@@ -365,8 +375,8 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setUploadedPrescriptionMeta(null, null);
       }
       if (mappedMedicines.length > 0) {
-        const priced = await resolvePrices(mappedMedicines);
-        setMedicines(priced);
+        const pricedMedicines = await resolvePrices(mappedMedicines);
+        setMedicines(pricedMedicines);
       }
     } catch (err) {
       const message =
@@ -376,7 +386,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
     } finally {
       setRecentLoading(false);
     }
-  }, [setPrescription, setMedicines, setUploadedPrescriptionMeta, resolvePrices]);
+  }, [resolvePrices, setPrescription, setMedicines, setUploadedPrescriptionMeta]);
 
   // ---- Checkout validation -------------------------------------------------
   const subtotal = medicines.reduce(
@@ -430,39 +440,24 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
         {!prescriptionUrl && !isUploading && (
           <>
-            {hasRecentPrescription !== false ? (
-              <TouchableOpacity
-                style={[
-                  styles.sourceOption,
-                  (recentLoading || hasRecentPrescription === null) && { opacity: 0.6 },
-                ]}
-                onPress={useRecentConsultation}
-                disabled={recentLoading || hasRecentPrescription === null}
-              >
-                <Text style={styles.sourceIcon}>🩺</Text>
-                <View style={styles.sourceTextWrap}>
-                  <Text style={styles.sourceTitle}>
-                    {recentLoading
-                      ? 'Loading recent prescription…'
-                      : hasRecentPrescription === null
-                        ? 'Checking for recent prescription…'
-                        : 'Use Recent Prescription'}
-                  </Text>
-                  <Text style={styles.sourceSubtitle}>
-                    Use your last doctor-issued prescription
-                  </Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.noRecentBanner}>
-                <Text style={styles.noRecentText}>
-                  ℹ️ No recent prescription found
+            <TouchableOpacity
+              style={[styles.sourceOption, recentLoading && { opacity: 0.6 }]}
+              onPress={useRecentConsultation}
+              disabled={recentLoading}
+            >
+              <Text style={styles.sourceIcon}>🩺</Text>
+              <View style={styles.sourceTextWrap}>
+                <Text style={styles.sourceTitle}>
+                  {recentLoading ? 'Loading recent prescription…' : 'Use Recent Prescription'}
+                </Text>
+                <Text style={styles.sourceSubtitle}>
+                  Use your last doctor-issued prescription
                 </Text>
               </View>
-            )}
+              <Text style={styles.arrow}>→</Text>
+            </TouchableOpacity>
 
-            {recentError && hasRecentPrescription !== false && (
+            {recentError && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>ℹ️ {recentError}</Text>
               </View>
@@ -657,6 +652,12 @@ export const PrescriptionOrderScreen: React.FC = () => {
             <Text style={styles.summaryLabel}>Delivery fee{subtotal >= freeDeliveryThreshold ? ' 🎉' : ''}</Text>
             <Text style={styles.summaryValue}>{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</Text>
           </View>
+          {deliveryFee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Free delivery unlock</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(freeDeliveryThreshold - subtotal)} away</Text>
+            </View>
+          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Estimated total</Text>
             <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
@@ -795,13 +796,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorText: { fontSize: 13, color: Colors.error },
-  noRecentBanner: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  noRecentText: { fontSize: 13, color: Colors.textMuted },
 
   // Preview
   previewWrap: { alignItems: 'center' },

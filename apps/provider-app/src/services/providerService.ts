@@ -3,13 +3,8 @@ export const providerService = {
   getProfile: async () => { const r = await api.get('/providers/me'); return r.data; },
   onboard: async (data: any) => { const r = await api.post('/providers/onboard', data); return r.data; },
   updateProfile: async (data: any) => { const r = await api.put('/providers/me', data); return r.data; },
-  updateAvailability: async (isAvailable: boolean, lat?: number, lng?: number, serviceRadius?: number) => {
-    const r = await api.put('/providers/me/availability', {
-      isAvailable,
-      currentLat: lat,
-      currentLng: lng,
-      serviceRadius,
-    });
+  updateAvailability: async (isAvailable: boolean, lat?: number, lng?: number) => {
+    const r = await api.put('/providers/me/availability', { isAvailable, currentLat: lat, currentLng: lng });
     return r.data;
   },
   submitConsultation: async (bookingId: string, data: any) => {
@@ -35,24 +30,11 @@ export const consultationService = {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
     return r.data;
   },
-
-  uploadPrescription: async (
+  addPrescription: async (
     bookingId: string,
-    file?: { uri: string; name?: string; mimeType?: string } | null,
-    details?: string,
+    data: { details?: string; fileUrl?: string },
   ) => {
-    const form = new FormData();
-    if (file?.uri) {
-      form.append('file', {
-        uri: file.uri,
-        name: file.name || `prescription_${Date.now()}`,
-        type: file.mimeType || 'application/octet-stream',
-      } as any);
-    }
-    if (details && details.trim()) form.append('details', details.trim());
-    const r = await api.post(`/consultation/${bookingId}/prescription`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const r = await api.post(`/consultation/${bookingId}/prescription`, data);
     return r.data;
   },
 };

@@ -46,13 +46,18 @@ export const RecommendationScreen: React.FC<Props> = ({ navigation, route }) => 
   }
 
   const renderOption = (
-    type: 'homeVisit' | 'doctorPlace',
+    type: 'homeVisit' | 'doctorPlace' | 'videoConsultation',
     option: RecommendationResponse['homeVisit'],
     label: string,
     icon: string,
   ) => {
     if (!option) return null;
-    const isRecommended = data.recommended === (type === 'homeVisit' ? 'HOME_VISIT' : 'DOCTOR_PLACE');
+    const modeMap: Record<typeof type, string> = {
+      homeVisit: 'HOME_VISIT',
+      doctorPlace: 'DOCTOR_PLACE',
+      videoConsultation: 'VIDEO_CONSULTATION',
+    };
+    const isRecommended = data.recommended === modeMap[type];
 
     return (
       <Card style={[styles.optionCard, isRecommended && styles.recommendedCard]}>
@@ -86,7 +91,7 @@ export const RecommendationScreen: React.FC<Props> = ({ navigation, route }) => 
           onPress={() =>
             navigation.navigate('BookingConfirm', {
               providerId: option.provider.id,
-              mode: type === 'homeVisit' ? 'HOME_VISIT' : 'DOCTOR_PLACE',
+              mode: modeMap[type] as 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION',
               fee: option.fee,
             })
           }
@@ -106,6 +111,7 @@ export const RecommendationScreen: React.FC<Props> = ({ navigation, route }) => 
 
       {renderOption('homeVisit', data.homeVisit, 'Home Visit', '🏠')}
       {renderOption('doctorPlace', data.doctorPlace, "Doctor's Clinic", '🏥')}
+      {renderOption('videoConsultation', data.videoConsultation, 'Video Consultation', '📹')}
     </ScrollView>
   );
 };

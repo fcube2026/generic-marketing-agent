@@ -30,6 +30,9 @@ describe('ConsultationController', () => {
             getSummary: jest
               .fn()
               .mockResolvedValue({ ...mockSummary, prescriptions: [] }),
+            addPrescription: jest
+              .fn()
+              .mockResolvedValue({ id: 'rx-1', details: 'Take after food' }),
             getPatientSummaries: jest.fn().mockResolvedValue({
               data: [{ ...mockSummary, prescriptions: [], booking: {} }],
               total: 1,
@@ -98,6 +101,25 @@ describe('ConsultationController', () => {
       await controller.getPatientSummaries(user, '2', '5');
 
       expect(service.getPatientSummaries).toHaveBeenCalledWith('user-1', 2, 5);
+    });
+  });
+
+  describe('addPrescription', () => {
+    it('should call service.addPrescription with correct params', async () => {
+      const dto = {
+        details: 'Take after food',
+        fileUrl: 'https://example.com/rx.pdf',
+      };
+      const user = { id: 'user-1' };
+
+      const result = await controller.addPrescription('booking-1', user, dto);
+
+      expect(result).toEqual({ id: 'rx-1', details: 'Take after food' });
+      expect(service.addPrescription).toHaveBeenCalledWith(
+        'booking-1',
+        'user-1',
+        dto,
+      );
     });
   });
 });

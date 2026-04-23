@@ -4,26 +4,37 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { VerificationBanner } from '../../components/verification/VerificationBanner';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
+import { Booking } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
+import { patientService } from '../../services/patientService';
+import { PatientProfile } from '../../types';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
+  const { data: profile, isLoading: profileLoading } = useQuery<PatientProfile | null>({
+    queryKey: ['patient-profile'],
+    queryFn: patientService.getProfile,
+  });
+
+  const isProfileComplete = Boolean(profile);
+  const canUsePatientApp = isProfileComplete;
 
   const {
     data: services,
@@ -32,14 +43,16 @@ export const HomeScreen: React.FC = () => {
     isRefetching,
   } = useQuery<ServiceCategory[]>({
     queryKey: ['services'],
+    enabled: canUsePatientApp,
     queryFn: async () => {
       const res = await api.get('/services');
       return res.data;
     },
   });
 
-  const { data: recentBookings } = useQuery({
+  const { data: recentBookings } = useQuery<Booking[]>({
     queryKey: ['patient-bookings'],
+    enabled: isProfileComplete,
     queryFn: async () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
@@ -50,11 +63,48 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('SelectService', { category });
   };
 
+  const activeVideoBookings = (recentBookings || []).filter(
+    (b: Booking) =>
+      b.mode === 'VIDEO_CONSULTATION' &&
+      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
+  );
+
+  const handleVideoConsultationPress = () => {
+    if (activeVideoBookings.length > 0) {
+      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
+    } else {
+      Alert.alert(
+        'Video Consultation',
+        'You have no active video sessions. Book a video consultation from the Services section.',
+      );
+    }
+  };
+
+  if (profileLoading || (canUsePatientApp && isLoading)) {
+    return <LoadingSpinner fullScreen />;
+  }
+
+  if (!canUsePatientApp) {
+    return (
+      <View style={styles.onboardingPrompt}>
+        <Text style={styles.onboardingIcon}>🩺</Text>
+        <Text style={styles.onboardingTitle}>Complete Your Profile</Text>
+        <Text style={styles.onboardingSub}>
+          Add your personal details before booking services.
+        </Text>
+        <TouchableOpacity style={styles.onboardingBtn} onPress={() => navigation.navigate('Onboarding')}>
+          <Text style={styles.onboardingBtnText}>Get Started →</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.container}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
+      <VerificationBanner />
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello 👋</Text>
@@ -89,26 +139,75 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Video Consultation Quick Access */}
+      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
+        <Text style={styles.videoCardIcon}>📹</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Video Consultation</Text>
+          <Text style={styles.videoCardSub}>
+            {activeVideoBookings.length > 0
+              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
+              : 'Consult doctors from the comfort of home'}
+          </Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
+      {/* Prescription Order Quick Access */}
+      <TouchableOpacity
+        style={styles.videoCard}
+        onPress={() => navigation.navigate('PrescriptionOrder')}
+      >
+        <Text style={styles.videoCardIcon}>💊</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Prescription Order</Text>
+          <Text style={styles.videoCardSub}>Upload prescription & order medicines</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
+      {/* OTC Medicine Order Quick Access */}
+      <TouchableOpacity
+        style={styles.videoCard}
+        onPress={() => navigation.navigate('MedicineSearch')}
+      >
+        <Text style={styles.videoCardIcon}>🛒</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Order Without Prescription</Text>
+          <Text style={styles.videoCardSub}>Search & order OTC medicines directly</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
-          {recentBookings.slice(0, 3).map((booking: any) => (
-            <TouchableOpacity
-              key={booking.id}
-              style={styles.bookingItem}
-              onPress={() => navigation.navigate('Tracking', { bookingId: booking.id })}
-            >
-              <View>
-                <Text style={styles.bookingProvider}>{booking.provider?.name || 'Provider'}</Text>
-                <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
-              </View>
-              <View>
-                <Text style={[styles.bookingStatus, { color: Colors.primary }]}>
-                  {booking.status}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {recentBookings.slice(0, 3).map((booking: any) => {
+            const isVideo = booking.mode === 'VIDEO_CONSULTATION';
+            return (
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.bookingItem}
+                onPress={() =>
+                  isVideo
+                    ? navigation.navigate('VideoLobby', { bookingId: booking.id })
+                    : navigation.navigate('Tracking', { bookingId: booking.id })
+                }
+              >
+                <View>
+                  <Text style={styles.bookingProvider}>
+                    {isVideo ? '📹 ' : ''}{booking.provider?.name || 'Provider'}
+                  </Text>
+                  <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
+                </View>
+                <View>
+                  <Text style={[styles.bookingStatus, { color: Colors.primary }]}>
+                    {booking.status}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -119,6 +218,29 @@ export const HomeScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  onboardingPrompt: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: Colors.background,
+  },
+  onboardingIcon: { fontSize: 72, marginBottom: 20 },
+  onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
+  onboardingSub: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 22,
+  },
+  onboardingBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -174,4 +296,26 @@ const styles = StyleSheet.create({
   bookingProvider: { fontWeight: '600', color: Colors.text, marginBottom: 2 },
   bookingService: { fontSize: 13, color: Colors.textMuted },
   bookingStatus: { fontWeight: '600', fontSize: 13 },
+  videoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  videoCardIcon: { fontSize: 28, marginRight: 14 },
+  videoCardContent: { flex: 1 },
+  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
 });

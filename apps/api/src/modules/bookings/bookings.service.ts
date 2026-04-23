@@ -2,12 +2,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
+import { PatientVerificationService } from '../patient-verification/patient-verification.service';
+import { ConfigService } from '@nestjs/config';
 
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -29,7 +33,23 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private videoReminderService: VideoConsultationReminderService,
+    private patientVerificationService: PatientVerificationService,
+    private config: ConfigService,
   ) {}
+
+  private formatScheduledTime(date: Date): string {
+    return date.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  private buildPatientUniqueId(patientId: string): string {
+    return `PT-${patientId.slice(-8).toUpperCase()}`;
+  }
 
   async createBooking(userId: string, dto: CreateBookingDto) {
     const patientProfile = await this.prisma.patientProfile.findUnique({
@@ -39,6 +59,26 @@ export class BookingsService {
       throw new NotFoundException(
         'Patient profile not found. Please complete your profile first.',
       );
+
+    // KYC gate: when PATIENT_VERIFICATION_REQUIRED=true, block booking
+    // creation unless the patient's KYC is CONFIRMED (or has an admin
+    // emergency override). Defaults to false in staging so the rest of the
+    // booking flow remains testable while the verification pipeline is
+    // being completed.
+    const kycRequired =
+      String(
+        this.config.get('PATIENT_VERIFICATION_REQUIRED', 'false'),
+      ).toLowerCase() === 'true';
+    if (kycRequired) {
+      const verified = await this.patientVerificationService.isPatientVerified(
+        patientProfile.id,
+      );
+      if (!verified) {
+        throw new ForbiddenException(
+          'VERIFICATION_REQUIRED: Please complete identity verification (KYC) from your Profile before booking.',
+        );
+      }
+    }
 
     const provider = await this.prisma.providerProfile.findUnique({
       where: { id: dto.providerId },
@@ -59,6 +99,14 @@ export class BookingsService {
     if (dto.mode === 'DOCTOR_PLACE' && !provider.doctorPlaceVisitEnabled) {
       throw new BadRequestException(
         'This provider does not offer clinic visits.',
+      );
+    }
+    if (
+      dto.mode === 'VIDEO_CONSULTATION' &&
+      !provider.videoConsultationEnabled
+    ) {
+      throw new BadRequestException(
+        'This provider does not offer video consultations.',
       );
     }
 
@@ -112,7 +160,9 @@ export class BookingsService {
     const fee =
       dto.mode === 'HOME_VISIT'
         ? provider.consultationFeeHomeVisit
-        : provider.consultationFeeDoctorPlace;
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? provider.consultationFeeVideoConsultation
+          : provider.consultationFeeDoctorPlace;
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -150,14 +200,33 @@ export class BookingsService {
       },
     });
 
-    // Notify provider of new booking request
-    await this.notificationsService.createNotification({
-      userId: provider.userId,
-      title: 'New Booking Request',
-      message: `You have a new ${dto.mode === 'HOME_VISIT' ? 'home visit' : 'clinic visit'} booking request.`,
-      type: 'BOOKING_REQUEST',
-      metadata: { bookingId: booking.id },
-    });
+    // Notify provider of new booking request with push and SMS
+    const modeText =
+      dto.mode === 'HOME_VISIT'
+        ? 'home visit'
+        : dto.mode === 'VIDEO_CONSULTATION'
+          ? 'video consultation'
+          : 'clinic visit';
+    await this.notificationsService.sendNotification(
+      {
+        userId: provider.userId,
+        title: 'New Booking Request',
+        message: `You have a new ${modeText} booking request for ${this.formatScheduledTime(scheduledAt)}.`,
+        type: 'BOOKING_REQUEST',
+        metadata: { bookingId: booking.id },
+      },
+      {
+        inApp: true,
+        push: true,
+        sms: true,
+        smsTemplate: 'NEW_BOOKING_REQUEST',
+        smsParams: {
+          mode: modeText,
+          patientName: patientProfile.name,
+          scheduledTime: this.formatScheduledTime(scheduledAt),
+        },
+      },
+    );
 
     return booking;
   }
@@ -180,7 +249,13 @@ export class BookingsService {
     });
 
     if (!booking) throw new NotFoundException('Booking not found');
-    return booking;
+    return {
+      ...booking,
+      patient: {
+        ...booking.patient,
+        uniquePatientId: this.buildPatientUniqueId(booking.patient.id),
+      },
+    };
   }
 
   async updateBookingStatus(
@@ -236,41 +311,69 @@ export class BookingsService {
     });
 
     // Send notifications for provider-driven status transitions
-    const PROVIDER_TRANSITION_MESSAGES: Partial<
-      Record<BookingStatus, { title: string; message: string }>
-    > = {
-      ON_THE_WAY: {
-        title: 'Provider On the Way',
-        message: 'Your provider is on the way.',
-      },
-      ARRIVED: {
-        title: 'Provider Arrived',
-        message: 'Your provider has arrived.',
-      },
-      IN_PROGRESS: {
-        title: 'Consultation Started',
-        message: 'Your consultation is now in progress.',
-      },
-      COMPLETED: {
-        title: 'Consultation Completed',
-        message: 'Your consultation has been completed.',
-      },
-    };
+    const fullBooking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
 
-    const notification = PROVIDER_TRANSITION_MESSAGES[dto.status];
-    if (notification) {
-      const fullBooking = await this.prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: { patient: true },
-      });
-      if (fullBooking) {
-        await this.notificationsService.createNotification({
-          userId: fullBooking.patient.userId,
-          title: notification.title,
-          message: notification.message,
-          type: 'BOOKING_STATUS_UPDATE',
-          metadata: { bookingId, status: dto.status },
-        });
+    if (fullBooking && fullBooking.provider?.name) {
+      const providerName = fullBooking.provider.name;
+      const PROVIDER_TRANSITION_CONFIG: Partial<
+        Record<
+          BookingStatus,
+          {
+            title: string;
+            message: string;
+            smsTemplate?: string;
+            sendSms: boolean;
+          }
+        >
+      > = {
+        ON_THE_WAY: {
+          title: 'Provider On the Way',
+          message: `Dr. ${providerName} is on the way to your location.`,
+          smsTemplate: 'PROVIDER_ON_THE_WAY',
+          sendSms: true,
+        },
+        ARRIVED: {
+          title: 'Provider Arrived',
+          message: `Dr. ${providerName} has arrived.`,
+          smsTemplate: 'PROVIDER_ARRIVED',
+          sendSms: true,
+        },
+        IN_PROGRESS: {
+          title: 'Consultation Started',
+          message: 'Your consultation is now in progress.',
+          sendSms: false,
+        },
+        COMPLETED: {
+          title: 'Consultation Completed',
+          message: `Your consultation with Dr. ${providerName} has been completed.`,
+          smsTemplate: 'CONSULTATION_COMPLETED',
+          sendSms: true,
+        },
+      };
+
+      const config = PROVIDER_TRANSITION_CONFIG[dto.status];
+      if (config) {
+        await this.notificationsService.sendNotification(
+          {
+            userId: fullBooking.patient.userId,
+            title: config.title,
+            message: config.message,
+            type: 'BOOKING_STATUS_UPDATE',
+            metadata: { bookingId, status: dto.status },
+          },
+          {
+            inApp: true,
+            push: true,
+            sms: config.sendSms,
+            smsTemplate: config.smsTemplate,
+            smsParams: {
+              providerName,
+            },
+          },
+        );
       }
     }
 
@@ -288,13 +391,37 @@ export class BookingsService {
       include: { patient: true, provider: true },
     });
     if (booking) {
-      await this.notificationsService.createNotification({
-        userId: booking.patient.userId,
-        title: 'Booking Accepted',
-        message: `Your booking has been accepted by ${booking.provider.name}.`,
-        type: 'BOOKING_ACCEPTED',
-        metadata: { bookingId },
-      });
+      await this.notificationsService.sendNotification(
+        {
+          userId: booking.patient.userId,
+          title: 'Booking Accepted',
+          message: `Your booking has been accepted by Dr. ${booking.provider.name}.`,
+          type: 'BOOKING_ACCEPTED',
+          metadata: { bookingId },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: 'BOOKING_ACCEPTED',
+          smsParams: {
+            providerName: booking.provider.name,
+            scheduledTime: this.formatScheduledTime(booking.scheduledAt),
+          },
+        },
+      );
+
+      // Schedule pre-session reminders for video consultations
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.scheduleReminders(
+          bookingId,
+          booking.scheduledAt,
+          booking.patient.userId,
+          booking.provider.userId,
+          booking.provider.name,
+          booking.patient.name,
+        );
+      }
     }
 
     return updated;
@@ -311,15 +438,26 @@ export class BookingsService {
       include: { patient: true, provider: true },
     });
     if (booking) {
-      await this.notificationsService.createNotification({
-        userId: booking.patient.userId,
-        title: 'Booking Declined',
-        message: reason
-          ? `Your booking was declined by ${booking.provider.name}. Reason: ${reason}`
-          : `Your booking was declined by ${booking.provider.name}.`,
-        type: 'BOOKING_DECLINED',
-        metadata: { bookingId, reason },
-      });
+      await this.notificationsService.sendNotification(
+        {
+          userId: booking.patient.userId,
+          title: 'Booking Declined',
+          message: reason
+            ? `Your booking was declined by Dr. ${booking.provider.name}. Reason: ${reason}`
+            : `Your booking was declined by Dr. ${booking.provider.name}.`,
+          type: 'BOOKING_DECLINED',
+          metadata: { bookingId, reason },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: 'BOOKING_DECLINED',
+          smsParams: {
+            reason: reason || '',
+          },
+        },
+      );
     }
 
     return updated;
@@ -342,13 +480,27 @@ export class BookingsService {
         : booking.patient.userId;
       const cancelledBy = isPatientCancelling ? 'the patient' : 'the provider';
 
-      await this.notificationsService.createNotification({
-        userId: notifyUserId,
-        title: 'Booking Cancelled',
-        message: `A booking has been cancelled by ${cancelledBy}.`,
-        type: 'BOOKING_CANCELLED',
-        metadata: { bookingId },
-      });
+      await this.notificationsService.sendNotification(
+        {
+          userId: notifyUserId,
+          title: 'Booking Cancelled',
+          message: `A booking has been cancelled by ${cancelledBy}.`,
+          type: 'BOOKING_CANCELLED',
+          metadata: { bookingId },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: isPatientCancelling
+            ? 'BOOKING_CANCELLED_BY_PATIENT'
+            : 'BOOKING_DECLINED',
+          smsParams: {
+            patientName: booking.patient.name,
+            scheduledTime: this.formatScheduledTime(booking.scheduledAt),
+          },
+        },
+      );
 
       // Trigger mock refund if payment was completed
       if (booking.payment && booking.payment.status === 'PAID') {
@@ -360,6 +512,30 @@ export class BookingsService {
           where: { id: bookingId },
           data: { paymentStatus: 'REFUNDED' },
         });
+
+        // Notify patient about refund
+        if (!isPatientCancelling) {
+          await this.notificationsService.sendNotification(
+            {
+              userId: booking.patient.userId,
+              title: 'Refund Processed',
+              message: `A refund of ₹${booking.totalFee} has been processed for your cancelled booking.`,
+              type: 'PAYMENT_REFUNDED',
+              metadata: { bookingId, amount: booking.totalFee },
+            },
+            {
+              inApp: true,
+              push: true,
+              sms: true,
+              smsTemplate: 'REFUND_PROCESSED',
+              smsParams: { amount: String(booking.totalFee) },
+            },
+          );
+        }
+      }
+      // Cancel scheduled video consultation reminders if applicable
+      if (booking.mode === 'VIDEO_CONSULTATION') {
+        await this.videoReminderService.cancelReminders(bookingId);
       }
     }
 

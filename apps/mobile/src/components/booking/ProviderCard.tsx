@@ -31,6 +31,11 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }
                 <Text style={styles.badgeText}>Clinic</Text>
               </View>
             )}
+            {provider.videoConsultationEnabled && (
+              <View style={[styles.badge, styles.badgeVideo]}>
+                <Text style={styles.badgeText}>📹 Video</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -74,6 +79,7 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   badgePrimary: { backgroundColor: Colors.primaryLight },
   badgeSecondary: { backgroundColor: '#DBEAFE' },
+  badgeVideo: { backgroundColor: '#F3E8FF' },
   badgeText: { fontSize: 11, fontWeight: '600', color: Colors.primary },
   footer: {
     flexDirection: 'row',

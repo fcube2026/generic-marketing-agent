@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
+import { unregisterPushToken } from '../services/notifications/pushNotifications';
 
 interface AuthState {
   token: string | null;
@@ -25,6 +26,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    // Unregister push token before logout
+    try {
+      await unregisterPushToken();
+    } catch (error) {
+      console.error('Failed to unregister push token:', error);
+    }
+
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('auth_user');
     set({ token: null, user: null, isAuthenticated: false });

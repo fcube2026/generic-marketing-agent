@@ -1,4 +1,6 @@
-export const API_BASE_URL = 'http://localhost:3000/api/v1';
+export const API_BASE_URL = (
+  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
+).replace(/\/$/, '');
 
 export const ENDPOINTS = {
   AUTH: {
@@ -21,4 +23,10 @@ export const ENDPOINTS = {
   CONSULTATION_PATIENT_SUMMARIES: '/consultation/patient/summaries',
   REFERRALS_PATIENT: '/referrals/patient/me',
   PAYMENTS: '/payments',
+  PHARMACY: {
+    MEDICINES_SEARCH: '/pharmacy/medicines/search',
+    PROVIDERS: '/pharmacy/providers',
+    ORDERS: '/pharmacy/orders',
+    MY_ORDERS: '/pharmacy/orders/me',
+  },
 };

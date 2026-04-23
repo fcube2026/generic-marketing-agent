@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, SafeAreaView, Switch, Alert,
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
@@ -14,7 +13,6 @@ type Route = RouteProp<ProviderStackParamList, 'ConsultationForm'>;
 type Nav = NativeStackNavigationProp<ProviderStackParamList>;
 
 type Medicine = { name: string; dosage: string };
-type PrescriptionAsset = { uri: string; name?: string; mimeType?: string };
 
 export const ConsultationFormScreen: React.FC = () => {
   const route = useRoute<Route>();
@@ -33,29 +31,9 @@ export const ConsultationFormScreen: React.FC = () => {
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
   const [referralNotes, setReferralNotes] = useState('');
+  const [prescriptionDetails, setPrescriptionDetails] = useState('');
+  const [prescriptionFileUrl, setPrescriptionFileUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [prescriptionFile, setPrescriptionFile] = useState<PrescriptionAsset | null>(null);
-  const [prescriptionNotes, setPrescriptionNotes] = useState('');
-
-  const pickPrescriptionFile = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (res.canceled) return;
-      const asset = res.assets?.[0];
-      if (!asset) return;
-      setPrescriptionFile({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType,
-      });
-    } catch {
-      Alert.alert('Error', 'Could not pick file.');
-    }
-  };
 
   const addMedicine = () => setMedicines(prev => [...prev, { name: '', dosage: '' }]);
   const removeMedicine = (index: number) => setMedicines(prev => prev.filter((_, i) => i !== index));
@@ -88,19 +66,11 @@ export const ConsultationFormScreen: React.FC = () => {
         });
       }
 
-      if (prescriptionFile || prescriptionNotes.trim()) {
-        try {
-          await consultationService.uploadPrescription(
-            bookingId,
-            prescriptionFile,
-            prescriptionNotes,
-          );
-        } catch {
-          Alert.alert(
-            'Prescription not uploaded',
-            'Summary was saved, but the prescription failed to upload. You can retry from booking details.',
-          );
-        }
+      if (prescriptionDetails.trim() || prescriptionFileUrl.trim()) {
+        await consultationService.addPrescription(bookingId, {
+          details: prescriptionDetails.trim() || undefined,
+          fileUrl: prescriptionFileUrl.trim() || undefined,
+        });
       }
 
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
@@ -191,31 +161,23 @@ export const ConsultationFormScreen: React.FC = () => {
           </>
         )}
 
-        {/* Prescription upload (optional) */}
-        <Text style={styles.label}>Prescription (optional)</Text>
-        <Text style={styles.helperText}>
-          Attach a signed prescription image or PDF. The patient will see it under their recent consultation prescription.
-        </Text>
-        <TouchableOpacity style={styles.prescBtn} onPress={pickPrescriptionFile}>
-          <Text style={styles.prescBtnText}>📎 Pick File / PDF / Image</Text>
-        </TouchableOpacity>
-        {prescriptionFile && (
-          <View style={styles.prescPreview}>
-            <Text style={styles.prescPreviewText} numberOfLines={1}>
-              ✅ {prescriptionFile.name || 'Selected file'}
-            </Text>
-            <TouchableOpacity onPress={() => setPrescriptionFile(null)}>
-              <Text style={styles.prescRemoveText}>Remove</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Prescription */}
+        <Text style={styles.label}>Prescription (Optional)</Text>
         <TextInput
           style={styles.textarea}
-          value={prescriptionNotes}
-          onChangeText={setPrescriptionNotes}
-          placeholder="Prescription notes (Rx text, instructions)…"
+          value={prescriptionDetails}
+          onChangeText={setPrescriptionDetails}
+          placeholder="Write medicine instructions if no file is uploaded..."
           multiline
           numberOfLines={3}
+        />
+        <TextInput
+          style={[styles.input, { marginTop: 8 }]}
+          value={prescriptionFileUrl}
+          onChangeText={setPrescriptionFileUrl}
+          placeholder="Prescription file URL (https://...)"
+          autoCapitalize="none"
+          keyboardType="url"
         />
 
         <TouchableOpacity
@@ -242,12 +204,6 @@ const styles = StyleSheet.create({
   removeBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
   addMedBtn: { marginTop: 4, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, borderStyle: 'dashed' },
   addMedBtnText: { color: Colors.primary, fontWeight: '600' },
-  helperText: { fontSize: 12, color: Colors.textMuted, marginBottom: 8, marginTop: -2 },
-  prescBtn: { paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, borderRadius: 10, backgroundColor: Colors.white, marginBottom: 10 },
-  prescBtnText: { color: Colors.primary, fontWeight: '700' },
-  prescPreview: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.primaryLight, borderRadius: 8, padding: 10, marginBottom: 10 },
-  prescPreviewText: { color: Colors.primary, fontWeight: '600', flex: 1, marginRight: 10 },
-  prescRemoveText: { color: Colors.error, fontWeight: '700' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
   toggleLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
   submitBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },
