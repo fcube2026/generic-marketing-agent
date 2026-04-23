@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,14 +16,30 @@ import { VerificationBanner } from '../../components/verification/VerificationBa
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import { ServiceCategory } from '../../types';
-import { Booking } from '../../types';
+import { Booking, PharmacyOrder } from '../../types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { patientService } from '../../services/patientService';
 import { PatientProfile } from '../../types';
+import { pharmacyService } from '../../services/pharmacyService';
+
+// Show refill banner if a delivered order is older than this many days
+const REFILL_THRESHOLD_DAYS = 25;
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
+
+const DAYS_MS = 24 * 60 * 60 * 1000;
+
+const shouldShowRefillBanner = (orders: PharmacyOrder[] | undefined): boolean => {
+  if (!orders || orders.length === 0) return false;
+  const now = Date.now();
+  return orders.some(
+    (o) =>
+      o.status === 'DELIVERED' &&
+      now - new Date(o.createdAt).getTime() > REFILL_THRESHOLD_DAYS * DAYS_MS,
+  );
+};
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -58,6 +74,18 @@ export const HomeScreen: React.FC = () => {
       return res.data;
     },
   });
+
+  const { data: pharmacyOrders } = useQuery<PharmacyOrder[]>({
+    queryKey: ['pharmacy-orders'],
+    enabled: isProfileComplete,
+    queryFn: () => pharmacyService.getOrders(1, 20),
+    select: (data) => data,
+  });
+
+  const showRefillBanner = useMemo(
+    () => shouldShowRefillBanner(pharmacyOrders),
+    [pharmacyOrders],
+  );
 
   const handleServicePress = (category: ServiceCategory) => {
     navigation.navigate('SelectService', { category });
@@ -108,6 +136,25 @@ export const HomeScreen: React.FC = () => {
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
       <VerificationBanner />
+
+      {showRefillBanner && (
+        <View style={styles.refillBanner}>
+          <Text style={styles.refillBannerIcon}>💊</Text>
+          <View style={styles.refillBannerContent}>
+            <Text style={styles.refillBannerTitle}>Time to refill your medicines</Text>
+            <Text style={styles.refillBannerSub}>
+              Your previous order may be running low
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.refillBannerButton}
+            onPress={() => navigation.navigate('PharmacyOrders')}
+          >
+            <Text style={styles.refillBannerButtonText}>Reorder Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello 👋</Text>
@@ -377,4 +424,28 @@ const styles = StyleSheet.create({
   videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   videoCardArrow: { fontSize: 18, color: Colors.textMuted },
+  refillBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  refillBannerIcon: { fontSize: 24, marginRight: 10 },
+  refillBannerContent: { flex: 1 },
+  refillBannerTitle: { fontSize: 14, fontWeight: '700', color: Colors.primaryDark },
+  refillBannerSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  refillBannerButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 10,
+  },
+  refillBannerButtonText: { fontSize: 12, fontWeight: '700', color: Colors.white },
 });

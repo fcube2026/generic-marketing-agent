@@ -54,6 +54,10 @@ export function usePushNotifications(isAuthenticated: boolean) {
           navigation.navigate('PatientTabs', { screen: 'Diagnostics' });
           break;
 
+        case 'REFILL_REMINDER':
+          navigation.navigate('PharmacyOrders');
+          break;
+
         case 'PAYMENT_SUCCESS':
         case 'PAYMENT_REFUNDED':
           if (data.bookingId) {
