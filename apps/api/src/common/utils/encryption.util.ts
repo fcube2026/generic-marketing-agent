@@ -76,12 +76,14 @@ export function isEncrypted(value: string | null | undefined): boolean {
  * - If `PII_ENCRYPTION_KEY` is not configured, the value is returned in
  *   plain text and a warning is logged once.
  */
-export function encrypt(text: string | null | undefined): string {
+export function encrypt(
+  text: string | null | undefined,
+): string | null | undefined {
   if (text === null || text === undefined) {
-    return text as unknown as string;
+    return text;
   }
   if (typeof text !== 'string' || text.length === 0) {
-    return text as string;
+    return text;
   }
   if (isEncrypted(text)) {
     return text;
@@ -113,12 +115,14 @@ export function encrypt(text: string | null | undefined): string {
  *   raw stored value is returned so the caller can degrade gracefully
  *   instead of breaking the API response.
  */
-export function decrypt(text: string | null | undefined): string {
+export function decrypt(
+  text: string | null | undefined,
+): string | null | undefined {
   if (text === null || text === undefined) {
-    return text as unknown as string;
+    return text;
   }
   if (typeof text !== 'string' || text.length === 0) {
-    return text as string;
+    return text;
   }
   if (!isEncrypted(text)) {
     return text;
