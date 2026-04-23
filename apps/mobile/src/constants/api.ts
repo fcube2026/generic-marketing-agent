@@ -51,6 +51,7 @@ export const ENDPOINTS = {
   PAYMENTS: '/payments',
   PHARMACY: {
     MEDICINES_SEARCH: '/pharmacy/medicines/search',
+    MEDICINE_COMPARE: '/pharmacy/medicines/compare',
     PARTNERS: '/pharmacy/partners',
     ORDERS: '/pharmacy/orders',
     PRESCRIPTIONS_UPLOAD: '/pharmacy/prescriptions/upload',

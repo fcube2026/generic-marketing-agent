@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Button } from '../../components/common/Button';
 import { pharmacyService } from '../../services/pharmacyService';
 import { MedicineResult } from '../../types';
@@ -23,6 +23,42 @@ import { requiresPrescriptionForMedicine } from '../../utils/pharmacy';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
+const RECENT_SEARCHES_KEY = 'pharmacy_recent_searches';
+const MAX_RECENT = 5;
+const PAGE_SIZE = 20;
+
+// ---------------------------------------------------------------------------
+// Skeleton row
+// ---------------------------------------------------------------------------
+const SkeletonRow: React.FC = () => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => {
+      anim.stop();
+      anim.reset();
+    };
+  }, [opacity]);
+  return (
+    <Animated.View style={[styles.skeletonRow, { opacity }]}>
+      <View style={styles.skeletonInfo}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonSub} />
+      </View>
+      <View style={styles.skeletonPrice} />
+    </Animated.View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 export const MedicineSearchScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const [query, setQuery] = useState('');
@@ -33,7 +69,83 @@ export const MedicineSearchScreen: React.FC = () => {
     new Map(),
   );
 
-  // ---- Debounced autocomplete: trigger search when query length >= 2 -------
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [allResults, setAllResults] = useState<MedicineResult[]>([]);
+  const [fullResultCache, setFullResultCache] = useState<MedicineResult[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Recent searches
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  // Loading / error state (managed manually for pagination)
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Load recent searches on mount
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCHES_KEY)
+      .then((raw) => {
+        if (raw) setRecentSearches(JSON.parse(raw) as string[]);
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveRecentSearch = useCallback(async (term: string) => {
+    try {
+      const prev = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      const list: string[] = prev ? JSON.parse(prev) : [];
+      const updated = [term, ...list.filter((s) => s !== term)].slice(0, MAX_RECENT);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      setRecentSearches(updated);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  // Fetch first page of results
+  const fetchResults = useCallback(
+    async (term: string, pc: string) => {
+      setIsLoading(true);
+      setIsError(false);
+      setPage(1);
+      setHasMore(true);
+      setAllResults([]);
+      setFullResultCache([]);
+      try {
+        const results = await pharmacyService.searchMedicines(term, pc || undefined);
+        setFullResultCache(results);
+        setAllResults(results.slice(0, PAGE_SIZE));
+        setHasMore(results.length > PAGE_SIZE);
+      } catch (err) {
+        setIsError(true);
+        setErrorMessage(
+          axios.isAxiosError(err) && err.response?.status === 401
+            ? 'Session expired. Please login again.'
+            : 'Something went wrong. Please try again.',
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
+
+  // Load next page from cached full results
+  const fetchNextPage = useCallback(() => {
+    if (!hasMore || loadingMore || isLoading) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const sliced = fullResultCache.slice(0, nextPage * PAGE_SIZE);
+    setAllResults(sliced);
+    setPage(nextPage);
+    setHasMore(sliced.length < fullResultCache.length);
+    setLoadingMore(false);
+  }, [hasMore, loadingMore, isLoading, page, fullResultCache]);
+
+  // ---- Debounced autocomplete -------
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length < 2) {
@@ -44,36 +156,29 @@ export const MedicineSearchScreen: React.FC = () => {
     const handle = setTimeout(() => {
       setSearchTerm(trimmed);
       setShowSuggestions(true);
+      fetchResults(trimmed, pincode);
+      saveRecentSearch(trimmed);
     }, 300);
     return () => clearTimeout(handle);
-  }, [query]);
+  }, [query, pincode, fetchResults, saveRecentSearch]);
 
-  const {
-    data: medicines,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery<MedicineResult[]>({
-    queryKey: ['pharmacy-medicines', searchTerm, pincode.trim()],
-    queryFn: () => pharmacyService.searchMedicines(searchTerm, pincode || undefined),
-    enabled: searchTerm.length >= 2,
-    retry: false,
-  });
-
-  const errorMessage = axios.isAxiosError(error) && error.response?.status === 401
-    ? 'Session expired. Please login again.'
-    : 'Something went wrong. Please try again.';
-
-  // Fallback for keyboard "Search" key — keeps current behaviour for users
-  // who prefer to confirm explicitly.
   const handleSearchSubmit = () => {
     if (query.trim().length < 2) {
       Alert.alert('Please enter at least 2 characters to search');
       return;
     }
-    setSearchTerm(query.trim());
+    const trimmed = query.trim();
+    setSearchTerm(trimmed);
     setShowSuggestions(true);
+    fetchResults(trimmed, pincode);
+    saveRecentSearch(trimmed);
+  };
+
+  const handleRecentSearchPress = (term: string) => {
+    setQuery(term);
+    setSearchTerm(term);
+    setShowSuggestions(true);
+    fetchResults(term, pincode);
   };
 
   const addToCart = (medicine: MedicineResult) => {
@@ -90,10 +195,8 @@ export const MedicineSearchScreen: React.FC = () => {
   };
 
   const handleSuggestionPress = (medicine: MedicineResult) => {
-    addToCart(medicine);
-    setQuery('');
-    setSearchTerm('');
-    setShowSuggestions(false);
+    // Navigate to detail screen; add-to-cart lives there
+    navigation.navigate('MedicineDetail', { medicine, pincode: pincode || undefined });
   };
 
   const removeFromCart = (medicineId: string) => {
@@ -121,6 +224,9 @@ export const MedicineSearchScreen: React.FC = () => {
     navigation.navigate('PharmacyCheckout', { cartItems });
   };
 
+  const showRecentSearches =
+    !showSuggestions && query.trim().length === 0 && recentSearches.length > 0 && cartList.length === 0;
+
   return (
     <View style={styles.container}>
       <View style={styles.searchArea}>
@@ -146,12 +252,31 @@ export const MedicineSearchScreen: React.FC = () => {
         />
       </View>
 
+      {/* Recent searches */}
+      {showRecentSearches && (
+        <View style={styles.recentWrap}>
+          <Text style={styles.recentTitle}>Recent Searches</Text>
+          {recentSearches.map((term) => (
+            <TouchableOpacity
+              key={term}
+              style={styles.recentRow}
+              onPress={() => handleRecentSearchPress(term)}
+            >
+              <Text style={styles.recentIcon}>🕐</Text>
+              <Text style={styles.recentText}>{term}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Autocomplete suggestion dropdown */}
       {showSuggestions && searchTerm.length >= 2 && (
         <View style={styles.suggestionsWrap}>
           {isLoading && (
             <View style={styles.suggestionLoading}>
-              <LoadingSpinner message="Searching..." />
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
             </View>
           )}
           {!isLoading && isError && (
@@ -159,23 +284,32 @@ export const MedicineSearchScreen: React.FC = () => {
               <Text style={styles.suggestionEmptyText}>{errorMessage}</Text>
               <Button
                 title="Retry"
-                onPress={() => refetch()}
+                onPress={() => fetchResults(searchTerm, pincode)}
                 style={styles.retryBtn}
                 fullWidth={false}
               />
             </View>
           )}
-          {!isLoading && !isError && (!medicines || medicines.length === 0) && (
+          {!isLoading && !isError && allResults.length === 0 && (
             <View style={styles.suggestionEmpty}>
               <Text style={styles.suggestionEmptyText}>No matches for "{searchTerm}"</Text>
             </View>
           )}
-          {!isLoading && !isError && medicines && medicines.length > 0 && (
+          {!isLoading && !isError && allResults.length > 0 && (
             <FlatList
-              data={medicines}
+              data={allResults}
               keyExtractor={(item) => item.id}
               keyboardShouldPersistTaps="handled"
               style={styles.suggestionList}
+              onEndReached={fetchNextPage}
+              onEndReachedThreshold={0.3}
+              ListFooterComponent={
+                loadingMore ? (
+                  <View style={styles.loadingMoreWrap}>
+                    <SkeletonRow />
+                  </View>
+                ) : null
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.suggestionRow}
@@ -203,7 +337,7 @@ export const MedicineSearchScreen: React.FC = () => {
       )}
 
       {/* Idle state */}
-      {!showSuggestions && cartList.length === 0 && (
+      {!showSuggestions && !showRecentSearches && cartList.length === 0 && (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyTitle}>Search for medicines</Text>
@@ -302,6 +436,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   pincodeInput: { marginTop: 4 },
+  recentWrap: {
+    backgroundColor: Colors.white,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+  },
+  recentTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  recentIcon: { fontSize: 14, marginRight: 8 },
+  recentText: { fontSize: 14, color: Colors.text },
   suggestionsWrap: {
     backgroundColor: Colors.white,
     marginHorizontal: 16,
@@ -309,7 +472,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
-    maxHeight: 280,
+    maxHeight: 320,
     overflow: 'hidden',
     elevation: 4,
     shadowColor: '#000',
@@ -317,10 +480,11 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
-  suggestionList: { maxHeight: 280 },
-  suggestionLoading: { padding: 16 },
+  suggestionList: { maxHeight: 320 },
+  suggestionLoading: { padding: 8 },
   suggestionEmpty: { padding: 16, alignItems: 'center' },
   suggestionEmptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },
+  loadingMoreWrap: { paddingVertical: 4 },
   suggestionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -334,6 +498,19 @@ const styles = StyleSheet.create({
   suggestionMfg: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   suggestionMeta: { flexDirection: 'row', alignItems: 'center', marginLeft: 10 },
   suggestionPrice: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  // Skeleton
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  skeletonInfo: { flex: 1 },
+  skeletonTitle: { height: 12, borderRadius: 6, backgroundColor: Colors.border, width: '60%', marginBottom: 6 },
+  skeletonSub: { height: 10, borderRadius: 5, backgroundColor: Colors.border, width: '40%' },
+  skeletonPrice: { height: 14, borderRadius: 7, backgroundColor: Colors.border, width: 48 },
   cartHeader: {
     fontSize: 13,
     fontWeight: '700',
@@ -419,3 +596,4 @@ const styles = StyleSheet.create({
   },
   checkoutBtnText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
 });
+
