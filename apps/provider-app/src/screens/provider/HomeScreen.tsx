@@ -12,6 +12,7 @@ import { providerService } from '../../services/providerService';
 import { bookingService } from '../../services/bookingService';
 import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import { formatCurrency } from '../../utils/format';
+import { getCurrentLocation } from '../../utils/location';
 import { Booking, BookingStatus } from '../../types';
 
 type Nav = NativeStackNavigationProp<ProviderStackParamList>;
@@ -32,7 +33,15 @@ export const HomeScreen: React.FC = () => {
   });
 
   const availabilityMutation = useMutation({
-    mutationFn: (isAvailable: boolean) => providerService.updateAvailability(isAvailable),
+    mutationFn: async (isAvailable: boolean) => {
+      const location = isAvailable ? await getCurrentLocation() : null;
+      return providerService.updateAvailability(
+        isAvailable,
+        location?.lat,
+        location?.lng,
+        profile?.serviceRadius,
+      );
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['provider-profile'] }),
     onError: () => Alert.alert('Error', 'Failed to update availability'),
   });
@@ -136,8 +145,16 @@ export const HomeScreen: React.FC = () => {
 
       {pendingBookings.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔔 New Requests</Text>
-          {pendingBookings.map((booking) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🔔 New Requests</Text>
+            <TouchableOpacity
+              style={styles.viewAllBtn}
+              onPress={() => navigation.navigate('IncomingBooking')}
+            >
+              <Text style={styles.viewAllText}>View All →</Text>
+            </TouchableOpacity>
+          </View>
+          {pendingBookings.slice(0, 2).map((booking) => (
             <TouchableOpacity
               key={booking.id}
               style={styles.bookingAlert}
@@ -190,7 +207,10 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 22, fontWeight: '800', color: Colors.text, marginBottom: 4 },
   statLabel: { fontSize: 11, color: Colors.textMuted },
   section: { padding: 16, paddingTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  viewAllBtn: { paddingVertical: 4, paddingHorizontal: 8 },
+  viewAllText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   bookingAlert: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: Colors.warning },
   bookingAlertText: { fontSize: 14, fontWeight: '600', color: Colors.text },
   bookingAlertFee: { fontSize: 15, fontWeight: '800', color: Colors.primary },

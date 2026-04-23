@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { providerService } from '../../services/providerService';
+import { getCurrentLocation } from '../../utils/location';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -29,14 +30,21 @@ export const AvailabilityScreen: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await providerService.updateAvailability({
-        isAvailable,
+      await providerService.updateProfile({
         homeVisitEnabled: homeVisit,
         consultationFeeHomeVisit: parseFloat(homeVisitFee) || 0,
         doctorPlaceVisitEnabled: doctorPlace,
         consultationFeeDoctorPlace: parseFloat(doctorPlaceFee) || 0,
         serviceRadius,
       });
+
+      const location = isAvailable ? await getCurrentLocation() : null;
+      await providerService.updateAvailability(
+        isAvailable,
+        location?.lat,
+        location?.lng,
+      );
+
       Alert.alert('Saved', 'Availability settings updated.');
     } catch {
       Alert.alert('Error', 'Failed to save settings.');
