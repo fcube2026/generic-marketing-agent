@@ -54,6 +54,14 @@ type ConsultationSummaryResponse = {
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 type Route = RouteProp<PatientStackParamList, 'PharmacyCheckout'>;
+type PaymentMethod = 'UPI' | 'COD' | 'CARD' | 'NETBANKING';
+
+const PAYMENT_METHOD_OPTIONS: Array<{ label: string; value: PaymentMethod }> = [
+  { label: 'UPI', value: 'UPI' },
+  { label: 'Cash on Delivery', value: 'COD' },
+  { label: 'Card', value: 'CARD' },
+  { label: 'Net Banking', value: 'NETBANKING' },
+];
 
 export const PharmacyCheckoutScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -63,6 +71,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const { uploadedPrescriptionId, uploadedPrescriptionStatus } = usePharmacyOrderStore();
 
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [notes, setNotes] = useState('');
 
   // Inline delivery address (no saved addresses)
@@ -242,13 +251,20 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       });
       const deliveryAddressId: string = addrRes.data.id;
 
+      const mergedNotes = [
+        `Payment Method: ${paymentMethod}`,
+        notes.trim(),
+      ]
+        .filter((value) => value.length > 0)
+        .join(' | ');
+
       placeOrderMutation.mutate({
         partnerId: selectedPartnerId,
         deliveryAddressId,
         bookingId: selectedPrescription?.bookingId || undefined,
         prescriptionId: selectedPrescriptionId || undefined,
         uploadedPrescriptionId: activeUploadedPrescriptionId || undefined,
-        notes: notes.trim() || undefined,
+        notes: mergedNotes || undefined,
         items: cartItems.map((item) => ({
           medicineCode: item.medicine.id,
           medicineName: item.medicine.name,
@@ -441,6 +457,32 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Payment Method</Text>
+        <View style={styles.paymentMethodWrap}>
+          {PAYMENT_METHOD_OPTIONS.map((option) => {
+            const isSelected = paymentMethod === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.paymentOption, isSelected && styles.paymentOptionSelected]}
+                onPress={() => setPaymentMethod(option.value)}
+              >
+                <Text
+                  style={[
+                    styles.paymentOptionText,
+                    isSelected && styles.paymentOptionTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.helperText}>Selected: {paymentMethod}</Text>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Order Notes</Text>
         <TextInput
           style={styles.notesInput}
@@ -604,6 +646,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.primary,
     fontWeight: '600',
+  },
+  paymentMethodWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  paymentOption: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.background,
+  },
+  paymentOptionSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  paymentOptionText: {
+    color: Colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  paymentOptionTextSelected: {
+    color: Colors.primary,
   },
   notesInput: {
     borderWidth: 1.5,

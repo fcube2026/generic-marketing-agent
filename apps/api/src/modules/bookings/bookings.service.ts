@@ -47,6 +47,10 @@ export class BookingsService {
     });
   }
 
+  private buildPatientUniqueId(patientId: string): string {
+    return `PT-${patientId.slice(-8).toUpperCase()}`;
+  }
+
   async createBooking(userId: string, dto: CreateBookingDto) {
     const patientProfile = await this.prisma.patientProfile.findUnique({
       where: { userId },
@@ -245,7 +249,13 @@ export class BookingsService {
     });
 
     if (!booking) throw new NotFoundException('Booking not found');
-    return booking;
+    return {
+      ...booking,
+      patient: {
+        ...booking.patient,
+        uniquePatientId: this.buildPatientUniqueId(booking.patient.id),
+      },
+    };
   }
 
   async updateBookingStatus(

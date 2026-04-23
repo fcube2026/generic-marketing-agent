@@ -112,4 +112,104 @@ describe('PharmacyService', () => {
       }),
     ]);
   });
+
+  it('enforces Rx=true when same molecule is mixed OTC and Rx from one provider', async () => {
+    const mixedProvider: PharmacyPartnerProvider = {
+      ...mockProvider,
+      searchMedicines: jest.fn().mockResolvedValue([
+        {
+          id: 'med-gaba-10',
+          name: 'Gabapentin 10mg',
+          price: 120,
+          requiresPrescription: true,
+        },
+        {
+          id: 'med-gaba-20',
+          name: 'Gabapentin 20mg',
+          price: 180,
+          requiresPrescription: false,
+        },
+      ]),
+    };
+
+    mockPrisma.pharmacyPartner.findFirst.mockResolvedValue({
+      id: 'partner-1',
+      code: 'mock',
+      name: 'mock',
+      isActive: true,
+    });
+
+    const serviceWithMixedProvider = new PharmacyService(
+      mockPrisma,
+      new Map<string, PharmacyPartnerProvider>([['mock', mixedProvider]]),
+    );
+
+    const results = await serviceWithMixedProvider.searchMedicines(
+      'gabapentin',
+      undefined,
+      'mock',
+    );
+
+    expect(results).toHaveLength(2);
+    expect(results.every((m) => m.requiresPrescription === true)).toBe(true);
+  });
+
+  it('enforces Rx=true when same molecule is mixed across providers', async () => {
+    const providerA: PharmacyPartnerProvider = {
+      ...mockProvider,
+      searchMedicines: jest.fn().mockResolvedValue([
+        {
+          id: 'med-gaba-a',
+          name: 'Gabapentin 10mg',
+          price: 120,
+          requiresPrescription: false,
+        },
+      ]),
+    };
+
+    const providerB: PharmacyPartnerProvider = {
+      ...mockProvider,
+      searchMedicines: jest.fn().mockResolvedValue([
+        {
+          id: 'med-gaba-b',
+          name: 'Gabapentin 20mg',
+          price: 180,
+          requiresPrescription: true,
+        },
+      ]),
+    };
+
+    mockPrisma.pharmacyPartner.findMany.mockResolvedValue([
+      {
+        id: 'partner-a',
+        code: 'a',
+        name: 'a',
+        isActive: true,
+        priority: 1,
+        displayName: 'A',
+      },
+      {
+        id: 'partner-b',
+        code: 'b',
+        name: 'b',
+        isActive: true,
+        priority: 2,
+        displayName: 'B',
+      },
+    ]);
+
+    const serviceWithMultipleProviders = new PharmacyService(
+      mockPrisma,
+      new Map<string, PharmacyPartnerProvider>([
+        ['a', providerA],
+        ['b', providerB],
+      ]),
+    );
+
+    const results =
+      await serviceWithMultipleProviders.searchMedicines('gabapentin');
+
+    expect(results).toHaveLength(2);
+    expect(results.every((m) => m.requiresPrescription === true)).toBe(true);
+  });
 });

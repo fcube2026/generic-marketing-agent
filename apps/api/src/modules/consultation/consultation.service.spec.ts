@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConsultationService } from './consultation.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -37,6 +38,13 @@ describe('ConsultationService', () => {
     sendNotification: jest.fn().mockResolvedValue({ success: true }),
   };
 
+  const mockPrescriptionStorageService = {
+    uploadFile: jest.fn().mockResolvedValue('patient-1/consultation-booking-1'),
+    getSignedUrl: jest
+      .fn()
+      .mockResolvedValue('https://supabase.example.com/consultation-booking-1'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -69,6 +77,10 @@ describe('ConsultationService', () => {
         {
           provide: NotificationsService,
           useValue: mockNotificationsService,
+        },
+        {
+          provide: PrescriptionStorageService,
+          useValue: mockPrescriptionStorageService,
         },
       ],
     }).compile();
@@ -385,6 +397,124 @@ describe('ConsultationService', () => {
         medicines: [],
         prescriptionUrl: null,
       });
+    });
+  });
+
+  describe('addPrescription', () => {
+    const bookingWithSummary = {
+      id: 'booking-1',
+      provider: {
+        id: 'provider-1',
+        userId: 'user-provider-1',
+        name: 'Dr. Smith',
+      },
+      patient: {
+        id: 'patient-1',
+        userId: 'user-patient-1',
+        user: { id: 'user-patient-1' },
+      },
+      consultationSummary: { id: 'summary-1' },
+    };
+
+    it('adds a prescription for provider-owned booking', async () => {
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        bookingWithSummary,
+      );
+      (prisma.prescription.create as jest.Mock).mockResolvedValue({
+        id: 'rx-1',
+        consultationSummaryId: 'summary-1',
+        details: 'Take after food',
+        fileUrl: 'https://example.com/rx.pdf',
+      });
+
+      const result = await service.addPrescription(
+        'booking-1',
+        'user-provider-1',
+        {
+          details: 'Take after food',
+          fileUrl: 'https://example.com/rx.pdf',
+        },
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'rx-1',
+          consultationSummaryId: 'summary-1',
+        }),
+      );
+      expect(prisma.prescription.create).toHaveBeenCalledWith({
+        data: {
+          consultationSummaryId: 'summary-1',
+          details: 'Take after food',
+          fileUrl: 'https://example.com/rx.pdf',
+        },
+      });
+      expect(mockNotificationsService.sendNotification).toHaveBeenCalled();
+    });
+
+    it('rejects addPrescription when neither details nor fileUrl is provided', async () => {
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        bookingWithSummary,
+      );
+
+      await expect(
+        service.addPrescription('booking-1', 'user-provider-1', {
+          details: '   ',
+          fileUrl: '   ',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('uploads file and adds prescription for provider-owned booking', async () => {
+      const bookingWithSummary = {
+        id: 'booking-1',
+        provider: {
+          id: 'provider-1',
+          userId: 'user-provider-1',
+          name: 'Dr. Smith',
+        },
+        patient: {
+          id: 'patient-1',
+          userId: 'user-patient-1',
+          user: { id: 'user-patient-1' },
+        },
+        consultationSummary: { id: 'summary-1' },
+      };
+
+      (prisma.booking.findUnique as jest.Mock)
+        .mockResolvedValueOnce({
+          ...bookingWithSummary,
+          consultationSummary: undefined,
+        })
+        .mockResolvedValueOnce(bookingWithSummary);
+
+      (prisma.prescription.create as jest.Mock).mockResolvedValue({
+        id: 'rx-2',
+        consultationSummaryId: 'summary-1',
+        details: 'Take after food',
+        fileUrl: 'https://supabase.example.com/consultation-booking-1',
+      });
+
+      const result = await service.addPrescriptionWithFile(
+        'booking-1',
+        'user-provider-1',
+        {
+          originalname: 'rx.pdf',
+          mimetype: 'application/pdf',
+          size: 1024,
+          buffer: Buffer.from('test'),
+        },
+        'Take after food',
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'rx-2',
+          consultationSummaryId: 'summary-1',
+        }),
+      );
+      expect(mockPrescriptionStorageService.uploadFile).toHaveBeenCalled();
+      expect(mockPrescriptionStorageService.getSignedUrl).toHaveBeenCalled();
     });
   });
 });

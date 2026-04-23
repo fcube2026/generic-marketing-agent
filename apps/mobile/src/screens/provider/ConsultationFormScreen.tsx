@@ -3,10 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, SafeAreaView, Switch, Alert, FlatList,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { consultationService } from '../../services/providerService';
+import { bookingService } from '../../services/bookingService';
 import { pharmacyService } from '../../services/pharmacyService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import type { MedicineResult } from '../../types';
@@ -117,6 +119,7 @@ export const ConsultationFormScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
   const { bookingId } = route.params;
+  const [booking, setBooking] = useState<any>(null);
 
   const [symptoms, setSymptoms] = useState('');
   const [observations, setObservations] = useState('');
@@ -131,13 +134,69 @@ export const ConsultationFormScreen: React.FC = () => {
   const [diagnosticTests, setDiagnosticTests] = useState('');
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
+  const [prescriptionDetails, setPrescriptionDetails] = useState('');
+  const [prescriptionFile, setPrescriptionFile] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    bookingService
+      .getBookingById(bookingId)
+      .then((data) => {
+        if (!cancelled) {
+          setBooking(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBooking(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
+
+  const patientName = booking?.patient?.name || 'Patient';
+  const uniquePatientId =
+    booking?.patient?.uniquePatientId ||
+    (booking?.patient?.id
+      ? `PT-${String(booking.patient.id).slice(-8).toUpperCase()}`
+      : '—');
 
   const addMedicine = () =>
     setMedicines(prev => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
   const removeMedicine = (index: number) => setMedicines(prev => prev.filter((_, i) => i !== index));
   const updateMedicine = (index: number, field: keyof Medicine, value: string) => {
     setMedicines(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
+  };
+
+  const pickPrescriptionFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      setPrescriptionFile({
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+        size: asset.size,
+      });
+    } catch {
+      Alert.alert('Error', 'Failed to pick prescription file.');
+    }
   };
 
   const handleSubmit = async () => {
@@ -157,6 +216,23 @@ export const ConsultationFormScreen: React.FC = () => {
         diagnosticTests: diagnosticNeeded ? diagnosticTests : undefined,
         specialistReferral: referralNeeded ? specialistType : undefined,
       });
+
+      if (prescriptionFile) {
+        await consultationService.addPrescriptionFile(
+          bookingId,
+          {
+            uri: prescriptionFile.uri,
+            name: prescriptionFile.name,
+            type: prescriptionFile.type,
+          },
+          prescriptionDetails.trim() || undefined,
+        );
+      } else if (prescriptionDetails.trim()) {
+        await consultationService.addPrescription(bookingId, {
+          details: prescriptionDetails.trim() || undefined,
+        });
+      }
+
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('Tabs') },
       ]);
@@ -170,6 +246,12 @@ export const ConsultationFormScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.patientHeaderCard}>
+          <Text style={styles.patientHeaderLabel}>Patient</Text>
+          <Text style={styles.patientHeaderName}>{patientName}</Text>
+          <Text style={styles.patientHeaderId}>Patient ID: {uniquePatientId}</Text>
+        </View>
+
         <Text style={styles.intro}>Complete this mandatory summary to close the consultation.</Text>
 
         {/* Symptoms */}
@@ -263,6 +345,30 @@ export const ConsultationFormScreen: React.FC = () => {
             placeholder="e.g. Cardiologist, Orthopedic Surgeon" />
         )}
 
+        {/* Prescription */}
+        <Text style={styles.label}>Prescription (Optional)</Text>
+        <TextInput
+          style={styles.textarea}
+          value={prescriptionDetails}
+          onChangeText={setPrescriptionDetails}
+          placeholder="Write prescription details..."
+          multiline
+          numberOfLines={3}
+        />
+        <TouchableOpacity style={styles.uploadBtn} onPress={pickPrescriptionFile}>
+          <Text style={styles.uploadBtnText}>Upload Prescription Image/PDF</Text>
+        </TouchableOpacity>
+        {prescriptionFile && (
+          <View style={styles.uploadInfoBox}>
+            <Text style={styles.uploadInfoText}>Selected: {prescriptionFile.name}</Text>
+            {!!prescriptionFile.size && (
+              <Text style={styles.uploadInfoMeta}>
+                {(prescriptionFile.size / (1024 * 1024)).toFixed(2)} MB
+              </Text>
+            )}
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
           onPress={handleSubmit}
@@ -278,6 +384,23 @@ export const ConsultationFormScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, paddingBottom: 50 },
+  patientHeaderCard: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  patientHeaderLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
+  },
+  patientHeaderName: { fontSize: 16, color: Colors.text, fontWeight: '700', marginTop: 4 },
+  patientHeaderId: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
   intro: { fontSize: 13, color: Colors.textMuted, marginBottom: 20, lineHeight: 18 },
   label: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 6, marginTop: 16 },
   input: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12, backgroundColor: Colors.white, fontSize: 14, color: Colors.text },
@@ -329,6 +452,26 @@ const styles = StyleSheet.create({
   addMedBtnText: { color: Colors.primary, fontWeight: '600' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
   toggleLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  uploadBtn: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+  },
+  uploadBtnText: { color: Colors.primary, fontWeight: '700' },
+  uploadInfoBox: {
+    marginTop: 8,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    padding: 10,
+  },
+  uploadInfoText: { color: Colors.text, fontSize: 13, fontWeight: '600' },
+  uploadInfoMeta: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
   submitBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },
   submitBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });
