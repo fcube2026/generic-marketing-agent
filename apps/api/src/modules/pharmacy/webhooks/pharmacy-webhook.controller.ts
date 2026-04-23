@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   UseGuards,
   Logger,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,7 @@ import {
   ApiHeader,
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Public } from '../../auth/decorators/roles.decorator';
 import { PharmacyOrderWebhookService } from './pharmacy-order-webhook.service';
 import { MockWebhookSimulatorService } from './mock-webhook-simulator.service';
@@ -75,6 +77,13 @@ export class PharmacyWebhookController {
     description: 'Secret token for mock partner validation (optional)',
     required: false,
   })
+  @ApiHeader({
+    name: 'x-signature',
+    description:
+      'HMAC-SHA256 signature of the raw request body, hex-encoded. ' +
+      'Required for non-mock partners when PHARMACY_WEBHOOK_SECRET is set.',
+    required: false,
+  })
   @ApiOkResponse({
     description: 'Webhook processed (or idempotently skipped)',
     schema: {
@@ -92,22 +101,26 @@ export class PharmacyWebhookController {
   async handleOrderStatusWebhook(
     @Param('partnerCode') partnerCode: string,
     @Body() payload: PharmacyWebhookPayloadDto,
+    @Req() request: { rawBody?: Buffer },
     @Headers('x-mock-secret') mockSecret?: string,
+    @Headers('x-signature') signature?: string,
   ) {
     // Validate partner code
     if (!VALID_PARTNER_CODES.has(partnerCode)) {
       throw new BadRequestException(`Unknown partner code: ${partnerCode}`);
     }
 
-    // Basic security for mock partner
+    // Basic security for mock partner — preserves the existing mock flow.
     if (partnerCode === 'mock' && mockSecret && mockSecret !== MOCK_SECRET) {
       throw new UnauthorizedException('Invalid mock secret');
     }
 
-    // Future: For real partners, verify HMAC signature here
-    // if (partnerCode !== 'mock') {
-    //   this.verifyHmacSignature(partnerCode, rawBody, signatureHeader);
-    // }
+    // HMAC-SHA256 signature verification for real partners.
+    // The mock partner is intentionally exempt so existing dev/test flows
+    // (including the in-memory simulator) continue to work without a secret.
+    if (partnerCode !== 'mock') {
+      this.verifyHmacSignature(request?.rawBody, signature);
+    }
 
     this.logger.log(
       `[webhook] Received status update from "${partnerCode}": ` +
@@ -207,5 +220,62 @@ export class PharmacyWebhookController {
       partnerOrderId,
       status as any,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verify the `x-signature` header against an HMAC-SHA256 of the raw request
+   * body using `PHARMACY_WEBHOOK_SECRET`.
+   *
+   * Behaviour:
+   *  - If `PHARMACY_WEBHOOK_SECRET` is not configured, logs a warning and
+   *    allows the request through (DEV ONLY — production deployments MUST
+   *    set this env var).
+   *  - If the secret IS configured, the `x-signature` header is required and
+   *    must match exactly. Mismatches throw `UnauthorizedException`.
+   *  - Comparison uses `crypto.timingSafeEqual` to prevent timing attacks.
+   */
+  private verifyHmacSignature(
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+  ): void {
+    const secret = process.env.PHARMACY_WEBHOOK_SECRET;
+    if (!secret) {
+      this.logger.warn(
+        '[webhook] PHARMACY_WEBHOOK_SECRET is not configured. ' +
+          'Skipping HMAC verification (DEV ONLY).',
+      );
+      return;
+    }
+
+    if (!signature) {
+      throw new UnauthorizedException('Missing webhook signature');
+    }
+
+    if (!rawBody || rawBody.length === 0) {
+      throw new UnauthorizedException(
+        'Cannot verify webhook signature: raw body unavailable',
+      );
+    }
+
+    const expectedSignature = createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex');
+
+    const provided = signature.trim().toLowerCase();
+    const expected = expectedSignature.toLowerCase();
+
+    if (provided.length !== expected.length) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
+
+    const a = Buffer.from(provided, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+    if (!timingSafeEqual(a, b)) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
   }
 }

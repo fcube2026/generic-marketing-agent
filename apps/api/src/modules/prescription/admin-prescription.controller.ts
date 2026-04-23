@@ -67,8 +67,8 @@ export class AdminPrescriptionController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Get prescription details with signed file URL' })
-  getDetails(@Param('id') id: string) {
-    return this.prescriptionService.getDetails(id);
+  getDetails(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.prescriptionService.getDetails(id, user?.id);
   }
 
   /**
