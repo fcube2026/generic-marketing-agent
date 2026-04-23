@@ -189,13 +189,48 @@ export const PrescriptionOrderScreen: React.FC = () => {
     }
   }, [setMedicines]);
 
-  // ---- Auto-load medicines on mount --------------------------------------
-  useEffect(() => {
-    if (medicines.length === 0) {
-      loadAllMedicines();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ---- Resolve missing medicine prices -----------------------------------
+  const resolvePrices = useCallback(async (
+    inputMedicines: PrescriptionMedicine[],
+  ): Promise<PrescriptionMedicine[]> => {
+    if (inputMedicines.length === 0) return inputMedicines;
+
+    const resolved = await Promise.all(
+      inputMedicines.map(async (med) => {
+        if (med.unitPrice > 0) return med;
+        try {
+          const results = await pharmacyService.searchMedicines(med.name);
+          if (!results || results.length === 0) return med;
+          const nameLower = med.name.toLowerCase();
+          // 1. Exact match
+          const exact = results.find(
+            (item) => item.name.toLowerCase() === nameLower,
+          );
+          // 2. Catalog name starts with doctor-written name (e.g. "Paracetamol" → "Paracetamol 500mg")
+          const startsWith = results.find(
+            (item) => item.name.toLowerCase().startsWith(nameLower),
+          );
+          // 3. Doctor-written name starts with catalog name (reverse partial)
+          const reverse = results.find(
+            (item) => nameLower.startsWith(item.name.toLowerCase()),
+          );
+          const bestMatch = exact ?? startsWith ?? reverse ?? results[0];
+          if (bestMatch?.price && bestMatch.price > 0) {
+            return { ...med, unitPrice: bestMatch.price };
+          }
+        } catch {
+          // Keep original value if lookup fails.
+        }
+        return med;
+      }),
+    );
+
+    return resolved;
   }, []);
+
+  // Medicines are intentionally NOT pre-loaded on mount.
+  // They populate only after the user uploads a prescription or taps
+  // "Use Recent Prescription".
 
   // ---- Shared: fetch medicines from latest consultation -------------------
   const fetchConsultationMedicines = useCallback(
@@ -217,7 +252,8 @@ export const PrescriptionOrderScreen: React.FC = () => {
             unitPrice: typeof m!.unitPrice === 'number' ? m!.unitPrice : 0,
           }));
         if (mappedMedicines.length > 0) {
-          setMedicines(mappedMedicines);
+          const pricedMedicines = await resolvePrices(mappedMedicines);
+          setMedicines(pricedMedicines);
           return true;
         }
         return false;
@@ -225,7 +261,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
         return false;
       }
     },
-    [setMedicines],
+    [resolvePrices, setMedicines],
   );
 
   // ---- Prescription upload via API -----------------------------------------
@@ -257,9 +293,8 @@ export const PrescriptionOrderScreen: React.FC = () => {
           response.data?.status ?? null,
         );
 
-        // Try consultation medicines first, fall back to full mock catalog
-        const gotMeds = await fetchConsultationMedicines();
-        if (!gotMeds) await loadAllMedicines();
+        // Try to load consultation medicines for this upload
+        await fetchConsultationMedicines();
       } catch (err: unknown) {
         const message =
           (err as { response?: { data?: { message?: string } } })?.response
@@ -267,13 +302,12 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setPrescription(uri);
         setUploadedPrescriptionMeta(null, null);
         setUploadError(message);
-        const gotMeds = await fetchConsultationMedicines();
-        if (!gotMeds) await loadAllMedicines();
+        await fetchConsultationMedicines();
       } finally {
         setUploading(false);
       }
     },
-    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines, loadAllMedicines],
+    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines],
   );
 
   // ---- Image picker helpers ------------------------------------------------
@@ -341,7 +375,8 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setUploadedPrescriptionMeta(null, null);
       }
       if (mappedMedicines.length > 0) {
-        setMedicines(mappedMedicines);
+        const pricedMedicines = await resolvePrices(mappedMedicines);
+        setMedicines(pricedMedicines);
       }
     } catch (err) {
       const message =
@@ -351,7 +386,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
     } finally {
       setRecentLoading(false);
     }
-  }, [setPrescription, setMedicines, setUploadedPrescriptionMeta]);
+  }, [resolvePrices, setPrescription, setMedicines, setUploadedPrescriptionMeta]);
 
   // ---- Checkout validation -------------------------------------------------
   const subtotal = medicines.reduce(

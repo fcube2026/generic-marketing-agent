@@ -31,6 +31,8 @@ export const ConsultationFormScreen: React.FC = () => {
   const [referralNeeded, setReferralNeeded] = useState(false);
   const [specialistType, setSpecialistType] = useState('');
   const [referralNotes, setReferralNotes] = useState('');
+  const [prescriptionDetails, setPrescriptionDetails] = useState('');
+  const [prescriptionFileUrl, setPrescriptionFileUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const addMedicine = () => setMedicines(prev => [...prev, { name: '', dosage: '' }]);
@@ -61,6 +63,13 @@ export const ConsultationFormScreen: React.FC = () => {
           bookingId,
           specialistType: specialistType.trim(),
           notes: referralNotes.trim() || undefined,
+        });
+      }
+
+      if (prescriptionDetails.trim() || prescriptionFileUrl.trim()) {
+        await consultationService.addPrescription(bookingId, {
+          details: prescriptionDetails.trim() || undefined,
+          fileUrl: prescriptionFileUrl.trim() || undefined,
         });
       }
 
@@ -151,6 +160,25 @@ export const ConsultationFormScreen: React.FC = () => {
               placeholder="Referral reason / additional notes…" multiline numberOfLines={2} />
           </>
         )}
+
+        {/* Prescription */}
+        <Text style={styles.label}>Prescription (Optional)</Text>
+        <TextInput
+          style={styles.textarea}
+          value={prescriptionDetails}
+          onChangeText={setPrescriptionDetails}
+          placeholder="Write medicine instructions if no file is uploaded..."
+          multiline
+          numberOfLines={3}
+        />
+        <TextInput
+          style={[styles.input, { marginTop: 8 }]}
+          value={prescriptionFileUrl}
+          onChangeText={setPrescriptionFileUrl}
+          placeholder="Prescription file URL (https://...)"
+          autoCapitalize="none"
+          keyboardType="url"
+        />
 
         <TouchableOpacity
           style={[styles.submitBtn, submitting && { opacity: 0.7 }]}

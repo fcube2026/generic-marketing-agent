@@ -7,12 +7,29 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
+
+interface UploadedConsultationPrescriptionFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
+const ALLOWED_PRESCRIPTION_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+];
+
+const MAX_PRESCRIPTION_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 @Injectable()
 export class ConsultationService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private prescriptionStorageService: PrescriptionStorageService,
   ) {}
 
   async createSummary(
@@ -204,11 +221,19 @@ export class ConsultationService {
       );
     }
 
+    const details = data.details?.trim();
+    const fileUrl = data.fileUrl?.trim();
+    if (!details && !fileUrl) {
+      throw new BadRequestException(
+        'Either prescription details or file URL is required',
+      );
+    }
+
     const prescription = await this.prisma.prescription.create({
       data: {
         consultationSummaryId: booking.consultationSummary.id,
-        details: data.details,
-        fileUrl: data.fileUrl,
+        details,
+        fileUrl,
       },
     });
 
@@ -239,5 +264,52 @@ export class ConsultationService {
     );
 
     return prescription;
+  }
+
+  async addPrescriptionWithFile(
+    bookingId: string,
+    userId: string,
+    file: UploadedConsultationPrescriptionFile,
+    details?: string,
+  ) {
+    if (!ALLOWED_PRESCRIPTION_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only JPEG, PNG, and PDF are accepted.',
+      );
+    }
+
+    if (file.size > MAX_PRESCRIPTION_FILE_SIZE_BYTES) {
+      throw new BadRequestException('File size exceeds the 10 MB limit.');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        provider: true,
+        patient: { include: { user: true } },
+      },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.provider.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can add prescriptions',
+      );
+    }
+
+    const filePath = await this.prescriptionStorageService.uploadFile(
+      booking.patient.userId,
+      `consultation-${bookingId}-${Date.now()}`,
+      file.buffer,
+      file.mimetype,
+    );
+    const fileUrl =
+      await this.prescriptionStorageService.getSignedUrl(filePath);
+
+    return this.addPrescription(bookingId, userId, {
+      details,
+      fileUrl,
+    });
   }
 }

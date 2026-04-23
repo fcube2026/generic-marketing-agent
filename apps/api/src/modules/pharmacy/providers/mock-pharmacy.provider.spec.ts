@@ -75,6 +75,17 @@ describe('MockPharmacyProvider', () => {
       expect(results.length).toBeLessThanOrEqual(10);
     });
 
+    it('keeps prescription classification consistent across strengths of the same molecule', async () => {
+      noFailure();
+
+      const promise = provider.searchMedicines('gabapentin');
+      await flush();
+      const results = await promise;
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.every((r) => r.requiresPrescription === true)).toBe(true);
+    });
+
     it('throws PharmacyTransientError on simulated failure', async () => {
       withFailure();
 

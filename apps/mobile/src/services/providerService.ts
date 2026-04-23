@@ -50,6 +50,30 @@ export const providerService = {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
     return r.data;
   },
+  addPrescription: async (
+    bookingId: string,
+    data: { details?: string; fileUrl?: string },
+  ) => {
+    const r = await api.post(`/consultation/${bookingId}/prescription`, data);
+    return r.data;
+  },
+  addPrescriptionFile: async (
+    bookingId: string,
+    file: { uri: string; name: string; type: string },
+    details?: string,
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file as any);
+    if (details?.trim()) {
+      formData.append('details', details.trim());
+    }
+
+    const r = await api.post(
+      `/consultation/${bookingId}/prescription/upload`,
+      formData,
+    );
+    return r.data;
+  },
 
   /** Submit NMC registration for automated multi-step verification. */
   submitNmcVerification: async (data: NmcVerificationPayload) => {

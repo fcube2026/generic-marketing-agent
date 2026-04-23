@@ -82,12 +82,29 @@ export class PatientsService {
       });
     }
 
-    return this.prisma.address.create({
+    const created = await this.prisma.address.create({
       data: {
         ...dto,
         userId,
       },
     });
+
+    // Keep only the 3 most recent addresses for this user.
+    const keep = await this.prisma.address.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { id: true },
+    });
+
+    await this.prisma.address.deleteMany({
+      where: {
+        userId,
+        id: { notIn: keep.map((a) => a.id) },
+      },
+    });
+
+    return created;
   }
 
   async updateAddress(
