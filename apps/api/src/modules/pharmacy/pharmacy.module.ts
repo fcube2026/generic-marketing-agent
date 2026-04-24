@@ -13,8 +13,12 @@ import { WebhookRateLimitGuard } from './webhooks/guards/webhook-rate-limit.guar
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrescriptionModule } from '../prescription/prescription.module';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PharmacyJobModule } from './jobs/pharmacy-job.module';
 import { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AdminPharmacyOrderController } from './admin-pharmacy-order.controller';
+import { OrdersAliasController } from './orders-alias.controller';
 import { PharmacyPartnersModule } from '../pharmacy-partners/pharmacy-partners.module';
 
 // Re-export so existing consumers of `import { PHARMACY_PROVIDERS_MAP } from './pharmacy.module'`
@@ -22,8 +26,18 @@ import { PharmacyPartnersModule } from '../pharmacy-partners/pharmacy-partners.m
 export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
 
 @Module({
-  imports: [PrescriptionModule, PharmacyJobModule, PharmacyPartnersModule],
-  controllers: [PharmacyController, PharmacyWebhookController],
+  imports: [
+    PrescriptionModule,
+    NotificationsModule,
+    PharmacyJobModule,
+    PharmacyPartnersModule,
+  ],
+  controllers: [
+    PharmacyController,
+    PharmacyWebhookController,
+    AdminPharmacyOrderController,
+    OrdersAliasController,
+  ],
   providers: [
     MockPharmacyProvider,
     LocalPharmacyProvider,
@@ -61,9 +75,20 @@ export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
         prisma: PrismaService,
         providers: Map<string, PharmacyPartnerProvider>,
         prescriptionService: PrescriptionService,
+        notificationsService: NotificationsService,
       ): PharmacyOrderService =>
-        new PharmacyOrderService(prisma, providers, prescriptionService),
-      inject: [PrismaService, PHARMACY_PROVIDERS_MAP, PrescriptionService],
+        new PharmacyOrderService(
+          prisma,
+          providers,
+          prescriptionService,
+          notificationsService,
+        ),
+      inject: [
+        PrismaService,
+        PHARMACY_PROVIDERS_MAP,
+        PrescriptionService,
+        NotificationsService,
+      ],
     },
   ],
   exports: [

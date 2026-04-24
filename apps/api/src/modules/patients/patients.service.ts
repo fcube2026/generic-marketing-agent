@@ -101,6 +101,8 @@ export class PatientsService {
       where: {
         userId,
         id: { notIn: keep.map((a) => a.id) },
+        bookings: { none: {} },
+        pharmacyOrders: { none: {} },
       },
     });
 

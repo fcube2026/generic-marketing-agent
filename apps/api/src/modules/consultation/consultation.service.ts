@@ -49,9 +49,13 @@ export class ConsultationService {
       );
     }
 
-    if (booking.status !== 'COMPLETED' && booking.status !== 'IN_PROGRESS') {
+    if (
+      booking.status !== 'COMPLETED' &&
+      booking.status !== 'IN_PROGRESS' &&
+      booking.status !== 'SUMMARY_SUBMITTED'
+    ) {
       throw new BadRequestException(
-        `Cannot submit summary for booking in ${booking.status} status. Booking must be COMPLETED or IN_PROGRESS.`,
+        `Cannot submit summary for booking in ${booking.status} status. Booking must be COMPLETED, IN_PROGRESS, or SUMMARY_SUBMITTED.`,
       );
     }
 
@@ -60,42 +64,54 @@ export class ConsultationService {
       create: {
         bookingId,
         ...dto,
-        medicinesAdvised: dto.medicinesAdvised
-          ? JSON.parse(JSON.stringify(dto.medicinesAdvised))
-          : undefined,
       },
       update: {
         ...dto,
-        medicinesAdvised: dto.medicinesAdvised
-          ? JSON.parse(JSON.stringify(dto.medicinesAdvised))
-          : undefined,
       },
     });
 
-    await this.prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: 'SUMMARY_SUBMITTED' },
-    });
+    if (booking.status !== 'SUMMARY_SUBMITTED') {
+      await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'SUMMARY_SUBMITTED' },
+      });
 
-    await this.prisma.bookingStatusHistory.create({
-      data: {
-        bookingId,
-        status: 'SUMMARY_SUBMITTED',
-        changedBy: userId,
-      },
-    });
+      await this.prisma.bookingStatusHistory.create({
+        data: {
+          bookingId,
+          status: 'SUMMARY_SUBMITTED',
+          changedBy: userId,
+        },
+      });
+    }
 
     return summary;
   }
 
   async getSummary(bookingId: string) {
-    const summary = await this.prisma.consultationSummary.findUnique({
-      where: { bookingId },
-      include: { prescriptions: true },
-    });
+    const [summary, pharmacyOrder] = await Promise.all([
+      this.prisma.consultationSummary.findUnique({
+        where: { bookingId },
+        include: {
+          prescriptions: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      }),
+      this.prisma.pharmacyOrder.findFirst({
+        where: { bookingId },
+        select: { id: true },
+      }),
+    ]);
 
     if (!summary) throw new NotFoundException('Consultation summary not found');
-    return summary;
+    const latestPrescription = summary.prescriptions[0];
+    return {
+      ...summary,
+      prescriptionUrl: latestPrescription?.fileUrl ?? null,
+      hasOrder: !!pharmacyOrder,
+      orderId: pharmacyOrder?.id ?? null,
+    };
   }
 
   async getPatientSummaries(
