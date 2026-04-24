@@ -3,6 +3,7 @@ import { PharmacyController } from './pharmacy.controller';
 import { PharmacyService } from './pharmacy.service';
 import { PharmacyOrderService } from './pharmacy-order.service';
 import { MockPharmacyProvider } from './providers/mock-pharmacy.provider';
+import { LocalPharmacyProvider } from './providers/local-pharmacy.provider';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
 import { PharmacyWebhookService } from './webhooks/pharmacy-webhook.service';
 import { PharmacyOrderWebhookService } from './webhooks/pharmacy-order-webhook.service';
@@ -18,13 +19,19 @@ import { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdminPharmacyOrderController } from './admin-pharmacy-order.controller';
 import { OrdersAliasController } from './orders-alias.controller';
+import { PharmacyPartnersModule } from '../pharmacy-partners/pharmacy-partners.module';
 
 // Re-export so existing consumers of `import { PHARMACY_PROVIDERS_MAP } from './pharmacy.module'`
 // continue to work.
 export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
 
 @Module({
-  imports: [PrescriptionModule, NotificationsModule, PharmacyJobModule],
+  imports: [
+    PrescriptionModule,
+    NotificationsModule,
+    PharmacyJobModule,
+    PharmacyPartnersModule,
+  ],
   controllers: [
     PharmacyController,
     PharmacyWebhookController,
@@ -33,6 +40,7 @@ export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
   ],
   providers: [
     MockPharmacyProvider,
+    LocalPharmacyProvider,
     PharmacyWebhookService,
     PharmacyOrderWebhookService,
     MockWebhookSimulatorService,
@@ -41,14 +49,17 @@ export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
       provide: PHARMACY_PROVIDERS_MAP,
       useFactory: (
         mockProvider: MockPharmacyProvider,
+        localProvider: LocalPharmacyProvider,
       ): Map<string, PharmacyPartnerProvider> => {
         const map = new Map<string, PharmacyPartnerProvider>();
         map.set('mock', mockProvider);
         map.set('demo-pharmacy', mockProvider);
         map.set('demo-pharmacy-express', mockProvider);
+        // LocalPharmacyProvider registered alongside mock — coexists without replacing it
+        map.set('local', localProvider);
         return map;
       },
-      inject: [MockPharmacyProvider],
+      inject: [MockPharmacyProvider, LocalPharmacyProvider],
     },
     {
       provide: PharmacyService,
