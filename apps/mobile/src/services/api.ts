@@ -21,15 +21,30 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Only clear token if the auth endpoint itself rejected us,
-      // not for regular API calls that might fail for other reasons
-      const url = error.config?.url || '';
-      const isAuthEndpoint = url.includes('/auth/');
-      if (isAuthEndpoint) {
-        await AsyncStorage.removeItem('auth_token');
-      }
+    const status = error.response?.status as number | undefined;
+    const url = error.config?.url || '';
+    const method = (error.config?.method || 'get').toUpperCase();
+
+    // In development, surface enough context (URL + status + body) to debug
+    // generic "couldn't load …" UIs without having to attach a debugger.
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[api] ${method} ${url} failed`,
+        status ? `→ ${status}` : '(no response)',
+        error.response?.data ?? error.message,
+      );
     }
+
+    // A 401 from any endpoint means the stored token is no longer valid
+    // (expired, revoked, or signed for a different environment). Clearing
+    // it here ensures the next app render falls back to the auth flow
+    // instead of looping on failing patient/provider requests.
+    if (status === 401) {
+      await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.removeItem('auth_user');
+    }
+
     return Promise.reject(error);
   }
 );
