@@ -356,24 +356,36 @@ export class BookingsService {
 
       const config = PROVIDER_TRANSITION_CONFIG[dto.status];
       if (config) {
-        await this.notificationsService.sendNotification(
-          {
-            userId: fullBooking.patient.userId,
-            title: config.title,
-            message: config.message,
-            type: 'BOOKING_STATUS_UPDATE',
-            metadata: { bookingId, status: dto.status },
-          },
-          {
-            inApp: true,
-            push: true,
-            sms: config.sendSms,
-            smsTemplate: config.smsTemplate,
-            smsParams: {
-              providerName,
+        // Fire-and-forget: do not block the status update on slow downstream
+        // providers (WhatsApp / SMS / Push). Mobile clients have a 30s axios
+        // timeout, and synchronous awaits here have caused PUT /bookings/:id/status
+        // to appear as "Network Error" to the provider app.
+        void this.notificationsService
+          .sendNotification(
+            {
+              userId: fullBooking.patient.userId,
+              title: config.title,
+              message: config.message,
+              type: 'BOOKING_STATUS_UPDATE',
+              metadata: { bookingId, status: dto.status },
             },
-          },
-        );
+            {
+              inApp: true,
+              push: true,
+              sms: config.sendSms,
+              smsTemplate: config.smsTemplate,
+              smsParams: {
+                providerName,
+              },
+            },
+          )
+          .catch((err) => {
+            // Swallow notification errors so they never bubble up; log for ops.
+            // eslint-disable-next-line no-console
+            console.error(
+              `[bookings] notification dispatch failed for booking=${bookingId} status=${dto.status}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
       }
     }
 

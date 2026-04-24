@@ -54,8 +54,18 @@ export const BookingDetailScreen: React.FC = () => {
       if (newStatus === 'IN_PROGRESS') {
         navigation.navigate('ConsultationForm', { bookingId });
       }
-    } catch {
-      Alert.alert('Error', 'Failed to update status.');
+    } catch (err: any) {
+      const apiMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to update status.';
+      console.warn('[BookingDetail] updateStatus failed', {
+        bookingId,
+        newStatus,
+        status: err?.response?.status,
+        data: err?.response?.data,
+      });
+      Alert.alert('Error', apiMessage);
     } finally {
       setUpdating(false);
     }
