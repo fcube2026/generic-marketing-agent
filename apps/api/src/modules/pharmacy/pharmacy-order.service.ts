@@ -18,6 +18,7 @@ import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import { encrypt, decrypt } from '../../common/utils/encryption.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePrescriptionOrderDto } from './dto/create-prescription-order.dto';
@@ -74,6 +75,7 @@ export class PharmacyOrderService {
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
     private readonly prescriptionService: PrescriptionService,
+    private readonly prescriptionStorage: PrescriptionStorageService,
     private readonly notificationsService?: NotificationsService,
   ) {}
 
@@ -302,12 +304,44 @@ export class PharmacyOrderService {
       this.prisma.pharmacyOrder.count({ where }),
     ]);
 
+    const data = await Promise.all(
+      orders.map(async (order) => {
+        const dto = this.toResponseDto(order);
+        const fresh = await this.refreshPrescriptionSignedUrl(order);
+        if (fresh) {
+          dto.prescriptionUrl = fresh;
+          dto.prescriptionImageUrl = fresh;
+        }
+        return dto;
+      }),
+    );
+
     return {
-      data: orders.map((order) => this.toResponseDto(order)),
+      data,
       total,
       page,
       limit,
     };
+  }
+
+  private async refreshPrescriptionSignedUrl(
+    order: PharmacyOrderWithRelations,
+  ): Promise<string | null> {
+    const uploadedId = order.uploadedPrescriptionId;
+    if (!uploadedId) return null;
+    try {
+      const upload = await this.prisma.uploadedPrescription.findUnique({
+        where: { id: uploadedId },
+        select: { filePath: true },
+      });
+      if (!upload?.filePath) return null;
+      return await this.prescriptionStorage.getSignedUrl(upload.filePath);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to refresh signed URL for order ${order.id}: ${(err as Error).message}`,
+      );
+      return null;
+    }
   }
 
   async approvePrescriptionOrder(

@@ -57,6 +57,9 @@ describe('PharmacyOrderService', () => {
       mockPrisma,
       new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
       mockPrescriptionService,
+      {
+        getSignedUrl: jest.fn().mockResolvedValue('https://signed.test/url'),
+      } as any,
     );
     jest.clearAllMocks();
     mockPrisma.user.findUnique.mockResolvedValue({ role: Role.PATIENT });
