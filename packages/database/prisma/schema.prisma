@@ -722,33 +722,35 @@ model PharmacyPartner {
 }
 
 model PharmacyOrder {
-  id                     String              @id @default(cuid())
-  orderNumber            String              @unique
+  id                     String                     @id @default(cuid())
+  orderNumber            String                     @unique
   patientProfileId       String
   bookingId              String?
   prescriptionId         String?
   uploadedPrescriptionId String?
-  pharmacyPartnerId      String
+  pharmacyPartnerId      String?
   partnerOrderId         String?
   deliveryAddressId      String
   prescriptionImageUrl   String?
-  subtotal               Float
-  deliveryFee            Float               @default(0)
-  discount               Float               @default(0)
-  totalAmount            Float
-  status                 PharmacyOrderStatus @default(PENDING)
+  prescriptionUrl        String?
+  subtotal               Float?
+  deliveryFee            Float?
+  discount               Float                      @default(0)
+  totalAmount            Float?
+  paymentStatus          PharmacyOrderPaymentStatus @default(UNPAID)
+  status                 PharmacyOrderStatus        @default(PENDING)
   estimatedDeliveryAt    DateTime?
   deliveredAt            DateTime?
   notes                  String?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
   items                PharmacyOrderItem[]
   statusHistory        PharmacyOrderStatusHistory[]
   booking              Booking?                     @relation(fields: [bookingId], references: [id])
   deliveryAddress      Address                      @relation(fields: [deliveryAddressId], references: [id])
   patientProfile       PatientProfile               @relation(fields: [patientProfileId], references: [id])
-  pharmacyPartner      PharmacyPartner              @relation(fields: [pharmacyPartnerId], references: [id])
+  pharmacyPartner      PharmacyPartner?             @relation(fields: [pharmacyPartnerId], references: [id])
   prescription         Prescription?                @relation(fields: [prescriptionId], references: [id])
   uploadedPrescription UploadedPrescription?        @relation(fields: [uploadedPrescriptionId], references: [id])
 
@@ -798,6 +800,11 @@ model PharmacyOrderStatusHistory {
 
 enum PharmacyOrderStatus {
   PENDING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PAID
+  DISPATCHED
   PRESCRIPTION_REVIEW
   CONFIRMED
   PACKED
@@ -807,6 +814,11 @@ enum PharmacyOrderStatus {
   CANCELLED
   RETURNED
   REFUNDED
+}
+
+enum PharmacyOrderPaymentStatus {
+  UNPAID
+  PAID
 }
 
 // =======================

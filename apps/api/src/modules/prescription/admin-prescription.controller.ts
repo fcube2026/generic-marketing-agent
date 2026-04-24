@@ -5,6 +5,7 @@ import {
   ApiOperation,
   ApiQuery,
 } from '@nestjs/swagger';
+import { PrescriptionStatus } from '@prisma/client';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 import { PrescriptionService } from './prescription.service';
 import { VerifyPrescriptionDto } from './dto/verify-prescription.dto';
@@ -34,12 +35,18 @@ export class AdminPrescriptionController {
     enum: ['createdAt', 'updatedAt'],
   })
   @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['ALL', ...Object.values(PrescriptionStatus)],
+  })
   getQueue(@Query() query: PrescriptionQueueQueryDto) {
     return this.prescriptionService.getQueue(
       query.page ?? 1,
       query.limit ?? 20,
       query.sortBy ?? 'createdAt',
       query.order ?? 'asc',
+      query.status ?? 'PENDING_REVIEW',
     );
   }
 

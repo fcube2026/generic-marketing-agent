@@ -11,6 +11,7 @@ import { PharmacyService } from './pharmacy.service';
 import { PharmacyOrderService } from './pharmacy-order.service';
 import { PharmacyWebhookService } from './webhooks/pharmacy-webhook.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
+import { CreatePrescriptionOrderDto } from './dto/create-prescription-order.dto';
 import { SearchMedicineDto } from './dto/search-medicine.dto';
 import { CurrentUser, Roles } from '../auth/decorators/roles.decorator';
 
@@ -60,6 +61,19 @@ export class PharmacyController {
   }
 
   /**
+   * POST /pharmacy/orders/prescription
+   * Create a prescription-only order without payment and without medicine items.
+   */
+  @Roles('PATIENT')
+  @Post('orders/prescription')
+  createPrescriptionOrder(
+    @CurrentUser() user: any,
+    @Body() dto: CreatePrescriptionOrderDto,
+  ) {
+    return this.pharmacyOrderService.createPrescriptionOnlyOrder(user.id, dto);
+  }
+
+  /**
    * GET /pharmacy/orders
    * List all pharmacy orders for the authenticated patient.
    */
@@ -101,6 +115,16 @@ export class PharmacyController {
   @Post('orders/:id/cancel')
   cancelOrder(@Param('id') id: string, @CurrentUser() user: any) {
     return this.pharmacyOrderService.cancelOrder(id, user.id);
+  }
+
+  /**
+   * POST /pharmacy/orders/:id/pay
+   * Mark an approved prescription order as paid.
+   */
+  @Roles('PATIENT')
+  @Post('orders/:id/pay')
+  payOrder(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.pharmacyOrderService.payOrder(id, user.id);
   }
 
   /**

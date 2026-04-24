@@ -204,12 +204,14 @@ export class PrescriptionService {
     limit = 20,
     sortBy: 'createdAt' | 'updatedAt' = 'createdAt',
     order: 'asc' | 'desc' = 'asc',
+    status: 'ALL' | PrescriptionStatus = PrescriptionStatus.PENDING_REVIEW,
   ) {
     const skip = (page - 1) * limit;
+    const where = status === 'ALL' ? {} : { status };
 
     const [items, total] = await Promise.all([
       this.prisma.uploadedPrescription.findMany({
-        where: { status: PrescriptionStatus.PENDING_REVIEW },
+        where,
         include: {
           user: { select: { id: true, phone: true, email: true } },
           assignedReviewer: {
@@ -221,7 +223,7 @@ export class PrescriptionService {
         take: limit,
       }),
       this.prisma.uploadedPrescription.count({
-        where: { status: PrescriptionStatus.PENDING_REVIEW },
+        where,
       }),
     ]);
 

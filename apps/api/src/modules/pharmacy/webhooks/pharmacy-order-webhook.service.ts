@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PharmacyOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { PartnerStatusValue } from './dto/pharmacy-webhook-payload.dto';
 
 /** Maps partner-side status strings to our internal enum. */
@@ -50,7 +51,10 @@ export class PharmacyOrderWebhookService {
   private readonly listeners: Array<(event: OrderStatusUpdatedEvent) => void> =
     [];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService?: NotificationsService,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -86,6 +90,13 @@ export class PharmacyOrderWebhookService {
     // Find order by partnerOrderId
     const order = await this.prisma.pharmacyOrder.findFirst({
       where: { partnerOrderId: orderId },
+      include: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
     });
 
     if (!order) {
@@ -189,8 +200,12 @@ export class PharmacyOrderWebhookService {
     };
     this.emitStatusUpdated(event);
 
-    // Mock notification
-    this.logNotification(order.id, internalStatus);
+    await this.notifyPatient(
+      order.id,
+      order.partnerOrderId || orderId,
+      order.patientProfile?.userId,
+      internalStatus,
+    );
 
     return {
       processed: true,
@@ -253,8 +268,13 @@ export class PharmacyOrderWebhookService {
     }
   }
 
-  /** Log a mock notification for the status update. */
-  private logNotification(orderId: string, status: PharmacyOrderStatus): void {
+  /** Send status update notification to patient; fallback to logs on failure. */
+  private async notifyPatient(
+    orderId: string,
+    partnerOrderId: string,
+    patientUserId: string | undefined,
+    status: PharmacyOrderStatus,
+  ): Promise<void> {
     const messages: Record<string, string> = {
       CONFIRMED: 'Your pharmacy order has been confirmed!',
       PACKED: 'Your order has been packed and is ready for dispatch.',
@@ -265,6 +285,37 @@ export class PharmacyOrderWebhookService {
     };
 
     const message = messages[status] || `Order status updated: ${status}`;
-    this.logger.log(`[notification] Order ${orderId}: ${message}`);
+
+    if (!patientUserId || !this.notificationsService) {
+      this.logger.log(`[notification] Order ${orderId}: ${message}`);
+      return;
+    }
+
+    try {
+      await this.notificationsService.sendNotification(
+        {
+          userId: patientUserId,
+          title: 'Pharmacy Order Update',
+          message,
+          type: 'PHARMACY_ORDER_STATUS_UPDATE',
+          metadata: {
+            pharmacyOrderId: orderId,
+            partnerOrderId,
+            status,
+          },
+        },
+        {
+          inApp: true,
+          push: true,
+          whatsapp: false,
+          sms: false,
+        },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `[notification] Failed to send status notification for order "${orderId}": ${(err as Error).message}`,
+      );
+      this.logger.log(`[notification] Order ${orderId}: ${message}`);
+    }
   }
 }

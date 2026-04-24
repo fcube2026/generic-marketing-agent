@@ -258,6 +258,8 @@ describe('PatientsService', () => {
         where: {
           userId,
           id: { notIn: ['addr-4', 'addr-3', 'addr-2'] },
+          bookings: { none: {} },
+          pharmacyOrders: { none: {} },
         },
       });
     });

@@ -69,6 +69,9 @@ describe('ConsultationService', () => {
             bookingStatusHistory: {
               create: jest.fn(),
             },
+            pharmacyOrder: {
+              findFirst: jest.fn(),
+            },
             patientProfile: {
               findUnique: jest.fn(),
             },
@@ -197,6 +200,26 @@ describe('ConsultationService', () => {
       expect(result).toEqual(mockSummary);
     });
 
+    it('should allow updating summary when booking is already SUMMARY_SUBMITTED', async () => {
+      const submittedBooking = { ...mockBooking, status: 'SUMMARY_SUBMITTED' };
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        submittedBooking,
+      );
+      (prisma.consultationSummary.upsert as jest.Mock).mockResolvedValue(
+        mockSummary,
+      );
+
+      const result = await service.createSummary(
+        'booking-1',
+        'user-provider-1',
+        dto,
+      );
+
+      expect(result).toEqual(mockSummary);
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+      expect(prisma.bookingStatusHistory.create).not.toHaveBeenCalled();
+    });
+
     it('should reject summary when booking is already CLOSED', async () => {
       (prisma.booking.findUnique as jest.Mock).mockResolvedValue({
         ...mockBooking,
@@ -210,18 +233,35 @@ describe('ConsultationService', () => {
   });
 
   describe('getSummary', () => {
-    it('should return consultation summary with prescriptions', async () => {
-      const summaryWithPrescriptions = { ...mockSummary, prescriptions: [] };
+    it('should return consultation summary with derived prescriptionUrl and order metadata', async () => {
+      const summaryWithPrescriptions = {
+        ...mockSummary,
+        prescriptions: [
+          { id: 'rx-1', fileUrl: 'https://files/x.pdf', createdAt: new Date() },
+        ],
+      };
       (prisma.consultationSummary.findUnique as jest.Mock).mockResolvedValue(
         summaryWithPrescriptions,
       );
+      (prisma.pharmacyOrder.findFirst as jest.Mock).mockResolvedValue({
+        id: 'order-1',
+      });
 
       const result = await service.getSummary('booking-1');
 
-      expect(result).toEqual(summaryWithPrescriptions);
+      expect(result).toEqual({
+        ...summaryWithPrescriptions,
+        prescriptionUrl: 'https://files/x.pdf',
+        hasOrder: true,
+        orderId: 'order-1',
+      });
       expect(prisma.consultationSummary.findUnique).toHaveBeenCalledWith({
         where: { bookingId: 'booking-1' },
-        include: { prescriptions: true },
+        include: {
+          prescriptions: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
       });
     });
 
