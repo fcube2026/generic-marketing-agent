@@ -15,6 +15,7 @@ import {
   SelfServeStatus,
   SelfServeStep,
 } from '../../services/verificationService';
+import { useAuthStore } from '../../store/authStore';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 
 type Props = {
@@ -72,10 +73,13 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
   const [data, setData] = useState<SelfServeStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const logout = useAuthStore((s) => s.logout);
 
   const loadStatus = useCallback(() => {
     setLoading(true);
     setLoadError(null);
+    setErrorStatus(null);
     // selfStart is idempotent — creates the verification row if missing,
     // returns the current status either way.
     verificationService
@@ -93,8 +97,17 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
           .catch((err) => {
             // eslint-disable-next-line no-console
             console.warn('[PatientKyc] Failed to load verification status', err);
+            const status: number | undefined = err?.response?.status;
+            // Prefer the server's message field, then a generic per-status
+            // label, then the axios error message as a last resort.
+            const serverMsg: string | undefined =
+              err?.response?.data?.message ||
+              err?.response?.data?.error ||
+              err?.message;
+            setErrorStatus(typeof status === 'number' ? status : null);
             setLoadError(
-              "We couldn't load your verification status. Please check your connection and try again.",
+              serverMsg ||
+                "We couldn't load your verification status. Please check your connection and try again.",
             );
           }),
       )
@@ -114,14 +127,34 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (loadError || !data) {
+    const isUnauthorized = errorStatus === 401;
+    const headline =
+      "We couldn't load your verification status. Please try again.";
+    const detail = loadError && loadError !== headline ? loadError : null;
+    const statusLabel =
+      errorStatus != null ? `Error ${errorStatus}` : null;
     return (
       <View style={styles.center}>
         <Text style={styles.bigIcon}>⚠️</Text>
         <Text style={styles.title}>Identity Verification</Text>
-        <Text style={styles.subtitle}>
-          {loadError ?? "We couldn't load your verification status. Please try again."}
-        </Text>
-        <Button title="Retry" onPress={loadStatus} variant="outline" />
+        <Text style={styles.subtitle}>{headline}</Text>
+        {(statusLabel || detail) && (
+          <Text style={styles.errorDetail}>
+            {[statusLabel, detail].filter(Boolean).join(' — ')}
+          </Text>
+        )}
+        {isUnauthorized ? (
+          <Button
+            title="Sign in again"
+            onPress={() => {
+              // Clear local auth state; the root navigator listens to
+              // `isAuthenticated` and swaps to AuthNavigator (Login screen).
+              void logout();
+            }}
+          />
+        ) : (
+          <Button title="Retry" onPress={loadStatus} variant="outline" />
+        )}
       </View>
     );
   }
@@ -247,6 +280,14 @@ const styles = StyleSheet.create({
   bigIcon: { fontSize: 56 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.text, textAlign: 'center', marginBottom: 6 },
   subtitle: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  errorDetail: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: -8,
+    marginBottom: 12,
+    fontFamily: 'monospace',
+  },
   card: { padding: 16, marginBottom: 16 },
   section: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12 },
   stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
