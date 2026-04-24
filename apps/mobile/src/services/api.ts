@@ -27,7 +27,12 @@ api.interceptors.response.use(
 
     // In development, surface enough context (URL + status + body) to debug
     // generic "couldn't load …" UIs without having to attach a debugger.
-    if (__DEV__) {
+    // Suppress expected 403s from tracking/location polling after a booking
+    // ends — these are not actionable and just spam the LogBox.
+    const isExpectedTrackingNoise =
+      status === 403 && url.includes('/tracking/location');
+
+    if (__DEV__ && !isExpectedTrackingNoise) {
       // eslint-disable-next-line no-console
       console.warn(
         `[api] ${method} ${url} failed`,

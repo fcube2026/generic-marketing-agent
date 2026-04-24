@@ -8,6 +8,7 @@ const navItems = [
   { href: '/verification-queue', label: 'Doctor Verification', icon: '🔍' },
   { href: '/verification/queue', label: 'Patient Verification', icon: '🆔' },
   { href: '/pharmacy-prescriptions', label: 'Prescription Queue', icon: '💊' },
+  { href: '/pharmacy-orders', label: 'Pharmacy Orders', icon: '📦' },
   { href: '/providers', label: 'Providers', icon: '👨‍⚕️' },
   { href: '/bookings', label: 'Bookings', icon: '📋' },
   { href: '/payouts', label: 'Payouts', icon: '💰' },
