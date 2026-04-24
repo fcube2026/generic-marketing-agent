@@ -293,6 +293,39 @@ export class PrescriptionService {
       });
     }
 
+    // Pull the full audit trail (upload, view, approve, reject, reupload,
+    // assignment changes, etc.) so the admin UI can show review history.
+    const auditEntries = await this.prisma.auditLog.findMany({
+      where: { entity: 'PRESCRIPTION', entityId: prescriptionId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, phone: true, email: true, role: true } },
+      },
+    });
+
+    const history = auditEntries.map((entry) => {
+      const meta = (entry.meta ?? {}) as Record<string, unknown>;
+      const notes =
+        typeof meta.notes === 'string' && meta.notes.trim().length > 0
+          ? (meta.notes as string)
+          : null;
+      return {
+        id: entry.id,
+        action: entry.action,
+        actorUserId: entry.userId,
+        actor: entry.user
+          ? {
+              id: entry.user.id,
+              phone: entry.user.phone,
+              email: entry.user.email,
+              role: entry.user.role,
+            }
+          : null,
+        notes,
+        createdAt: entry.createdAt,
+      };
+    });
+
     return {
       ...prescription,
       fileUrl,
@@ -301,6 +334,7 @@ export class PrescriptionService {
         elapsedMs: ageMs,
         breached: ageMs > SLA_TARGET_MS,
       },
+      history,
     };
   }
 
