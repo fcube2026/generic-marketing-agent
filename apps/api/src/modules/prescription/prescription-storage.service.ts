@@ -7,6 +7,7 @@ const DEFAULT_BUCKET = 'prescriptions';
 
 /** Signed URL expiry in seconds (5 minutes). */
 const SIGNED_URL_EXPIRY_SECONDS = 300;
+const MIN_SIGNED_URL_EXPIRY_SECONDS = 60;
 
 const BUCKET_FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024;
 const BUCKET_ALLOWED_MIME_TYPES = [
@@ -30,10 +31,26 @@ export class PrescriptionStorageService implements OnModuleInit {
       'PRESCRIPTION_STORAGE_BUCKET',
       DEFAULT_BUCKET,
     );
-    this.signedUrlExpirySeconds = this.config.get<number>(
+    const configuredExpiry = this.config.get<number>(
       'PRESCRIPTION_SIGNED_URL_EXPIRY_SECONDS',
       SIGNED_URL_EXPIRY_SECONDS,
     );
+    // Guard against bad env values (0/negative/non-number) that would
+    // create immediately-expired URLs and trigger InvalidJWT(exp) errors.
+    const normalizedExpiry = Number(configuredExpiry);
+    if (!Number.isFinite(normalizedExpiry)) {
+      this.logger.warn(
+        'PRESCRIPTION_SIGNED_URL_EXPIRY_SECONDS is invalid. Falling back to 300 seconds.',
+      );
+      this.signedUrlExpirySeconds = SIGNED_URL_EXPIRY_SECONDS;
+    } else if (normalizedExpiry < MIN_SIGNED_URL_EXPIRY_SECONDS) {
+      this.logger.warn(
+        `PRESCRIPTION_SIGNED_URL_EXPIRY_SECONDS (${normalizedExpiry}) is too low. Using minimum ${MIN_SIGNED_URL_EXPIRY_SECONDS} seconds.`,
+      );
+      this.signedUrlExpirySeconds = MIN_SIGNED_URL_EXPIRY_SECONDS;
+    } else {
+      this.signedUrlExpirySeconds = Math.floor(normalizedExpiry);
+    }
 
     if (!url || !serviceKey) {
       this.logger.warn(
