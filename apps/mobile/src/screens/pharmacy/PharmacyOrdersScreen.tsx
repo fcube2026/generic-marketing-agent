@@ -62,13 +62,28 @@ const ACTIVE_STATUSES = new Set([
 const applyFilter = (orders: PharmacyOrder[], tab: FilterTab): PharmacyOrder[] => {
   switch (tab) {
     case 'Active':
-      return orders.filter((o) => ACTIVE_STATUSES.has(o.status));
+      return orders.filter((o) => {
+        const reuploadRequired =
+          o.status === 'REJECTED' &&
+          typeof o.notes === 'string' &&
+          o.notes.startsWith(REUPLOAD_NOTE_PREFIX);
+        return ACTIVE_STATUSES.has(o.status) || reuploadRequired;
+      });
     case 'Delivered':
       return orders.filter((o) => o.status === 'DELIVERED');
     case 'Cancelled':
-      return orders.filter((o) =>
-        o.status === 'CANCELLED' || o.status === 'RETURNED' || o.status === 'REFUNDED',
-      );
+      return orders.filter((o) => {
+        const reuploadRequired =
+          o.status === 'REJECTED' &&
+          typeof o.notes === 'string' &&
+          o.notes.startsWith(REUPLOAD_NOTE_PREFIX);
+        return (
+          o.status === 'CANCELLED' ||
+          o.status === 'RETURNED' ||
+          o.status === 'REFUNDED' ||
+          (o.status === 'REJECTED' && !reuploadRequired)
+        );
+      });
   }
 };
 
@@ -211,15 +226,21 @@ export const PharmacyOrdersScreen: React.FC = () => {
           renderItem={({ item }) => {
             const pricing = getPharmacyDisplayPricing(item);
             const isDelivered = item.status === 'DELIVERED';
+            const reuploadRequired =
+              item.status === 'REJECTED' &&
+              typeof item.notes === 'string' &&
+              item.notes.startsWith(REUPLOAD_NOTE_PREFIX);
+            const statusLabel = reuploadRequired
+              ? 'REUPLOAD REQUIRED'
+              : item.status.replace(/_/g, ' ');
+            const statusColor = reuploadRequired
+              ? Colors.warning
+              : STATUS_COLORS[item.status] ?? Colors.textMuted;
 
             return (
               <TouchableOpacity
                 style={styles.orderCard}
                 onPress={() => {
-                  const reuploadRequired =
-                    item.status === 'REJECTED' &&
-                    typeof item.notes === 'string' &&
-                    item.notes.startsWith(REUPLOAD_NOTE_PREFIX);
                   if (item.status === 'APPROVED' || reuploadRequired) {
                     navigation.navigate('PharmacyOrderDetail', { orderId: item.id });
                     return;
@@ -230,11 +251,9 @@ export const PharmacyOrdersScreen: React.FC = () => {
                 <View style={styles.orderHeader}>
                   <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
                   <Text
-                    style={[styles.statusBadge, { color: STATUS_COLORS[item.status] ?? Colors.textMuted }]}
+                    style={[styles.statusBadge, { color: statusColor }]}
                   >
-                    {item.status === 'REJECTED' && item.notes?.startsWith(REUPLOAD_NOTE_PREFIX)
-                      ? 'REUPLOAD REQUIRED'
-                      : item.status.replace(/_/g, ' ')}
+                    {statusLabel}
                   </Text>
                 </View>
                 <Text style={styles.partnerName}>{item.partnerName ?? 'Awaiting pharmacy assignment'}</Text>
