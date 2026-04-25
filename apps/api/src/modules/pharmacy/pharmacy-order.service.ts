@@ -344,6 +344,82 @@ export class PharmacyOrderService {
     }
   }
 
+  async listAllPrescriptionOrders(
+    page = 1,
+    limit = 20,
+    status?: string,
+  ): Promise<{
+    data: PharmacyOrderResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const where: Prisma.PharmacyOrderWhereInput = {
+      status: status
+        ? (status as any)
+        : {
+            in: [
+              ORDER_STATUS.PENDING_APPROVAL,
+              ORDER_STATUS.APPROVED,
+              ORDER_STATUS.REJECTED,
+            ] as any[],
+          },
+    };
+
+    const [orders, total] = await Promise.all([
+      this.prisma.pharmacyOrder.findMany({
+        where,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.pharmacyOrder.count({ where }),
+    ]);
+
+    const data = await Promise.all(
+      orders.map(async (order) => {
+        const dto = this.toResponseDto(order);
+        const fresh = await this.refreshPrescriptionSignedUrl(order);
+        if (fresh) {
+          dto.prescriptionUrl = fresh;
+          dto.prescriptionImageUrl = fresh;
+        }
+        return dto;
+      }),
+    );
+
+    return { data, total, page, limit };
+  }
+
+  async getPrescriptionOrderImageUrl(orderId: string): Promise<string | null> {
+    const order = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      select: { uploadedPrescriptionId: true, prescriptionUrl: true },
+    });
+    if (!order) return null;
+
+    if (order.uploadedPrescriptionId) {
+      const upload = await this.prisma.uploadedPrescription.findUnique({
+        where: { id: order.uploadedPrescriptionId },
+        select: { filePath: true },
+      });
+      if (upload?.filePath) {
+        try {
+          return await this.prescriptionStorage.getSignedUrl(upload.filePath);
+        } catch {
+          // fall through to prescriptionUrl
+        }
+      }
+    }
+
+    return (order as any).prescriptionUrl ?? null;
+  }
+
   async approvePrescriptionOrder(
     orderId: string,
     actorUserId: string,

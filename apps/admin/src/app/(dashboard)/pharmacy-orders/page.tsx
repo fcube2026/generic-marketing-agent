@@ -66,10 +66,15 @@ const statusVariant: Record<string, 'warning' | 'success' | 'error' | 'info'> = 
   DELIVERED: 'success',
 };
 
+type StatusFilter = 'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export default function PharmacyOrdersPage() {
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [selected, setSelected] = useState<PharmacyOrder | null>(null);
+  const [liveImageUrl, setLiveImageUrl] = useState<string | null>(null);
+  const [loadingImage, setLoadingImage] = useState(false);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [items, setItems] = useState<ApprovalItemDraft[]>([
@@ -80,16 +85,16 @@ export default function PharmacyOrdersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (filter: StatusFilter = 'ALL') => {
     setLoading(true);
     try {
-      const response = await api.get<PendingResponse>('/admin/orders/prescriptions', {
-        params: { page: 1, limit: 50 },
-      });
+      const params: Record<string, string | number> = { page: 1, limit: 100 };
+      if (filter !== 'ALL') params.status = filter;
+      const response = await api.get<PendingResponse>('/admin/orders/prescriptions/all', { params });
       setOrders(response.data.data);
     } catch {
       setOrders([]);
-      setFeedback({ type: 'error', message: 'Failed to load pending pharmacy orders.' });
+      setFeedback({ type: 'error', message: 'Failed to load pharmacy orders.' });
     } finally {
       setLoading(false);
     }
@@ -106,9 +111,15 @@ export default function PharmacyOrdersPage() {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(statusFilter);
     fetchPartners();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchOrders, fetchPartners]);
+
+  const handleFilterChange = (filter: StatusFilter) => {
+    setStatusFilter(filter);
+    fetchOrders(filter);
+  };
 
   useEffect(() => {
     if (!feedback) return undefined;
@@ -116,16 +127,28 @@ export default function PharmacyOrdersPage() {
     return () => clearTimeout(t);
   }, [feedback]);
 
-  const openOrder = (order: PharmacyOrder) => {
+  const openOrder = async (order: PharmacyOrder) => {
     setSelected(order);
+    setLiveImageUrl(null);
     setPartnerId(partners[0]?.id ?? '');
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
     setNotes('');
     setRejectReason('');
+    // Fetch a fresh signed URL immediately
+    setLoadingImage(true);
+    try {
+      const res = await api.get<{ url: string }>(`/admin/orders/prescriptions/${order.id}/image`);
+      setLiveImageUrl(res.data.url || null);
+    } catch {
+      setLiveImageUrl(null);
+    } finally {
+      setLoadingImage(false);
+    }
   };
 
   const closeModal = () => {
     setSelected(null);
+    setLiveImageUrl(null);
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
     setNotes('');
     setRejectReason('');
@@ -170,7 +193,7 @@ export default function PharmacyOrdersPage() {
       });
       setFeedback({ type: 'success', message: 'Order approved.' });
       closeModal();
-      await fetchOrders();
+      await fetchOrders(statusFilter);
     } catch (err: any) {
       setFeedback({
         type: 'error',
@@ -195,7 +218,7 @@ export default function PharmacyOrdersPage() {
       });
       setFeedback({ type: 'success', message: 'Order rejected.' });
       closeModal();
-      await fetchOrders();
+      await fetchOrders(statusFilter);
     } catch (err: any) {
       setFeedback({
         type: 'error',
@@ -206,7 +229,9 @@ export default function PharmacyOrdersPage() {
     }
   };
 
-  const previewUrl = selected?.prescriptionUrl || selected?.prescriptionImageUrl;
+  const previewUrl = liveImageUrl || selected?.prescriptionUrl || selected?.prescriptionImageUrl;
+  const isPending = selected?.status === 'PENDING_APPROVAL';
+  const pendingCount = orders.filter((o) => o.status === 'PENDING_APPROVAL').length;
 
   return (
     <div className="space-y-6">
@@ -218,7 +243,7 @@ export default function PharmacyOrdersPage() {
           </p>
         </div>
         <button
-          onClick={fetchOrders}
+          onClick={() => fetchOrders(statusFilter)}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
         >
@@ -240,19 +265,44 @@ export default function PharmacyOrdersPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <StatCard label="Pending Orders" value={orders.length} icon="📦" highlight />
+        <StatCard label="Pending Orders" value={pendingCount} icon="📦" highlight />
         <StatCard label="Active Partners" value={partners.length} icon="🏪" />
       </div>
 
-      <Card title="Pending Prescription Orders" subtitle="Each order awaits pharmacist review">
+      {/* Status filter tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {(['ALL', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'] as StatusFilter[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => handleFilterChange(f)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+              statusFilter === f
+                ? 'bg-gray-900 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {f === 'ALL' ? 'All' : f.replace(/_/g, ' ')}
+            {f === 'PENDING_APPROVAL' && pendingCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs text-white">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <Card
+        title={statusFilter === 'ALL' ? 'All Prescription Orders' : `${statusFilter.replace(/_/g, ' ')} Orders`}
+        subtitle={`${orders.length} order${orders.length !== 1 ? 's' : ''}`}
+      >
         {loading ? (
           <div className="flex h-32 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
           </div>
         ) : orders.length === 0 ? (
           <div className="py-10 text-center text-gray-400">
-            <p className="text-lg font-medium">No pending orders</p>
-            <p className="mt-1 text-sm">All prescription orders have been processed.</p>
+            <p className="text-lg font-medium">No orders</p>
+            <p className="mt-1 text-sm">No prescription orders found for this filter.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -298,30 +348,32 @@ export default function PharmacyOrdersPage() {
                   Created {new Date(selected.createdAt).toLocaleString()}
                 </p>
 
-                {previewUrl ? (
-                  <div className="mt-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      Prescription Image
-                    </p>
-                    <div className="mt-2 max-h-[55vh] overflow-auto rounded-xl border border-gray-200 bg-gray-50">
-                      <img
-                        src={previewUrl}
-                        alt="Prescription"
-                        className="w-full"
-                      />
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Prescription Image
+                  </p>
+                  {loadingImage ? (
+                    <div className="mt-2 flex h-24 items-center justify-center rounded-xl border border-gray-200 bg-gray-50">
+                      <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary" />
                     </div>
-                    <a
-                      href={previewUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
-                    >
-                      Open in new tab ↗
-                    </a>
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-gray-500">No prescription image attached.</p>
-                )}
+                  ) : previewUrl ? (
+                    <div className="mt-2">
+                      <div className="max-h-[55vh] overflow-auto rounded-xl border border-gray-200 bg-gray-50">
+                        <img src={previewUrl} alt="Prescription" className="w-full" />
+                      </div>
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
+                      >
+                        Open in new tab ↗
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-gray-500">No prescription image attached.</p>
+                  )}
+                </div>
 
                 {selected.deliveryAddress && (
                   <div className="mt-4">
@@ -334,6 +386,17 @@ export default function PharmacyOrdersPage() {
               </div>
 
               <div className="space-y-5 p-6">
+                {!isPending && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    <p className="text-sm font-medium text-gray-600">
+                      This order has already been{' '}
+                      <span className={selected?.status === 'APPROVED' ? 'text-green-600' : 'text-red-600'}>
+                        {selected?.status?.toLowerCase()}
+                      </span>
+                      . View-only mode.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Pharmacy Partner
@@ -450,20 +513,24 @@ export default function PharmacyOrdersPage() {
                   >
                     Close
                   </button>
-                  <button
-                    onClick={submitReject}
-                    disabled={submitting || !rejectReason.trim()}
-                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-                  >
-                    {submitting ? 'Working…' : 'Reject'}
-                  </button>
-                  <button
-                    onClick={submitApprove}
-                    disabled={submitting}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-                  >
-                    {submitting ? 'Working…' : 'Approve'}
-                  </button>
+                  {isPending && (
+                    <>
+                      <button
+                        onClick={submitReject}
+                        disabled={submitting || !rejectReason.trim()}
+                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                      >
+                        {submitting ? 'Working…' : 'Reject'}
+                      </button>
+                      <button
+                        onClick={submitApprove}
+                        disabled={submitting}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                      >
+                        {submitting ? 'Working…' : 'Approve'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
