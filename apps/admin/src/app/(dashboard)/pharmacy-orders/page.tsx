@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Badge from '@/components/ui/Badge';
 import Card, { StatCard } from '@/components/ui/Card';
 import api from '@/lib/api';
@@ -59,6 +59,13 @@ interface ApprovalItemDraft {
   unitPrice: number;
 }
 
+interface MedicineSearchResult {
+  id: string;
+  name: string;
+  price: number;
+  manufacturer?: string | null;
+}
+
 const statusVariant: Record<string, 'warning' | 'success' | 'error' | 'info'> = {
   PENDING_APPROVAL: 'warning',
   APPROVED: 'success',
@@ -94,6 +101,9 @@ export default function PharmacyOrdersPage() {
   const [items, setItems] = useState<ApprovalItemDraft[]>([
     { medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 },
   ]);
+  const [medicineSuggestions, setMedicineSuggestions] = useState<Record<number, MedicineSearchResult[]>>({});
+  const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
+  const searchDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [notes, setNotes] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -141,11 +151,19 @@ export default function PharmacyOrdersPage() {
     return () => clearTimeout(t);
   }, [feedback]);
 
+  useEffect(() => {
+    return () => {
+      Object.values(searchDebounceRef.current).forEach((timerId) => clearTimeout(timerId));
+    };
+  }, []);
+
   const openOrder = async (order: PharmacyOrder) => {
     setSelected(order);
     setLiveImageUrl(null);
     setPartnerId(partners[0]?.id ?? '');
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
+    setMedicineSuggestions({});
+    setSearchingIndex(null);
     setNotes('');
     setRejectReason('');
     setImageMode('image');
@@ -166,6 +184,8 @@ export default function PharmacyOrdersPage() {
     setLiveImageUrl(null);
     setImageMode('image');
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
+    setMedicineSuggestions({});
+    setSearchingIndex(null);
     setNotes('');
     setRejectReason('');
   };
@@ -184,6 +204,50 @@ export default function PharmacyOrdersPage() {
       current.map((it, i) => (i === index ? { ...it, ...patch } : it)),
     );
 
+  const selectedPartnerCode = partners.find((p) => p.id === partnerId)?.code;
+
+  const searchMedicinesForRow = async (index: number, query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setMedicineSuggestions((current) => ({ ...current, [index]: [] }));
+      setSearchingIndex((current) => (current === index ? null : current));
+      return;
+    }
+
+    setSearchingIndex(index);
+    try {
+      const params: Record<string, string> = { query: trimmed };
+      if (selectedPartnerCode) {
+        params.partner = selectedPartnerCode;
+      }
+      const response = await api.get<MedicineSearchResult[]>('/pharmacy/medicines/search', { params });
+      const list = Array.isArray(response.data) ? response.data : [];
+      setMedicineSuggestions((current) => ({ ...current, [index]: list.slice(0, 8) }));
+    } catch {
+      setMedicineSuggestions((current) => ({ ...current, [index]: [] }));
+    } finally {
+      setSearchingIndex((current) => (current === index ? null : current));
+    }
+  };
+
+  const scheduleMedicineSearch = (index: number, query: string) => {
+    if (searchDebounceRef.current[index]) {
+      clearTimeout(searchDebounceRef.current[index]);
+    }
+    searchDebounceRef.current[index] = setTimeout(() => {
+      void searchMedicinesForRow(index, query);
+    }, 350);
+  };
+
+  const applySuggestion = (index: number, medicine: MedicineSearchResult) => {
+    updateItem(index, {
+      medicineCode: medicine.id,
+      medicineName: medicine.name,
+      unitPrice: typeof medicine.price === 'number' ? medicine.price : 0,
+    });
+    setMedicineSuggestions((current) => ({ ...current, [index]: [] }));
+  };
+
   const submitApprove = async () => {
     if (!selected) return;
     if (!partnerId) {
@@ -193,6 +257,13 @@ export default function PharmacyOrdersPage() {
     const cleanItems = items.filter((it) => it.medicineName.trim().length > 0);
     if (cleanItems.length === 0) {
       setFeedback({ type: 'error', message: 'Add at least one medicine line item.' });
+      return;
+    }
+    if (cleanItems.some((it) => Number(it.unitPrice) <= 0)) {
+      setFeedback({
+        type: 'error',
+        message: 'Each medicine must have unit price > 0. Select from suggestions or enter price manually.',
+      });
       return;
     }
     setSubmitting(true);
@@ -498,54 +569,84 @@ export default function PharmacyOrdersPage() {
                       + Add row
                     </button>
                   </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Type at least 2 letters in medicine name to search from provider catalog and auto-fill price.
+                  </p>
                   <div className="mt-2 space-y-2">
                     {items.map((item, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2">
-                        <input
-                          placeholder="Code"
-                          value={item.medicineCode}
-                          onChange={(e) =>
-                            updateItem(idx, { medicineCode: e.target.value })
-                          }
-                          className="col-span-3 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                        />
-                        <input
-                          placeholder="Medicine name"
-                          value={item.medicineName}
-                          onChange={(e) =>
-                            updateItem(idx, { medicineName: e.target.value })
-                          }
-                          className="col-span-4 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          placeholder="Qty"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(idx, { quantity: Number(e.target.value) })
-                          }
-                          className="col-span-2 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="Unit ₹"
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            updateItem(idx, { unitPrice: Number(e.target.value) })
-                          }
-                          className="col-span-2 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeItemRow(idx)}
-                          className="col-span-1 text-sm text-red-500 hover:text-red-700"
-                          aria-label="Remove row"
-                        >
-                          ✕
-                        </button>
+                      <div key={idx} className="space-y-1">
+                        <div className="grid grid-cols-12 gap-2">
+                          <input
+                            placeholder="Code"
+                            value={item.medicineCode}
+                            onChange={(e) =>
+                              updateItem(idx, { medicineCode: e.target.value })
+                            }
+                            className="col-span-3 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                          />
+                          <input
+                            placeholder="Medicine name"
+                            value={item.medicineName}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              updateItem(idx, { medicineName: value });
+                              scheduleMedicineSearch(idx, value);
+                            }}
+                            className="col-span-4 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateItem(idx, { quantity: Number(e.target.value) })
+                            }
+                            className="col-span-2 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="Unit ₹"
+                            value={item.unitPrice}
+                            onChange={(e) =>
+                              updateItem(idx, { unitPrice: Number(e.target.value) })
+                            }
+                            className="col-span-2 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeItemRow(idx)}
+                            className="col-span-1 text-sm text-red-500 hover:text-red-700"
+                            aria-label="Remove row"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {searchingIndex === idx && (
+                          <p className="text-xs text-gray-400">Searching medicines...</p>
+                        )}
+
+                        {(medicineSuggestions[idx] ?? []).length > 0 && (
+                          <div className="max-h-40 overflow-auto rounded-md border border-gray-200 bg-white">
+                            {(medicineSuggestions[idx] ?? []).map((medicine) => (
+                              <button
+                                key={medicine.id}
+                                type="button"
+                                onClick={() => applySuggestion(idx, medicine)}
+                                className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
+                              >
+                                <span className="truncate pr-3 text-sm text-gray-700">
+                                  {medicine.name}
+                                  {medicine.manufacturer ? ` · ${medicine.manufacturer}` : ''}
+                                </span>
+                                <span className="text-xs font-semibold text-primary">₹{medicine.price}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
