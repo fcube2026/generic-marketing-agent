@@ -449,39 +449,30 @@ export class AdminService {
   }
 
   async getDashboardStats() {
-    const [
-      totalBookings,
-      activeProviders,
-      pendingVerification,
-      totalPatients,
-      completedBookings,
-      cancelledBookings,
-      totalEarningsAgg,
-      bookingsByStatus,
-    ] = await Promise.all([
-      this.prisma.booking.count(),
-      this.prisma.providerProfile.count({
-        where: { isActive: true, isVerified: true },
-      }),
-      this.prisma.providerProfile.count({
-        where: { isVerified: false, isActive: true },
-      }),
-      this.prisma.patientProfile.count(),
-      this.prisma.booking.count({
-        where: {
-          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-        },
-      }),
-      this.prisma.booking.count({ where: { status: 'CANCELLED' } }),
-      this.prisma.payment.aggregate({
-        where: { status: 'PAID' },
-        _sum: { amount: true },
-      }),
-      this.prisma.booking.groupBy({
-        by: ['status'],
-        _count: true,
-      }),
-    ]);
+    const totalBookings = await this.prisma.booking.count();
+    const activeProviders = await this.prisma.providerProfile.count({
+      where: { isActive: true, isVerified: true },
+    });
+    const pendingVerification = await this.prisma.providerProfile.count({
+      where: { isVerified: false, isActive: true },
+    });
+    const totalPatients = await this.prisma.patientProfile.count();
+    const completedBookings = await this.prisma.booking.count({
+      where: {
+        status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+      },
+    });
+    const cancelledBookings = await this.prisma.booking.count({
+      where: { status: 'CANCELLED' },
+    });
+    const totalEarningsAgg = await this.prisma.payment.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amount: true },
+    });
+    const bookingsByStatus = await this.prisma.booking.groupBy({
+      by: ['status'],
+      _count: true,
+    });
 
     const statusBreakdown: Record<string, number> = {};
     for (const entry of bookingsByStatus) {
