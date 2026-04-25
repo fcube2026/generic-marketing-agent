@@ -265,6 +265,19 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.videoCardArrow}>→</Text>
       </TouchableOpacity>
 
+      {/* Pharmacy My Orders Quick Access */}
+      <TouchableOpacity
+        style={styles.videoCard}
+        onPress={() => navigation.navigate('PharmacyOrders')}
+      >
+        <Text style={styles.videoCardIcon}>📦</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>My Orders</Text>
+          <Text style={styles.videoCardSub}>Track and revisit your medicine orders</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {recentBookings && recentBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
