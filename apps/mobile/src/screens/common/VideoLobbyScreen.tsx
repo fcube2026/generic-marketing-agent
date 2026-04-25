@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +52,7 @@ export const VideoLobbyScreen: React.FC = () => {
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [ending, setEnding] = useState(false);
   const [networkOk, setNetworkOk] = useState<boolean | null>(null);
   
@@ -109,20 +111,29 @@ export const VideoLobbyScreen: React.FC = () => {
       const start = Date.now();
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        await fetch(NETWORK_CHECK_URL, { signal: controller.signal, method: 'HEAD', cache: 'no-store' });
-        clearTimeout(timeoutId);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         
+        // Fetch a small asset to measure latency
+        await fetch('https://www.google.com/favicon.ico', { 
+          signal: controller.signal, 
+          method: 'HEAD', 
+          cache: 'no-store' 
+        });
+        
+        clearTimeout(timeoutId);
         const latency = Date.now() - start;
         setNetworkOk(true);
-        if (latency > 1500) {
-          updateCheck('network', 'warning', 'Weak connection');
+
+        if (latency < 400) {
+          updateCheck('network', 'ok', 'Excellent (Fast)');
+        } else if (latency < 1000) {
+          updateCheck('network', 'warning', 'Moderate (May Lag)');
         } else {
-          updateCheck('network', 'ok', 'Good connection');
+          updateCheck('network', 'error', 'Poor (Use Audio-Only)');
         }
       } catch {
         setNetworkOk(false);
-        updateCheck('network', 'denied', 'No internet');
+        updateCheck('network', 'denied', 'No Connection');
       }
     };
 
@@ -143,9 +154,16 @@ export const VideoLobbyScreen: React.FC = () => {
 
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['video-session', bookingId],
-    queryFn: () => bookingService.getVideoSession(bookingId),
-    retry: 1,
-    refetchInterval: 5000,
+    queryFn: async () => {
+      try {
+        return await bookingService.getVideoSession(bookingId);
+      } catch {
+        // No backend session yet — that's fine, we'll start one on Join.
+        return null;
+      }
+    },
+    retry: false,
+    refetchInterval: 15000,
   });
 
   // 3. Readiness Logic
@@ -158,28 +176,93 @@ export const VideoLobbyScreen: React.FC = () => {
   const permissionsOk = cameraPermission?.granted && micPermission === true;
   const sessionActive = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
   const bookingReady = booking?.status === 'ACCEPTED' || booking?.status === 'IN_PROGRESS';
-  
-  const canJoin = permissionsOk && networkOk && (sessionActive || (isTimeReady && bookingReady)) && !joining;
+
+  // The lobby allows joining when:
+  //  - permissions are granted, AND
+  //  - the booking is in a joinable state, AND
+  //  - either an active session exists OR we're within the join window.
+  // We DO NOT block on network — the mock call works offline.
+  const canJoin = !!permissionsOk && bookingReady && (sessionActive || isTimeReady) && !joining;
 
   // 4. Handlers
-  const handleJoinCall = async () => {
+  const handleJoinCall = async (audioOnly = false) => {
     if (!canJoin) return;
     setJoining(true);
+
     try {
-      await bookingService.startVideoSession(bookingId);
-      const tokenInfo = await bookingService.getVideoToken(bookingId);
+      // 1. Notify backend that the session is starting
+      await bookingService.startVideoSession(bookingId).catch(() => undefined);
+
+      // 2. Build the Jitsi URL
+      const roomName = `curex24-${bookingId}`;
+      const isProvider = navigation.getState()?.routeNames?.includes('ConsultationForm') || false; 
+      const displayName = isProvider ? 'Doctor' : 'Patient';
       
-      navigation.navigate('VideoCall', {
-        bookingId,
-        token: tokenInfo.token,
-        roomId: tokenInfo.roomId,
-        role: tokenInfo.role === 'host' ? 'provider' : 'patient',
-      });
-    } catch (err: any) {
-      Alert.alert('Join Failed', err?.message || 'Connection error. Please try again.');
+      // Jitsi config parameters for audio-only and prejoin bypass
+      const config = [
+        'config.prejoinPageEnabled=false',
+        `userInfo.displayName="${encodeURIComponent(displayName)}"`,
+        audioOnly ? 'config.startAudioOnly=true' : 'config.startVideoMuted=false'
+      ].join('&');
+
+      const jitsiUrl = `https://meet.jit.si/${roomName}#${config}`;
+
+      // 3. Open in Browser
+      const supported = await Linking.canOpenURL(jitsiUrl);
+      if (supported) {
+        await Linking.openURL(jitsiUrl);
+        setCallStartTime(Date.now());
+        Alert.alert(
+          audioOnly ? 'Audio Consultation Started' : 'Video Consultation Started',
+          'Opening Jitsi in your browser. Return here to end the consultation.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error('Could not open browser');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start the session.');
     } finally {
       setJoining(false);
     }
+  };
+
+  const handleEndCall = async () => {
+    Alert.alert(
+      'End Consultation?',
+      'Are you sure you want to end this consultation? This will close the session.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Yes, End Call', 
+          style: 'destructive',
+          onPress: async () => {
+            setJoining(true);
+            try {
+              await bookingService.endVideoSession(bookingId).catch(() => undefined);
+              
+              const isProvider = navigation.getState()?.routeNames?.includes('ConsultationForm') || false;
+              
+              // Calculate duration
+              const now = Date.now();
+              const start = callStartTime || now;
+              const durationMs = now - start;
+              const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+
+              navigation.replace('PostCall', { 
+                bookingId, 
+                durationMinutes, 
+                isProvider 
+              });
+            } catch (error) {
+              Alert.alert('Error', 'Failed to end session.');
+            } finally {
+              setJoining(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleBack = () => {
@@ -310,13 +393,35 @@ export const VideoLobbyScreen: React.FC = () => {
                 <Text style={styles.joinBtnText}>Joining Session...</Text>
               ) : (
                 <Text style={styles.joinBtnText}>
-                  {!networkOk ? 'No Internet Connection' : 
-                   !permissionsOk ? 'Check Permissions' :
-                   isFuture ? 'Waiting for Session' : 
+                  {!permissionsOk ? 'Grant Camera & Mic Access' :
+                   !bookingReady ? 'Booking Not Confirmed' :
+                   isFuture ? 'Not Ready — Opens 10 min Before' :
                    sessionActive ? 'Join Consultation Now' : 'Start Session Now'}
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Audio Only Option */}
+            {canJoin && (
+              <TouchableOpacity
+                style={[styles.audioOnlyBtn, joining && { opacity: 0.5 }]}
+                onPress={() => handleJoinCall(true)}
+                disabled={joining}
+              >
+                <Text style={styles.audioOnlyBtnText}>🎙 Join as Audio Only (Better for Weak Signal)</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* End Call Button */}
+            {sessionActive && (
+              <TouchableOpacity
+                style={[styles.endBtn, joining && { opacity: 0.5 }]}
+                onPress={handleEndCall}
+                disabled={joining}
+              >
+                <Text style={styles.endBtnText}>🏁 End Consultation</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.cancelLink} onPress={handleBack}>
               <Text style={styles.cancelLinkText}>Cancel & Return to Dashboard</Text>
@@ -466,6 +571,26 @@ const styles = StyleSheet.create({
   },
   joinBtnDisabled: { backgroundColor: '#334155', shadowOpacity: 0, elevation: 0 },
   joinBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  audioOnlyBtn: {
+    marginTop: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    borderRadius: 18,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  audioOnlyBtnText: { color: '#3B82F6', fontSize: 14, fontWeight: '600' },
+  endBtn: {
+    marginTop: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  endBtnText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
   cancelLink: { marginTop: 20, alignItems: 'center' },
   cancelLinkText: { color: '#64748B', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
 

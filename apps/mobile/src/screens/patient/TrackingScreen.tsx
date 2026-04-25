@@ -122,6 +122,23 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Video Consultation Action Card */}
+      {booking.mode === 'VIDEO_CONSULTATION' && 
+       ['ACCEPTED', 'IN_PROGRESS'].includes(booking.status) && (
+        <Card style={styles.videoActionCard}>
+          <Text style={styles.videoActionIcon}>📹</Text>
+          <View style={styles.videoActionContent}>
+            <Text style={styles.videoActionTitle}>Video Call is Ready</Text>
+            <Text style={styles.videoActionSub}>Click below to enter the lobby and join your doctor.</Text>
+            <Button 
+              title="Join Video Consultation" 
+              onPress={() => navigation.navigate('VideoLobby', { bookingId })}
+              style={{ marginTop: 12 }}
+            />
+          </View>
+        </Card>
+      )}
+
       {/* Map view for home-visit bookings when provider is trackable */}
       {isTrackable && hasProviderCoords && (
         <Card style={styles.mapCard}>
@@ -253,7 +270,7 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </Card>
 
-      {booking.address && (
+      {booking.address && booking.mode !== 'VIDEO_CONSULTATION' && (
         <Card style={styles.addressCard}>
           <Text style={styles.sectionTitle}>Visit Address</Text>
           <Text style={styles.addressText}>{booking.address.addressLine}</Text>
@@ -304,6 +321,19 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  videoActionCard: {
+    margin: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: Colors.white,
+    borderLeftWidth: 5,
+    borderLeftColor: Colors.primary,
+  },
+  videoActionIcon: { fontSize: 40, marginRight: 16 },
+  videoActionContent: { flex: 1 },
+  videoActionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text },
+  videoActionSub: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   mapCard: { margin: 16, marginBottom: 0 },
   mapWrapper: { borderRadius: 10, overflow: 'hidden', marginTop: 8 },
   map: { width: '100%', height: 220 },

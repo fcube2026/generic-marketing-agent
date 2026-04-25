@@ -72,12 +72,12 @@ export const RecommendationScreen: React.FC<Props> = ({ navigation, route }) => 
         <Text style={styles.providerSpec}>{option.provider.specialization}</Text>
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{formatDistance(option.distance)}</Text>
-            <Text style={styles.statLabel}>Distance</Text>
+            <Text style={styles.statValue}>{type === 'videoConsultation' ? 'Online' : formatDistance(option.distance)}</Text>
+            <Text style={styles.statLabel}>{type === 'videoConsultation' ? 'Location' : 'Distance'}</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>{formatEta(option.eta)}</Text>
-            <Text style={styles.statLabel}>ETA</Text>
+            <Text style={styles.statValue}>{type === 'videoConsultation' ? 'Instant' : formatEta(option.eta)}</Text>
+            <Text style={styles.statLabel}>{type === 'videoConsultation' ? 'Availability' : 'ETA'}</Text>
           </View>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: Colors.primary }]}>

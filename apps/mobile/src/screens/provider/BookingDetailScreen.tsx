@@ -127,7 +127,11 @@ export const BookingDetailScreen: React.FC = () => {
   const STATUS_ORDER = isVideo ? STATUS_ORDER_VIDEO : STATUS_ORDER_HOME;
   const currentStep = STATUS_ORDER.indexOf(booking.status);
 
-  const getNextAction = (): { label: string; next?: string; nav?: keyof ProviderStackParamList } | null => {
+  const getNextAction = (): { 
+    label: string; 
+    next?: string; 
+    nav?: 'VideoLobby' | 'ConsultationForm' | 'SafetyChecklist' | 'VisitOtp';
+  } | null => {
     if (isVideo) {
       switch (booking.status) {
         case 'ACCEPTED':
@@ -182,7 +186,11 @@ export const BookingDetailScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Patient</Text>
           <Text style={styles.infoText}>Name: {booking.patient?.name || 'Patient'}</Text>
-          <Text style={styles.infoText}>Phone: {booking.patient?.phone ? `+91 ****${booking.patient.phone.slice(-4)}` : '—'}</Text>
+          <Text style={styles.infoText}>
+            Phone: {booking.patient?.phone && typeof booking.patient.phone === 'string' 
+              ? `+91 ****${booking.patient.phone.slice(-4)}` 
+              : '—'}
+          </Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
           <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '🎥 Video Consultation' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
@@ -231,6 +239,7 @@ export const BookingDetailScreen: React.FC = () => {
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
             onPress={() => {
               if (nextAction.nav) {
+                // @ts-ignore - Narrowed types are safe but TS can be picky with navigation.navigate
                 navigation.navigate(nextAction.nav, { bookingId });
               } else if (nextAction.next) {
                 updateStatus(nextAction.next);

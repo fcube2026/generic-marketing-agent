@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { VideoConsultationService } from './video-consultation.service';
 import { VideoConsultationController } from './video-consultation.controller';
+import { VideoConsultationService } from './video-consultation.service';
 import { VideoConsultationReminderService } from './video-consultation-reminder.service';
 import { VideoConsultationReminderProcessor } from './video-consultation-reminder.processor';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,13 +11,13 @@ const queueProviders = QUEUES_ENABLED
   : [];
 
 @Module({
-  imports: [ConfigModule, NotificationsModule],
+  imports: [NotificationsModule],
+  controllers: [VideoConsultationController],
   providers: [
     VideoConsultationService,
     VideoConsultationReminderService,
     ...queueProviders,
   ],
-  controllers: [VideoConsultationController],
   exports: [VideoConsultationService, VideoConsultationReminderService],
 })
 export class VideoConsultationModule {}

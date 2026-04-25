@@ -84,11 +84,12 @@ export const VideoConsultationScreen: React.FC = () => {
 
   const handleJoin = async () => {
     try {
-      const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      const { token, roomId, serverUrl } = await bookingService.getVideoToken(bookingId);
       navigation.navigate('VideoCall', {
         bookingId,
         token,
         roomId,
+        serverUrl,
         role: 'provider',
       });
     } catch {
@@ -132,7 +133,7 @@ export const VideoConsultationScreen: React.FC = () => {
           <View style={styles.noSession}>
             <Text style={styles.noSessionIcon}>🎥</Text>
             <Text style={styles.noSessionText}>
-              No video room created yet. Click "Create Video Room" to set up the 100ms session.
+              No video room created yet. Click "Create Video Room" to set up the session.
             </Text>
           </View>
         ) : (

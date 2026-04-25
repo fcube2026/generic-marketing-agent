@@ -63,11 +63,12 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
 
   const handleJoin = async () => {
     try {
-      const { token, roomId } = await bookingService.getVideoToken(bookingId);
+      const { token, roomId, serverUrl } = await bookingService.getVideoToken(bookingId);
       navigation.navigate('VideoCall', {
         bookingId,
         token,
         roomId,
+        serverUrl,
         role: 'patient',
       });
     } catch {

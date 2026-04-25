@@ -114,6 +114,12 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
           <Text style={styles.label}>Mode</Text>
           <Text style={styles.value}>{getModeLabel(mode)}</Text>
         </View>
+        {mode === 'VIDEO_CONSULTATION' && (
+          <View style={styles.row}>
+            <Text style={styles.label}>Duration</Text>
+            <Text style={styles.value}>15 Minutes</Text>
+          </View>
+        )}
         {mode === 'HOME_VISIT' && selectedAddress && (
           <View style={styles.row}>
             <Text style={styles.label}>Address</Text>

@@ -22,6 +22,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { patientService } from '../../services/patientService';
+import { notificationService, Notification } from '../../services/notificationService';
 import { PatientProfile } from '../../types';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
@@ -59,12 +60,21 @@ export const HomeScreen: React.FC = () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
     },
-    // Keep status in sync with provider actions: poll while screen is mounted
-    // and force refetch on every focus so changes show immediately on return.
     refetchInterval: 15000,
     refetchOnWindowFocus: 'always',
     staleTime: 0,
   });
+
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    enabled: isProfileComplete,
+    queryFn: notificationService.getNotifications,
+    refetchInterval: 5000, // Poll every 5 seconds for reminders
+  });
+
+  const latestReminder = (notifications || []).find(
+    n => !n.isRead && n.type === 'VIDEO_CONSULTATION_REMINDER'
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -113,6 +123,25 @@ export const HomeScreen: React.FC = () => {
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
       <VerificationBanner />
+      
+      {latestReminder && (
+        <TouchableOpacity 
+          style={styles.reminderBanner}
+          onPress={() => {
+            notificationService.markAsRead(latestReminder.id);
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            if (latestReminder.metadata?.bookingId) {
+              navigation.navigate('VideoLobby', { bookingId: latestReminder.metadata.bookingId });
+            }
+          }}
+        >
+          <View style={styles.reminderContent}>
+            <Text style={styles.reminderTitle}>{latestReminder.title}</Text>
+            <Text style={styles.reminderMessage}>{latestReminder.message}</Text>
+          </View>
+          <Text style={styles.reminderAction}>JOIN ➔</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello 👋</Text>
@@ -346,4 +375,44 @@ const styles = StyleSheet.create({
   videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   videoCardArrow: { fontSize: 18, color: Colors.textMuted },
+  reminderBanner: {
+    backgroundColor: '#F59E0B',
+    margin: 16,
+    marginBottom: 0,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  reminderMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reminderAction: {
+    color: Colors.white,
+    fontWeight: '900',
+    fontSize: 14,
+    marginLeft: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
 });

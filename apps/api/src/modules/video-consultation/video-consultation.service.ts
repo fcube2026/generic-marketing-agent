@@ -11,10 +11,9 @@ import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service
 /**
  * Mock-only video consultation service.
  *
- * The real 100ms integration has been removed. All rooms and tokens returned
- * by this service are deterministic mock values. The mobile client recognises
- * tokens with the `mock-token-` prefix and renders a mock UI instead of
- * attempting a real WebRTC connection.
+ * The real 100ms/LiveKit integrations have been removed to maintain
+ * a stable JS-only environment. All rooms and tokens returned
+ * by this service are deterministic mock values.
  */
 @Injectable()
 export class VideoConsultationService {
@@ -25,7 +24,7 @@ export class VideoConsultationService {
     private readonly supabaseSync: SupabaseSyncService,
   ) {
     this.logger.warn(
-      'VideoConsultationService is running in MOCK mode — all video rooms and tokens are mock values.',
+      'VideoConsultationService is running in MOCK mode — all video sessions are mock values.',
     );
   }
 
@@ -68,7 +67,6 @@ export class VideoConsultationService {
     if (existing) return existing;
 
     const roomId = `mock-room-${bookingId}`;
-    this.logger.debug(`[MOCK] createRoom — using mock roomId: ${roomId}`);
 
     const session = await this.prisma.videoSession.create({
       data: {
@@ -99,12 +97,7 @@ export class VideoConsultationService {
     }
 
     const token = `mock-token-${session.roomId}-${userId}-${tokenRole}`;
-    this.logger.debug(
-      `[MOCK] generateToken — using mock token for userId: ${userId}`,
-    );
 
-    // Persist the most recently issued token so admin/clients can reuse it
-    // and so it lands in Supabase video_sessions.session_token.
     const updated = await this.prisma.videoSession.update({
       where: { bookingId },
       data: { sessionToken: token },
