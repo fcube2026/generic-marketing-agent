@@ -44,7 +44,7 @@ export type PatientStackParamList = {
   Onboarding: undefined;
   PatientKyc: undefined;
   PatientKycPersonal: undefined;
-  PatientKycAddress: undefined;
+  PatientKycAddress: { returnToBooking?: boolean } | undefined;
   PatientKycIdUpload: undefined;
   PatientKycAadhaarUpload: undefined;
   PatientKycFaceCapture: undefined;
@@ -65,7 +65,9 @@ export type PatientStackParamList = {
   VideoCall: VideoCallParams;
   MedicineSearch: undefined;
   MedicineDetail: { medicine: MedicineResult; pincode?: string };
-  PrescriptionOrder: { bookingId?: string; prescriptionUrl?: string } | undefined;
+  PrescriptionOrder:
+    | { bookingId?: string; prescriptionUrl?: string; orderId?: string }
+    | undefined;
   PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };

@@ -8,7 +8,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Button } from '../../components/common/Button';
@@ -19,9 +20,15 @@ import { formatCurrency } from '../../utils/format';
 import { canCancelPharmacyOrder, getPharmacyDisplayPricing } from '../../utils/pharmacy';
 
 type Route = RouteProp<PatientStackParamList, 'PharmacyOrderDetail'>;
+type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: Colors.warning,
+  PENDING_APPROVAL: Colors.warning,
+  APPROVED: Colors.secondary,
+  PAID: Colors.success,
+  DISPATCHED: Colors.primary,
+  REJECTED: Colors.error,
   PRESCRIPTION_REVIEW: Colors.warning,
   CONFIRMED: Colors.secondary,
   PACKED: Colors.secondary,
@@ -34,6 +41,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export const PharmacyOrderDetailScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { orderId } = route.params;
   const queryClient = useQueryClient();
@@ -63,6 +71,21 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
     },
   });
 
+  const payMutation = useMutation({
+    mutationFn: () => pharmacyService.payOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-order', orderId] });
+      Alert.alert('Payment Complete', 'Your pharmacy order payment is successful.');
+    },
+    onError: (error: any) => {
+      Alert.alert(
+        'Payment Failed',
+        error?.response?.data?.message || 'Could not complete payment right now.',
+      );
+    },
+  });
+
   const handleCancel = () => {
     Alert.alert(
       'Cancel Order',
@@ -81,7 +104,15 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
   if (isLoading) return <LoadingSpinner fullScreen message="Loading order..." />;
   if (!order) return null;
 
+  const reuploadRequired =
+    order.status === 'REJECTED' &&
+    typeof order.notes === 'string' &&
+    order.notes.startsWith('[REUPLOAD_REQUIRED]');
+  const reuploadReason = reuploadRequired
+    ? order.notes?.replace('[REUPLOAD_REQUIRED]', '').trim()
+    : null;
   const canCancel = canCancelPharmacyOrder(order.status);
+  const canPayNow = order.status === 'APPROVED' && order.paymentStatus === 'UNPAID';
   const statusColor = STATUS_COLORS[order.status] ?? Colors.textMuted;
   const pricing = getPharmacyDisplayPricing(order);
 
@@ -98,7 +129,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
             {order.status.replace(/_/g, ' ')}
           </Text>
         </View>
-        <Text style={styles.partnerName}>{order.partnerName}</Text>
+        <Text style={styles.partnerName}>{order.partnerName ?? 'Awaiting pharmacy assignment'}</Text>
       </View>
 
       {/* Items */}
@@ -178,16 +209,46 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
             <Text style={styles.infoValue}>{order.notes}</Text>
           </View>
         )}
+
+        {reuploadRequired && (
+          <View style={styles.reuploadCard}>
+            <Text style={styles.reuploadTitle}>Prescription re-upload required</Text>
+            <Text style={styles.reuploadText}>
+              {reuploadReason || 'Please upload a clearer prescription for this order.'}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {canCancel && (
+      {(canPayNow || canCancel || reuploadRequired) && (
         <View style={styles.cancelArea}>
+          {reuploadRequired && (
+            <View style={{ marginBottom: 12 }}>
+              <Button
+                title="Upload Corrected Prescription"
+                onPress={() => navigation.navigate('PrescriptionOrder', { orderId })}
+              />
+            </View>
+          )}
+
+          {canPayNow && (
+            <View style={{ marginBottom: canCancel ? 12 : 0 }}>
+              <Button
+                title={payMutation.isPending ? 'Processing Payment...' : 'Pay Now'}
+                onPress={() => payMutation.mutate()}
+                loading={payMutation.isPending}
+              />
+            </View>
+          )}
+
+          {canCancel && (
           <Button
             title={cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}
             onPress={handleCancel}
             variant="danger"
             loading={cancelMutation.isPending}
           />
+          )}
         </View>
       )}
 
@@ -268,5 +329,15 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 13, color: Colors.textMuted, flex: 0.4 },
   infoValue: { fontSize: 13, color: Colors.text, flex: 0.6, textAlign: 'right' },
+  reuploadCard: {
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    backgroundColor: '#fffbeb',
+    padding: 10,
+  },
+  reuploadTitle: { fontSize: 13, fontWeight: '700', color: '#92400e', marginBottom: 4 },
+  reuploadText: { fontSize: 12, color: '#92400e' },
   cancelArea: { margin: 16, marginTop: 20 },
 });

@@ -128,6 +128,24 @@ export class PharmacyController {
   }
 
   /**
+   * POST /pharmacy/orders/:id/reupload
+   * Re-upload prescription for an existing prescription order in reupload state.
+   */
+  @Roles('PATIENT')
+  @Post('orders/:id/reupload')
+  reuploadPrescriptionForOrder(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreatePrescriptionOrderDto,
+  ) {
+    return this.pharmacyOrderService.reuploadPrescriptionForOrder(
+      id,
+      user.id,
+      dto,
+    );
+  }
+
+  /**
    * PATCH /pharmacy/orders/:id/status
    * Pull the latest status from the partner API and persist it.
    */

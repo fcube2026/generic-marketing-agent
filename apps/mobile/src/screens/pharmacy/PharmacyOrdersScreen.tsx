@@ -22,9 +22,15 @@ import { getPharmacyDisplayPricing } from '../../utils/pharmacy';
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 const PAGE_SIZE = 10;
+const REUPLOAD_NOTE_PREFIX = '[REUPLOAD_REQUIRED]';
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: Colors.warning,
+  PENDING_APPROVAL: Colors.warning,
+  APPROVED: Colors.secondary,
+  PAID: Colors.success,
+  DISPATCHED: Colors.primary,
+  REJECTED: Colors.error,
   PRESCRIPTION_REVIEW: Colors.warning,
   CONFIRMED: Colors.secondary,
   PACKED: Colors.secondary,
@@ -42,6 +48,10 @@ const FILTER_TABS: FilterTab[] = ['Active', 'Delivered', 'Cancelled'];
 
 const ACTIVE_STATUSES = new Set([
   'PENDING',
+  'PENDING_APPROVAL',
+  'APPROVED',
+  'PAID',
+  'DISPATCHED',
   'PRESCRIPTION_REVIEW',
   'CONFIRMED',
   'PACKED',
@@ -205,17 +215,29 @@ export const PharmacyOrdersScreen: React.FC = () => {
             return (
               <TouchableOpacity
                 style={styles.orderCard}
-                onPress={() => navigation.navigate('OrderTracking', { orderId: item.id })}
+                onPress={() => {
+                  const reuploadRequired =
+                    item.status === 'REJECTED' &&
+                    typeof item.notes === 'string' &&
+                    item.notes.startsWith(REUPLOAD_NOTE_PREFIX);
+                  if (item.status === 'APPROVED' || reuploadRequired) {
+                    navigation.navigate('PharmacyOrderDetail', { orderId: item.id });
+                    return;
+                  }
+                  navigation.navigate('OrderTracking', { orderId: item.id });
+                }}
               >
                 <View style={styles.orderHeader}>
                   <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
                   <Text
                     style={[styles.statusBadge, { color: STATUS_COLORS[item.status] ?? Colors.textMuted }]}
                   >
-                    {item.status.replace(/_/g, ' ')}
+                    {item.status === 'REJECTED' && item.notes?.startsWith(REUPLOAD_NOTE_PREFIX)
+                      ? 'REUPLOAD REQUIRED'
+                      : item.status.replace(/_/g, ' ')}
                   </Text>
                 </View>
-                <Text style={styles.partnerName}>{item.partnerName}</Text>
+                <Text style={styles.partnerName}>{item.partnerName ?? 'Awaiting pharmacy assignment'}</Text>
                 <Text style={styles.itemsCount}>
                   {item.items?.length ?? 0} item{(item.items?.length ?? 0) !== 1 ? 's' : ''}
                 </Text>
@@ -225,6 +247,15 @@ export const PharmacyOrdersScreen: React.FC = () => {
                   </Text>
                   <Text style={styles.totalAmount}>{formatCurrency(pricing.totalAmount)}</Text>
                 </View>
+
+                {item.status === 'APPROVED' && item.paymentStatus === 'UNPAID' && (
+                  <Text style={styles.inlineActionText}>Review medicines and pay now →</Text>
+                )}
+
+                {item.status === 'REJECTED' && item.notes?.startsWith(REUPLOAD_NOTE_PREFIX) && (
+                  <Text style={styles.inlineActionText}>Re-upload corrected prescription →</Text>
+                )}
+
                 {isDelivered && (
                   <TouchableOpacity
                     style={styles.reorderButton}
@@ -296,6 +327,7 @@ const styles = StyleSheet.create({
   },
   deliveryAddress: { flex: 1, fontSize: 12, color: Colors.textMuted, marginRight: 8 },
   totalAmount: { fontSize: 15, fontWeight: '700', color: Colors.primary },
+  inlineActionText: { marginTop: 8, fontSize: 12, fontWeight: '600', color: Colors.primary },
   reorderButton: {
     marginTop: 10,
     paddingVertical: 8,

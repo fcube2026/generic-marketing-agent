@@ -28,6 +28,42 @@ export const pharmacyService = {
     return response.data;
   },
 
+  createPrescriptionOrder: async (payload: {
+    uploadedPrescriptionId?: string;
+    deliveryAddressId?: string;
+    prescriptionUrl?: string;
+    notes?: string;
+  }): Promise<PharmacyOrder> => {
+    try {
+      const response = await api.post(`${ENDPOINTS.PHARMACY.ORDERS}/prescription`, payload);
+      return response.data;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status !== 404) {
+        throw error;
+      }
+
+      try {
+        const aliasResponse = await api.post('/orders/prescription', payload);
+        return aliasResponse.data;
+      } catch (aliasError: any) {
+        const aliasStatus = aliasError?.response?.status;
+        if (aliasStatus === 404) {
+          const deploymentError = new Error(
+            'Prescription-order API is not available on current backend. Please deploy latest API to staging or switch mobile app to local updated API.',
+          );
+          (deploymentError as any).response = {
+            data: {
+              message: deploymentError.message,
+            },
+          };
+          throw deploymentError;
+        }
+        throw aliasError;
+      }
+    }
+  },
+
   getOrders: async (page = 1, limit = 10): Promise<PharmacyOrder[]> => {
     const response = await api.get(ENDPOINTS.PHARMACY.ORDERS, {
       params: { page, limit },
@@ -44,6 +80,26 @@ export const pharmacyService = {
 
   cancelOrder: async (id: string): Promise<PharmacyOrder> => {
     const response = await api.post(`${ENDPOINTS.PHARMACY.ORDERS}/${id}/cancel`);
+    return response.data;
+  },
+
+  payOrder: async (id: string): Promise<PharmacyOrder> => {
+    const response = await api.post(`${ENDPOINTS.PHARMACY.ORDERS}/${id}/pay`);
+    return response.data;
+  },
+
+  reuploadPrescriptionForOrder: async (
+    id: string,
+    payload: {
+      uploadedPrescriptionId?: string;
+      prescriptionUrl?: string;
+      notes?: string;
+    },
+  ): Promise<PharmacyOrder> => {
+    const response = await api.post(
+      `${ENDPOINTS.PHARMACY.ORDERS}/${id}/reupload`,
+      payload,
+    );
     return response.data;
   },
 

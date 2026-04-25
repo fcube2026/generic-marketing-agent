@@ -594,10 +594,9 @@ export class PharmacyOrderService {
 
     await this.safeNotify(existing.patientProfile.userId, {
       title: 'Prescription Rejected',
-      message:
-        'Your prescription order was rejected. Please upload a clearer prescription.',
+      message: `Your prescription order was rejected. Reason: ${dto.reason}`,
       type: 'PRESCRIPTION_ORDER_REJECTED',
-      metadata: { orderId: updated.id },
+      metadata: { orderId: updated.id, reason: dto.reason },
     });
 
     void this.recordStatusHistory(
@@ -682,8 +681,7 @@ export class PharmacyOrderService {
 
     await this.safeNotify(existing.patientProfile.userId, {
       title: 'Prescription Reupload Needed',
-      message:
-        'Your prescription needs a clearer reupload. Please upload again to continue your order.',
+      message: `Please re-upload your prescription. Reason: ${reason}`,
       type: 'PRESCRIPTION_REUPLOAD_REQUIRED',
       metadata: { orderId: updated.id, reason },
     });
@@ -693,6 +691,99 @@ export class PharmacyOrderService {
       ORDER_STATUS.REJECTED as any,
       actorUserId,
     );
+
+    return this.toResponseDto(updated);
+  }
+
+  async reuploadPrescriptionForOrder(
+    orderId: string,
+    userId: string,
+    dto: CreatePrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    if (!dto.uploadedPrescriptionId && !dto.prescriptionUrl) {
+      throw new BadRequestException(
+        'Either uploadedPrescriptionId or prescriptionUrl is required.',
+      );
+    }
+
+    const patient = await this.getPatientProfile(userId);
+    const existing = await this.prisma.pharmacyOrder.findFirst({
+      where: { id: orderId, patientProfileId: patient.id },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+
+    const isReuploadOrder =
+      (existing.status as string) === ORDER_STATUS.REJECTED &&
+      ((existing.notes ?? '').startsWith(REUPLOAD_NOTE_PREFIX) ||
+        (existing as any).uploadedPrescriptionId);
+    if (!isReuploadOrder) {
+      throw new BadRequestException(
+        'This order is not currently marked for prescription reupload.',
+      );
+    }
+
+    let uploadedPrescriptionId: string | null = null;
+    if (dto.uploadedPrescriptionId) {
+      const uploadedPrescription =
+        await this.prisma.uploadedPrescription.findFirst({
+          where: {
+            id: dto.uploadedPrescriptionId,
+            userId,
+            status: {
+              in: [
+                PrescriptionStatus.PENDING_REVIEW,
+                PrescriptionStatus.REUPLOAD_REQUIRED,
+                PrescriptionStatus.APPROVED,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+
+      if (!uploadedPrescription) {
+        throw new BadRequestException(
+          'Uploaded prescription not found for this patient.',
+        );
+      }
+
+      uploadedPrescriptionId = uploadedPrescription.id;
+      await this.prisma.uploadedPrescription.update({
+        where: { id: uploadedPrescriptionId },
+        data: {
+          status: PrescriptionStatus.PENDING_REVIEW,
+          reviewNotes: null,
+        },
+      });
+    }
+
+    const updated = await this.prisma.pharmacyOrder.update({
+      where: { id: orderId },
+      data: {
+        uploadedPrescriptionId,
+        prescriptionUrl: dto.prescriptionUrl ?? existing.prescriptionUrl,
+        status: ORDER_STATUS.PENDING_APPROVAL as any,
+        notes: dto.notes ?? null,
+        pharmacyPartnerId: null,
+        partnerOrderId: null,
+        subtotal: null,
+        deliveryFee: null,
+        totalAmount: null,
+        paymentStatus: PAYMENT_STATUS.UNPAID,
+      } as any,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
 
     return this.toResponseDto(updated);
   }
