@@ -1,5 +1,7 @@
-export const formatCurrency = (amount: number): string => {
-  return `₹${amount.toLocaleString('en-IN')}`;
+export const formatCurrency = (amount: number | null | undefined): string => {
+  const safeAmount =
+    typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+  return `₹${safeAmount.toLocaleString('en-IN')}`;
 };
 
 export const formatDate = (dateStr: string): string => {
