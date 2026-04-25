@@ -13,6 +13,7 @@ import { WebhookRateLimitGuard } from './webhooks/guards/webhook-rate-limit.guar
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PrescriptionModule } from '../prescription/prescription.module';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PharmacyJobModule } from './jobs/pharmacy-job.module';
 import { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
@@ -75,18 +76,21 @@ export { PHARMACY_PROVIDERS_MAP } from './pharmacy.constants';
         prisma: PrismaService,
         providers: Map<string, PharmacyPartnerProvider>,
         prescriptionService: PrescriptionService,
+        prescriptionStorage: PrescriptionStorageService,
         notificationsService: NotificationsService,
       ): PharmacyOrderService =>
         new PharmacyOrderService(
           prisma,
           providers,
           prescriptionService,
+          prescriptionStorage,
           notificationsService,
         ),
       inject: [
         PrismaService,
         PHARMACY_PROVIDERS_MAP,
         PrescriptionService,
+        PrescriptionStorageService,
         NotificationsService,
       ],
     },
