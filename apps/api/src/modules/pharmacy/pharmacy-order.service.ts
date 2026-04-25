@@ -50,6 +50,8 @@ const ORDER_STATUS = {
   PAID: 'PAID',
 } as const;
 
+const REUPLOAD_NOTE_PREFIX = '[REUPLOAD_REQUIRED]';
+
 type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
     items: true;
@@ -58,6 +60,13 @@ type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   };
 }> & {
   uploadedPrescriptionId?: string | null;
+  patientProfile?: {
+    name?: string | null;
+    user?: {
+      phone?: string | null;
+      email?: string | null;
+    } | null;
+  } | null;
 };
 
 @Injectable()
@@ -296,6 +305,17 @@ export class PharmacyOrderService {
           items: true,
           deliveryAddress: true,
           pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'asc' },
         skip: (page - 1) * limit,
@@ -354,17 +374,23 @@ export class PharmacyOrderService {
     page: number;
     limit: number;
   }> {
-    const where: Prisma.PharmacyOrderWhereInput = {
-      status: status
-        ? (status as any)
+    const where: Prisma.PharmacyOrderWhereInput =
+      status === 'REUPLOAD_REQUIRED'
+        ? {
+            status: ORDER_STATUS.REJECTED as any,
+            notes: { startsWith: REUPLOAD_NOTE_PREFIX },
+          }
         : {
-            in: [
-              ORDER_STATUS.PENDING_APPROVAL,
-              ORDER_STATUS.APPROVED,
-              ORDER_STATUS.REJECTED,
-            ] as any[],
-          },
-    };
+            status: status
+              ? (status as any)
+              : {
+                  in: [
+                    ORDER_STATUS.PENDING_APPROVAL,
+                    ORDER_STATUS.APPROVED,
+                    ORDER_STATUS.REJECTED,
+                  ] as any[],
+                },
+          };
 
     const [orders, total] = await Promise.all([
       this.prisma.pharmacyOrder.findMany({
@@ -373,6 +399,17 @@ export class PharmacyOrderService {
           items: true,
           deliveryAddress: true,
           pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -561,6 +598,94 @@ export class PharmacyOrderService {
         'Your prescription order was rejected. Please upload a clearer prescription.',
       type: 'PRESCRIPTION_ORDER_REJECTED',
       metadata: { orderId: updated.id },
+    });
+
+    void this.recordStatusHistory(
+      orderId,
+      ORDER_STATUS.REJECTED as any,
+      actorUserId,
+    );
+
+    return this.toResponseDto(updated);
+  }
+
+  async requestPrescriptionReupload(
+    orderId: string,
+    actorUserId: string,
+    dto: RejectPrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const existing = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if ((existing.status as string) !== ORDER_STATUS.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Only pending prescription orders can be marked for reupload.',
+      );
+    }
+
+    const reason =
+      dto.reason?.trim() || 'Please upload a clearer prescription.';
+    const note = `${REUPLOAD_NOTE_PREFIX} ${reason}`;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (existing.uploadedPrescriptionId) {
+        await tx.uploadedPrescription.update({
+          where: { id: existing.uploadedPrescriptionId },
+          data: {
+            status: PrescriptionStatus.REUPLOAD_REQUIRED,
+            reviewNotes: reason,
+            reviewedBy: actorUserId,
+          },
+        });
+      }
+
+      return tx.pharmacyOrder.update({
+        where: { id: orderId },
+        data: {
+          status: ORDER_STATUS.REJECTED as any,
+          paymentStatus: PAYMENT_STATUS.UNPAID,
+          notes: note,
+          subtotal: null,
+          deliveryFee: null,
+          totalAmount: null,
+        } as any,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    await this.safeNotify(existing.patientProfile.userId, {
+      title: 'Prescription Reupload Needed',
+      message:
+        'Your prescription needs a clearer reupload. Please upload again to continue your order.',
+      type: 'PRESCRIPTION_REUPLOAD_REQUIRED',
+      metadata: { orderId: updated.id, reason },
     });
 
     void this.recordStatusHistory(
@@ -924,6 +1049,9 @@ export class PharmacyOrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       patientProfileId: order.patientProfileId,
+      patientName: order.patientProfile?.name ?? null,
+      patientPhone: order.patientProfile?.user?.phone ?? null,
+      patientEmail: order.patientProfile?.user?.email ?? null,
       bookingId: order.bookingId,
       prescriptionId: order.prescriptionId,
       uploadedPrescriptionId: order.uploadedPrescriptionId,

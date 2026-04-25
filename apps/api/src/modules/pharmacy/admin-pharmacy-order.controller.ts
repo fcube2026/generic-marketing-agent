@@ -89,6 +89,20 @@ export class AdminPharmacyOrderController {
     return this.pharmacyOrderService.rejectPrescriptionOrder(id, user.id, dto);
   }
 
+  @Post('prescriptions/:id/reupload')
+  @ApiOperation({ summary: 'Mark prescription order for reupload' })
+  reupload(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: RejectPrescriptionOrderDto,
+  ) {
+    return this.pharmacyOrderService.requestPrescriptionReupload(
+      id,
+      user.id,
+      dto,
+    );
+  }
+
   @Post(':id/reject')
   @ApiOperation({ summary: 'Reject prescription-only order (alias endpoint)' })
   rejectAlias(

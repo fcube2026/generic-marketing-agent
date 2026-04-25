@@ -20,6 +20,9 @@ interface PharmacyOrder {
   id: string;
   orderNumber: string;
   patientProfileId: string;
+  patientName?: string | null;
+  patientPhone?: string | null;
+  patientEmail?: string | null;
   status: OrderStatus;
   paymentStatus: string;
   prescriptionImageUrl: string | null;
@@ -60,13 +63,23 @@ const statusVariant: Record<string, 'warning' | 'success' | 'error' | 'info'> = 
   PENDING_APPROVAL: 'warning',
   APPROVED: 'success',
   REJECTED: 'error',
+  REUPLOAD_REQUIRED: 'warning',
   PLACED: 'info',
   CONFIRMED: 'info',
   PROCESSING: 'info',
   DELIVERED: 'success',
 };
 
-type StatusFilter = 'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+type StatusFilter = 'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'REUPLOAD_REQUIRED';
+
+const REUPLOAD_NOTE_PREFIX = '[REUPLOAD_REQUIRED]';
+
+const displayStatus = (order: PharmacyOrder): string => {
+  if (order.status === 'REJECTED' && order.notes?.startsWith(REUPLOAD_NOTE_PREFIX)) {
+    return 'REUPLOAD_REQUIRED';
+  }
+  return order.status;
+};
 
 export default function PharmacyOrdersPage() {
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
@@ -75,6 +88,7 @@ export default function PharmacyOrdersPage() {
   const [selected, setSelected] = useState<PharmacyOrder | null>(null);
   const [liveImageUrl, setLiveImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [imageMode, setImageMode] = useState<'image' | 'document'>('image');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnerId, setPartnerId] = useState('');
   const [items, setItems] = useState<ApprovalItemDraft[]>([
@@ -134,6 +148,7 @@ export default function PharmacyOrdersPage() {
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
     setNotes('');
     setRejectReason('');
+    setImageMode('image');
     // Fetch a fresh signed URL immediately
     setLoadingImage(true);
     try {
@@ -149,6 +164,7 @@ export default function PharmacyOrdersPage() {
   const closeModal = () => {
     setSelected(null);
     setLiveImageUrl(null);
+    setImageMode('image');
     setItems([{ medicineCode: '', medicineName: '', quantity: 1, unitPrice: 0 }]);
     setNotes('');
     setRejectReason('');
@@ -229,6 +245,30 @@ export default function PharmacyOrdersPage() {
     }
   };
 
+  const submitReupload = async () => {
+    if (!selected) return;
+    if (!rejectReason.trim()) {
+      setFeedback({ type: 'error', message: 'Please enter reupload reason.' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post(`/admin/orders/prescriptions/${selected.id}/reupload`, {
+        reason: rejectReason.trim(),
+      });
+      setFeedback({ type: 'success', message: 'Marked as reupload required.' });
+      closeModal();
+      await fetchOrders(statusFilter);
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: err?.response?.data?.message ?? 'Failed to mark reupload required.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const previewUrl = liveImageUrl || selected?.prescriptionUrl || selected?.prescriptionImageUrl;
   const isPending = selected?.status === 'PENDING_APPROVAL';
   const pendingCount = orders.filter((o) => o.status === 'PENDING_APPROVAL').length;
@@ -271,7 +311,7 @@ export default function PharmacyOrdersPage() {
 
       {/* Status filter tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(['ALL', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'] as StatusFilter[]).map((f) => (
+        {(['ALL', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'REUPLOAD_REQUIRED'] as StatusFilter[]).map((f) => (
           <button
             key={f}
             onClick={() => handleFilterChange(f)}
@@ -314,11 +354,11 @@ export default function PharmacyOrdersPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900">#{order.orderNumber}</p>
-                    <Badge variant={statusVariant[order.status] ?? 'info'}>
-                      {order.status.replace(/_/g, ' ')}
+                    <Badge variant={statusVariant[displayStatus(order)] ?? 'info'}>
+                      {displayStatus(order).replace(/_/g, ' ')}
                     </Badge>
                     {order.notes && (
-                      <span className="text-xs text-gray-500">📝 {order.notes}</span>
+                      <span className="text-xs text-gray-500">📝 {order.notes.replace(REUPLOAD_NOTE_PREFIX, '').trim()}</span>
                     )}
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
@@ -358,9 +398,24 @@ export default function PharmacyOrdersPage() {
                     </div>
                   ) : previewUrl ? (
                     <div className="mt-2">
-                      <div className="max-h-[55vh] overflow-auto rounded-xl border border-gray-200 bg-gray-50">
-                        <img src={previewUrl} alt="Prescription" className="w-full" />
-                      </div>
+                      {imageMode === 'image' ? (
+                        <div className="max-h-[55vh] overflow-auto rounded-xl border border-gray-200 bg-gray-50">
+                          <img
+                            src={previewUrl}
+                            alt="Prescription"
+                            className="w-full"
+                            onError={() => setImageMode('document')}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-[55vh] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                          <iframe
+                            src={previewUrl}
+                            title="Prescription Document"
+                            className="h-full w-full"
+                          />
+                        </div>
+                      )}
                       <a
                         href={previewUrl}
                         target="_blank"
@@ -383,6 +438,21 @@ export default function PharmacyOrdersPage() {
                     <p className="mt-1 text-sm text-gray-700">{selected.deliveryAddress}</p>
                   </div>
                 )}
+
+                <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Patient Details
+                  </p>
+                  <p className="mt-1 text-sm text-gray-700">
+                    Name: {selected.patientName || 'N/A'}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    Phone: {selected.patientPhone || 'N/A'}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    Email: {selected.patientEmail || 'N/A'}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-5 p-6">
@@ -521,6 +591,13 @@ export default function PharmacyOrdersPage() {
                         className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
                       >
                         {submitting ? 'Working…' : 'Reject'}
+                      </button>
+                      <button
+                        onClick={submitReupload}
+                        disabled={submitting || !rejectReason.trim()}
+                        className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                      >
+                        {submitting ? 'Working…' : 'Reupload'}
                       </button>
                       <button
                         onClick={submitApprove}
