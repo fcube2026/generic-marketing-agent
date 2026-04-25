@@ -26,31 +26,7 @@ import {
   getFreeDeliveryThreshold,
   requiresPrescriptionForMedicine,
 } from '../../utils/pharmacy';
-import { usePharmacyOrderStore } from '../../store/pharmacyOrderStore';
-
-type PrescriptionOption = {
-  id: string;
-  details?: string | null;
-  fileUrl?: string | null;
-  createdAt: string;
-  bookingId: string;
-  providerName?: string;
-  serviceCategoryName?: string;
-};
-
-type ConsultationSummaryResponse = {
-  booking?: {
-    id: string;
-    provider?: { name?: string };
-    serviceCategory?: { name?: string };
-  };
-  prescriptions?: Array<{
-    id: string;
-    details?: string | null;
-    fileUrl?: string | null;
-    createdAt: string;
-  }>;
-};
+import { usePharmacyCartStore } from '../../store/pharmacyCartStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 type Route = RouteProp<PatientStackParamList, 'PharmacyCheckout'>;
@@ -68,9 +44,8 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const route = useRoute<Route>();
   const { cartItems } = route.params;
   const queryClient = useQueryClient();
-  const { uploadedPrescriptionId, uploadedPrescriptionStatus } = usePharmacyOrderStore();
+  const clearCart = usePharmacyCartStore((state) => state.clearCart);
 
-  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [notes, setNotes] = useState('');
 
@@ -146,34 +121,10 @@ export const PharmacyCheckoutScreen: React.FC = () => {
     }
   }, [loadingPartners, partners]);
 
-  const { data: prescriptionOptions = [], isLoading: loadingPrescriptions } = useQuery<PrescriptionOption[]>({
-    queryKey: ['patient-prescriptions'],
-    queryFn: async () => {
-      const res = await api.get('/consultation/patient/summaries', {
-        params: { page: 1, limit: 50 },
-      });
-      const payload = res.data;
-      const summaries: ConsultationSummaryResponse[] = Array.isArray(payload)
-        ? payload
-        : payload.data ?? [];
-
-      return summaries.flatMap((summary) =>
-        (summary.prescriptions ?? []).map((prescription) => ({
-          id: prescription.id,
-          details: prescription.details,
-          fileUrl: prescription.fileUrl,
-          createdAt: prescription.createdAt,
-          bookingId: summary.booking?.id ?? '',
-          providerName: summary.booking?.provider?.name,
-          serviceCategoryName: summary.booking?.serviceCategory?.name,
-        })),
-      );
-    },
-  });
-
   const placeOrderMutation = useMutation({
     mutationFn: pharmacyService.createOrder,
     onSuccess: (order) => {
+      clearCart();
       queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
       Alert.alert(
         '✅ Order Placed!',
@@ -208,23 +159,6 @@ export const PharmacyCheckoutScreen: React.FC = () => {
   const gstAmount = Math.round(subtotal * GST_RATE);
   const totalAmount = subtotal + DELIVERY_FEE + gstAmount;
 
-  const prescriptionRequired = useMemo(
-    () => cartItems.some((item) => requiresPrescriptionForMedicine(item.medicine)),
-    [cartItems],
-  );
-
-  const selectedPrescription = useMemo(
-    () => prescriptionOptions.find((item) => item.id === selectedPrescriptionId) ?? null,
-    [prescriptionOptions, selectedPrescriptionId],
-  );
-
-  const activeUploadedPrescriptionId = selectedPrescriptionId
-    ? null
-    : uploadedPrescriptionId;
-
-  const prescriptionRequirementSatisfied =
-    !prescriptionRequired || !!selectedPrescriptionId || !!activeUploadedPrescriptionId;
-
   const handlePlaceOrder = async () => {
     if (!selectedPartnerId) {
       Alert.alert('Pharmacy unavailable', 'No pharmacy partner is available right now.');
@@ -234,22 +168,71 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       Alert.alert('Incomplete address', 'Please fill in all delivery address fields');
       return;
     }
-    if (!prescriptionRequirementSatisfied) {
-      Alert.alert('Prescription required', 'Valid prescription required for selected medicines');
-      return;
-    }
 
     try {
+      const normalizedAddressLine = addressLine.trim().toLowerCase();
+      const normalizedCity = city.trim().toLowerCase();
+      const normalizedState = state.trim().toLowerCase();
+      const normalizedPincode = pincode.trim();
+
+      const existingAddressesRes = await api.get(ENDPOINTS.PATIENTS.ADDRESSES);
+      const existingAddresses: Array<{
+        id: string;
+        addressLine: string;
+        city: string;
+        state: string;
+        pincode: string;
+      }> = Array.isArray(existingAddressesRes.data) ? existingAddressesRes.data : [];
+
+      const matchingExistingAddress = existingAddresses.find((addr) =>
+        addr.addressLine?.trim().toLowerCase() === normalizedAddressLine &&
+        addr.city?.trim().toLowerCase() === normalizedCity &&
+        addr.state?.trim().toLowerCase() === normalizedState &&
+        addr.pincode?.trim() === normalizedPincode,
+      );
+
       // Create a saved address first, then use its ID for the order.
       // The staging API rejects inline deliveryAddress objects.
-      const addrRes = await api.post(ENDPOINTS.PATIENTS.ADDRESSES, {
-        label: 'Delivery',
-        addressLine: addressLine.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-      });
-      const deliveryAddressId: string = addrRes.data.id;
+      let deliveryAddressId: string;
+
+      if (matchingExistingAddress?.id) {
+        deliveryAddressId = matchingExistingAddress.id;
+      } else {
+        try {
+          const addrRes = await api.post(ENDPOINTS.PATIENTS.ADDRESSES, {
+            label: 'Delivery',
+            addressLine: addressLine.trim(),
+            city: city.trim(),
+            state: state.trim(),
+            pincode: pincode.trim(),
+          });
+          deliveryAddressId = addrRes.data.id;
+        } catch {
+          // If address create partially succeeded server-side but returned 5xx,
+          // fetch again and reuse the matching persisted address.
+          const retryRes = await api.get(ENDPOINTS.PATIENTS.ADDRESSES);
+          const retryAddresses: Array<{
+            id: string;
+            addressLine: string;
+            city: string;
+            state: string;
+            pincode: string;
+          }> = Array.isArray(retryRes.data) ? retryRes.data : [];
+
+          const persistedMatch = retryAddresses.find((addr) =>
+            addr.addressLine?.trim().toLowerCase() === normalizedAddressLine &&
+            addr.city?.trim().toLowerCase() === normalizedCity &&
+            addr.state?.trim().toLowerCase() === normalizedState &&
+            addr.pincode?.trim() === normalizedPincode,
+          );
+
+          if (!persistedMatch?.id) {
+            throw new Error('Could not save address');
+          }
+
+          deliveryAddressId = persistedMatch.id;
+        }
+      }
 
       const mergedNotes = [
         `Payment Method: ${paymentMethod}`,
@@ -261,9 +244,6 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       placeOrderMutation.mutate({
         partnerId: selectedPartnerId,
         deliveryAddressId,
-        bookingId: selectedPrescription?.bookingId || undefined,
-        prescriptionId: selectedPrescriptionId || undefined,
-        uploadedPrescriptionId: activeUploadedPrescriptionId || undefined,
         notes: mergedNotes || undefined,
         items: cartItems.map((item) => ({
           medicineCode: item.medicine.id,
@@ -274,12 +254,14 @@ export const PharmacyCheckoutScreen: React.FC = () => {
       });
     } catch (err: any) {
       const raw = err?.response?.data?.message;
-      const msg = Array.isArray(raw) ? raw.join('\n') : (raw || 'Could not save address');
+      const msg = Array.isArray(raw)
+        ? raw.join('\n')
+        : (raw || err?.message || 'Could not save address');
       Alert.alert('Address Error', String(msg));
     }
   };
 
-  if (loadingPartners || loadingPrescriptions) {
+  if (loadingPartners) {
     return <LoadingSpinner fullScreen message="Loading checkout..." />;
   }
 
@@ -327,75 +309,6 @@ export const PharmacyCheckoutScreen: React.FC = () => {
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>{formatCurrency(totalAmount)}</Text>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Prescription Compliance</Text>
-        <View style={[styles.complianceCard, prescriptionRequired && styles.complianceCardWarning]}>
-          <Text style={styles.complianceTitle}>
-            {prescriptionRequired ? 'Prescription required' : 'Prescription optional'}
-          </Text>
-          <Text style={styles.complianceText}>
-            {prescriptionRequired
-              ? 'Valid prescription required for selected medicines'
-              : 'These medicines can be ordered without a prescription, but you may still attach one.'}
-          </Text>
-        </View>
-
-        {activeUploadedPrescriptionId && (
-          <View style={styles.uploadedRxCard}>
-            <Text style={styles.uploadedRxTitle}>Uploaded prescription attached</Text>
-            <Text style={styles.uploadedRxText}>
-              Review status: {(uploadedPrescriptionStatus ?? 'PENDING_REVIEW').replace(/_/g, ' ')}
-            </Text>
-            <Text style={styles.uploadedRxSubtext}>
-              This uploaded prescription will be used for pharmacy verification if no doctor-issued prescription is selected below.
-            </Text>
-          </View>
-        )}
-
-        {prescriptionOptions.length === 0 ? (
-          <Text style={styles.noDataText}>
-            No doctor-issued prescriptions are available in your account yet.
-          </Text>
-        ) : (
-          prescriptionOptions.map((prescription) => {
-            const isSelected = selectedPrescriptionId === prescription.id;
-            return (
-              <TouchableOpacity
-                key={prescription.id}
-                style={[styles.prescriptionCard, isSelected && styles.selectedCard]}
-                onPress={() =>
-                  setSelectedPrescriptionId((current) =>
-                    current === prescription.id ? null : prescription.id,
-                  )
-                }
-              >
-                <View style={styles.addressInfo}>
-                  <Text style={styles.addressLabel}>
-                    {prescription.providerName || 'Doctor prescription'}
-                  </Text>
-                  <Text style={styles.addressText}>
-                    {prescription.serviceCategoryName || 'Consultation'}
-                    {' • '}
-                    {new Date(prescription.createdAt).toLocaleDateString()}
-                  </Text>
-                  {prescription.details ? (
-                    <Text style={styles.prescriptionDetails} numberOfLines={2}>
-                      {prescription.details}
-                    </Text>
-                  ) : null}
-                  {prescription.fileUrl ? (
-                    <Text style={styles.defaultBadge}>File attached</Text>
-                  ) : null}
-                </View>
-                <View
-                  style={[styles.radioBtn, isSelected && styles.radioBtnSelected]}
-                />
-              </TouchableOpacity>
-            );
-          })
-        )}
       </View>
 
       {/* Delivery Address */}
@@ -501,7 +414,7 @@ export const PharmacyCheckoutScreen: React.FC = () => {
           title={placeOrderMutation.isPending ? 'Placing Order...' : `Place Order - ${formatCurrency(totalAmount)}`}
           onPress={handlePlaceOrder}
           loading={placeOrderMutation.isPending}
-          disabled={!selectedPartnerId || !addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim() || !prescriptionRequirementSatisfied}
+          disabled={!selectedPartnerId || !addressLine.trim() || !city.trim() || !state.trim() || !pincode.trim()}
         />
       </View>
 
