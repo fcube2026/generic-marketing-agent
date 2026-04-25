@@ -71,6 +71,10 @@ export const providerService = {
     const r = await api.post(
       `/consultation/${bookingId}/prescription/upload`,
       formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (data) => data,
+      },
     );
     return r.data;
   },

@@ -189,7 +189,9 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
           {mode === 'HOME_VISIT' && !selectedAddress && (
             <Button
               title="Add Address"
-              onPress={() => navigation.navigate('PatientKycAddress')}
+              onPress={() =>
+                navigation.navigate('PatientKycAddress', { returnToBooking: true })
+              }
               style={{ marginTop: 12 }}
             />
           )}

@@ -18,6 +18,7 @@ import { MedicineResult, MedicinePriceComparison } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
 import { requiresPrescriptionForMedicine } from '../../utils/pharmacy';
+import { usePharmacyCartStore } from '../../store/pharmacyCartStore';
 
 type RouteProps = RouteProp<PatientStackParamList, 'MedicineDetail'>;
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
@@ -27,6 +28,7 @@ export const MedicineDetailScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { medicine, pincode } = route.params;
   const [quantity, setQuantity] = useState(1);
+  const addItem = usePharmacyCartStore((state) => state.addItem);
 
   const {
     data: comparisons,
@@ -40,9 +42,8 @@ export const MedicineDetailScreen: React.FC = () => {
   });
 
   const handleAddToCart = () => {
-    navigation.navigate('PharmacyCheckout', {
-      cartItems: [{ medicine, quantity }],
-    });
+    addItem(medicine, quantity);
+    navigation.navigate('MedicineSearch');
   };
 
   const increaseQty = () => setQuantity((q) => q + 1);
@@ -163,6 +164,7 @@ export const MedicineDetailScreen: React.FC = () => {
             fullWidth={false}
             style={styles.addToCartBtn}
           />
+          <Text style={styles.cartHint}>Added items stay in your cart until you choose checkout.</Text>
         </View>
       </View>
     </View>
@@ -270,4 +272,5 @@ const styles = StyleSheet.create({
   qtyCount: { fontSize: 18, fontWeight: '700', color: Colors.text, marginHorizontal: 12 },
   addToCartWrap: { flex: 1 },
   addToCartBtn: { minHeight: 44, paddingVertical: 10 },
+  cartHint: { fontSize: 11, color: Colors.textMuted, textAlign: 'center', marginTop: 6 },
 });

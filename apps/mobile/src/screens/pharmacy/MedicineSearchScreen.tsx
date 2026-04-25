@@ -20,6 +20,7 @@ import { MedicineResult } from '../../types';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { formatCurrency } from '../../utils/format';
 import { requiresPrescriptionForMedicine } from '../../utils/pharmacy';
+import { usePharmacyCartStore } from '../../store/pharmacyCartStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
@@ -65,9 +66,9 @@ export const MedicineSearchScreen: React.FC = () => {
   const [pincode, setPincode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [cart, setCart] = useState<Map<string, { medicine: MedicineResult; quantity: number }>>(
-    new Map(),
-  );
+  const items = usePharmacyCartStore((state) => state.items);
+  const addItem = usePharmacyCartStore((state) => state.addItem);
+  const decreaseItem = usePharmacyCartStore((state) => state.decreaseItem);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -182,16 +183,7 @@ export const MedicineSearchScreen: React.FC = () => {
   };
 
   const addToCart = (medicine: MedicineResult) => {
-    setCart((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(medicine.id);
-      if (existing) {
-        next.set(medicine.id, { medicine, quantity: existing.quantity + 1 });
-      } else {
-        next.set(medicine.id, { medicine, quantity: 1 });
-      }
-      return next;
-    });
+    addItem(medicine, 1);
   };
 
   const handleSuggestionPress = (medicine: MedicineResult) => {
@@ -199,20 +191,7 @@ export const MedicineSearchScreen: React.FC = () => {
     navigation.navigate('MedicineDetail', { medicine, pincode: pincode || undefined });
   };
 
-  const removeFromCart = (medicineId: string) => {
-    setCart((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(medicineId);
-      if (existing && existing.quantity > 1) {
-        next.set(medicineId, { ...existing, quantity: existing.quantity - 1 });
-      } else {
-        next.delete(medicineId);
-      }
-      return next;
-    });
-  };
-
-  const cartItems = Array.from(cart.values());
+  const cartItems = Object.values(items);
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const cartList = cartItems.map((item) => item.medicine);
 
@@ -358,7 +337,7 @@ export const MedicineSearchScreen: React.FC = () => {
           ) : null
         }
         renderItem={({ item }) => {
-          const cartItem = cart.get(item.id);
+          const cartItem = items[item.id];
           return (
             <View style={styles.medicineCard}>
               <View style={styles.medicineInfo}>
@@ -379,7 +358,7 @@ export const MedicineSearchScreen: React.FC = () => {
                   <View style={styles.quantityRow}>
                     <TouchableOpacity
                       style={styles.qtyBtn}
-                      onPress={() => removeFromCart(item.id)}
+                      onPress={() => decreaseItem(item.id)}
                     >
                       <Text style={styles.qtyBtnText}>−</Text>
                     </TouchableOpacity>

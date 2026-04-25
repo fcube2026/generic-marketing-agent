@@ -7,6 +7,13 @@ import { PatientNavigator } from './PatientNavigator';
 import { ProviderNavigator } from './ProviderNavigator';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Colors } from '../constants/colors';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
+/** Mounts push notification handler inside NavigationContainer so useNavigation() works */
+const PushHandler: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
+  usePushNotifications(isAuthenticated);
+  return null;
+};
 
 export const RootNavigator: React.FC = () => {
   const { isAuthenticated, isLoading, loadStoredAuth, user } = useAuthStore();
@@ -50,6 +57,7 @@ export const RootNavigator: React.FC = () => {
         console.log('[RootNavigator] NavigationContainer ready');
       }}
     >
+      <PushHandler isAuthenticated={isAuthenticated} />
       {isAuthenticated ? (
         user?.role === 'PROVIDER' ? <ProviderNavigator /> : <PatientNavigator />
       ) : (

@@ -78,6 +78,14 @@ export function usePushNotifications(isAuthenticated: boolean) {
           navigation.navigate('ProviderTabs', { screen: 'Earnings' });
           break;
 
+        case 'PHARMACY_ORDER_STATUS_UPDATE':
+          if (data.pharmacyOrderId) {
+            navigation.navigate('OrderTracking', { orderId: data.pharmacyOrderId });
+          } else {
+            navigation.navigate('PharmacyOrders');
+          }
+          break;
+
         default:
           // Navigate to notifications list
           navigation.navigate('Notifications');

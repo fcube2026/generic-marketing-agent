@@ -7,7 +7,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
-import { consultationService } from '../../services/providerService';
+import {
+  consultationService,
+  diagnosticsService,
+  referralService,
+} from '../../services/providerService';
 import { bookingService } from '../../services/bookingService';
 import { pharmacyService } from '../../services/pharmacyService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
@@ -206,16 +210,37 @@ export const ConsultationFormScreen: React.FC = () => {
     }
     setSubmitting(true);
     try {
-      await consultationService.submitSummary(bookingId, {
-        symptoms,
-        observations,
-        diagnosis,
-        medicinesAdvised: medicines.filter(m => m.name.trim()),
-        nextSteps,
-        followUpRecommendation: followUpNeeded ? followUpNotes : undefined,
-        diagnosticTests: diagnosticNeeded ? diagnosticTests : undefined,
-        specialistReferral: referralNeeded ? specialistType : undefined,
-      });
+      const hasExistingSubmittedSummary =
+        booking?.status === 'SUMMARY_SUBMITTED' || booking?.status === 'CLOSED';
+
+      if (!hasExistingSubmittedSummary) {
+        await consultationService.submitSummary(bookingId, {
+          symptoms,
+          observations: observations || undefined,
+          diagnosis,
+          medicinesAdvised: medicines.filter(m => m.name.trim()).length > 0
+            ? medicines.filter(m => m.name.trim())
+            : undefined,
+          nextSteps: nextSteps || undefined,
+          followUpRecommendation: followUpNeeded ? followUpNotes : undefined,
+        });
+
+        setBooking((prev: any) => (prev ? { ...prev, status: 'SUMMARY_SUBMITTED' } : prev));
+      }
+
+      if (diagnosticNeeded && diagnosticTests.trim()) {
+        await diagnosticsService.createRequest({
+          bookingId,
+          testType: diagnosticTests.trim(),
+        });
+      }
+
+      if (referralNeeded && specialistType.trim()) {
+        await referralService.createReferral({
+          bookingId,
+          specialistType: specialistType.trim(),
+        });
+      }
 
       if (prescriptionFile) {
         await consultationService.addPrescriptionFile(
@@ -236,8 +261,12 @@ export const ConsultationFormScreen: React.FC = () => {
       Alert.alert('Summary Submitted', 'Consultation summary saved successfully.', [
         { text: 'OK', onPress: () => navigation.navigate('Tabs') },
       ]);
-    } catch {
-      Alert.alert('Error', 'Failed to submit summary. Please try again.');
+    } catch (err: any) {
+      const rawMessage = err?.response?.data?.message || err?.response?.data?.error;
+      const message = Array.isArray(rawMessage)
+        ? rawMessage.join('\n')
+        : rawMessage || err?.message || 'Failed to submit summary. Please try again.';
+      Alert.alert('Error', String(message));
     } finally {
       setSubmitting(false);
     }
