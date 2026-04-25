@@ -7,6 +7,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/verification-queue', label: 'Doctor Verification', icon: '🔍' },
   { href: '/verification/queue', label: 'Patient Verification', icon: '🆔' },
+  { href: '/order-tracking', label: 'Order Tracking', icon: '🧭' },
   { href: '/pharmacy-orders', label: 'Pharmacy Orders', icon: '📦' },
   { href: '/providers', label: 'Providers', icon: '👨‍⚕️' },
   { href: '/bookings', label: 'Bookings', icon: '📋' },

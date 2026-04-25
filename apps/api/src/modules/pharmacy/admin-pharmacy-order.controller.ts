@@ -47,6 +47,41 @@ export class AdminPharmacyOrderController {
     );
   }
 
+  @Get('tracking')
+  @ApiOperation({
+    summary:
+      'Get admin order tracking list for medicine and prescription flows with lifecycle history',
+  })
+  @ApiQuery({ name: 'flow', required: false, example: 'ALL' })
+  @ApiQuery({ name: 'status', required: false, example: 'PENDING' })
+  @ApiQuery({ name: 'paymentStatus', required: false, example: 'PAID' })
+  @ApiQuery({ name: 'patientQuery', required: false, example: '98765' })
+  @ApiQuery({ name: 'fromDate', required: false, example: '2026-04-01' })
+  @ApiQuery({ name: 'toDate', required: false, example: '2026-04-25' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 50 })
+  listTracking(
+    @Query('flow') flow?: string,
+    @Query('status') status?: string,
+    @Query('paymentStatus') paymentStatus?: string,
+    @Query('patientQuery') patientQuery?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<any> {
+    return this.pharmacyOrderService.listAdminOrderTracking({
+      flow,
+      status,
+      paymentStatus,
+      patientQuery,
+      fromDate,
+      toDate,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
+  }
+
   @Get('prescriptions/:id/image')
   @ApiOperation({
     summary: 'Get fresh signed image URL for a prescription order',

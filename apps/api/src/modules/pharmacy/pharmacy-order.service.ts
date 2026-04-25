@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { FeatureFlags } from '../../common/feature-flags/feature-flags';
 import {
   PharmacyOrderStatus,
+  PharmacyOrderPaymentStatus,
   PrescriptionStatus,
   Prisma,
   Role,
@@ -51,6 +52,28 @@ const ORDER_STATUS = {
 } as const;
 
 const REUPLOAD_NOTE_PREFIX = '[REUPLOAD_REQUIRED]';
+
+type AdminOrderFlow = 'ALL' | 'MEDICINE' | 'PRESCRIPTION';
+
+interface AdminOrderTrackingOptions {
+  flow?: string;
+  status?: string;
+  paymentStatus?: string;
+  patientQuery?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface AdminTrackingTimelineEvent {
+  status: string;
+  timestamp: Date;
+  source: string | null;
+  actorId: string | null;
+  actorRole: Role | null;
+  actorLabel: string | null;
+}
 
 type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
@@ -431,6 +454,296 @@ export class PharmacyOrderService {
     );
 
     return { data, total, page, limit };
+  }
+
+  async listAdminOrderTracking(options: AdminOrderTrackingOptions): Promise<{
+    data: Array<
+      PharmacyOrderResponseDto & {
+        flow: Exclude<AdminOrderFlow, 'ALL'>;
+        timeline: AdminTrackingTimelineEvent[];
+        timestamps: {
+          createdAt: Date;
+          approvedAt: Date | null;
+          rejectedAt: Date | null;
+          paidAt: Date | null;
+          dispatchedAt: Date | null;
+          deliveredAt: Date | null;
+        };
+        prescriptionReview: {
+          status: PrescriptionStatus | null;
+          notes: string | null;
+          reviewedBy: string | null;
+          reviewedByRole: Role | null;
+          reviewedAt: Date | null;
+        } | null;
+      }
+    >;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(200, Math.max(1, options.limit ?? 50));
+    const flow = this.normalizeAdminOrderFlow(options.flow);
+
+    const where: Prisma.PharmacyOrderWhereInput = {};
+    const andConditions: Prisma.PharmacyOrderWhereInput[] = [];
+
+    if (options.status?.trim()) {
+      where.status = options.status.trim().toUpperCase() as any;
+    }
+
+    if (options.paymentStatus?.trim()) {
+      const normalizedPayment = options.paymentStatus.trim().toUpperCase();
+      if (
+        normalizedPayment === PharmacyOrderPaymentStatus.PAID ||
+        normalizedPayment === PharmacyOrderPaymentStatus.UNPAID
+      ) {
+        where.paymentStatus = normalizedPayment as PharmacyOrderPaymentStatus;
+      }
+    }
+
+    const patientQuery = options.patientQuery?.trim();
+    if (patientQuery) {
+      andConditions.push({
+        OR: [
+          { orderNumber: { contains: patientQuery, mode: 'insensitive' } },
+          {
+            patientProfile: {
+              name: { contains: patientQuery, mode: 'insensitive' },
+            },
+          },
+          {
+            patientProfile: {
+              user: {
+                phone: { contains: patientQuery, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            patientProfile: {
+              user: {
+                email: { contains: patientQuery, mode: 'insensitive' },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (options.fromDate) {
+      const from = new Date(options.fromDate);
+      if (!Number.isNaN(from.getTime())) {
+        createdAt.gte = from;
+      }
+    }
+    if (options.toDate) {
+      const to = new Date(options.toDate);
+      if (!Number.isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        createdAt.lte = to;
+      }
+    }
+    if (Object.keys(createdAt).length > 0) {
+      where.createdAt = createdAt;
+    }
+
+    const prescriptionFlowCondition: Prisma.PharmacyOrderWhereInput = {
+      OR: [
+        { uploadedPrescriptionId: { not: null } },
+        { prescriptionUrl: { not: null } },
+        {
+          status: {
+            in: [
+              ORDER_STATUS.PENDING_APPROVAL,
+              ORDER_STATUS.APPROVED,
+              ORDER_STATUS.REJECTED,
+            ] as any[],
+          },
+        },
+      ],
+    };
+
+    const medicineFlowCondition: Prisma.PharmacyOrderWhereInput = {
+      AND: [
+        { uploadedPrescriptionId: null },
+        { prescriptionUrl: null },
+        {
+          NOT: {
+            status: {
+              in: [
+                ORDER_STATUS.PENDING_APPROVAL,
+                ORDER_STATUS.APPROVED,
+                ORDER_STATUS.REJECTED,
+              ] as any[],
+            },
+          },
+        },
+      ],
+    };
+
+    if (flow === 'PRESCRIPTION') {
+      andConditions.push(prescriptionFlowCondition);
+    }
+
+    if (flow === 'MEDICINE') {
+      andConditions.push(medicineFlowCondition);
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.pharmacyOrder.findMany({
+        where,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          statusHistory: {
+            orderBy: { timestamp: 'asc' },
+          },
+          uploadedPrescription: {
+            select: {
+              status: true,
+              reviewNotes: true,
+              reviewedBy: true,
+              reviewLogs: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  createdAt: true,
+                  performedBy: true,
+                  action: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.pharmacyOrder.count({ where }),
+    ]);
+
+    const actorIds = new Set<string>();
+    orders.forEach((order) => {
+      order.statusHistory.forEach((entry) => {
+        const actorId = this.extractActorIdFromHistorySource(entry.source);
+        if (actorId) {
+          actorIds.add(actorId);
+        }
+      });
+
+      const reviewActor =
+        order.uploadedPrescription?.reviewedBy ??
+        order.uploadedPrescription?.reviewLogs[0]?.performedBy ??
+        null;
+      if (reviewActor) {
+        actorIds.add(reviewActor);
+      }
+    });
+
+    const actors =
+      actorIds.size > 0
+        ? await this.prisma.user.findMany({
+            where: {
+              id: { in: Array.from(actorIds) },
+            },
+            select: {
+              id: true,
+              role: true,
+              email: true,
+              phone: true,
+            },
+          })
+        : [];
+
+    const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+
+    return {
+      data: orders.map((order) => {
+        const response = this.toResponseDto(order as any);
+        const orderFlow: Exclude<AdminOrderFlow, 'ALL'> =
+          this.isPrescriptionTrackingOrder(order) ? 'PRESCRIPTION' : 'MEDICINE';
+
+        const timeline: AdminTrackingTimelineEvent[] = order.statusHistory.map(
+          (entry) => {
+            const actorId = this.extractActorIdFromHistorySource(entry.source);
+            const actor = actorId ? actorById.get(actorId) : null;
+
+            return {
+              status: entry.status,
+              timestamp: entry.timestamp,
+              source: entry.source,
+              actorId,
+              actorRole: actor?.role ?? null,
+              actorLabel: actor?.email ?? actor?.phone ?? actorId,
+            };
+          },
+        );
+
+        const reviewLog = order.uploadedPrescription?.reviewLogs[0] ?? null;
+        const reviewedBy =
+          order.uploadedPrescription?.reviewedBy ??
+          reviewLog?.performedBy ??
+          null;
+        const reviewer = reviewedBy ? actorById.get(reviewedBy) : null;
+
+        return {
+          ...response,
+          flow: orderFlow,
+          timeline,
+          timestamps: {
+            createdAt: order.createdAt,
+            approvedAt: this.findFirstStatusTimestamp(
+              order.statusHistory,
+              'APPROVED',
+            ),
+            rejectedAt: this.findFirstStatusTimestamp(
+              order.statusHistory,
+              'REJECTED',
+            ),
+            paidAt: this.findFirstStatusTimestamp(order.statusHistory, 'PAID'),
+            dispatchedAt: this.findFirstStatusTimestamp(order.statusHistory, [
+              'DISPATCHED',
+              'SHIPPED',
+              'OUT_FOR_DELIVERY',
+            ]),
+            deliveredAt:
+              order.deliveredAt ??
+              this.findFirstStatusTimestamp(order.statusHistory, 'DELIVERED'),
+          },
+          prescriptionReview:
+            orderFlow === 'PRESCRIPTION'
+              ? {
+                  status: order.uploadedPrescription?.status ?? null,
+                  notes: order.uploadedPrescription?.reviewNotes ?? null,
+                  reviewedBy,
+                  reviewedByRole: reviewer?.role ?? null,
+                  reviewedAt: reviewLog?.createdAt ?? null,
+                }
+              : null,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
   }
 
   async getPrescriptionOrderImageUrl(orderId: string): Promise<string | null> {
@@ -1219,6 +1532,54 @@ export class PharmacyOrderService {
         'Prescription approval/payment flow is currently disabled. Set ENABLE_PRESCRIPTION_FLOW=true to enable.',
       );
     }
+  }
+
+  private normalizeAdminOrderFlow(flow?: string): AdminOrderFlow {
+    const normalized = flow?.trim().toUpperCase();
+    if (normalized === 'MEDICINE' || normalized === 'PRESCRIPTION') {
+      return normalized;
+    }
+    return 'ALL';
+  }
+
+  private isPrescriptionTrackingOrder(order: {
+    uploadedPrescriptionId?: string | null;
+    prescriptionUrl?: string | null;
+    status: PharmacyOrderStatus;
+  }): boolean {
+    return (
+      Boolean(order.uploadedPrescriptionId) ||
+      Boolean(order.prescriptionUrl) ||
+      [
+        ORDER_STATUS.PENDING_APPROVAL,
+        ORDER_STATUS.APPROVED,
+        ORDER_STATUS.REJECTED,
+      ].includes(order.status as any)
+    );
+  }
+
+  private extractActorIdFromHistorySource(
+    source?: string | null,
+  ): string | null {
+    if (!source) {
+      return null;
+    }
+    const prefix = 'manual:';
+    return source.startsWith(prefix) ? source.slice(prefix.length) : null;
+  }
+
+  private findFirstStatusTimestamp(
+    history: Array<{ status: PharmacyOrderStatus; timestamp: Date }>,
+    statuses: string | string[],
+  ): Date | null {
+    const wanted = new Set(
+      (Array.isArray(statuses) ? statuses : [statuses]).map((status) =>
+        status.toUpperCase(),
+      ),
+    );
+
+    const match = history.find((entry) => wanted.has(entry.status));
+    return match?.timestamp ?? null;
   }
 
   private async safeNotify(
