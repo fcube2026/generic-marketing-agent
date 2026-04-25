@@ -113,7 +113,12 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
     : null;
   const canCancel = canCancelPharmacyOrder(order.status);
   const canPayNow = order.status === 'APPROVED' && order.paymentStatus === 'UNPAID';
-  const statusColor = STATUS_COLORS[order.status] ?? Colors.textMuted;
+  const statusLabel = reuploadRequired
+    ? 'REUPLOAD REQUIRED'
+    : order.status.replace(/_/g, ' ');
+  const statusColor = reuploadRequired
+    ? Colors.warning
+    : STATUS_COLORS[order.status] ?? Colors.textMuted;
   const pricing = getPharmacyDisplayPricing(order);
 
   return (
@@ -126,7 +131,7 @@ export const PharmacyOrderDetailScreen: React.FC = () => {
         <Text style={styles.orderNumber}>Order #{order.orderNumber}</Text>
         <View style={[styles.statusPill, { backgroundColor: statusColor + '22' }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {order.status.replace(/_/g, ' ')}
+            {statusLabel}
           </Text>
         </View>
         <Text style={styles.partnerName}>{order.partnerName ?? 'Awaiting pharmacy assignment'}</Text>
