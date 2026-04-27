@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { USE_SEED, getSeedDashboardStats, getSeedConsultationsList } from '@/lib/seed-data';
+import { USE_SEED, getSeedDashboardStats } from '@/lib/seed-data';
 
 interface RecentConsultation {
   id: string;
@@ -115,13 +115,11 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const recentConsultations: RecentConsultation[] = USE_SEED
-    ? (getSeedConsultationsList().slice(0, 5) as unknown as RecentConsultation[])
-    : (stats?.recentConsultations ?? []);
+  const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
   const fetchData = useCallback(() => {
     if (USE_SEED) {
-      setStats({ ...(getSeedDashboardStats() as any), recentConsultations: [] });
+      setStats(getSeedDashboardStats());
       setLoading(false);
       return;
     }

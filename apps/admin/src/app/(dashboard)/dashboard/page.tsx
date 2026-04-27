@@ -35,6 +35,12 @@ interface RecentBooking {
   serviceCategory?: { name: string };
 }
 
+function formatBookingMode(mode: string): string {
+  if (mode === 'HOME_VISIT') return '🏠 Home';
+  if (mode === 'VIDEO_CONSULTATION') return '🎥 Video';
+  return '🏥 Clinic';
+}
+
 const REFRESH_INTERVAL_MS = 30_000;
 
 export default function DashboardPage() {
@@ -240,7 +246,7 @@ export default function DashboardPage() {
                     <td className="px-5 py-3 text-sm text-gray-600">{booking.provider?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm text-gray-600">{booking.serviceCategory?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm">
-                      {booking.mode === 'HOME_VISIT' ? '🏠 Home' : booking.mode === 'VIDEO_CONSULTATION' ? '🎥 Video' : '🏥 Clinic'}
+                      {formatBookingMode(booking.mode)}
                     </td>
                     <td className="px-5 py-3"><StatusBadge status={booking.status} /></td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{booking.totalFee}</td>

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { DiagnosticStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
@@ -315,7 +316,16 @@ export class ProvidersService {
     return 'scheduled';
   }
 
-  private mapBookingToConsultation(booking: any) {
+  private mapBookingToConsultation(
+    booking: Prisma.BookingGetPayload<{
+      include: {
+        patient: true;
+        consultationSummary: { include: { prescriptions: true } };
+        diagnosticRequests: true;
+        videoSession: true;
+      };
+    }>,
+  ) {
     const dob = booking.patient?.dateOfBirth as Date | null | undefined;
     const patientAge = dob
       ? Math.floor(
@@ -404,7 +414,7 @@ export class ProvidersService {
       this.prisma.diagnosticRequest.count({
         where: {
           booking: { providerId: profile.id },
-          status: { notIn: ['RESULTED'] as any },
+          status: { notIn: [DiagnosticStatus.RESULTED] },
         },
       }),
       this.prisma.booking.findMany({
