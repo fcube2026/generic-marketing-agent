@@ -162,6 +162,8 @@ export default function OrderTrackingPage() {
   const [combinedTotal, setCombinedTotal] = useState(0);
   const [medicineTotal, setMedicineTotal] = useState(0);
   const [prescriptionTotal, setPrescriptionTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [selected, setSelected] = useState<TrackingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -172,8 +174,8 @@ export default function OrderTrackingPage() {
     try {
       const params: Record<string, string | number> = {
         flow,
-        page: 1,
-        limit: 200,
+        page,
+        limit: PAGE_SIZE,
       };
 
       if (status !== 'ALL') params.status = status;
@@ -202,7 +204,13 @@ export default function OrderTrackingPage() {
     } finally {
       setLoading(false);
     }
-  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate, selected]);
+  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate, page, selected]);
+
+  // Reset to first page whenever filters or flow change so users don't end up
+  // on an out-of-range page after the dataset shrinks.
+  useEffect(() => {
+    setPage(1);
+  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate]);
 
   useEffect(() => {
     void fetchOrders();
@@ -420,6 +428,40 @@ export default function OrderTrackingPage() {
                   ))}
                 </tbody>
               </table>
+              {total > PAGE_SIZE && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 text-sm text-gray-600">
+                  <span>
+                    Showing {(page - 1) * PAGE_SIZE + 1}
+                    {'–'}
+                    {Math.min(page * PAGE_SIZE, total)} of {total}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1 || loading}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-gray-500">
+                      Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) =>
+                          Math.min(Math.max(1, Math.ceil(total / PAGE_SIZE)), p + 1),
+                        )
+                      }
+                      disabled={page >= Math.ceil(total / PAGE_SIZE) || loading}
+                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>
