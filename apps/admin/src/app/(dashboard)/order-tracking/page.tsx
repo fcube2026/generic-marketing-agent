@@ -159,6 +159,7 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<TrackingOrder[]>([]);
   const [total, setTotal] = useState(0);
+  const [combinedTotal, setCombinedTotal] = useState(0);
   const [selected, setSelected] = useState<TrackingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -205,6 +206,48 @@ export default function OrderTrackingPage() {
     void fetchOrders();
   }, [fetchOrders]);
 
+  // Fetch combined total across both Medicine and Prescription flows so the
+  // "Total Orders" stat reflects the sum regardless of which flow tab is active.
+  // Other filters (status, payment, patient, dates) are still respected.
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildParams = (flowValue: FlowFilter): Record<string, string | number> => {
+      const params: Record<string, string | number> = {
+        flow: flowValue,
+        page: 1,
+        limit: 1,
+      };
+      if (status !== 'ALL') params.status = status;
+      if (paymentStatus !== 'ALL') params.paymentStatus = paymentStatus;
+      if (patientQuery.trim()) params.patientQuery = patientQuery.trim();
+      if (fromDate) params.fromDate = fromDate;
+      if (toDate) params.toDate = toDate;
+      return params;
+    };
+
+    const fetchCombinedTotal = async () => {
+      try {
+        const [medicineRes, prescriptionRes] = await Promise.all([
+          api.get<TrackingResponse>('/admin/orders/tracking', { params: buildParams('MEDICINE') }),
+          api.get<TrackingResponse>('/admin/orders/tracking', { params: buildParams('PRESCRIPTION') }),
+        ]);
+        if (cancelled) return;
+        const medicineTotal = medicineRes.data.total || 0;
+        const prescriptionTotal = prescriptionRes.data.total || 0;
+        setCombinedTotal(medicineTotal + prescriptionTotal);
+      } catch {
+        if (!cancelled) setCombinedTotal(0);
+      }
+    };
+
+    void fetchCombinedTotal();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, paymentStatus, patientQuery, fromDate, toDate]);
+
   const flowCounts = useMemo(() => {
     const medicineCount = orders.filter((order) => order.flow === 'MEDICINE').length;
     const prescriptionCount = orders.filter((order) => order.flow === 'PRESCRIPTION').length;
@@ -223,7 +266,7 @@ export default function OrderTrackingPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="Total Orders" value={total} icon="📦" />
+        <StatCard label="Total Orders" value={combinedTotal} icon="📦" />
         <StatCard label="Medicine Orders (Current View)" value={flowCounts.medicineCount} icon="💊" />
         <StatCard label="Prescription Orders (Current View)" value={flowCounts.prescriptionCount} icon="🧾" />
       </div>
