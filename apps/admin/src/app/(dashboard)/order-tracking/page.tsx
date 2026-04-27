@@ -173,7 +173,7 @@ export default function OrderTrackingPage() {
       const params: Record<string, string | number> = {
         flow,
         page: 1,
-        limit: 25,
+        limit: 200,
       };
 
       if (status !== 'ALL') params.status = status;
