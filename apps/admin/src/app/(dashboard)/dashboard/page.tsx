@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { StatCard } from '@/components/ui/Card';
 import MiniBarChart from '@/components/ui/MiniBarChart';
 import StatusBreakdownChart from '@/components/ui/StatusBreakdownChart';
+import { StatusBadge } from '@/components/ui/Badge';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -23,11 +24,23 @@ interface DashboardCharts {
   earningsPerDay: Record<string, number>;
 }
 
+interface RecentBooking {
+  id: string;
+  mode: string;
+  status: string;
+  totalFee: number;
+  createdAt: string;
+  patient?: { name: string };
+  provider?: { name: string };
+  serviceCategory?: { name: string };
+}
+
 const REFRESH_INTERVAL_MS = 30_000;
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [charts, setCharts] = useState<DashboardCharts | null>(null);
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -64,12 +77,18 @@ export default function DashboardPage() {
           },
         };
       }),
+      api.get('/admin/bookings?page=1&limit=5').catch((err) => {
+        if (err?.response?.status === 401) throw err;
+        console.error('[Dashboard] /admin/bookings error:', err?.response?.status, err?.message);
+        return { data: { data: [] } };
+      }),
     ])
-      .then(([statsRes, chartsRes]) => {
+      .then(([statsRes, chartsRes, bookingsRes]) => {
         console.log('[Dashboard] Stats response:', statsRes.data);
         console.log('[Dashboard] Charts response:', chartsRes.data);
         setStats(statsRes.data);
         setCharts(chartsRes.data);
+        setRecentBookings(bookingsRes.data?.data ?? []);
         setLastUpdated(new Date());
       })
       .finally(() => {
@@ -185,6 +204,59 @@ export default function DashboardPage() {
           <StatusBreakdownChart data={stats.bookingsByStatus} />
         </div>
       )}
+
+      {/* Recent Bookings */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
+          <Link href="/bookings" className="text-sm text-primary font-medium hover:underline">
+            View all →
+          </Link>
+        </div>
+        {recentBookings.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center text-gray-400">
+            <p className="text-3xl mb-3">📋</p>
+            <p className="font-medium">No bookings yet</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-left">Patient</th>
+                  <th className="px-5 py-3 text-left">Provider</th>
+                  <th className="px-5 py-3 text-left">Service</th>
+                  <th className="px-5 py-3 text-left">Mode</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-left">Fee</th>
+                  <th className="px-5 py-3 text-left">Date</th>
+                  <th className="px-5 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentBookings.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-gray-50 transition">
+                    <td className="px-5 py-3 text-sm font-medium text-gray-900">{booking.patient?.name || '—'}</td>
+                    <td className="px-5 py-3 text-sm text-gray-600">{booking.provider?.name || '—'}</td>
+                    <td className="px-5 py-3 text-sm text-gray-600">{booking.serviceCategory?.name || '—'}</td>
+                    <td className="px-5 py-3 text-sm">
+                      {booking.mode === 'HOME_VISIT' ? '🏠 Home' : booking.mode === 'VIDEO_CONSULTATION' ? '🎥 Video' : '🏥 Clinic'}
+                    </td>
+                    <td className="px-5 py-3"><StatusBadge status={booking.status} /></td>
+                    <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{booking.totalFee}</td>
+                    <td className="px-5 py-3 text-sm text-gray-500">{new Date(booking.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3">
+                      <Link href={`/bookings/${booking.id}`} className="text-primary text-sm font-medium hover:underline">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

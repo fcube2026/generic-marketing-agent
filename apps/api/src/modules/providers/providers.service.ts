@@ -305,6 +305,42 @@ export class ProvidersService {
     });
   }
 
+  private mapBookingStatus(
+    status: string,
+  ): 'scheduled' | 'in_progress' | 'completed' | 'cancelled' {
+    if (['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(status))
+      return 'completed';
+    if (status === 'IN_PROGRESS') return 'in_progress';
+    if (['DECLINED', 'CANCELLED'].includes(status)) return 'cancelled';
+    return 'scheduled';
+  }
+
+  private mapBookingToConsultation(booking: any) {
+    const dob = booking.patient?.dateOfBirth as Date | null | undefined;
+    const patientAge = dob
+      ? Math.floor(
+          (Date.now() - new Date(dob).getTime()) /
+            (1000 * 60 * 60 * 24 * 365.25),
+        )
+      : undefined;
+    return {
+      id: booking.id,
+      patientName: booking.patient?.name ?? 'Unknown',
+      patientUHID: booking.patient?.id ?? null,
+      patientAge,
+      patientGender: booking.patient?.gender ?? null,
+      scheduledAt: booking.scheduledAt,
+      status: this.mapBookingStatus(booking.status),
+      type: booking.mode,
+      chiefComplaint:
+        booking.consultationSummary?.symptoms ?? booking.symptoms ?? null,
+      diagnosis: booking.consultationSummary?.diagnosis ?? null,
+      prescription: booking.consultationSummary?.prescriptions ?? [],
+      labReports: booking.diagnosticRequests ?? [],
+      videoSession: booking.videoSession ?? null,
+    };
+  }
+
   async getDashboard(userId: string) {
     const profile = await this.prisma.providerProfile.findUnique({
       where: { userId },
@@ -316,41 +352,85 @@ export class ProvidersService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayConsultations, upcoming, completed, earnings] =
-      await Promise.all([
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            scheduledAt: { gte: today, lt: tomorrow },
-          },
-        }),
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            status: { in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED'] },
-            scheduledAt: { gte: today },
-          },
-        }),
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-          },
-        }),
-        this.prisma.booking.aggregate({
-          where: {
-            providerId: profile.id,
-            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-          },
-          _sum: { totalFee: true },
-        }),
-      ]);
+    const [
+      todayConsultations,
+      upcomingConsultations,
+      inProgressConsultations,
+      completedConsultations,
+      earnings,
+      totalPatients,
+      pendingLabReports,
+      recentBookingsRaw,
+    ] = await Promise.all([
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          scheduledAt: { gte: today, lt: tomorrow },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: { in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED'] },
+          scheduledAt: { gte: today },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: 'IN_PROGRESS',
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+      }),
+      this.prisma.booking.aggregate({
+        where: {
+          providerId: profile.id,
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+        _sum: { totalFee: true },
+      }),
+      this.prisma.booking
+        .findMany({
+          where: { providerId: profile.id },
+          select: { patientId: true },
+          distinct: ['patientId'],
+        })
+        .then((rows) => rows.length),
+      this.prisma.diagnosticRequest.count({
+        where: {
+          booking: { providerId: profile.id },
+          status: { notIn: ['RESULTED'] as any },
+        },
+      }),
+      this.prisma.booking.findMany({
+        where: { providerId: profile.id },
+        include: {
+          patient: true,
+          consultationSummary: { include: { prescriptions: true } },
+          diagnosticRequests: true,
+          videoSession: true,
+        },
+        orderBy: { scheduledAt: 'desc' },
+        take: 5,
+      }),
+    ]);
 
     return {
       todayConsultations,
-      upcoming,
-      completed,
+      upcomingConsultations,
+      inProgressConsultations,
+      completedConsultations,
       totalEarnings: earnings._sum.totalFee || 0,
+      totalPatients,
+      pendingLabReports,
+      recentConsultations: recentBookingsRaw.map((b) =>
+        this.mapBookingToConsultation(b),
+      ),
     };
   }
 
@@ -360,16 +440,20 @@ export class ProvidersService {
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
-    return this.prisma.booking.findMany({
+    const bookings = await this.prisma.booking.findMany({
       where: { providerId: profile.id },
       include: {
-        patient: { include: { user: true } },
-        serviceCategory: true,
-        consultationSummary: true,
+        patient: true,
+        consultationSummary: { include: { prescriptions: true } },
+        diagnosticRequests: true,
         videoSession: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
+
+    return {
+      consultations: bookings.map((b) => this.mapBookingToConsultation(b)),
+    };
   }
 
   async getPatients(userId: string) {
