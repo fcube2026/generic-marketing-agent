@@ -595,50 +595,49 @@ export class PharmacyOrderService {
       where.AND = andConditions;
     }
 
-    const [orders, total] = await Promise.all([
-      this.prisma.pharmacyOrder.findMany({
-        where,
-        include: {
-          items: true,
-          deliveryAddress: true,
-          pharmacyPartner: true,
-          patientProfile: {
-            select: {
-              name: true,
-              user: {
-                select: {
-                  phone: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          statusHistory: {
-            orderBy: { timestamp: 'asc' },
-          },
-          uploadedPrescription: {
-            select: {
-              status: true,
-              reviewNotes: true,
-              reviewedBy: true,
-              reviewLogs: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-                select: {
-                  createdAt: true,
-                  performedBy: true,
-                  action: true,
-                },
+    const orders = await this.prisma.pharmacyOrder.findMany({
+      where,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+        patientProfile: {
+          select: {
+            name: true,
+            user: {
+              select: {
+                phone: true,
+                email: true,
               },
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.pharmacyOrder.count({ where }),
-    ]);
+        statusHistory: {
+          orderBy: { timestamp: 'asc' },
+        },
+        uploadedPrescription: {
+          select: {
+            status: true,
+            reviewNotes: true,
+            reviewedBy: true,
+            reviewLogs: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                createdAt: true,
+                performedBy: true,
+                action: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const total = await this.prisma.pharmacyOrder.count({ where });
 
     const actorIds = new Set<string>();
     orders.forEach((order) => {
