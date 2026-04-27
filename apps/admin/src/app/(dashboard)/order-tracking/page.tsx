@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Badge from '@/components/ui/Badge';
 import Card, { StatCard } from '@/components/ui/Card';
 import api from '@/lib/api';
@@ -160,6 +160,8 @@ export default function OrderTrackingPage() {
   const [orders, setOrders] = useState<TrackingOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [combinedTotal, setCombinedTotal] = useState(0);
+  const [medicineTotal, setMedicineTotal] = useState(0);
+  const [prescriptionTotal, setPrescriptionTotal] = useState(0);
   const [selected, setSelected] = useState<TrackingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,11 +235,17 @@ export default function OrderTrackingPage() {
           api.get<TrackingResponse>('/admin/orders/tracking', { params: buildParams('PRESCRIPTION') }),
         ]);
         if (cancelled) return;
-        const medicineTotal = medicineRes.data.total || 0;
-        const prescriptionTotal = prescriptionRes.data.total || 0;
-        setCombinedTotal(medicineTotal + prescriptionTotal);
+        const medTotal = medicineRes.data.total || 0;
+        const presTotal = prescriptionRes.data.total || 0;
+        setMedicineTotal(medTotal);
+        setPrescriptionTotal(presTotal);
+        setCombinedTotal(medTotal + presTotal);
       } catch {
-        if (!cancelled) setCombinedTotal(0);
+        if (!cancelled) {
+          setMedicineTotal(0);
+          setPrescriptionTotal(0);
+          setCombinedTotal(0);
+        }
       }
     };
 
@@ -247,12 +255,6 @@ export default function OrderTrackingPage() {
       cancelled = true;
     };
   }, [status, paymentStatus, patientQuery, fromDate, toDate]);
-
-  const flowCounts = useMemo(() => {
-    const medicineCount = orders.filter((order) => order.flow === 'MEDICINE').length;
-    const prescriptionCount = orders.filter((order) => order.flow === 'PRESCRIPTION').length;
-    return { medicineCount, prescriptionCount };
-  }, [orders]);
 
   return (
     <div className="space-y-6" data-testid="order-tracking-page">
@@ -267,8 +269,8 @@ export default function OrderTrackingPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard label="Total Orders" value={combinedTotal} icon="📦" />
-        <StatCard label="Medicine Orders (Current View)" value={flowCounts.medicineCount} icon="💊" />
-        <StatCard label="Prescription Orders (Current View)" value={flowCounts.prescriptionCount} icon="🧾" />
+        <StatCard label="Medicine Orders" value={medicineTotal} icon="💊" />
+        <StatCard label="Prescription Orders" value={prescriptionTotal} icon="🧾" />
       </div>
 
       <Card>
