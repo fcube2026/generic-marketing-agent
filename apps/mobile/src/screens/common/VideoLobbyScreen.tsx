@@ -88,7 +88,7 @@ export const VideoLobbyScreen: React.FC = () => {
 
   useEffect(() => {
     // Pulse animation for camera preview
-    Animated.loop(
+    const cameraLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(cameraAnim, {
           toValue: 1,
@@ -103,11 +103,12 @@ export const VideoLobbyScreen: React.FC = () => {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+    cameraLoop.start();
 
     // Mic bar animations
-    micBars.forEach((bar, i) => {
-      Animated.loop(
+    const micLoops = micBars.map((bar, i) => {
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.delay(i * 120),
           Animated.timing(bar, {
@@ -123,8 +124,15 @@ export const VideoLobbyScreen: React.FC = () => {
             useNativeDriver: true,
           }),
         ]),
-      ).start();
+      );
+      loop.start();
+      return loop;
     });
+
+    return () => {
+      cameraLoop.stop();
+      micLoops.forEach((loop) => loop.stop());
+    };
   }, [cameraAnim, micBars]);
 
   // Run real permission and network checks
