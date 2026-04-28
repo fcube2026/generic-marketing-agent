@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
@@ -49,7 +50,7 @@ export class VideoSessionsService {
       select: { startedAt: true, status: true, roomId: true },
     });
 
-    const roomId = existing?.roomId ?? `curex24-${bookingId}`;
+    const roomId = existing?.roomId ?? `room-${randomUUID()}`;
     const nextStatus = isProvider
       ? 'IN_PROGRESS'
       : existing?.status === 'IN_PROGRESS'
@@ -73,7 +74,6 @@ export class VideoSessionsService {
             : existing?.startedAt,
       },
     });
-
 
     if (nextStatus === 'IN_PROGRESS' && booking.status !== 'IN_PROGRESS') {
       const updatedBooking = await this.prisma.booking.update({
@@ -124,13 +124,15 @@ export class VideoSessionsService {
       },
     });
 
-    // Mark the booking itself as COMPLETED so both sides see the consultation end
-    const updatedBooking = await this.prisma.booking.update({
-      where: { id: bookingId },
-      data: { status: 'COMPLETED' },
-    });
+    // Mark the booking itself as COMPLETED only if it's a video consultation
+    if (booking.mode === 'VIDEO_CONSULTATION') {
+      const updatedBooking = await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'COMPLETED' },
+      });
+      await this.supabaseSync.syncBooking(updatedBooking);
+    }
 
-    await this.supabaseSync.syncBooking(updatedBooking);
     await this.supabaseSync.syncVideoSession(updated);
     return updated;
   }

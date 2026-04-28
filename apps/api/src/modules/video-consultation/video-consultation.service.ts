@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
@@ -72,7 +73,7 @@ export class VideoConsultationService {
     });
     if (existing) return existing;
 
-    const roomId = `mock-room-${bookingId}`;
+    const roomId = `room-${randomUUID()}`;
 
     const session = await this.prisma.videoSession.create({
       data: {

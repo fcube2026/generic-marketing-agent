@@ -37,6 +37,12 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: getBundleId(),
+    infoPlist: {
+      NSCameraUsageDescription: 'Allow Curex24 to access your camera for video consultations and document upload.',
+      NSPhotoLibraryUsageDescription: 'Allow Curex24 to access your photos for document upload.',
+      NSPhotoLibraryAddUsageDescription: 'Allow Curex24 to save photos to your library.',
+      UIBackgroundModes: ['remote-notification'],
+    },
   },
   android: {
     icon: './assets/icon.png',
@@ -45,6 +51,13 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       backgroundColor: '#0D9488',
     },
     package: getBundleId(),
+    permissions: [
+      'android.permission.CAMERA',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.READ_MEDIA_IMAGES',
+    ],
+    useNextNotificationsApi: true,
   },
   extra: {
     appEnv: process.env.APP_ENV || 'development',
@@ -63,5 +76,6 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
         photosPermission: 'Allow Curex24 to access your photos for document upload.',
       },
     ],
+    'expo-notifications',
   ],
 });

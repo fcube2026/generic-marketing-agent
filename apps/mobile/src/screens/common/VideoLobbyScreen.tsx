@@ -15,6 +15,8 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -42,6 +44,7 @@ export const VideoLobbyScreen: React.FC = () => {
   const route = useRoute<RouteProp<{ VideoLobby: VideoLobbyParams }, 'VideoLobby'>>();
   const { bookingId } = route.params;
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore(state => state.user);
 
   // Permissions hooks
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -113,12 +116,9 @@ export const VideoLobbyScreen: React.FC = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
-        // Fetch a small asset to measure latency
-        await fetch(NETWORK_CHECK_URL, { 
-          signal: controller.signal, 
-          method: 'HEAD', 
-          cache: 'no-store' 
-        });
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        await api.head('/health', { signal: controller.signal });
         
         clearTimeout(timeoutId);
         const latency = Date.now() - start;
@@ -139,7 +139,7 @@ export const VideoLobbyScreen: React.FC = () => {
 
     runChecks();
     return () => clearInterval(interval);
-  }, [cameraPermission]);
+  }, [cameraPermission, micPermissionResponse]);
 
   const updateCheck = (id: string, status: CheckStatus, message?: string) => {
     setChecks(prev => prev.map(c => c.id === id ? { ...c, status, message } : c));
@@ -194,8 +194,8 @@ export const VideoLobbyScreen: React.FC = () => {
       await bookingService.startVideoSession(bookingId).catch(() => undefined);
 
       // 2. Build the Jitsi URL
-      const roomName = `curex24-${bookingId}`;
-      const isProvider = navigation.getState()?.routeNames?.includes('ConsultationForm') || false; 
+      const { roomId } = await bookingService.getVideoToken(bookingId);
+      const isProvider = booking?.provider?.userId === currentUser?.id; 
       const displayName = isProvider ? 'Doctor' : 'Patient';
       
       // Jitsi config parameters for audio-only and prejoin bypass
@@ -205,7 +205,7 @@ export const VideoLobbyScreen: React.FC = () => {
         audioOnly ? 'config.startAudioOnly=true' : 'config.startVideoMuted=false'
       ].join('&');
 
-      const jitsiUrl = `https://meet.jit.si/${roomName}#${config}`;
+      const jitsiUrl = `https://meet.jit.si/${roomId}#${config}`;
 
       // 3. Open in Browser
       const supported = await Linking.canOpenURL(jitsiUrl);
@@ -239,15 +239,20 @@ export const VideoLobbyScreen: React.FC = () => {
           onPress: async () => {
             setJoining(true);
             try {
-              await bookingService.endVideoSession(bookingId).catch(() => undefined);
+              const response = await bookingService.endVideoSession(bookingId).catch(() => undefined);
               
-              const isProvider = navigation.getState()?.routeNames?.includes('ConsultationForm') || false;
+              const isProvider = booking?.provider?.userId === currentUser?.id;
               
               // Calculate duration
-              const now = Date.now();
-              const start = callStartTime || now;
-              const durationMs = now - start;
-              const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+              let durationMinutes = 1;
+              if (response && response.duration != null) {
+                durationMinutes = Math.max(1, Math.round(response.duration / 60));
+              } else {
+                const now = Date.now();
+                const start = callStartTime || now;
+                const durationMs = now - start;
+                durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+              }
 
               navigation.replace('PostCall', { 
                 bookingId, 

@@ -12,11 +12,16 @@ import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
+import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
+import { bookingService } from '../../services/bookingService';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type Route = RouteProp<PatientStackParamList, 'PostCall'>;
+type CombinedParamList = PatientStackParamList & ProviderStackParamList;
+type Nav = NativeStackNavigationProp<CombinedParamList>;
+type Route = RouteProp<CombinedParamList, 'PostCall'>;
 
 export const PostCallScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { bookingId, durationMinutes, isProvider } = route.params;
   const [rating, setRating] = useState(0);
@@ -34,11 +39,15 @@ export const PostCallScreen: React.FC = () => {
     setRating(score);
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    if (rating > 0) {
+      await bookingService.submitRating(bookingId, rating).catch(() => undefined);
+    }
+    
     if (isProvider) {
       navigation.navigate('ConsultationForm', { bookingId });
     } else {
-      navigation.navigate('Tabs');
+      navigation.navigate('Tabs', { screen: 'Home' });
     }
   };
 

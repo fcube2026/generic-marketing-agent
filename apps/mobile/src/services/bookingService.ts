@@ -102,4 +102,10 @@ export const bookingService = {
     const r = await api.post(`/video-sessions/${bookingId}/end`);
     return r.data;
   },
+
+  submitRating: async (bookingId: string, rating: number) => {
+    // Mock endpoint for rating submission
+    const r = await api.post(`/bookings/${bookingId}/rating`, { rating });
+    return r.data;
+  },
 };

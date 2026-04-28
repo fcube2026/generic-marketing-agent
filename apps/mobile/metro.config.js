@@ -29,6 +29,7 @@ config.resolver.blockList = [
   new RegExp(path.resolve(monorepoRoot, 'apps/admin').replace(/\\/g, '\\\\') + '/.*'),
   new RegExp(path.resolve(monorepoRoot, 'apps/api').replace(/\\/g, '\\\\') + '/.*'),
   new RegExp(path.resolve(monorepoRoot, 'apps/doctor-portal').replace(/\\/g, '\\\\') + '/.*'),
+  new RegExp(path.resolve(monorepoRoot, 'apps/marketing-agent').replace(/\\/g, '\\\\') + '/.*'),
   new RegExp(path.resolve(monorepoRoot, 'packages').replace(/\\/g, '\\\\') + '/(?!design-tokens).*'),
 ];
 config.resolver.disableHierarchicalLookup = true;
