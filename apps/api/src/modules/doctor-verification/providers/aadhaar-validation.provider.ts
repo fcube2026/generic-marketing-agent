@@ -39,9 +39,11 @@ export class AadhaarValidationProvider {
   }
 
   private mockValidate(aadhaarNumber: string): AadhaarValidationResult {
-    const masked = `${aadhaarNumber.slice(0, 4)}XXXX${aadhaarNumber.slice(-4)}`;
-    this.logger.log(`[aadhaar-mock] Validating Aadhaar: ${masked}`);
     const valid = /^\d{12}$/.test(aadhaarNumber);
+    const masked = valid
+      ? `${aadhaarNumber.slice(0, 4)}XXXX${aadhaarNumber.slice(-4)}`
+      : '****XXXX****';
+    this.logger.log(`[aadhaar-mock] Validating Aadhaar: ${masked}`);
     return {
       valid,
       aadhaarNumber: valid ? aadhaarNumber : undefined,
@@ -58,7 +60,9 @@ export class AadhaarValidationProvider {
       );
     }
 
-    const masked = `${aadhaarNumber.slice(0, 4)}XXXX${aadhaarNumber.slice(-4)}`;
+    const masked = /^\d{12}$/.test(aadhaarNumber)
+      ? `${aadhaarNumber.slice(0, 4)}XXXX${aadhaarNumber.slice(-4)}`
+      : '****XXXX****';
     this.logger.log(`[aadhaar] Validating Aadhaar: ${masked}`);
 
     const controller = new AbortController();

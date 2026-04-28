@@ -214,8 +214,14 @@ export const KycScreen: React.FC = () => {
       return;
     }
     const yearVal = yearOfAdmission.trim();
+    const currentYear = new Date().getFullYear();
     if (!yearVal || !/^\d{4}$/.test(yearVal)) {
       Alert.alert('Required', 'Please enter a valid 4-digit year of registration.');
+      return;
+    }
+    const yearNum = parseInt(yearVal, 10);
+    if (yearNum < 1950 || yearNum > currentYear) {
+      Alert.alert('Invalid Year', `Year of registration must be between 1950 and ${currentYear}.`);
       return;
     }
     setWizardStep(3);
