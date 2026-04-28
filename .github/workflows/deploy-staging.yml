@@ -702,3 +702,82 @@ jobs:
           echo "| Service | URL | Platform |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-----|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| Doctor Portal | https://doctor.staging.curex24.com | Vercel |" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────
+  # Publish OTA update to EAS staging channel (Expo Updates)
+  # ────────────────────────────────────────────────────────────
+  deploy-mobile:
+    name: Publish OTA Update → EAS (staging channel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test]
+    permissions:
+      contents: read
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check if EXPO_TOKEN is configured
+        id: check-secrets
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ EXPO_TOKEN not configured — skipping EAS mobile update"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm add -g eas-cli
+
+      - name: Publish OTA update to staging channel
+        if: steps.check-secrets.outputs.skip != 'true'
+        id: eas-update
+        run: |
+          cd apps/mobile
+          eas update \
+            --branch staging \
+            --message "Staging update: ${{ github.sha }}" \
+            --non-interactive \
+            --json \
+            | tee /tmp/eas-update-output.json
+        env:
+          APP_ENV: staging
+          EXPO_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+          EXPO_PUBLIC_SUPABASE_URL: https://ksmufpryzrozpqdejlwa.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbXVmcHJ5enJvenBxZGVqbHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjM2NzQsImV4cCI6MjA5MTQ5OTY3NH0.3-9mv7NkaL3J5b1kmC6SJRX-U6MQONkpuI_SoyDa3TU
+
+      - name: Mobile staging deploy summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## ✅ Mobile OTA Update Published (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Channel | \`staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| EAS Dashboard | https://expo.dev/accounts/curex24/projects/curex24/updates |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Includes:** Video consultation screens (patient + provider), VideoLobbyScreen" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Install the latest staging build from EAS then open the app to receive this update." >> $GITHUB_STEP_SUMMARY
