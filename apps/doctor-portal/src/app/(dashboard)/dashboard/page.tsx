@@ -114,6 +114,7 @@ const quickActions = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [doctorName, setDoctorName] = useState('Doctor');
 
   const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
@@ -123,9 +124,16 @@ export default function DashboardPage() {
       setLoading(false);
       return;
     }
-    api
-      .get('/providers/me/dashboard')
-      .then((res) => setStats(res.data))
+    Promise.all([
+      api.get('/providers/me/dashboard'),
+      api.get('/providers/me'),
+    ])
+      .then(([dashRes, profileRes]) => {
+        setStats(dashRes.data);
+        if (profileRes.data?.name) {
+          setDoctorName(profileRes.data.name);
+        }
+      })
       .catch((err) => {
         if (err?.response?.status !== 401) {
           console.error('[Doctor Dashboard] Error:', err?.message);
@@ -156,7 +164,7 @@ export default function DashboardPage() {
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="page-title">Good morning, Dr. Arjun 👋</h1>
+          <h1 className="page-title">Good morning, {doctorName} 👋</h1>
           <p className="page-subtitle">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
