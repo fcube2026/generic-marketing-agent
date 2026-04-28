@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Badge from '@/components/ui/Badge';
 import Card, { StatCard } from '@/components/ui/Card';
 import api from '@/lib/api';
@@ -160,38 +160,60 @@ export default function OrderTrackingPage() {
   const [orders, setOrders] = useState<TrackingOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [combinedTotal, setCombinedTotal] = useState(0);
+  const [medicineTotal, setMedicineTotal] = useState(0);
+  const [prescriptionTotal, setPrescriptionTotal] = useState(0);
   const [selected, setSelected] = useState<TrackingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Page size used per backend request. We loop pages until all rows for the
+  // current filter are fetched, so the table reflects the full dataset and the
+  // stat cards always match the rendered rows.
+  const FETCH_PAGE_SIZE = 200;
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const params: Record<string, string | number> = {
+      const baseParams: Record<string, string | number> = {
         flow,
-        page: 1,
-        limit: 25,
+        limit: FETCH_PAGE_SIZE,
       };
+      if (status !== 'ALL') baseParams.status = status;
+      if (paymentStatus !== 'ALL') baseParams.paymentStatus = paymentStatus;
+      if (patientQuery.trim()) baseParams.patientQuery = patientQuery.trim();
+      if (fromDate) baseParams.fromDate = fromDate;
+      if (toDate) baseParams.toDate = toDate;
 
-      if (status !== 'ALL') params.status = status;
-      if (paymentStatus !== 'ALL') params.paymentStatus = paymentStatus;
-      if (patientQuery.trim()) params.patientQuery = patientQuery.trim();
-      if (fromDate) params.fromDate = fromDate;
-      if (toDate) params.toDate = toDate;
+      const collected: TrackingOrder[] = [];
+      let pageIndex = 1;
+      let knownTotal = 0;
 
-      const response = await api.get<TrackingResponse>('/admin/orders/tracking', {
-        params,
-      });
+      // Safety cap to avoid runaway loops; with FETCH_PAGE_SIZE=200 this allows
+      // up to 10,000 rows per filter, well above any near-term company volume.
+      const MAX_PAGES = 50;
 
-      const rows = Array.isArray(response.data.data) ? response.data.data : [];
-      setOrders(rows);
-      setTotal(response.data.total || 0);
+      // eslint-disable-next-line no-constant-condition
+      while (pageIndex <= MAX_PAGES) {
+        const response = await api.get<TrackingResponse>('/admin/orders/tracking', {
+          params: { ...baseParams, page: pageIndex },
+        });
+        const rows = Array.isArray(response.data.data) ? response.data.data : [];
+        collected.push(...rows);
+        knownTotal = response.data.total || collected.length;
+        if (rows.length < FETCH_PAGE_SIZE || collected.length >= knownTotal) {
+          break;
+        }
+        pageIndex += 1;
+      }
 
-      if (rows.length === 0) {
+      setOrders(collected);
+      setTotal(knownTotal);
+
+      if (collected.length === 0) {
         setSelected(null);
-      } else if (!selected || !rows.some((row) => row.id === selected.id)) {
-        setSelected(rows[0]);
+      } else if (!selected || !collected.some((row) => row.id === selected.id)) {
+        setSelected(collected[0]);
       }
     } catch {
       setOrders([]);
@@ -233,11 +255,17 @@ export default function OrderTrackingPage() {
           api.get<TrackingResponse>('/admin/orders/tracking', { params: buildParams('PRESCRIPTION') }),
         ]);
         if (cancelled) return;
-        const medicineTotal = medicineRes.data.total || 0;
-        const prescriptionTotal = prescriptionRes.data.total || 0;
-        setCombinedTotal(medicineTotal + prescriptionTotal);
+        const medTotal = medicineRes.data.total || 0;
+        const presTotal = prescriptionRes.data.total || 0;
+        setMedicineTotal(medTotal);
+        setPrescriptionTotal(presTotal);
+        setCombinedTotal(medTotal + presTotal);
       } catch {
-        if (!cancelled) setCombinedTotal(0);
+        if (!cancelled) {
+          setMedicineTotal(0);
+          setPrescriptionTotal(0);
+          setCombinedTotal(0);
+        }
       }
     };
 
@@ -247,12 +275,6 @@ export default function OrderTrackingPage() {
       cancelled = true;
     };
   }, [status, paymentStatus, patientQuery, fromDate, toDate]);
-
-  const flowCounts = useMemo(() => {
-    const medicineCount = orders.filter((order) => order.flow === 'MEDICINE').length;
-    const prescriptionCount = orders.filter((order) => order.flow === 'PRESCRIPTION').length;
-    return { medicineCount, prescriptionCount };
-  }, [orders]);
 
   return (
     <div className="space-y-6" data-testid="order-tracking-page">
@@ -267,8 +289,8 @@ export default function OrderTrackingPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard label="Total Orders" value={combinedTotal} icon="📦" />
-        <StatCard label="Medicine Orders (Current View)" value={flowCounts.medicineCount} icon="💊" />
-        <StatCard label="Prescription Orders (Current View)" value={flowCounts.prescriptionCount} icon="🧾" />
+        <StatCard label="Medicine Orders" value={medicineTotal} icon="💊" />
+        <StatCard label="Prescription Orders" value={prescriptionTotal} icon="🧾" />
       </div>
 
       <Card>
@@ -373,9 +395,9 @@ export default function OrderTrackingPage() {
           ) : orders.length === 0 ? (
             <p className="text-sm text-gray-500">No orders found for the selected filters.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[600px] overflow-y-auto overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-gray-200 text-left text-gray-500">
                     <th className="pb-2 pr-3 font-medium">Order</th>
                     <th className="pb-2 pr-3 font-medium">Patient</th>
@@ -418,6 +440,11 @@ export default function OrderTrackingPage() {
                   ))}
                 </tbody>
               </table>
+              {total > 0 && (
+                <div className="sticky bottom-0 mt-2 border-t border-gray-100 bg-white py-2 text-xs text-gray-500">
+                  Showing {orders.length} of {total} {flow === 'MEDICINE' ? 'medicine' : 'prescription'} orders
+                </div>
+              )}
             </div>
           )}
         </Card>
