@@ -33,6 +33,7 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
     selectedService,
     selectedAddress,
     symptoms,
+    scheduledAt,
     setLastBookingId,
     setSelectedAddress,
   } = useBookingStore();
@@ -88,7 +89,7 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         serviceCategoryId: selectedService?.id || '',
         addressId: mode === 'HOME_VISIT' ? selectedAddress?.id : undefined,
         mode,
-        scheduledAt: new Date().toISOString(),
+        scheduledAt: (scheduledAt || new Date()).toISOString(),
         symptoms,
       });
 
@@ -158,6 +159,12 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
           <Text style={styles.label}>Mode</Text>
           <Text style={styles.value}>{getModeLabel(mode)}</Text>
         </View>
+        {mode === 'VIDEO_CONSULTATION' && (
+          <View style={styles.row}>
+            <Text style={styles.label}>Duration</Text>
+            <Text style={styles.value}>15 Minutes</Text>
+          </View>
+        )}
         {mode === 'HOME_VISIT' && selectedAddress && (
           <View style={styles.row}>
             <Text style={styles.label}>Address</Text>
@@ -168,7 +175,16 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         )}
         <View style={styles.row}>
           <Text style={styles.label}>Time</Text>
-          <Text style={styles.value}>Now</Text>
+          <Text style={styles.value}>
+            {scheduledAt 
+              ? scheduledAt.toLocaleString('en-IN', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }) 
+              : 'Now'}
+          </Text>
         </View>
         {symptoms ? (
           <View style={styles.row}>

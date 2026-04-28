@@ -93,8 +93,19 @@ export const bookingService = {
     return r.data as { token: string; roomId: string; role: string };
   },
 
+  startVideoSession: async (bookingId: string) => {
+    const r = await api.post(`/video-sessions/${bookingId}/start`);
+    return r.data;
+  },
+
   endVideoSession: async (bookingId: string) => {
     const r = await api.post(`/video-sessions/${bookingId}/end`);
+    return r.data;
+  },
+
+  submitRating: async (bookingId: string, rating: number) => {
+    // Mock endpoint for rating submission
+    const r = await api.post(`/bookings/${bookingId}/rating`, { rating });
     return r.data;
   },
 };

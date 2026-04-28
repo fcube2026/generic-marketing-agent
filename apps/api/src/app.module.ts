@@ -37,6 +37,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { PharmacyPartnersModule } from './modules/pharmacy-partners/pharmacy-partners.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
+import { SupabaseSyncModule } from './common/supabase/supabase-sync.module';
 
 @Module({
   controllers: [AppController],
@@ -47,6 +48,7 @@ import { HealthModule } from './common/health/health.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
+    SupabaseSyncModule,
     FeatureFlagsModule,
     QueueModule,
     SmsModule,

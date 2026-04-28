@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
@@ -36,6 +37,7 @@ export class BookingsService {
     private videoReminderService: VideoConsultationReminderService,
     private patientVerificationService: PatientVerificationService,
     private config: ConfigService,
+    private readonly supabaseSync: SupabaseSyncService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -200,6 +202,12 @@ export class BookingsService {
       },
     });
 
+    // Mirror to Supabase (best-effort). Sync FK-side rows first so the
+    // booking row's source mappings have a counterpart.
+    await this.supabaseSync.syncPatient(patientProfile);
+    await this.supabaseSync.syncProvider(provider);
+    await this.supabaseSync.syncBooking(booking);
+
     // Notify provider of new booking request with push and SMS
     const modeText =
       dto.mode === 'HOME_VISIT'
@@ -302,6 +310,8 @@ export class BookingsService {
       data: { status: dto.status },
     });
 
+    await this.supabaseSync.syncBooking(updated);
+
     await this.prisma.bookingStatusHistory.create({
       data: {
         bookingId,
@@ -392,7 +402,22 @@ export class BookingsService {
     return updated;
   }
 
+  private async assertBookingProvider(bookingId: string, userId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { provider: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.provider?.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can perform this action',
+      );
+    }
+  }
+
   async acceptBooking(bookingId: string, userId: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.ACCEPTED,
     });
@@ -440,6 +465,8 @@ export class BookingsService {
   }
 
   async declineBooking(bookingId: string, userId: string, reason?: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.DECLINED,
     });

@@ -10,6 +10,7 @@ import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge'
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { providerService } from '../../services/providerService';
 import { bookingService } from '../../services/bookingService';
+import { notificationService, Notification } from '../../services/notificationService';
 import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import { formatCurrency } from '../../utils/format';
 import { getCurrentLocation } from '../../utils/location';
@@ -31,6 +32,17 @@ export const HomeScreen: React.FC = () => {
     queryFn: bookingService.getProviderBookings,
     refetchInterval: 15000,
   });
+
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    enabled: !!profile,
+    queryFn: notificationService.getNotifications,
+    refetchInterval: 5000, // Poll every 5 seconds for reminders
+  });
+
+  const latestReminder = (notifications || []).find(
+    n => !n.isRead && n.type === 'VIDEO_CONSULTATION_REMINDER'
+  );
 
   const availabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
@@ -90,6 +102,24 @@ export const HomeScreen: React.FC = () => {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
+      {latestReminder && (
+        <TouchableOpacity
+          style={styles.reminderBanner}
+          onPress={() => {
+            notificationService.markAsRead(latestReminder.id);
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            if (latestReminder.metadata?.bookingId) {
+              navigation.navigate('VideoLobby', { bookingId: latestReminder.metadata.bookingId });
+            }
+          }}
+        >
+          <View style={styles.reminderContent}>
+            <Text style={styles.reminderTitle}>{latestReminder.title}</Text>
+            <Text style={styles.reminderMessage}>{latestReminder.message}</Text>
+          </View>
+          <Text style={styles.reminderAction}>JOIN ➔</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Welcome back,</Text>
@@ -102,6 +132,35 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* New Requests Section (Top Priority) */}
+      {pendingBookings.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🔔 New Requests</Text>
+            <Text style={styles.requestCount}>{pendingBookings.length} pending</Text>
+          </View>
+          {pendingBookings.map((booking) => (
+            <TouchableOpacity
+              key={booking.id}
+              style={styles.bookingAlert}
+              onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
+            >
+              <View style={styles.bookingAlertContent}>
+                <Text style={styles.bookingAlertPatient}>
+                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : '🏠 '}
+                  {booking.patient?.name || 'Patient'}
+                </Text>
+                <Text style={styles.bookingAlertService}>{booking.serviceCategory?.name}</Text>
+              </View>
+              <View style={styles.bookingAlertRight}>
+                <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
+                <Text style={styles.bookingAlertArrow}>→</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <Card style={styles.availabilityCard}>
         <Text style={styles.availabilityTitle}>
@@ -146,25 +205,6 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.videoCardArrow}>→</Text>
       </TouchableOpacity>
 
-      {pendingBookings.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔔 New Requests</Text>
-          {pendingBookings.map((booking) => (
-            <TouchableOpacity
-              key={booking.id}
-              style={styles.bookingAlert}
-              onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
-            >
-              <Text style={styles.bookingAlertText}>
-                {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
-                {booking.patient?.name || 'Patient'} — {booking.serviceCategory?.name}
-              </Text>
-              <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
       {todayBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
@@ -205,11 +245,28 @@ const styles = StyleSheet.create({
   statCard: { flex: 1 },
   statValue: { fontSize: 22, fontWeight: '800', color: Colors.text, marginBottom: 4 },
   statLabel: { fontSize: 11, color: Colors.textMuted },
-  section: { padding: 16, paddingTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
-  bookingAlert: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: Colors.warning },
-  bookingAlertText: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  bookingAlertFee: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  section: { padding: 16, paddingTop: 12 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  requestCount: { fontSize: 12, fontWeight: '600', color: Colors.warning, backgroundColor: '#FFFBEB', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  bookingAlert: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.warning,
+    elevation: 1,
+  },
+  bookingAlertContent: { flex: 1 },
+  bookingAlertPatient: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
+  bookingAlertService: { fontSize: 13, color: Colors.textMuted },
+  bookingAlertRight: { alignItems: 'flex-end', gap: 4 },
+  bookingAlertFee: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  bookingAlertArrow: { fontSize: 16, color: Colors.warning, fontWeight: 'bold' },
   bookingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.white, borderRadius: 10, padding: 14, marginBottom: 8, elevation: 2 },
   bookingItemLeft: {},
   bookingPatient: { fontSize: 15, fontWeight: '600', color: Colors.text },
@@ -241,4 +298,44 @@ const styles = StyleSheet.create({
   onboardingSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 22 },
   onboardingBtn: { backgroundColor: Colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
   onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
+  reminderBanner: {
+    backgroundColor: '#F59E0B',
+    margin: 16,
+    marginBottom: 0,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  reminderMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reminderAction: {
+    color: Colors.white,
+    fontWeight: '900',
+    fontSize: 14,
+    marginLeft: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
 });

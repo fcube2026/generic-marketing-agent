@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Alert, Linking,
+  SafeAreaView, Alert, Linking, RefreshControl,
 } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
@@ -31,26 +32,34 @@ const STATUS_ORDER_VIDEO = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED']
 export const BookingDetailScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
+  const queryClient = useQueryClient();
   const { bookingId } = route.params;
-  const [booking, setBooking] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  const {
+    data: booking,
+    isLoading: loading,
+    refetch,
+    isRefetching,
+  } = useQuery<any>({
+    queryKey: ['booking', bookingId],
+    queryFn: () => bookingService.getBookingById(bookingId),
+    refetchInterval: 10000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
+  });
 
   // Push provider location at intervals for active home-visit bookings
   useProviderLocationTracking(bookingId, booking?.status);
-
-  useEffect(() => {
-    bookingService.getBookingById(bookingId).then(data => {
-      setBooking(data);
-      setLoading(false);
-    });
-  }, [bookingId]);
 
   const updateStatus = async (newStatus: string) => {
     setUpdating(true);
     try {
       await bookingService.updateStatus(bookingId, newStatus);
-      setBooking((prev: any) => ({ ...prev, status: newStatus }));
+      // Refresh both this booking and any list views (provider + patient).
+      await queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
       if (newStatus === 'IN_PROGRESS') {
         navigation.navigate('ConsultationForm', { bookingId });
       }
@@ -69,6 +78,46 @@ export const BookingDetailScreen: React.FC = () => {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const invalidateAll = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+    queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
+  };
+
+  const handleAccept = async () => {
+    setUpdating(true);
+    try {
+      await bookingService.acceptBooking(bookingId);
+      await invalidateAll();
+    } catch {
+      Alert.alert('Error', 'Failed to accept booking.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDecline = () => {
+    Alert.alert('Decline Booking', 'Are you sure you want to decline this request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setUpdating(true);
+          try {
+            await bookingService.declineBooking(bookingId);
+            await invalidateAll();
+            navigation.goBack();
+          } catch {
+            Alert.alert('Error', 'Failed to decline booking.');
+          } finally {
+            setUpdating(false);
+          }
+        },
+      },
+    ]);
   };
 
   const openMaps = (address: string) => {
@@ -121,11 +170,18 @@ export const BookingDetailScreen: React.FC = () => {
   const STATUS_ORDER = isVideo ? STATUS_ORDER_VIDEO : STATUS_ORDER_HOME;
   const currentStep = STATUS_ORDER.indexOf(booking.status);
 
-  const getNextAction = () => {
+  const getNextAction = (): { 
+    label: string; 
+    next?: string; 
+    nav?: 'VideoLobby' | 'ConsultationForm' | 'SafetyChecklist' | 'VisitOtp';
+  } | null => {
     if (isVideo) {
       switch (booking.status) {
-        case 'ACCEPTED': return { label: '🎥 Go to Video Session', nav: 'VideoLobby' as const };
-        default: return null;
+        case 'ACCEPTED':
+        case 'IN_PROGRESS':
+          return { label: '🎥 Go to Video Session', nav: 'VideoLobby' };
+        default:
+          return null;
       }
     }
     switch (booking.status) {
@@ -141,7 +197,12 @@ export const BookingDetailScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
+        }
+      >
         {/* Status */}
         <View style={styles.statusCard}>
           <Text style={styles.statusLabel}>Status</Text>
@@ -168,7 +229,11 @@ export const BookingDetailScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Patient</Text>
           <Text style={styles.infoText}>Name: {booking.patient?.name || 'Patient'}</Text>
-          <Text style={styles.infoText}>Phone: {booking.patient?.phone ? `+91 ****${booking.patient.phone.slice(-4)}` : '—'}</Text>
+          <Text style={styles.infoText}>
+            Phone: {booking.patient?.phone && typeof booking.patient.phone === 'string' 
+              ? `+91 ****${booking.patient.phone.slice(-4)}` 
+              : '—'}
+          </Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
           <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '🎥 Video Consultation' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
@@ -230,13 +295,33 @@ export const BookingDetailScreen: React.FC = () => {
         )}
 
         {/* Action Button */}
+        {booking.status === 'REQUESTED' && (
+          <View style={styles.requestActions}>
+            <TouchableOpacity
+              style={[styles.declineBtn, updating && { opacity: 0.7 }]}
+              onPress={handleDecline}
+              disabled={updating}
+            >
+              <Text style={styles.declineBtnText}>Decline</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.acceptBtn, updating && { opacity: 0.7 }]}
+              onPress={handleAccept}
+              disabled={updating}
+            >
+              <Text style={styles.acceptBtnText}>{updating ? 'Working…' : 'Accept'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {nextAction && (
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
             onPress={() => {
-              if ('nav' in nextAction) {
+              if (nextAction.nav) {
+                // @ts-ignore - Narrowed types are safe but TS can be picky with navigation.navigate
                 navigation.navigate(nextAction.nav, { bookingId });
-              } else {
+              } else if (nextAction.next) {
                 updateStatus(nextAction.next);
               }
             }}
@@ -276,6 +361,11 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  requestActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  acceptBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center' },
+  acceptBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  declineBtn: { flex: 1, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.error, borderRadius: 14, padding: 18, alignItems: 'center' },
+  declineBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
   rowActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
   secondaryBtn: {
     flex: 1,

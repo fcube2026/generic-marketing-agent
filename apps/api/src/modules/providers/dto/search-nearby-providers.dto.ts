@@ -22,5 +22,9 @@ export class SearchNearbyProvidersDto {
 
   @IsOptional()
   @IsString()
+  serviceId?: string;
+
+  @IsOptional()
+  @IsString()
   mode?: string;
 }

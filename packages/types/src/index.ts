@@ -9,11 +9,13 @@ export enum Role {
 export enum BookingMode {
   HOME_VISIT = 'HOME_VISIT',
   DOCTOR_PLACE = 'DOCTOR_PLACE',
+  VIDEO_CONSULTATION = 'VIDEO_CONSULTATION',
 }
 
 export enum BookingStatus {
   REQUESTED = 'REQUESTED',
   ACCEPTED = 'ACCEPTED',
+  DECLINED = 'DECLINED',
   ON_THE_WAY = 'ON_THE_WAY',
   ARRIVED = 'ARRIVED',
   IN_PROGRESS = 'IN_PROGRESS',

@@ -80,6 +80,7 @@ export const providerService = {
     return r.data;
   },
 
+
   /** Submit NMC registration for automated multi-step verification. */
   submitNmcVerification: async (data: NmcVerificationPayload) => {
     const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
@@ -145,6 +146,7 @@ export const providerService = {
     lat?: number;
     lng?: number;
     serviceCategory?: string;
+    serviceId?: string;
     mode?: string;
   }) => {
     const response = await api.get(ENDPOINTS.PROVIDERS.NEARBY, { params });

@@ -100,6 +100,7 @@ export class ProvidersController {
       query.lng ?? 0,
       query.serviceCategory,
       query.mode,
+      query.serviceId,
     );
   }
 

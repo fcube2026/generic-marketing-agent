@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -21,6 +22,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { patientService } from '../../services/patientService';
+import { notificationService, Notification } from '../../services/notificationService';
 import { PatientProfile } from '../../types';
 import { pharmacyService } from '../../services/pharmacyService';
 
@@ -44,6 +46,7 @@ const shouldShowRefillBanner = (orders: PharmacyOrder[] | undefined): boolean =>
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useQuery<PatientProfile | null>({
     queryKey: ['patient-profile'],
     queryFn: patientService.getProfile,
@@ -73,7 +76,21 @@ export const HomeScreen: React.FC = () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
     },
+    refetchInterval: 15000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
+
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    enabled: isProfileComplete,
+    queryFn: notificationService.getNotifications,
+    refetchInterval: 5000, // Poll every 5 seconds for reminders
+  });
+
+  const latestReminder = (notifications || []).find(
+    n => !n.isRead && n.type === 'VIDEO_CONSULTATION_REMINDER'
+  );
 
   const { data: pharmacyOrders } = useQuery<PharmacyOrder[]>({
     queryKey: ['pharmacy-orders'],
@@ -87,6 +104,12 @@ export const HomeScreen: React.FC = () => {
     [pharmacyOrders],
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
+    }, [queryClient]),
+  );
+
   const handleServicePress = (category: ServiceCategory) => {
     navigation.navigate('SelectService', { category });
   };
@@ -97,18 +120,10 @@ export const HomeScreen: React.FC = () => {
       ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
   );
 
-  const handleBookByType = (mode: 'VIDEO_CONSULTATION' | 'HOME_VISIT' | 'DOCTOR_PLACE') => {
-    if (mode === 'VIDEO_CONSULTATION' && activeVideoBookings.length > 0) {
-      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-      return;
-    }
-    // For video, location is not required; for others, we pass 0,0 and let
-    // the user's GPS be used on the ProviderListScreen via getCurrentLocation.
-    navigation.navigate('ProviderList', { mode });
-  };
-
   const handleVideoConsultationPress = () => {
-    handleBookByType('VIDEO_CONSULTATION');
+    if (activeVideoBookings.length > 0) {
+      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
+    }
   };
 
   if (profileLoading || (canUsePatientApp && isLoading)) {
@@ -136,6 +151,25 @@ export const HomeScreen: React.FC = () => {
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
       <VerificationBanner />
+
+      {latestReminder && (
+        <TouchableOpacity 
+          style={styles.reminderBanner}
+          onPress={() => {
+            notificationService.markAsRead(latestReminder.id);
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            if (latestReminder.metadata?.bookingId) {
+              navigation.navigate('VideoLobby', { bookingId: latestReminder.metadata.bookingId });
+            }
+          }}
+        >
+          <View style={styles.reminderContent}>
+            <Text style={styles.reminderTitle}>{latestReminder.title}</Text>
+            <Text style={styles.reminderMessage}>{latestReminder.message}</Text>
+          </View>
+          <Text style={styles.reminderAction}>JOIN ➔</Text>
+        </TouchableOpacity>
+      )}
 
       {showRefillBanner && (
         <View style={styles.refillBanner}>
@@ -172,41 +206,6 @@ export const HomeScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* ── Book by Service Type ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Book a Consultation</Text>
-        <View style={styles.bookingTypeRow}>
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#3B82F6' }]}
-            onPress={() => handleBookByType('VIDEO_CONSULTATION')}
-            accessibilityLabel="Book video call consultation"
-          >
-            <Text style={styles.bookingTypeIcon}>📹</Text>
-            <Text style={styles.bookingTypeLabel}>Video Call</Text>
-            <Text style={styles.bookingTypeDesc}>Consult from anywhere</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#10B981' }]}
-            onPress={() => handleBookByType('HOME_VISIT')}
-            accessibilityLabel="Book home visit"
-          >
-            <Text style={styles.bookingTypeIcon}>🏠</Text>
-            <Text style={styles.bookingTypeLabel}>Home Visit</Text>
-            <Text style={styles.bookingTypeDesc}>Doctor comes to you</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#8B5CF6' }]}
-            onPress={() => handleBookByType('DOCTOR_PLACE')}
-            accessibilityLabel="Book clinic visit"
-          >
-            <Text style={styles.bookingTypeIcon}>🏥</Text>
-            <Text style={styles.bookingTypeLabel}>Clinic Visit</Text>
-            <Text style={styles.bookingTypeDesc}>Visit a nearby clinic</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Services</Text>
@@ -225,19 +224,18 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Video Consultation Quick Access */}
-      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultation</Text>
-          <Text style={styles.videoCardSub}>
-            {activeVideoBookings.length > 0
-              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'Consult doctors from the comfort of home'}
-          </Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
+      {activeVideoBookings.length > 0 && (
+        <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
+          <Text style={styles.videoCardIcon}>📹</Text>
+          <View style={styles.videoCardContent}>
+            <Text style={styles.videoCardTitle}>Resume Video Consultation</Text>
+            <Text style={styles.videoCardSub}>
+              {`${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`}
+            </Text>
+          </View>
+          <Text style={styles.videoCardArrow}>→</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Prescription Order Quick Access */}
       <TouchableOpacity
@@ -437,6 +435,46 @@ const styles = StyleSheet.create({
   videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   videoCardArrow: { fontSize: 18, color: Colors.textMuted },
+  reminderBanner: {
+    backgroundColor: '#F59E0B',
+    margin: 16,
+    marginBottom: 0,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  reminderMessage: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  reminderAction: {
+    color: Colors.white,
+    fontWeight: '900',
+    fontSize: 14,
+    marginLeft: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
   refillBanner: {
     flexDirection: 'row',
     alignItems: 'center',

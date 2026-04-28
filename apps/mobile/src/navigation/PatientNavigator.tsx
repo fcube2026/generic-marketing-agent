@@ -10,6 +10,7 @@ import { BookingConfirmScreen } from '../screens/patient/BookingConfirmScreen';
 import { PaymentScreen } from '../screens/patient/PaymentScreen';
 import { TrackingScreen } from '../screens/patient/TrackingScreen';
 import { ConsultationSummaryScreen } from '../screens/patient/ConsultationSummaryScreen';
+import { PostCallScreen } from '../screens/common/PostCallScreen';
 import { VideoConsultationScreen } from '../screens/patient/VideoConsultationScreen';
 import { HistoryScreen } from '../screens/patient/HistoryScreen';
 import { ProfileScreen } from '../screens/patient/ProfileScreen';
@@ -33,11 +34,9 @@ import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
 import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
-import { VideoCallScreen } from '../screens/common/VideoCallScreen';
 import { NotificationSettingsScreen } from '../screens/common/NotificationSettingsScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
-import type { VideoCallParams } from '../screens/common/VideoCallScreen';
 
 export type PatientStackParamList = {
   Tabs: undefined;
@@ -51,7 +50,7 @@ export type PatientStackParamList = {
   PatientKycGuardian: undefined;
   PatientKycReview: undefined;
   SelectService: { category: ServiceCategory };
-  ProviderList: { categoryId?: string; categorySlug?: string; lat?: number; lng?: number; mode?: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION' };
+  ProviderList: { categoryId?: string; categorySlug?: string; serviceId?: string; lat?: number; lng?: number; mode?: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION' };
   Recommendation: { categorySlug: string; lat: number; lng: number };
   BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION'; fee: number };
   ClinicalIntake: { bookingId: string };
@@ -62,7 +61,7 @@ export type PatientStackParamList = {
   ConsultationSummary: { bookingId: string };
   VideoLobby: { bookingId: string };
   VideoConsultation: { bookingId: string };
-  VideoCall: VideoCallParams;
+  PostCall: { bookingId: string; durationMinutes: number; isProvider: boolean };
   MedicineSearch: undefined;
   MedicineDetail: { medicine: MedicineResult; pincode?: string };
   PrescriptionOrder:
@@ -125,7 +124,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Lobby', headerStyle: { backgroundColor: '#0F172A' }, headerTintColor: Colors.white }} />
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
-    <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="PostCall" component={PostCallScreen} options={{ headerShown: false, gestureEnabled: false }} />
     <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
     <Stack.Screen name="MedicineDetail" component={MedicineDetailScreen} options={{ title: 'Medicine Details' }} />
     <Stack.Screen name="PrescriptionOrder" component={PrescriptionOrderScreen} options={{ title: 'Prescription Order' }} />
