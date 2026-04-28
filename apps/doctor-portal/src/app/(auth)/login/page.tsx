@@ -41,7 +41,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/verify-otp', { phone, otp, role: 'PROVIDER' });
+      const { data } = await api.post('/auth/verify-otp', {
+        phone,
+        otp,
+        role: 'PROVIDER',
+      });
 
       localStorage.setItem('provider_token', data.token);
       localStorage.setItem(
@@ -52,7 +56,20 @@ export default function LoginPage() {
       const secure = window.location.protocol === 'https:' ? '; Secure' : '';
       document.cookie = `provider_token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${secure}`;
 
-      router.push('/dashboard');
+      // Check whether this provider has completed onboarding.
+      // If the ProviderProfile row is missing the API returns 404 and we
+      // must send the doctor through the onboarding flow before the
+      // dashboard / consultations / earnings pages can load any data.
+      try {
+        await api.get('/providers/me');
+        router.push('/dashboard');
+      } catch (profileErr: any) {
+        if (profileErr?.response?.status === 404) {
+          router.push('/onboarding');
+        } else {
+          router.push('/dashboard');
+        }
+      }
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||
