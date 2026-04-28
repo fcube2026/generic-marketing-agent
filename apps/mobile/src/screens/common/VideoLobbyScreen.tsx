@@ -35,7 +35,7 @@ interface PreCallCheck {
   message?: string;
 }
 
-const NETWORK_CHECK_URL = 'https://www.google.com';
+const NETWORK_CHECK_URL = 'https://captive.apple.com/hotspot-detect.html';
 
 export const VideoLobbyScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -114,7 +114,7 @@ export const VideoLobbyScreen: React.FC = () => {
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         // Fetch a small asset to measure latency
-        await fetch('https://www.google.com/favicon.ico', { 
+        await fetch(NETWORK_CHECK_URL, { 
           signal: controller.signal, 
           method: 'HEAD', 
           cache: 'no-store' 

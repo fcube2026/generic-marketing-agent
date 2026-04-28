@@ -55,6 +55,12 @@ export class VideoConsultationService {
 
     this.assertParticipant(booking, userId);
 
+    if (booking.mode !== 'VIDEO_CONSULTATION') {
+      throw new BadRequestException(
+        'A video room can only be created for video consultation bookings',
+      );
+    }
+
     if (booking.status !== 'ACCEPTED') {
       throw new BadRequestException(
         'A video room can only be created for an accepted booking',
