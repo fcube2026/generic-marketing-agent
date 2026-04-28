@@ -162,40 +162,58 @@ export default function OrderTrackingPage() {
   const [combinedTotal, setCombinedTotal] = useState(0);
   const [medicineTotal, setMedicineTotal] = useState(0);
   const [prescriptionTotal, setPrescriptionTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
   const [selected, setSelected] = useState<TrackingOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Page size used per backend request. We loop pages until all rows for the
+  // current filter are fetched, so the table reflects the full dataset and the
+  // stat cards always match the rendered rows.
+  const FETCH_PAGE_SIZE = 200;
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const params: Record<string, string | number> = {
+      const baseParams: Record<string, string | number> = {
         flow,
-        page,
-        limit: PAGE_SIZE,
+        limit: FETCH_PAGE_SIZE,
       };
+      if (status !== 'ALL') baseParams.status = status;
+      if (paymentStatus !== 'ALL') baseParams.paymentStatus = paymentStatus;
+      if (patientQuery.trim()) baseParams.patientQuery = patientQuery.trim();
+      if (fromDate) baseParams.fromDate = fromDate;
+      if (toDate) baseParams.toDate = toDate;
 
-      if (status !== 'ALL') params.status = status;
-      if (paymentStatus !== 'ALL') params.paymentStatus = paymentStatus;
-      if (patientQuery.trim()) params.patientQuery = patientQuery.trim();
-      if (fromDate) params.fromDate = fromDate;
-      if (toDate) params.toDate = toDate;
+      const collected: TrackingOrder[] = [];
+      let pageIndex = 1;
+      let knownTotal = 0;
 
-      const response = await api.get<TrackingResponse>('/admin/orders/tracking', {
-        params,
-      });
+      // Safety cap to avoid runaway loops; with FETCH_PAGE_SIZE=200 this allows
+      // up to 10,000 rows per filter, well above any near-term company volume.
+      const MAX_PAGES = 50;
 
-      const rows = Array.isArray(response.data.data) ? response.data.data : [];
-      setOrders(rows);
-      setTotal(response.data.total || 0);
+      // eslint-disable-next-line no-constant-condition
+      while (pageIndex <= MAX_PAGES) {
+        const response = await api.get<TrackingResponse>('/admin/orders/tracking', {
+          params: { ...baseParams, page: pageIndex },
+        });
+        const rows = Array.isArray(response.data.data) ? response.data.data : [];
+        collected.push(...rows);
+        knownTotal = response.data.total || collected.length;
+        if (rows.length < FETCH_PAGE_SIZE || collected.length >= knownTotal) {
+          break;
+        }
+        pageIndex += 1;
+      }
 
-      if (rows.length === 0) {
+      setOrders(collected);
+      setTotal(knownTotal);
+
+      if (collected.length === 0) {
         setSelected(null);
-      } else if (!selected || !rows.some((row) => row.id === selected.id)) {
-        setSelected(rows[0]);
+      } else if (!selected || !collected.some((row) => row.id === selected.id)) {
+        setSelected(collected[0]);
       }
     } catch {
       setOrders([]);
@@ -204,13 +222,7 @@ export default function OrderTrackingPage() {
     } finally {
       setLoading(false);
     }
-  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate, page, selected]);
-
-  // Reset to first page whenever filters or flow change so users don't end up
-  // on an out-of-range page after the dataset shrinks.
-  useEffect(() => {
-    setPage(1);
-  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate]);
+  }, [flow, status, paymentStatus, patientQuery, fromDate, toDate, selected]);
 
   useEffect(() => {
     void fetchOrders();
@@ -383,9 +395,9 @@ export default function OrderTrackingPage() {
           ) : orders.length === 0 ? (
             <p className="text-sm text-gray-500">No orders found for the selected filters.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[600px] overflow-y-auto overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white">
                   <tr className="border-b border-gray-200 text-left text-gray-500">
                     <th className="pb-2 pr-3 font-medium">Order</th>
                     <th className="pb-2 pr-3 font-medium">Patient</th>
@@ -428,38 +440,9 @@ export default function OrderTrackingPage() {
                   ))}
                 </tbody>
               </table>
-              {total > PAGE_SIZE && (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3 text-sm text-gray-600">
-                  <span>
-                    Showing {(page - 1) * PAGE_SIZE + 1}
-                    {'–'}
-                    {Math.min(page * PAGE_SIZE, total)} of {total}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page <= 1 || loading}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-xs text-gray-500">
-                      Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPage((p) =>
-                          Math.min(Math.max(1, Math.ceil(total / PAGE_SIZE)), p + 1),
-                        )
-                      }
-                      disabled={page >= Math.ceil(total / PAGE_SIZE) || loading}
-                      className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
+              {total > 0 && (
+                <div className="sticky bottom-0 mt-2 border-t border-gray-100 bg-white py-2 text-xs text-gray-500">
+                  Showing {orders.length} of {total} {flow === 'MEDICINE' ? 'medicine' : 'prescription'} orders
                 </div>
               )}
             </div>
