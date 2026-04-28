@@ -24,6 +24,25 @@ const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent 
 const MARKETING_DEFAULT_PASSWORD =
   process.env.MARKETING_PASSWORD || 'marketing123';
 
+/**
+ * Normalize an Indian phone number to E.164 (+91XXXXXXXXXX).
+ * Accepts inputs like "7396041487", "917396041487", "+91 7396041487",
+ * "+917396041487". Returns the input unchanged if it cannot be normalized
+ * (e.g. non-Indian numbers or admin/marketing placeholders).
+ */
+function normalizePhone(phone: string): string {
+  if (!phone) return phone;
+  const trimmed = phone.trim();
+  // Preserve placeholder admin/marketing phones as-is
+  if (trimmed === ADMIN_PHONE || trimmed === MARKETING_PHONE) return trimmed;
+  const cleaned = trimmed.replace(/\D/g, '');
+  if (cleaned.length === 10) return '+91' + cleaned;
+  if (cleaned.length === 12 && cleaned.startsWith('91')) return '+' + cleaned;
+  if (cleaned.length === 11 && cleaned.startsWith('0'))
+    return '+91' + cleaned.slice(1);
+  return trimmed.startsWith('+') ? trimmed : cleaned ? '+' + cleaned : trimmed;
+}
+
 // Well-known staging admin credentials, always provisioned on non-production
 // environments so the staging admin portal is reachable with the documented
 // defaults regardless of Railway env-var drift. See docs/api-testing-strategy.md.
@@ -266,19 +285,20 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
+    const phone = normalizePhone(dto.phone);
     const otp = this.generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     try {
       // Invalidate old OTPs for this phone
       await this.prisma.otpVerification.updateMany({
-        where: { phone: dto.phone, verified: false },
+        where: { phone, verified: false },
         data: { verified: true },
       });
 
       await this.prisma.otpVerification.create({
         data: {
-          phone: dto.phone,
+          phone,
           otp,
           expiresAt,
           verified: false,
@@ -286,7 +306,7 @@ export class AuthService implements OnModuleInit {
       });
     } catch (err) {
       this.logger.error(
-        `Failed to create OTP for phone=${maskPhone(dto.phone)}`,
+        `Failed to create OTP for phone=${maskPhone(phone)}`,
         err,
       );
       throw new ServiceUnavailableException(
@@ -301,7 +321,7 @@ export class AuthService implements OnModuleInit {
       process.env.APP_ENV === 'staging';
 
     if (showOtp) {
-      console.log(`OTP for ${maskPhone(dto.phone)}: ${otp}`);
+      console.log(`OTP for ${maskPhone(phone)}: ${otp}`);
     }
 
     return {
@@ -312,11 +332,12 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
+    const phone = normalizePhone(dto.phone);
     let otpRecord;
     try {
       otpRecord = await this.prisma.otpVerification.findFirst({
         where: {
-          phone: dto.phone,
+          phone,
           otp: dto.otp,
           verified: false,
           expiresAt: { gt: new Date() },
@@ -324,10 +345,7 @@ export class AuthService implements OnModuleInit {
         orderBy: { createdAt: 'desc' },
       });
     } catch (err) {
-      this.logger.error(
-        `OTP lookup failed for phone=${maskPhone(dto.phone)}`,
-        err,
-      );
+      this.logger.error(`OTP lookup failed for phone=${maskPhone(phone)}`, err);
       throw new ServiceUnavailableException(
         'Verification service temporarily unavailable. Please try again shortly.',
       );
@@ -346,13 +364,13 @@ export class AuthService implements OnModuleInit {
 
       // Find or create user
       let user = await this.prisma.user.findUnique({
-        where: { phone: dto.phone },
+        where: { phone },
       });
 
       if (!user) {
         user = await this.prisma.user.create({
           data: {
-            phone: dto.phone,
+            phone,
             role: (dto.role as Role) ?? Role.PATIENT,
           },
         });
@@ -372,7 +390,7 @@ export class AuthService implements OnModuleInit {
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       this.logger.error(
-        `OTP verification failed for phone=${maskPhone(dto.phone)}`,
+        `OTP verification failed for phone=${maskPhone(phone)}`,
         err,
       );
       throw new ServiceUnavailableException(
