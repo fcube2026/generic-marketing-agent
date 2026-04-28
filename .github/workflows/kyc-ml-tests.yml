@@ -1,0 +1,44 @@
+name: kyc-ml tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/kyc-ml/**'
+      - '.github/workflows/kyc-ml-tests.yml'
+  pull_request:
+    paths:
+      - 'apps/kyc-ml/**'
+      - '.github/workflows/kyc-ml-tests.yml'
+
+jobs:
+  pytest:
+    name: pytest (apps/kyc-ml)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/kyc-ml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # Install only the lightweight runtime + test deps.
+      # PaddleOCR and DeepFace pull ~3 GB of model wheels and are intentionally
+      # excluded from CI — the test suite mocks them out via fixtures.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            'fastapi>=0.110' 'uvicorn[standard]>=0.27' \
+            'python-multipart>=0.0.9' 'pydantic>=2.6' 'pydantic-settings>=2.2' \
+            'numpy>=1.26,<2.0' 'opencv-python-headless>=4.9' 'Pillow>=10.2' \
+            'httpx>=0.27' 'pytest>=8.0' 'pytest-asyncio>=0.23'
+
+      - name: Run pytest
+        run: python -m pytest -q

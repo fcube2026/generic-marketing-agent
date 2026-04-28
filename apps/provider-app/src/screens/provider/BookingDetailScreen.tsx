@@ -61,6 +61,39 @@ export const BookingDetailScreen: React.FC = () => {
     Linking.openURL(url);
   };
 
+  const handleAccept = async () => {
+    setUpdating(true);
+    try {
+      await bookingService.acceptBooking(bookingId);
+      setBooking((prev: any) => ({ ...prev, status: 'ACCEPTED' }));
+    } catch {
+      Alert.alert('Error', 'Failed to accept booking.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDecline = () => {
+    Alert.alert('Decline Booking', 'Are you sure you want to decline this booking?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline',
+        style: 'destructive',
+        onPress: async () => {
+          setUpdating(true);
+          try {
+            await bookingService.declineBooking(bookingId);
+            setBooking((prev: any) => ({ ...prev, status: 'DECLINED' }));
+          } catch {
+            Alert.alert('Error', 'Failed to decline booking.');
+          } finally {
+            setUpdating(false);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return <View style={styles.center}><Text style={styles.loadingText}>Loading booking…</Text></View>;
   }
@@ -127,8 +160,21 @@ export const BookingDetailScreen: React.FC = () => {
         {booking.mode === 'HOME_VISIT' && booking.address && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Patient Address</Text>
-            <Text style={styles.infoText}>{booking.address}</Text>
-            <TouchableOpacity style={styles.mapBtn} onPress={() => openMaps(booking.address)}>
+            <Text style={styles.infoText}>
+              {[booking.address.line1, booking.address.line2, booking.address.city, booking.address.state, booking.address.pincode]
+                .filter(Boolean)
+                .join(', ')}
+            </Text>
+            <TouchableOpacity
+              style={styles.mapBtn}
+              onPress={() =>
+                openMaps(
+                  [booking.address.line1, booking.address.line2, booking.address.city, booking.address.state, booking.address.pincode]
+                    .filter(Boolean)
+                    .join(', '),
+                )
+              }
+            >
               <Text style={styles.mapBtnText}>🗺 Open in Maps</Text>
             </TouchableOpacity>
           </View>
@@ -140,6 +186,25 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.feeText}>₹{booking.totalFee}</Text>
           <Text style={styles.payStatus}>Payment: {booking.paymentStatus}</Text>
         </View>
+
+        {booking.status === 'REQUESTED' && (
+          <View style={styles.rowActions}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, updating && { opacity: 0.7 }]}
+              onPress={handleDecline}
+              disabled={updating}
+            >
+              <Text style={styles.secondaryBtnText}>Decline</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { flex: 1, marginTop: 0 }, updating && { opacity: 0.7 }]}
+              onPress={handleAccept}
+              disabled={updating}
+            >
+              <Text style={styles.actionBtnText}>Accept Booking</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Action Button */}
         {nextAction && (
@@ -198,4 +263,14 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  rowActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  secondaryBtn: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
 });

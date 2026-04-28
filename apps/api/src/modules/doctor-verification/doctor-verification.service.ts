@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
 import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
+import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
 import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
@@ -61,6 +62,7 @@ export class DoctorVerificationService {
     private nmcProvider: NmcApiProvider,
     private smcProvider: SmcScraperProvider,
     private faceProvider: FaceVerificationProvider,
+    private aadhaarProvider: AadhaarValidationProvider,
     private notificationsService: NotificationsService,
   ) {}
 
@@ -78,7 +80,6 @@ export class DoctorVerificationService {
     // Validate completeness
     if (
       !dto.nmcRegistrationNumber?.trim() ||
-      !dto.stateCouncil?.trim() ||
       !dto.yearOfAdmission?.trim() ||
       !dto.fullName?.trim()
     ) {
@@ -243,6 +244,19 @@ export class DoctorVerificationService {
       });
     }
 
+    // Validate Aadhaar number if provided
+    let aadhaarValidation: { valid: boolean } | null = null;
+    if (dto.aadhaarNumber) {
+      try {
+        aadhaarValidation = await this.aadhaarProvider.validate(
+          dto.aadhaarNumber,
+        );
+      } catch (err) {
+        this.logger.warn(`Aadhaar validation error: ${String(err)}`);
+        aadhaarValidation = { valid: false };
+      }
+    }
+
     await this.prisma.doctorVerificationLog.create({
       data: {
         providerId: profile.id,
@@ -258,6 +272,7 @@ export class DoctorVerificationService {
         rawResponse: {
           aadhaarDocumentUrl: dto.aadhaarDocumentUrl,
           medicalCertificateUrl: dto.medicalCertificateUrl,
+          aadhaarValidation,
         } as unknown as Prisma.InputJsonValue,
         errorCode: null,
       },
@@ -268,8 +283,8 @@ export class DoctorVerificationService {
     return {
       licenseId: license.id,
       documentsReceived: true,
-      message:
-        'Documents uploaded successfully. Proceed to DigiLocker consent.',
+      aadhaarValid: aadhaarValidation?.valid ?? null,
+      message: 'Documents uploaded successfully. Proceed to face verification.',
     };
   }
 
@@ -335,9 +350,9 @@ export class DoctorVerificationService {
     });
     if (!license) throw new NotFoundException('License not found');
 
-    if (!license.nmcRegistrationNumber || !license.stateCouncil) {
+    if (!license.nmcRegistrationNumber) {
       throw new BadRequestException(
-        'License does not have NMC registration details. The doctor must submit them first.',
+        'License does not have a registration number. The doctor must submit it first.',
       );
     }
 
@@ -476,11 +491,15 @@ export class DoctorVerificationService {
       verificationAttempts,
     } = license;
 
-    if (!nmcRegistrationNumber || !stateCouncil) {
+    if (!nmcRegistrationNumber) {
       throw new BadRequestException(
-        'NMC registration number and state council are required for verification',
+        'Registration number is required for verification',
       );
     }
+
+    // Use empty string when stateCouncil is not provided — the Surepass API
+    // resolves the state council internally from the registration number.
+    const resolvedStateCouncil = stateCouncil ?? '';
 
     const updatedAttempts = verificationAttempts + 1;
     await this.prisma.providerLicense.update({
@@ -498,7 +517,7 @@ export class DoctorVerificationService {
     let nmcNameMatch = false;
     const nmcRequest = {
       memberId: nmcRegistrationNumber,
-      stateCouncil,
+      stateCouncil: resolvedStateCouncil,
       yearOfAdmission: yearOfAdmission ?? '',
     };
 
@@ -554,7 +573,7 @@ export class DoctorVerificationService {
       const smcResult = await this.smcProvider.verify({
         registrationNumber: nmcRegistrationNumber,
         fullName: dto.fullName ?? '',
-        stateCouncil,
+        stateCouncil: resolvedStateCouncil,
       });
       smcFound = smcResult.found;
 
@@ -586,7 +605,7 @@ export class DoctorVerificationService {
       });
 
       this.logger.log(
-        `SMC check: ${smcFound ? 'FOUND' : 'NOT_FOUND'} — ${nmcRegistrationNumber} / ${stateCouncil}`,
+        `SMC check: ${smcFound ? 'FOUND' : 'NOT_FOUND'} — ${nmcRegistrationNumber} / ${resolvedStateCouncil}`,
       );
     } catch (err) {
       steps.push({

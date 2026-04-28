@@ -33,6 +33,7 @@ Notifications.setNotificationHandler({
 export interface PushNotificationData {
   type?: string;
   bookingId?: string;
+  pharmacyOrderId?: string;
   [key: string]: unknown;
 }
 

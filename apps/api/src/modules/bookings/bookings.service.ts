@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
@@ -36,6 +37,7 @@ export class BookingsService {
     private videoReminderService: VideoConsultationReminderService,
     private patientVerificationService: PatientVerificationService,
     private config: ConfigService,
+    private readonly supabaseSync: SupabaseSyncService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -45,6 +47,10 @@ export class BookingsService {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  private buildPatientUniqueId(patientId: string): string {
+    return `PT-${patientId.slice(-8).toUpperCase()}`;
   }
 
   async createBooking(userId: string, dto: CreateBookingDto) {
@@ -196,6 +202,12 @@ export class BookingsService {
       },
     });
 
+    // Mirror to Supabase (best-effort). Sync FK-side rows first so the
+    // booking row's source mappings have a counterpart.
+    await this.supabaseSync.syncPatient(patientProfile);
+    await this.supabaseSync.syncProvider(provider);
+    await this.supabaseSync.syncBooking(booking);
+
     // Notify provider of new booking request with push and SMS
     const modeText =
       dto.mode === 'HOME_VISIT'
@@ -245,7 +257,13 @@ export class BookingsService {
     });
 
     if (!booking) throw new NotFoundException('Booking not found');
-    return booking;
+    return {
+      ...booking,
+      patient: {
+        ...booking.patient,
+        uniquePatientId: this.buildPatientUniqueId(booking.patient.id),
+      },
+    };
   }
 
   async updateBookingStatus(
@@ -291,6 +309,8 @@ export class BookingsService {
       where: { id: bookingId },
       data: { status: dto.status },
     });
+
+    await this.supabaseSync.syncBooking(updated);
 
     await this.prisma.bookingStatusHistory.create({
       data: {
@@ -346,31 +366,58 @@ export class BookingsService {
 
       const config = PROVIDER_TRANSITION_CONFIG[dto.status];
       if (config) {
-        await this.notificationsService.sendNotification(
-          {
-            userId: fullBooking.patient.userId,
-            title: config.title,
-            message: config.message,
-            type: 'BOOKING_STATUS_UPDATE',
-            metadata: { bookingId, status: dto.status },
-          },
-          {
-            inApp: true,
-            push: true,
-            sms: config.sendSms,
-            smsTemplate: config.smsTemplate,
-            smsParams: {
-              providerName,
+        // Fire-and-forget: do not block the status update on slow downstream
+        // providers (WhatsApp / SMS / Push). Mobile clients have a 30s axios
+        // timeout, and synchronous awaits here have caused PUT /bookings/:id/status
+        // to appear as "Network Error" to the provider app.
+        void this.notificationsService
+          .sendNotification(
+            {
+              userId: fullBooking.patient.userId,
+              title: config.title,
+              message: config.message,
+              type: 'BOOKING_STATUS_UPDATE',
+              metadata: { bookingId, status: dto.status },
             },
-          },
-        );
+            {
+              inApp: true,
+              push: true,
+              sms: config.sendSms,
+              smsTemplate: config.smsTemplate,
+              smsParams: {
+                providerName,
+              },
+            },
+          )
+          .catch((err) => {
+            // Swallow notification errors so they never bubble up; log for ops.
+            // eslint-disable-next-line no-console
+            console.error(
+              `[bookings] notification dispatch failed for booking=${bookingId} status=${dto.status}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
       }
     }
 
     return updated;
   }
 
+  private async assertBookingProvider(bookingId: string, userId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { provider: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.provider?.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can perform this action',
+      );
+    }
+  }
+
   async acceptBooking(bookingId: string, userId: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.ACCEPTED,
     });
@@ -418,6 +465,8 @@ export class BookingsService {
   }
 
   async declineBooking(bookingId: string, userId: string, reason?: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.DECLINED,
     });

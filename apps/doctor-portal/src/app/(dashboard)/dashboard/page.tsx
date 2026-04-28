@@ -3,7 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { USE_SEED, getSeedDashboardStats, getSeedConsultationsList } from '@/lib/seed-data';
+import { USE_SEED, getSeedDashboardStats } from '@/lib/seed-data';
+
+interface RecentConsultation {
+  id: string;
+  patientName: string;
+  patientUHID?: string | null;
+  scheduledAt: string;
+  status: string;
+  chiefComplaint?: string | null;
+  diagnosis?: string | null;
+}
 
 interface DashboardStats {
   totalPatients: number;
@@ -13,6 +23,7 @@ interface DashboardStats {
   completedConsultations: number;
   pendingLabReports: number;
   totalEarnings: number;
+  recentConsultations: RecentConsultation[];
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -103,7 +114,10 @@ const quickActions = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const recentConsultations = USE_SEED ? getSeedConsultationsList().slice(0, 5) : [];
+  const [doctorName, setDoctorName] = useState('Doctor');
+  const [profileNotFound, setProfileNotFound] = useState(false);
+
+  const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
   const fetchData = useCallback(() => {
     if (USE_SEED) {
@@ -111,11 +125,20 @@ export default function DashboardPage() {
       setLoading(false);
       return;
     }
-    api
-      .get('/providers/me/dashboard')
-      .then((res) => setStats(res.data))
+    Promise.all([
+      api.get('/providers/me/dashboard'),
+      api.get('/providers/me'),
+    ])
+      .then(([dashRes, profileRes]) => {
+        setStats(dashRes.data);
+        if (profileRes.data?.name) {
+          setDoctorName(profileRes.data.name);
+        }
+      })
       .catch((err) => {
-        if (err?.response?.status !== 401) {
+        if (err?.response?.status === 404) {
+          setProfileNotFound(true);
+        } else if (err?.response?.status !== 401) {
           console.error('[Doctor Dashboard] Error:', err?.message);
         }
       })
@@ -139,12 +162,27 @@ export default function DashboardPage() {
     );
   }
 
+  if (profileNotFound) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-2xl">⚠️</div>
+          <h2 className="text-lg font-semibold text-navy">Doctor profile not set up</h2>
+          <p className="text-sm text-gray-500">
+            Your account is registered but no doctor profile has been created yet.
+            Please contact the Curex24 admin team to complete your onboarding.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="page-title">Good morning, Dr. Arjun 👋</h1>
+          <h1 className="page-title">Good morning, {doctorName} 👋</h1>
           <p className="page-subtitle">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>

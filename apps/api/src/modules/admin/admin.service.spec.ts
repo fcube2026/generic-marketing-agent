@@ -15,6 +15,14 @@ describe('AdminService', () => {
       update: jest.fn(),
       count: jest.fn(),
     },
+    providerService: {
+      count: jest.fn(),
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    serviceCategory: {
+      findFirst: jest.fn(),
+    },
     providerLicense: {
       updateMany: jest.fn(),
     },
@@ -212,12 +220,19 @@ describe('AdminService', () => {
     const adminId = 'admin-1';
 
     it('should verify provider and update licenses', async () => {
-      const provider = { id: providerId, userId: 'user-1' };
+      const provider = {
+        id: providerId,
+        userId: 'user-1',
+        specialization: 'Cardiology',
+      };
       const updated = { ...provider, isVerified: true, isActive: true };
 
       mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
       mockPrisma.providerLicense.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
+      mockPrisma.providerService.count.mockResolvedValue(0);
+      mockPrisma.serviceCategory.findFirst.mockResolvedValue({ id: 'cat-1' });
+      mockPrisma.providerService.createMany.mockResolvedValue({ count: 1 });
       mockPrisma.adminAction.create.mockResolvedValue({});
 
       const result = await service.verifyProvider(
@@ -234,6 +249,10 @@ describe('AdminService', () => {
       expect(mockPrisma.providerProfile.update).toHaveBeenCalledWith({
         where: { id: providerId },
         data: { isVerified: true, isActive: true },
+      });
+      expect(mockPrisma.providerService.createMany).toHaveBeenCalledWith({
+        data: [{ providerId, serviceCategoryId: 'cat-1' }],
+        skipDuplicates: true,
       });
       expect(mockPrisma.adminAction.create).toHaveBeenCalledWith({
         data: expect.objectContaining({

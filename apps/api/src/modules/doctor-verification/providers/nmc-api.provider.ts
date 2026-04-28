@@ -121,6 +121,18 @@ export class NmcApiProvider {
   private buildPayload(req: NmcVerificationRequest): Record<string, unknown> {
     switch (this.provider) {
       case 'surepass':
+        // Surepass doctor-verification API uses id_number for the NMC registration
+        // number. consent must be the string "Y". state_council and
+        // year_of_admission are optional — Surepass resolves them internally.
+        return {
+          reference_id: `curex24-${Date.now()}`,
+          consent: 'Y',
+          id_number: req.memberId,
+          ...(req.stateCouncil ? { state_council: req.stateCouncil } : {}),
+          ...(req.yearOfAdmission
+            ? { year_of_admission: req.yearOfAdmission }
+            : {}),
+        };
       case 'decentro':
         return {
           reference_id: `curex24-${Date.now()}`,
@@ -152,7 +164,26 @@ export class NmcApiProvider {
     req: NmcVerificationRequest,
   ): NmcVerificationResult {
     switch (this.provider) {
-      case 'surepass':
+      case 'surepass': {
+        // Surepass response shape:
+        // { success: true, status_code: 200, data: { results: [{ full_name, registration_number, ... }] } }
+        const payload = (data.data ?? {}) as Record<string, unknown>;
+        const results = Array.isArray(payload.results) ? payload.results : [];
+        const first = (results[0] ?? {}) as Record<string, unknown>;
+        const found = data.success === true && results.length > 0;
+        return {
+          found,
+          registrationNumber: first.registration_number as string | undefined,
+          name: first.full_name as string | undefined,
+          qualifications: first.qualification
+            ? [first.qualification as string]
+            : [],
+          stateCouncil: first.state_medical_council as string | undefined,
+          registrationDate: first.registration_date as string | undefined,
+          registrationStatus: first.registration_status as string | undefined,
+          rawResponse: data,
+        };
+      }
       case 'decentro': {
         const payload = (data.data ?? data) as Record<string, unknown>;
         const found =

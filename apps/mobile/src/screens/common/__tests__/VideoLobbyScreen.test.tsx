@@ -13,13 +13,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // ── expo-camera ───────────────────────────────────────────────────────────────
-jest.mock('expo-camera', () => ({
-  Camera: {
-    requestCameraPermissionsAsync: jest.fn(() =>
-      Promise.resolve({ status: 'granted' }),
-    ),
-  },
-}));
+jest.mock('expo-camera', () => {
+  const { View } = require('react-native');
+  return {
+    CameraView: View,
+    useCameraPermissions: jest.fn(() => [{ granted: true }, jest.fn()]),
+    useMicrophonePermissions: jest.fn(() => [{ granted: true }, jest.fn()]),
+    Camera: {
+      requestCameraPermissionsAsync: jest.fn(() =>
+        Promise.resolve({ status: 'granted' }),
+      ),
+    },
+  };
+});
 
 // ── expo-av ───────────────────────────────────────────────────────────────────
 jest.mock('expo-av', () => ({
@@ -53,6 +59,7 @@ jest.mock('@react-navigation/native', () => ({
 // ── React Query ───────────────────────────────────────────────────────────────
 jest.mock('@tanstack/react-query', () => ({
   useQuery: jest.fn(),
+  useQueryClient: jest.fn(() => ({ invalidateQueries: jest.fn() })),
 }));
 
 import { useQuery } from '@tanstack/react-query';

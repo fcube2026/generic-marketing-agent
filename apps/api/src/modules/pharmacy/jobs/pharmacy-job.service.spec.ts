@@ -294,6 +294,268 @@ describe('PharmacyJobService', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // getProviderOrderStatus (per-partner routing)
+  // ---------------------------------------------------------------------------
+
+  describe('getProviderOrderStatus', () => {
+    it('routes to the matching partner provider by code', async () => {
+      const partnerProvider: jest.Mocked<PharmacyPartnerProvider> = {
+        ...mockProvider,
+        getOrderStatus: jest.fn().mockResolvedValue({
+          partnerOrderId: 'ORD-1',
+          status: 'SHIPPED',
+        }),
+      };
+
+      const serviceWithPartner = new PharmacyJobService(
+        mockPrisma,
+        new Map<string, PharmacyPartnerProvider>([
+          ['mock', mockProvider],
+          ['demo-pharmacy', partnerProvider],
+        ]),
+      );
+
+      const status = await serviceWithPartner.getProviderOrderStatus(
+        'demo-pharmacy',
+        'Demo Pharmacy',
+        'ORD-1',
+      );
+
+      expect(status).toBe('SHIPPED');
+      expect(partnerProvider.getOrderStatus).toHaveBeenCalledWith('ORD-1');
+      expect(mockProvider.getOrderStatus).not.toHaveBeenCalled();
+    });
+
+    it('falls back to mock provider when partner code is not registered', async () => {
+      mockProvider.getOrderStatus.mockResolvedValue({
+        partnerOrderId: 'ORD-1',
+        status: 'CONFIRMED',
+      });
+
+      const status = await service.getProviderOrderStatus(
+        'unknown-partner',
+        'Unknown',
+        'ORD-1',
+      );
+
+      expect(status).toBe('CONFIRMED');
+      expect(mockProvider.getOrderStatus).toHaveBeenCalledWith('ORD-1');
+    });
+
+    it('returns null when no provider is registered at all', async () => {
+      const emptyService = new PharmacyJobService(
+        mockPrisma,
+        new Map<string, PharmacyPartnerProvider>(),
+      );
+
+      const status = await emptyService.getProviderOrderStatus(
+        'any',
+        'any',
+        'ORD-1',
+      );
+
+      expect(status).toBeNull();
+    });
+
+    it('throws when the resolved provider throws', async () => {
+      mockProvider.getOrderStatus.mockRejectedValue(new Error('Timeout'));
+
+      await expect(
+        service.getProviderOrderStatus('unknown', 'unknown', 'ORD-1'),
+      ).rejects.toThrow('Timeout');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // pollOrderStatuses — per-partner routing
+  // ---------------------------------------------------------------------------
+
+  describe('pollOrderStatuses (per-partner routing)', () => {
+    it('routes polling to the correct provider for each order', async () => {
+      const demoProvider: jest.Mocked<PharmacyPartnerProvider> = {
+        ...mockProvider,
+        getOrderStatus: jest.fn().mockResolvedValue({
+          partnerOrderId: 'ORD-DEMO',
+          status: 'SHIPPED',
+        }),
+      };
+
+      const serviceWithMultiple = new PharmacyJobService(
+        mockPrisma,
+        new Map<string, PharmacyPartnerProvider>([
+          ['mock', mockProvider],
+          ['demo-pharmacy', demoProvider],
+        ]),
+      );
+
+      mockPrisma.pharmacyOrder.findMany.mockResolvedValue([
+        {
+          id: 'order-mock',
+          partnerOrderId: 'ORD-MOCK',
+          status: PharmacyOrderStatus.PENDING,
+          pharmacyPartner: { code: 'mock', name: 'Mock' },
+        },
+        {
+          id: 'order-demo',
+          partnerOrderId: 'ORD-DEMO',
+          status: PharmacyOrderStatus.CONFIRMED,
+          pharmacyPartner: { code: 'demo-pharmacy', name: 'Demo Pharmacy' },
+        },
+      ]);
+
+      mockProvider.getOrderStatus.mockResolvedValue({
+        partnerOrderId: 'ORD-MOCK',
+        status: 'CONFIRMED',
+      });
+
+      const result = await serviceWithMultiple.pollOrderStatuses();
+
+      expect(mockProvider.getOrderStatus).toHaveBeenCalledWith('ORD-MOCK');
+      expect(demoProvider.getOrderStatus).toHaveBeenCalledWith('ORD-DEMO');
+      expect(result.updated).toBe(2); // mock: PENDING→CONFIRMED; demo: CONFIRMED→SHIPPED
+      expect(result.skipped).toBe(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // scheduleRefillOnDelivery
+  // ---------------------------------------------------------------------------
+
+  describe('scheduleRefillOnDelivery', () => {
+    it('is a no-op when no scheduler is injected', async () => {
+      // service has no scheduler (default)
+      await expect(
+        service.scheduleRefillOnDelivery('order-1', new Date()),
+      ).resolves.not.toThrow();
+    });
+
+    it('calls scheduleRefillReminder on the scheduler with correct args', async () => {
+      const mockScheduler = {
+        scheduleRefillReminder: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const serviceWithScheduler = new PharmacyJobService(
+        {
+          ...mockPrisma,
+          pharmacyOrder: {
+            ...mockPrisma.pharmacyOrder,
+            findUnique: jest.fn().mockResolvedValue({
+              orderNumber: 'PHARM-TESTXYZ',
+              patientProfileId: 'patient-1',
+            }),
+          },
+        },
+        new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+        mockScheduler,
+      );
+
+      const deliveredAt = new Date('2026-04-23T00:00:00Z');
+      await serviceWithScheduler.scheduleRefillOnDelivery(
+        'order-1',
+        deliveredAt,
+      );
+
+      expect(mockScheduler.scheduleRefillReminder).toHaveBeenCalledWith(
+        'order-1',
+        'PHARM-TESTXYZ',
+        'patient-1',
+        deliveredAt,
+      );
+    });
+
+    it('does not throw when order is not found', async () => {
+      const mockScheduler = {
+        scheduleRefillReminder: jest.fn(),
+      };
+
+      const serviceWithScheduler = new PharmacyJobService(
+        {
+          ...mockPrisma,
+          pharmacyOrder: {
+            ...mockPrisma.pharmacyOrder,
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
+        },
+        new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+        mockScheduler,
+      );
+
+      await expect(
+        serviceWithScheduler.scheduleRefillOnDelivery(
+          'missing-order',
+          new Date(),
+        ),
+      ).resolves.not.toThrow();
+
+      expect(mockScheduler.scheduleRefillReminder).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // updateOrderStatus triggers refill on DELIVERED
+  // ---------------------------------------------------------------------------
+
+  describe('updateOrderStatus triggers refill on DELIVERED', () => {
+    it('calls scheduleRefillOnDelivery after transitioning to DELIVERED', async () => {
+      mockPrisma.pharmacyOrderStatusHistory.findUnique.mockResolvedValue(null);
+
+      const mockScheduler = {
+        scheduleRefillReminder: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const findUniqueMock = jest.fn().mockResolvedValue({
+        orderNumber: 'PHARM-DEL-1',
+        patientProfileId: 'patient-1',
+      });
+
+      const serviceWithScheduler = new PharmacyJobService(
+        {
+          ...mockPrisma,
+          pharmacyOrder: {
+            ...mockPrisma.pharmacyOrder,
+            findUnique: findUniqueMock,
+          },
+        },
+        new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+        mockScheduler,
+      );
+
+      await serviceWithScheduler.updateOrderStatus(
+        'order-1',
+        PharmacyOrderStatus.DELIVERED,
+      );
+
+      expect(mockScheduler.scheduleRefillReminder).toHaveBeenCalledWith(
+        'order-1',
+        'PHARM-DEL-1',
+        'patient-1',
+        expect.any(Date),
+      );
+    });
+
+    it('does not call scheduleRefillOnDelivery for non-DELIVERED statuses', async () => {
+      mockPrisma.pharmacyOrderStatusHistory.findUnique.mockResolvedValue(null);
+
+      const mockScheduler = {
+        scheduleRefillReminder: jest.fn(),
+      };
+
+      const serviceWithScheduler = new PharmacyJobService(
+        mockPrisma,
+        new Map<string, PharmacyPartnerProvider>([['mock', mockProvider]]),
+        mockScheduler,
+      );
+
+      await serviceWithScheduler.updateOrderStatus(
+        'order-1',
+        PharmacyOrderStatus.CONFIRMED,
+      );
+
+      expect(mockScheduler.scheduleRefillReminder).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // sendNotification
   // ---------------------------------------------------------------------------
 

@@ -8,11 +8,15 @@ import {
   Animated,
   Easing,
   Platform,
+  Alert,
+  StatusBar,
+  Linking,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
-import { Camera } from 'expo-camera';
-import { Audio } from 'expo-av';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useAuthStore } from '../../store/authStore';
+import api from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { Card } from '../../components/common/Card';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -23,62 +27,47 @@ import { formatDateTime } from '../../utils/format';
 
 export type VideoLobbyParams = { bookingId: string };
 
-type CheckStatus = 'checking' | 'ok' | 'denied' | 'error';
+type CheckStatus = 'checking' | 'ok' | 'denied' | 'error' | 'warning';
 
 interface PreCallCheck {
+  id: string;
   label: string;
   icon: string;
   status: CheckStatus;
+  message?: string;
 }
 
-/** URL used for the network connectivity check in the lobby pre-call flow */
-const NETWORK_CHECK_URL = 'https://www.google.com';
-
-const SESSION_STATUS_COLOR: Record<VideoSessionStatus, string> = {
-  CREATED: Colors.textMuted,
-  WAITING: '#F59E0B',
-  IN_PROGRESS: Colors.error,
-  COMPLETED: Colors.success,
-  FAILED: Colors.error,
-  EXPIRED: Colors.textMuted,
-};
-
-const SESSION_STATUS_LABEL: Record<VideoSessionStatus, string> = {
-  CREATED: '🕐 Session Created',
-  WAITING: '⏳ Waiting',
-  IN_PROGRESS: '🔴 Live',
-  COMPLETED: '✅ Completed',
-  FAILED: '❌ Failed',
-  EXPIRED: '⌛ Expired',
-};
-
-const CHECK_STATUS_COLOR: Record<CheckStatus, string> = {
-  checking: '#F59E0B',
-  ok: Colors.success,
-  denied: Colors.error,
-  error: Colors.error,
-};
-
-const CHECK_STATUS_ICON: Record<CheckStatus, string> = {
-  checking: '⏳',
-  ok: '✅',
-  denied: '❌',
-  error: '⚠️',
-};
+const NETWORK_CHECK_URL = 'https://captive.apple.com/hotspot-detect.html';
 
 export const VideoLobbyScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ VideoLobby: VideoLobbyParams }, 'VideoLobby'>>();
   const { bookingId } = route.params;
+  const queryClient = useQueryClient();
+  const currentUser = useAuthStore(state => state.user);
 
+  // Permissions hooks
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [micPermissionResponse, requestMicPermission] = useMicrophonePermissions();
+  const [micPermission, setMicPermission] = useState<boolean | null>(null);
+
+  // Component state
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [joining, setJoining] = useState(false);
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [ending, setEnding] = useState(false);
+  const [networkOk, setNetworkOk] = useState<boolean | null>(null);
+  
   const [checks, setChecks] = useState<PreCallCheck[]>([
-    { label: 'Camera Permission', icon: '📷', status: 'checking' },
-    { label: 'Microphone Permission', icon: '🎤', status: 'checking' },
-    { label: 'Network Connectivity', icon: '📶', status: 'checking' },
+    { id: 'camera', label: 'Camera', icon: '📷', status: 'checking' },
+    { id: 'mic', label: 'Microphone', icon: '🎤', status: 'checking' },
+    { id: 'network', label: 'Connection', icon: '📶', status: 'checking' },
   ]);
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
   // Animated camera pulse
   const cameraAnim = useRef(new Animated.Value(0.85)).current;
   // Animated mic bars
@@ -87,8 +76,14 @@ export const VideoLobbyScreen: React.FC = () => {
   ).current;
 
   useEffect(() => {
+    // Page entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 600, easing: Easing.out(Easing.back(1)), useNativeDriver: true }),
+    ]).start();
+
     // Pulse animation for camera preview
-    Animated.loop(
+    const cameraLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(cameraAnim, {
           toValue: 1,
@@ -103,11 +98,12 @@ export const VideoLobbyScreen: React.FC = () => {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+    cameraLoop.start();
 
     // Mic bar animations
-    micBars.forEach((bar, i) => {
-      Animated.loop(
+    const micLoops = micBars.map((bar, i) => {
+      const loop = Animated.loop(
         Animated.sequence([
           Animated.delay(i * 120),
           Animated.timing(bar, {
@@ -123,428 +119,543 @@ export const VideoLobbyScreen: React.FC = () => {
             useNativeDriver: true,
           }),
         ]),
-      ).start();
+      );
+      loop.start();
+      return loop;
     });
+
+    return () => {
+      cameraLoop.stop();
+      micLoops.forEach((loop) => loop.stop());
+    };
   }, [cameraAnim, micBars]);
 
   // Run real permission and network checks
   useEffect(() => {
-    let cancelled = false;
-
-    const setCheck = (idx: number, status: CheckStatus) => {
-      if (!cancelled) {
-        setChecks((prev) =>
-          prev.map((c, i) => (i === idx ? { ...c, status } : c)),
-        );
-      }
-    };
+    let interval: NodeJS.Timeout;
 
     const runChecks = async () => {
-      // Camera permission check
-      try {
-        // On web or environments where Camera module isn't available, fall back gracefully
-        if (Platform.OS !== 'web' && Camera?.requestCameraPermissionsAsync) {
-          const { status } = await Camera.requestCameraPermissionsAsync();
-          setCheck(0, status === 'granted' ? 'ok' : 'denied');
-        } else {
-          setCheck(0, 'ok');
-        }
-      } catch {
-        setCheck(0, 'error');
+      // Camera
+      if (cameraPermission?.granted) {
+        updateCheck('camera', 'ok', 'Camera ready');
+      } else if (cameraPermission?.canAskAgain === false) {
+        updateCheck('camera', 'denied', 'Permission denied');
+      } else {
+        const result = await requestCameraPermission();
+        updateCheck('camera', result.granted ? 'ok' : 'denied');
       }
 
-      // Microphone permission check
+      // Mic
       try {
-        if (Platform.OS !== 'web' && Audio?.requestPermissionsAsync) {
-          const { status } = await Audio.requestPermissionsAsync();
-          setCheck(1, status === 'granted' ? 'ok' : 'denied');
+        if (micPermissionResponse?.granted) {
+          setMicPermission(true);
+          updateCheck('mic', 'ok', 'Mic ready');
         } else {
-          setCheck(1, 'ok');
+          const result = await requestMicPermission();
+          setMicPermission(result.granted);
+          updateCheck('mic', result.granted ? 'ok' : 'denied');
         }
       } catch {
-        setCheck(1, 'error');
+        updateCheck('mic', 'error', 'Mic check failed');
       }
 
-      // Network connectivity check
+      // Network
+      checkNetwork();
+      interval = setInterval(checkNetwork, 10000); // Check every 10s
+    };
+
+    const checkNetwork = async () => {
+      const start = Date.now();
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
-        await fetch(NETWORK_CHECK_URL, { signal: controller.signal, method: 'HEAD' });
+        
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        await api.head('/health', { signal: controller.signal });
+        
         clearTimeout(timeoutId);
-        setCheck(2, 'ok');
+        const latency = Date.now() - start;
+        setNetworkOk(true);
+
+        if (latency < 400) {
+          updateCheck('network', 'ok', 'Excellent (Fast)');
+        } else if (latency < 1000) {
+          updateCheck('network', 'warning', 'Moderate (May Lag)');
+        } else {
+          updateCheck('network', 'error', 'Poor (Use Audio-Only)');
+        }
       } catch {
-        setCheck(2, 'error');
+        setNetworkOk(false);
+        updateCheck('network', 'denied', 'No Connection');
       }
     };
 
     runChecks();
+    return () => clearInterval(interval);
+  }, [cameraPermission, micPermissionResponse]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const updateCheck = (id: string, status: CheckStatus, message?: string) => {
+    setChecks(prev => prev.map(c => c.id === id ? { ...c, status, message } : c));
+  };
 
-  const { data: booking, isLoading: bookingLoading } = useQuery({
+  // 2. Data Fetching
+  const { data: booking, isLoading: bookingLoading, isError: bookingError } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: () => bookingService.getBookingById(bookingId),
+    refetchInterval: 15000,
   });
 
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['video-session', bookingId],
-    queryFn: () => bookingService.getVideoSession(bookingId),
+    queryFn: async () => {
+      try {
+        return await bookingService.getVideoSession(bookingId);
+      } catch {
+        // No backend session yet — that's fine, we'll start one on Join.
+        return null;
+      }
+    },
     retry: false,
+    refetchInterval: 15000,
   });
 
-  if (bookingLoading || sessionLoading) {
-    return <LoadingSpinner fullScreen message="Preparing lobby..." />;
-  }
+  // 3. Readiness Logic
+  const now = Date.now();
+  const scheduledTime = booking?.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
+  // Allow joining up to 10 minutes early or anytime after scheduled time
+  const isTimeReady = scheduledTime > 0 && now >= scheduledTime - 10 * 60 * 1000;
+  const isFuture = scheduledTime > now + 10 * 60 * 1000;
+  
+  const permissionsOk = cameraPermission?.granted && micPermission === true;
+  const sessionActive = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
+  const bookingReady = booking?.status === 'ACCEPTED' || booking?.status === 'IN_PROGRESS';
 
-  const allChecksOk = checks.every((c) => c.status === 'ok');
-  const canJoin =
-    allChecksOk &&
-    session &&
-    ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
+  // The lobby allows joining when:
+  //  - permissions are granted, AND
+  //  - the booking is in a joinable state, AND
+  //  - either an active session exists OR we're within the join window.
+  // We DO NOT block on network — the mock call works offline.
+  const canJoin = !!permissionsOk && bookingReady && (sessionActive || isTimeReady) && !joining;
 
-  const handleJoinCall = () => {
-    navigation.navigate('VideoConsultation', { bookingId });
+  // 4. Handlers
+  const handleJoinCall = async (audioOnly = false) => {
+    if (!canJoin) return;
+    setJoining(true);
+
+    try {
+      // 1. Notify backend that the session is starting
+      await bookingService.startVideoSession(bookingId).catch(() => undefined);
+
+      // 2. Build the Jitsi URL
+      const { roomId } = await bookingService.getVideoToken(bookingId);
+      const isProvider = booking?.provider?.userId === currentUser?.id; 
+      const displayName = isProvider ? 'Doctor' : 'Patient';
+      
+      // Jitsi config parameters for audio-only and prejoin bypass
+      const config = [
+        'config.prejoinPageEnabled=false',
+        `userInfo.displayName="${encodeURIComponent(displayName)}"`,
+        audioOnly ? 'config.startAudioOnly=true' : 'config.startVideoMuted=false'
+      ].join('&');
+
+      const jitsiUrl = `https://meet.jit.si/${roomId}#${config}`;
+
+      // 3. Open in Browser
+      const supported = await Linking.canOpenURL(jitsiUrl);
+      if (supported) {
+        await Linking.openURL(jitsiUrl);
+        setCallStartTime(Date.now());
+        Alert.alert(
+          audioOnly ? 'Audio Consultation Started' : 'Video Consultation Started',
+          'Opening Jitsi in your browser. Return here to end the consultation.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        throw new Error('Could not open browser');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start the session.');
+    } finally {
+      setJoining(false);
+    }
   };
 
+  const handleEndCall = async () => {
+    Alert.alert(
+      'End Consultation?',
+      'Are you sure you want to end this consultation? This will close the session.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Yes, End Call', 
+          style: 'destructive',
+          onPress: async () => {
+            setJoining(true);
+            try {
+              const response = await bookingService.endVideoSession(bookingId).catch(() => undefined);
+              
+              const isProvider = booking?.provider?.userId === currentUser?.id;
+              
+              // Calculate duration
+              let durationMinutes = 1;
+              if (response && response.duration != null) {
+                durationMinutes = Math.max(1, Math.round(response.duration / 60));
+              } else {
+                const now = Date.now();
+                const start = callStartTime || now;
+                const durationMs = now - start;
+                durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+              }
+
+              navigation.replace('PostCall', { 
+                bookingId, 
+                durationMinutes, 
+                isProvider 
+              });
+            } catch (error) {
+              Alert.alert('Error', 'Failed to end session.');
+            } finally {
+              setJoining(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleBack = () => {
+    if (joining) return;
+    navigation.goBack();
+  };
+
+  if (bookingLoading) return <LoadingSpinner fullScreen message="Preparing Lobby..." />;
+  if (bookingError || !booking) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>⚠️ Failed to load booking details.</Text>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Camera Preview */}
-      <View style={styles.previewContainer}>
-        {cameraEnabled ? (
-          <Animated.View
-            style={[styles.cameraPreview, { transform: [{ scale: cameraAnim }] }]}
-          >
-            <Text style={styles.cameraIcon}>🙋</Text>
-            <Text style={styles.cameraLabel}>Camera Preview</Text>
-            <Text style={styles.cameraSub}>Your video is on</Text>
-          </Animated.View>
-        ) : (
-          <View style={[styles.cameraPreview, styles.cameraOff]}>
-            <Text style={styles.cameraIcon}>🚫</Text>
-            <Text style={styles.cameraLabel}>Camera Off</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
+              <Text style={styles.backIcon}>✕</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Video Consultation</Text>
+            <View style={{ width: 40 }} />
           </View>
-        )}
 
-        {/* Self preview badge */}
-        <View style={styles.selfBadge}>
-          <Text style={styles.selfBadgeText}>You</Text>
-        </View>
+          {/* 1. Camera Preview Section */}
+          <View style={styles.previewCard}>
+            <View style={styles.previewWrapper}>
+              {cameraEnabled && cameraPermission?.granted ? (
+                <CameraView style={styles.camera} facing="front" />
+              ) : (
+                <View style={styles.cameraPlaceholder}>
+                  <Text style={styles.placeholderEmoji}>{!cameraEnabled ? '📵' : '🚫'}</Text>
+                  <Text style={styles.placeholderText}>
+                    {!cameraEnabled ? 'Camera is turned off' : 'Camera permission required'}
+                  </Text>
+                </View>
+              )}
+              
+              <View style={styles.previewOverlay}>
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>PREVIEW</Text>
+                </View>
+                
+                <View style={styles.micStatus}>
+                  <Text style={styles.micStatusText}>{micEnabled ? '🎤 Audio Live' : '🔇 Muted'}</Text>
+                </View>
+              </View>
+            </View>
 
-        {/* Mic level indicator */}
-        {micEnabled && (
-          <View style={styles.micIndicator}>
-            {micBars.map((bar, i) => (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.micBar,
-                  { transform: [{ scaleY: bar }] },
-                ]}
-              />
+            <View style={styles.previewControls}>
+              <TouchableOpacity 
+                style={[styles.controlCircle, !micEnabled && styles.controlCircleOff]} 
+                onPress={() => setMicEnabled(!micEnabled)}
+              >
+                <Text style={styles.controlEmoji}>{micEnabled ? '🎤' : '🔇'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.controlCircle, !cameraEnabled && styles.controlCircleOff]} 
+                onPress={() => setCameraEnabled(!cameraEnabled)}
+              >
+                <Text style={styles.controlEmoji}>{cameraEnabled ? '📷' : '📵'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 2. Readiness & Checks */}
+          <View style={styles.checksGrid}>
+            {checks.map(check => (
+              <View key={check.id} style={styles.checkItem}>
+                <View style={[styles.checkCircle, styles[`check_${check.status}`]]}>
+                  <Text style={styles.checkEmoji}>{check.status === 'ok' ? '✓' : check.status === 'denied' ? '✕' : check.status === 'warning' ? '!' : '...'}</Text>
+                </View>
+                <Text style={styles.checkLabel}>{check.label}</Text>
+                <Text style={styles.checkSubText}>{check.message || (check.status === 'checking' ? 'Verifying...' : 'Ready')}</Text>
+              </View>
             ))}
           </View>
-        )}
-      </View>
 
-      {/* Device Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.controlBtn, !micEnabled && styles.controlBtnOff]}
-          onPress={() => setMicEnabled((v) => !v)}
-          accessibilityLabel={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
-        >
-          <Text style={styles.controlIcon}>{micEnabled ? '🎤' : '🔇'}</Text>
-          <Text style={styles.controlLabel}>{micEnabled ? 'Mic On' : 'Mic Off'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.controlBtn, !cameraEnabled && styles.controlBtnOff]}
-          onPress={() => setCameraEnabled((v) => !v)}
-          accessibilityLabel={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-        >
-          <Text style={styles.controlIcon}>{cameraEnabled ? '📷' : '📵'}</Text>
-          <Text style={styles.controlLabel}>{cameraEnabled ? 'Cam On' : 'Cam Off'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Pre-call Checks */}
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>🔍 Pre-call Checks</Text>
-        {checks.map((check) => (
-          <View key={check.label} style={styles.checkRow}>
-            <Text style={styles.checkIcon}>{check.icon}</Text>
-            <Text style={styles.checkLabel}>{check.label}</Text>
-            <Text style={[styles.checkStatus, { color: CHECK_STATUS_COLOR[check.status] }]}>
-              {CHECK_STATUS_ICON[check.status]}{' '}
-              {check.status === 'checking' ? 'Checking…' : check.status === 'ok' ? 'Ready' : 'Issue'}
-            </Text>
-          </View>
-        ))}
-      </Card>
-
-      {/* Booking Details */}
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>📋 Booking Details</Text>
-        {booking ? (
-          <>
-            {booking.provider && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Provider</Text>
-                <Text style={styles.value}>{booking.provider.name}</Text>
+          {/* 3. Booking Info */}
+          <Card style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <View>
+                <Text style={styles.infoLabel}>CONSULTATION WITH</Text>
+                <Text style={styles.infoValue}>{booking.provider?.name || 'Medical Specialist'}</Text>
+                <Text style={styles.infoSub}>{booking.serviceCategory?.name || 'General Consultation'}</Text>
               </View>
-            )}
-            {booking.serviceCategory && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Service</Text>
-                <Text style={styles.value}>{booking.serviceCategory.name}</Text>
-              </View>
-            )}
-            <View style={styles.row}>
-              <Text style={styles.label}>Scheduled</Text>
-              <Text style={styles.value}>{formatDateTime(booking.scheduledAt)}</Text>
-            </View>
-            <View style={[styles.row, { borderBottomWidth: 0 }]}>
-              <Text style={styles.label}>Status</Text>
               <BookingStatusBadge status={booking.status as BookingStatus} />
             </View>
-          </>
-        ) : (
-          <Text style={styles.noData}>Booking details unavailable</Text>
-        )}
-      </Card>
-
-      {/* Session Status */}
-      {session && (
-        <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>📹 Session Status</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Status</Text>
-            <Text
-              style={[
-                styles.value,
-                { color: SESSION_STATUS_COLOR[session.status as VideoSessionStatus] },
-              ]}
-            >
-              {SESSION_STATUS_LABEL[session.status as VideoSessionStatus] || session.status}
-            </Text>
-          </View>
-          {!['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status) && (
-            <View style={[styles.row, { borderBottomWidth: 0 }]}>
-              <Text style={styles.waitingNote}>
-                ⏳ Waiting for the session to become active…
-              </Text>
+            
+            <View style={styles.divider} />
+            
+            <View style={styles.timeBox}>
+              <Text style={styles.timeLabel}>📅 SCHEDULED TIME</Text>
+              <Text style={styles.timeValue}>{formatDateTime(booking.scheduledAt)}</Text>
+              {isFuture && (
+                <Text style={styles.countdownText}>Room opens 10 mins before start</Text>
+              )}
             </View>
-          )}
-        </Card>
-      )}
+          </Card>
 
-      {!session && (
-        <Card style={styles.card}>
-          <View style={styles.noSession}>
-            <Text style={styles.noSessionIcon}>🎥</Text>
-            <Text style={styles.noSessionText}>
-              The video room will be ready once the provider sets up the session.
-            </Text>
+          {/* 4. Action Area */}
+          <View style={styles.actionArea}>
+            {!permissionsOk && (
+              <TouchableOpacity style={styles.permissionBar} onPress={() => requestCameraPermission()}>
+                <Text style={styles.permissionBarText}>Grant Camera Permissions to Join ➔</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.joinBtn, !canJoin && styles.joinBtnDisabled]}
+              onPress={handleJoinCall}
+              disabled={!canJoin}
+            >
+              {joining ? (
+                <Text style={styles.joinBtnText}>Joining Session...</Text>
+              ) : (
+                <Text style={styles.joinBtnText}>
+                  {!permissionsOk ? 'Grant Camera & Mic Access' :
+                   !bookingReady ? 'Booking Not Confirmed' :
+                   isFuture ? 'Not Ready — Opens 10 min Before' :
+                   sessionActive ? 'Join Consultation Now' : 'Start Session Now'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Audio Only Option */}
+            {canJoin && (
+              <TouchableOpacity
+                style={[styles.audioOnlyBtn, joining && { opacity: 0.5 }]}
+                onPress={() => handleJoinCall(true)}
+                disabled={joining}
+              >
+                <Text style={styles.audioOnlyBtnText}>🎙 Join as Audio Only (Better for Weak Signal)</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* End Call Button */}
+            {sessionActive && (
+              <TouchableOpacity
+                style={[styles.endBtn, joining && { opacity: 0.5 }]}
+                onPress={handleEndCall}
+                disabled={joining}
+              >
+                <Text style={styles.endBtnText}>🏁 End Consultation</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity style={styles.cancelLink} onPress={handleBack}>
+              <Text style={styles.cancelLinkText}>Cancel & Return to Dashboard</Text>
+            </TouchableOpacity>
           </View>
-        </Card>
-      )}
 
-      {/* Join Call Button */}
-      <TouchableOpacity
-        style={[styles.joinButton, !canJoin && styles.joinButtonDisabled]}
-        onPress={handleJoinCall}
-        disabled={!canJoin}
-        accessibilityLabel="Join video call"
-      >
-        <Text style={styles.joinButtonText}>
-          {!allChecksOk ? '⏳ Running checks…' : canJoin ? '🎥 Join Call' : '🔒 Session Not Ready'}
-        </Text>
-      </TouchableOpacity>
-
-      {!allChecksOk && (
-        <Text style={styles.checksNote}>
-          Please wait while we verify your device and connection.
-        </Text>
-      )}
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
-
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F172A' },
-  content: { paddingTop: 16 },
+  scrollContent: { paddingBottom: 40 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 20,
+  },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
+  backIcon: { color: '#94A3B8', fontSize: 18, fontWeight: '300' },
 
-  // Camera preview
-  previewContainer: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    height: 220,
-    borderRadius: 16,
+  // Preview
+  previewCard: { marginHorizontal: 20, marginBottom: 24 },
+  previewWrapper: {
+    height: 300,
+    borderRadius: 24,
     backgroundColor: '#1E293B',
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
-  cameraPreview: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraOff: { opacity: 0.5 },
-  cameraIcon: { fontSize: 64 },
-  cameraLabel: { color: '#94A3B8', fontSize: 16, fontWeight: '600', marginTop: 8 },
-  cameraSub: { color: '#64748B', fontSize: 12, marginTop: 4 },
-  selfBadge: {
+  camera: { flex: 1 },
+  cameraPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  placeholderEmoji: { fontSize: 60, marginBottom: 12 },
+  placeholderText: { color: '#94A3B8', fontSize: 14, fontWeight: '500' },
+  previewOverlay: {
     position: 'absolute',
-    bottom: 12,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    top: 0, left: 0, right: 0, bottom: 0,
+    padding: 16,
+    justifyContent: 'space-between',
   },
-  selfBadgeText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
-  micIndicator: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-    height: 24,
-  },
-  micBar: {
-    width: 4,
-    height: 20,
-    backgroundColor: Colors.success,
-    borderRadius: 2,
-  },
-
-  // Controls
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-    marginBottom: 20,
-    paddingHorizontal: 16,
-  },
-  controlBtn: {
-    width: 80,
-    height: 70,
-    borderRadius: 14,
-    backgroundColor: '#1E293B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  controlBtnOff: {
-    backgroundColor: '#EF4444',
-  },
-  controlIcon: { fontSize: 24 },
-  controlLabel: { color: Colors.white, fontSize: 11, fontWeight: '600' },
-
-  // Cards
-  card: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: Colors.white,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 12,
-  },
-
-  // Check rows
-  checkRow: {
+  liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
-  checkIcon: { fontSize: 18, marginRight: 10 },
-  checkLabel: { flex: 1, fontSize: 14, color: Colors.text },
-  checkStatus: { fontSize: 13, fontWeight: '600' },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 },
+  liveText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  micStatus: {
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-end',
+  },
+  micStatusText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  previewControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: -30,
+    zIndex: 10,
+  },
+  controlCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  controlCircleOff: { backgroundColor: '#EF4444' },
+  controlEmoji: { fontSize: 24 },
 
-  // Booking rows
-  row: {
+  // Checks
+  checksGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  checkItem: { alignItems: 'center', flex: 1 },
+  checkCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  label: { fontSize: 14, color: Colors.textMuted },
-  value: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    flex: 1,
-    textAlign: 'right',
-  },
-  noData: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingVertical: 12 },
+  checkEmoji: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  checkLabel: { color: '#fff', fontSize: 12, fontWeight: '600', marginBottom: 2 },
+  checkSubText: { color: '#64748B', fontSize: 10, textAlign: 'center' },
+  check_ok: { backgroundColor: '#10B981' },
+  check_denied: { backgroundColor: '#EF4444' },
+  check_warning: { backgroundColor: '#F59E0B' },
+  check_checking: { backgroundColor: '#334155' },
+  check_error: { backgroundColor: '#EF4444' },
 
-  // Session
-  waitingNote: {
-    fontSize: 13,
-    color: '#F59E0B',
-    flex: 1,
-    paddingVertical: 4,
-  },
-  noSession: { alignItems: 'center', paddingVertical: 16 },
-  noSessionIcon: { fontSize: 36, marginBottom: 10 },
-  noSessionText: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  // Info Card
+  infoCard: { marginHorizontal: 20, padding: 20, backgroundColor: '#1E293B', borderColor: '#334155' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  infoLabel: { color: '#64748B', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
+  infoValue: { color: '#fff', fontSize: 20, fontWeight: '700' },
+  infoSub: { color: '#3B82F6', fontSize: 14, fontWeight: '600', marginTop: 2 },
+  divider: { height: 1, backgroundColor: '#334155', marginVertical: 16 },
+  timeBox: { alignItems: 'center' },
+  timeLabel: { color: '#64748B', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
+  timeValue: { color: '#E2E8F0', fontSize: 16, fontWeight: '600' },
+  countdownText: { color: '#F59E0B', fontSize: 12, marginTop: 4, fontWeight: '600' },
 
-  // Join button
-  joinButton: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingVertical: 17,
-    alignItems: 'center',
-  },
-  joinButtonDisabled: {
-    backgroundColor: '#334155',
-  },
-  joinButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  checksNote: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 8,
-    marginHorizontal: 16,
-  },
-
-  // Back button
-  backButton: {
-    marginHorizontal: 16,
-    marginTop: 12,
+  // Action
+  actionArea: { paddingHorizontal: 20, marginTop: 10 },
+  permissionBar: {
+    backgroundColor: '#F59E0B22',
+    padding: 12,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#334155',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  permissionBarText: { color: '#F59E0B', fontWeight: '700', fontSize: 13 },
+  joinBtn: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  joinBtnDisabled: { backgroundColor: '#334155', shadowOpacity: 0, elevation: 0 },
+  joinBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  audioOnlyBtn: {
+    marginTop: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    borderRadius: 18,
     paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
-  backButtonText: { color: '#94A3B8', fontSize: 15, fontWeight: '600' },
+  audioOnlyBtnText: { color: '#3B82F6', fontSize: 14, fontWeight: '600' },
+  endBtn: {
+    marginTop: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  endBtnText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
+  cancelLink: { marginTop: 20, alignItems: 'center' },
+  cancelLinkText: { color: '#64748B', fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+
+  // Errors
+  errorContainer: { flex: 1, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center', padding: 40 },
+  errorText: { color: '#fff', fontSize: 16, textAlign: 'center', marginBottom: 24 },
+  backButton: { padding: 16, backgroundColor: '#1E293B', borderRadius: 12 },
+  backButtonText: { color: '#fff', fontWeight: '600' },
 });

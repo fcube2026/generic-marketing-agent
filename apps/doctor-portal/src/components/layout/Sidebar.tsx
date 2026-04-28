@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import api from '@/lib/api';
 
 const navGroups = [
   {
@@ -87,6 +89,27 @@ const navGroups = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [doctorName, setDoctorName] = useState('Doctor');
+  const [specialization, setSpecialization] = useState('');
+  const doctorInitials = useMemo(() => {
+    return doctorName
+      .replace(/^Dr\.?\s*/i, '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0].toUpperCase())
+      .join('') || 'DR';
+  }, [doctorName]);
+
+  useEffect(() => {
+    api
+      .get('/providers/me')
+      .then((res) => {
+        if (res.data?.name) setDoctorName(res.data.name);
+        if (res.data?.specialization) setSpecialization(res.data.specialization);
+      })
+      .catch(() => {/* silently ignore — sidebar is non-critical */});
+  }, []);
 
   return (
     <aside
@@ -152,11 +175,11 @@ export default function Sidebar() {
       <div className="px-4 py-4 border-t border-surface-border">
         <div className="flex items-center gap-3 px-2">
           <div className="w-8 h-8 rounded-full bg-primary-lighter flex items-center justify-center text-primary font-bold text-xs shrink-0">
-            AM
+            {doctorInitials}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-navy truncate">Dr. Arjun Mehta</p>
-            <p className="text-[10px] text-gray-400">Internal Medicine</p>
+            <p className="text-xs font-semibold text-navy truncate">{doctorName}</p>
+            <p className="text-[10px] text-gray-400">{specialization || 'Doctor'}</p>
           </div>
           <div className="w-2 h-2 rounded-full bg-teal shrink-0" title="Online" />
         </div>

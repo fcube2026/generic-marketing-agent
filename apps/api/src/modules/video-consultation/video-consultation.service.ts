@@ -3,42 +3,30 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { SDK as HMSSDK } from '@100mslive/server-sdk';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
+/**
+ * Mock-only video consultation service.
+ *
+ * The real 100ms/LiveKit integrations have been removed to maintain
+ * a stable JS-only environment. All rooms and tokens returned
+ * by this service are deterministic mock values.
+ */
 @Injectable()
 export class VideoConsultationService {
   private readonly logger = new Logger(VideoConsultationService.name);
-  private hms: HMSSDK | null = null;
-  private readonly mockMode: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly supabaseSync: SupabaseSyncService,
   ) {
-    this.mockMode =
-      this.config.get<string>('VIDEO_MOCK_MODE', 'false') === 'true';
-
-    if (this.mockMode) {
-      this.logger.warn(
-        'VideoConsultationService is running in MOCK mode — no real 100ms API calls will be made.',
-      );
-    }
-
-    const accessKey = this.config.get<string>('HMS_APP_ACCESS_KEY', '');
-    const secret = this.config.get<string>('HMS_APP_SECRET', '');
-
-    if (accessKey && secret) {
-      this.hms = new HMSSDK(accessKey, secret);
-    } else if (!this.mockMode) {
-      this.logger.warn(
-        'HMS_APP_ACCESS_KEY or HMS_APP_SECRET not configured. Video consultation endpoints will not function. Set VIDEO_MOCK_MODE=true to use mock mode.',
-      );
-    }
+    this.logger.warn(
+      'VideoConsultationService is running in MOCK mode — all video sessions are mock values.',
+    );
   }
 
   private async getBookingWithParticipants(bookingId: string) {
@@ -68,6 +56,12 @@ export class VideoConsultationService {
 
     this.assertParticipant(booking, userId);
 
+    if (booking.mode !== 'VIDEO_CONSULTATION') {
+      throw new BadRequestException(
+        'A video room can only be created for video consultation bookings',
+      );
+    }
+
     if (booking.status !== 'ACCEPTED') {
       throw new BadRequestException(
         'A video room can only be created for an accepted booking',
@@ -79,42 +73,18 @@ export class VideoConsultationService {
     });
     if (existing) return existing;
 
-    let roomId: string;
+    const roomId = `room-${randomUUID()}`;
 
-    if (this.mockMode) {
-      roomId = `mock-room-${bookingId}`;
-      this.logger.debug(`[MOCK] createRoom — using mock roomId: ${roomId}`);
-    } else {
-      if (!this.hms) {
-        throw new InternalServerErrorException(
-          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
-        );
-      }
-      const templateId = this.config.get<string>('HMS_TEMPLATE_ID');
-      try {
-        const room = await this.hms.rooms.create({
-          name: `curex24-${bookingId}`,
-          description: `Video consultation for booking ${bookingId}`,
-          ...(templateId ? { template_id: templateId } : {}),
-        });
-        roomId = room.id;
-      } catch (err) {
-        this.logger.error(
-          `Failed to create 100ms room for booking ${bookingId}: ${(err as Error).message}`,
-        );
-        throw new InternalServerErrorException(
-          'Failed to create video room. Please try again.',
-        );
-      }
-    }
-
-    return this.prisma.videoSession.create({
+    const session = await this.prisma.videoSession.create({
       data: {
         bookingId,
         roomId,
         status: 'CREATED',
+        creatorUserId: userId,
       },
     });
+    await this.supabaseSync.syncVideoSession(session);
+    return session;
   }
 
   async generateToken(bookingId: string, userId: string, role?: string) {
@@ -133,35 +103,13 @@ export class VideoConsultationService {
       );
     }
 
-    let token: string;
+    const token = `mock-token-${session.roomId}-${userId}-${tokenRole}`;
 
-    if (this.mockMode) {
-      token = `mock-token-${session.roomId}-${userId}-${tokenRole}`;
-      this.logger.debug(
-        `[MOCK] generateToken — using mock token for userId: ${userId}`,
-      );
-    } else {
-      if (!this.hms) {
-        throw new InternalServerErrorException(
-          'Video consultation is not configured. Set HMS_APP_ACCESS_KEY and HMS_APP_SECRET.',
-        );
-      }
-      try {
-        const authToken = await this.hms.auth.getAuthToken({
-          roomId: session.roomId,
-          userId,
-          role: tokenRole,
-        });
-        token = authToken.token;
-      } catch (err) {
-        this.logger.error(
-          `Failed to generate 100ms token for booking ${bookingId}: ${(err as Error).message}`,
-        );
-        throw new InternalServerErrorException(
-          'Failed to generate join token. Please try again.',
-        );
-      }
-    }
+    const updated = await this.prisma.videoSession.update({
+      where: { bookingId },
+      data: { sessionToken: token },
+    });
+    await this.supabaseSync.syncVideoSession(updated);
 
     return { token, roomId: session.roomId, role: tokenRole };
   }

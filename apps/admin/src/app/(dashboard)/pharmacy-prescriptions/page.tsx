@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Badge from '@/components/ui/Badge';
 import Card, { StatCard } from '@/components/ui/Card';
 import api from '@/lib/api';
@@ -12,13 +12,13 @@ type PrescriptionStatus =
   | 'REUPLOAD_REQUIRED';
 
 type VerifyAction = 'APPROVE' | 'REJECT' | 'REUPLOAD';
-type ReviewerRole = 'ADMIN' | 'PHARMACIST';
+type QueueFilterStatus = PrescriptionStatus | 'ALL';
 
 interface Reviewer {
   id: string;
   email: string | null;
   phone: string;
-  role: ReviewerRole;
+  role: 'ADMIN' | 'PHARMACIST';
 }
 
 interface QueueItem {
@@ -55,6 +55,21 @@ interface QueueResponse {
 
 interface PrescriptionDetails extends QueueItem {
   fileUrl: string;
+  history?: HistoryEntry[];
+}
+
+interface HistoryEntry {
+  id: string;
+  action: string;
+  actorUserId: string | null;
+  actor: {
+    id: string;
+    phone: string | null;
+    email: string | null;
+    role: string;
+  } | null;
+  notes: string | null;
+  createdAt: string;
 }
 
 const statusVariant: Record<PrescriptionStatus, 'warning' | 'success' | 'error' | 'info'> = {
@@ -76,28 +91,45 @@ function formatDuration(elapsedMs: number): string {
   return `${minutes}m`;
 }
 
+const auditActionLabel: Record<string, string> = {
+  PRESCRIPTION_UPLOADED: 'Uploaded',
+  PRESCRIPTION_VIEWED: 'Viewed',
+  PRESCRIPTION_APPROVED: 'Approved',
+  PRESCRIPTION_REJECTED: 'Rejected',
+  PRESCRIPTION_REUPLOAD_REQUIRED: 'Re-upload requested',
+  PRESCRIPTION_ASSIGNED: 'Assigned to reviewer',
+};
+
+function formatAuditAction(action: string): string {
+  return auditActionLabel[action] ?? action.replace(/_/g, ' ').toLowerCase();
+}
+
+const auditActionVariant: Record<string, 'warning' | 'success' | 'error' | 'info'> = {
+  PRESCRIPTION_UPLOADED: 'info',
+  PRESCRIPTION_VIEWED: 'info',
+  PRESCRIPTION_APPROVED: 'success',
+  PRESCRIPTION_REJECTED: 'error',
+  PRESCRIPTION_REUPLOAD_REQUIRED: 'warning',
+  PRESCRIPTION_ASSIGNED: 'info',
+};
+
 export default function PharmacyPrescriptionsPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [reviewers, setReviewers] = useState<Reviewer[]>([]);
-  const [currentRole, setCurrentRole] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<QueueFilterStatus>('ALL');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<PrescriptionDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [action, setAction] = useState<VerifyAction>('APPROVE');
-  const [selectedReviewerId, setSelectedReviewerId] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [assigning, setAssigning] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const isAdmin = currentRole === 'ADMIN';
-
-  const fetchQueue = async () => {
+  const fetchQueue = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get<QueueResponse>('/admin/pharmacy/prescriptions/queue', {
-        params: { page: 1, limit: 50, sortBy: 'createdAt', order: 'asc' },
+        params: { page: 1, limit: 50, sortBy: 'createdAt', order: 'desc', status: statusFilter },
       });
       setQueue(response.data.data);
     } catch {
@@ -106,16 +138,7 @@ export default function PharmacyPrescriptionsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchReviewers = async () => {
-    try {
-      const response = await api.get<Reviewer[]>('/admin/pharmacy/prescriptions/reviewers');
-      setReviewers(response.data);
-    } catch {
-      setReviewers([]);
-    }
-  };
+  }, [statusFilter]);
 
   const syncQueueItem = (updated: PrescriptionDetails) => {
     setQueue((current) =>
@@ -137,18 +160,7 @@ export default function PharmacyPrescriptionsPage() {
 
   useEffect(() => {
     fetchQueue();
-    fetchReviewers();
-
-    try {
-      const storedUser = localStorage.getItem('admin_user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser) as { role?: string };
-        setCurrentRole(parsed.role ?? null);
-      }
-    } catch {
-      setCurrentRole(null);
-    }
-  }, []);
+  }, [fetchQueue]);
 
   useEffect(() => {
     if (!feedback) {
@@ -160,7 +172,7 @@ export default function PharmacyPrescriptionsPage() {
   }, [feedback]);
 
   const stats = useMemo(() => {
-    const pending = queue.length;
+    const pending = queue.filter((item) => item.status === 'PENDING_REVIEW').length;
     const breached = queue.filter((item) => item.sla.breached).length;
     const avgElapsedMs =
       queue.length === 0
@@ -181,7 +193,6 @@ export default function PharmacyPrescriptionsPage() {
     try {
       const response = await api.get<PrescriptionDetails>(`/admin/pharmacy/prescriptions/${id}`);
       setSelected(response.data);
-      setSelectedReviewerId(response.data.assignedReviewer?.id ?? '');
     } catch {
       setFeedback({ type: 'error', message: 'Failed to load prescription details.' });
     } finally {
@@ -193,31 +204,7 @@ export default function PharmacyPrescriptionsPage() {
     setSelected(null);
     setNotes('');
     setAction('APPROVE');
-    setSelectedReviewerId('');
     setZoom(1);
-  };
-
-  const assignReviewer = async () => {
-    if (!selected || !selectedReviewerId) {
-      return;
-    }
-
-    setAssigning(true);
-    try {
-      const response = await api.post<PrescriptionDetails>(
-        `/admin/pharmacy/prescriptions/${selected.id}/assign`,
-        {
-          reviewerId: selectedReviewerId,
-        },
-      );
-      setSelected((current) => (current ? { ...current, ...response.data } : response.data));
-      syncQueueItem(response.data);
-      setFeedback({ type: 'success', message: 'Reviewer assignment updated.' });
-    } catch {
-      setFeedback({ type: 'error', message: 'Failed to update reviewer assignment.' });
-    } finally {
-      setAssigning(false);
-    }
   };
 
   const submitDecision = async () => {
@@ -227,10 +214,18 @@ export default function PharmacyPrescriptionsPage() {
 
     setSubmitting(true);
     try {
-      await api.post(`/admin/pharmacy/prescriptions/${selected.id}/verify`, {
+      const response = await api.post<PrescriptionDetails>(`/admin/pharmacy/prescriptions/${selected.id}/verify`, {
         action,
         notes: notes || undefined,
       });
+
+      setSelected((current) => (current ? { ...current, ...response.data } : response.data));
+      syncQueueItem(response.data);
+
+      if (statusFilter !== 'ALL' && statusFilter !== response.data.status) {
+        setQueue((current) => current.filter((item) => item.id !== response.data.id));
+      }
+
       setFeedback({ type: 'success', message: 'Prescription review decision saved.' });
       closeDetails();
       await fetchQueue();
@@ -239,14 +234,6 @@ export default function PharmacyPrescriptionsPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const reviewerLabel = (reviewer: Reviewer | null) => {
-    if (!reviewer) {
-      return 'Unassigned';
-    }
-
-    return reviewer.email || reviewer.phone;
   };
 
   const adjustZoom = (delta: number) => {
@@ -275,6 +262,21 @@ export default function PharmacyPrescriptionsPage() {
         </button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">Show</label>
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as QueueFilterStatus)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+        >
+          <option value="ALL">All statuses</option>
+          <option value="PENDING_REVIEW">Pending review</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+          <option value="REUPLOAD_REQUIRED">Re-upload required</option>
+        </select>
+      </div>
+
       {feedback && (
         <div
           className={`rounded-lg border px-4 py-3 text-sm font-medium ${
@@ -295,7 +297,7 @@ export default function PharmacyPrescriptionsPage() {
 
       <Card
         title="Uploaded Prescriptions"
-        subtitle="Pending patient uploads awaiting pharmacist or admin review"
+        subtitle="Prescription uploads with saved review decisions"
       >
         {loading ? (
           <div className="flex h-32 items-center justify-center">
@@ -304,7 +306,7 @@ export default function PharmacyPrescriptionsPage() {
         ) : queue.length === 0 ? (
           <div className="py-10 text-center text-gray-400">
             <p className="text-lg font-medium">Queue is empty</p>
-            <p className="mt-1 text-sm">No prescriptions are waiting for review.</p>
+            <p className="mt-1 text-sm">No prescriptions match the selected status.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -321,10 +323,6 @@ export default function PharmacyPrescriptionsPage() {
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
                     Uploaded {new Date(item.createdAt).toLocaleString()} · Queue age {formatDuration(item.sla.elapsedMs)}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Assigned reviewer: {reviewerLabel(item.assignedReviewer)}
-                    {item.assignedAt ? ` · ${new Date(item.assignedAt).toLocaleString()}` : ''}
                   </p>
                   {item.reviewNotes && (
                     <p className="mt-1 text-sm text-gray-500">Latest note: {item.reviewNotes}</p>
@@ -433,53 +431,6 @@ export default function PharmacyPrescriptionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Assigned Reviewer</p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Badge variant={selected.assignedReviewer ? 'info' : 'default'}>
-                          {reviewerLabel(selected.assignedReviewer)}
-                        </Badge>
-                        {selected.assignedReviewer && (
-                          <span className="text-xs text-gray-500">{selected.assignedReviewer.role}</span>
-                        )}
-                      </div>
-                      {selected.assignedAt && (
-                        <p className="mt-2 text-sm text-gray-500">
-                          Assigned on {new Date(selected.assignedAt).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-
-                    {isAdmin && (
-                      <div>
-                        <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Reassign Reviewer
-                        </label>
-                        <div className="mt-2 flex gap-2">
-                          <select
-                            value={selectedReviewerId}
-                            onChange={(event) => setSelectedReviewerId(event.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">Select a reviewer</option>
-                            {reviewers.map((reviewer) => (
-                              <option key={reviewer.id} value={reviewer.id}>
-                                {(reviewer.email || reviewer.phone)} ({reviewer.role})
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={assignReviewer}
-                            disabled={assigning || !selectedReviewerId}
-                            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
-                            type="button"
-                          >
-                            {assigning ? 'Assigning...' : 'Assign'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                         Decision
                       </label>
@@ -505,6 +456,38 @@ export default function PharmacyPrescriptionsPage() {
                         placeholder="Add pharmacist or admin review notes"
                         className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                       />
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        Review History
+                      </p>
+                      {selected.history && selected.history.length > 0 ? (
+                        <ol className="mt-2 max-h-64 space-y-3 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          {selected.history.map((entry) => (
+                            <li key={entry.id} className="rounded-md bg-white p-3 shadow-sm">
+                              <div className="flex items-center justify-between gap-2">
+                                <Badge variant={auditActionVariant[entry.action] ?? 'info'}>
+                                  {formatAuditAction(entry.action)}
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(entry.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-gray-600">
+                                {entry.actor
+                                  ? `${entry.actor.role} · ${entry.actor.email || entry.actor.phone || entry.actor.id}`
+                                  : 'System'}
+                              </p>
+                              {entry.notes && (
+                                <p className="mt-1 text-sm text-gray-700">{entry.notes}</p>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-500">No prior actions recorded.</p>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">

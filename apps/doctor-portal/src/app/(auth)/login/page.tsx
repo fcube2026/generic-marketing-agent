@@ -41,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/verify-otp', { phone, otp });
+      const { data } = await api.post('/auth/verify-otp', { phone, otp, role: 'PROVIDER' });
 
       localStorage.setItem('provider_token', data.token);
       localStorage.setItem(

@@ -9,6 +9,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [NotificationsModule],
   controllers: [PrescriptionController, AdminPrescriptionController],
   providers: [PrescriptionService, PrescriptionStorageService],
-  exports: [PrescriptionService],
+  exports: [PrescriptionService, PrescriptionStorageService],
 })
 export class PrescriptionModule {}

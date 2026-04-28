@@ -28,8 +28,12 @@ const POLL_INTERVAL_MS = 30_000;
 // The backend may also use PENDING / PRESCRIPTION_REVIEW which we treat
 // as the first "Placed" step so the timeline stays accurate.
 const TIMELINE_STEPS: { key: string; label: string; aliases?: string[] }[] = [
-  { key: 'PLACED', label: 'Order Placed', aliases: ['PENDING', 'PRESCRIPTION_REVIEW'] },
-  { key: 'CONFIRMED', label: 'Confirmed' },
+  {
+    key: 'PLACED',
+    label: 'Order Placed',
+    aliases: ['PENDING', 'PRESCRIPTION_REVIEW', 'PENDING_APPROVAL'],
+  },
+  { key: 'CONFIRMED', label: 'Confirmed', aliases: ['APPROVED', 'PAID', 'DISPATCHED'] },
   { key: 'PACKED', label: 'Packed' },
   { key: 'SHIPPED', label: 'Shipped' },
   { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery' },
@@ -218,6 +222,21 @@ export const OrderTrackingScreen: React.FC = () => {
     },
   });
 
+  const payMutation = useMutation({
+    mutationFn: () => pharmacyService.payOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-order', orderId] });
+      Alert.alert('Payment Complete', 'Your pharmacy order payment is successful.');
+    },
+    onError: (err: any) => {
+      Alert.alert(
+        'Payment Failed',
+        err?.response?.data?.message || 'Could not complete payment right now.',
+      );
+    },
+  });
+
   const handleCancel = () => {
     Alert.alert(
       'Cancel Order',
@@ -303,6 +322,7 @@ export const OrderTrackingScreen: React.FC = () => {
     order.status === 'REFUNDED';
   const currentIndex = getStepIndex(order.status);
   const canCancel = canCancelPharmacyOrder(order.status);
+  const canPayNow = order.status === 'APPROVED' && order.paymentStatus === 'UNPAID';
   const eta = formatEstimatedDelivery(order.estimatedDeliveryAt);
   const delivered = order.status === 'DELIVERED';
   const pricing = getPharmacyDisplayPricing(order);
@@ -322,7 +342,7 @@ export const OrderTrackingScreen: React.FC = () => {
             </Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.partnerName}>{order.partnerName}</Text>
+            <Text style={styles.partnerName}>{order.partnerName ?? 'Awaiting pharmacy assignment'}</Text>
             <Text style={styles.orderNumber}>Order #{order.orderNumber}</Text>
             <Text style={styles.orderDate}>
               Placed on {formatDate(order.createdAt)} at {formatTime(order.createdAt)}
@@ -380,7 +400,7 @@ export const OrderTrackingScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>Price Details</Text>
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Subtotal</Text>
-          <Text style={styles.priceValue}>{formatCurrency(order.subtotal)}</Text>
+          <Text style={styles.priceValue}>{formatCurrency(order.subtotal ?? 0)}</Text>
         </View>
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Delivery Fee</Text>
@@ -402,6 +422,16 @@ export const OrderTrackingScreen: React.FC = () => {
 
       {/* Actions */}
       <View style={styles.actions}>
+        {canPayNow && (
+          <View style={{ marginBottom: 12 }}>
+            <Button
+              title={payMutation.isPending ? 'Processing Payment...' : 'Pay Now'}
+              onPress={() => payMutation.mutate()}
+              loading={payMutation.isPending}
+            />
+          </View>
+        )}
+
         {canCancel ? (
           <Button
             title={cancelMutation.isPending ? 'Cancelling...' : 'Cancel Order'}

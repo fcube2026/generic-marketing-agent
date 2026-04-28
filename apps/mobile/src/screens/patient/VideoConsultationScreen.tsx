@@ -11,29 +11,13 @@ import { bookingService } from '../../services/bookingService';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { BookingStatus, VideoSessionStatus } from '../../types';
 import { formatDateTime, formatCurrency } from '../../utils/format';
+import { SESSION_STATUS_LABEL, SESSION_STATUS_COLOR } from '../../constants/videoConsultation';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'VideoConsultation'>;
   route: RouteProp<PatientStackParamList, 'VideoConsultation'>;
 };
 
-const SESSION_STATUS_LABEL: Record<VideoSessionStatus, string> = {
-  CREATED: '🕐 Session Created',
-  WAITING: '⏳ Waiting for Provider',
-  IN_PROGRESS: '🔴 Live',
-  COMPLETED: '✅ Completed',
-  FAILED: '❌ Failed',
-  EXPIRED: '⌛ Expired',
-};
-
-const SESSION_STATUS_COLOR: Record<VideoSessionStatus, string> = {
-  CREATED: Colors.textMuted,
-  WAITING: '#F59E0B',
-  IN_PROGRESS: Colors.error,
-  COMPLETED: Colors.success,
-  FAILED: Colors.error,
-  EXPIRED: Colors.textMuted,
-};
 
 export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) => {
   const { bookingId } = route.params;
@@ -41,12 +25,18 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
   const { data: booking, isLoading: bookingLoading } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: () => bookingService.getBookingById(bookingId),
+    refetchInterval: 5000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
 
   const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: ['video-session', bookingId],
     queryFn: () => bookingService.getVideoSession(bookingId),
     retry: false,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
 
   if (bookingLoading || sessionLoading) {
@@ -55,18 +45,8 @@ export const VideoConsultationScreen: React.FC<Props> = ({ navigation, route }) 
 
   const canJoin = session && ['CREATED', 'WAITING', 'IN_PROGRESS'].includes(session.status);
 
-  const handleJoin = async () => {
-    try {
-      const { token, roomId } = await bookingService.getVideoToken(bookingId);
-      navigation.navigate('VideoCall', {
-        bookingId,
-        token,
-        roomId,
-        role: 'patient',
-      });
-    } catch {
-      Alert.alert('Error', 'Failed to get join token. Please try again.');
-    }
+  const handleJoin = () => {
+    navigation.navigate('VideoLobby', { bookingId });
   };
 
   return (

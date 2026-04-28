@@ -39,6 +39,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ./apps/api/.env
     environment:
       DATABASE_URL: postgresql://curex24:curex24password@postgres:5432/curex24
       DIRECT_URL: postgresql://curex24:curex24password@postgres:5432/curex24
@@ -46,6 +48,9 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       NODE_ENV: development
       PORT: 3000
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       postgres:
         condition: service_healthy

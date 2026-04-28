@@ -3,14 +3,77 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { PharmacyOrderStatus, Prisma, Role } from '@prisma/client';
+import { FeatureFlags } from '../../common/feature-flags/feature-flags';
+import {
+  PharmacyOrderStatus,
+  PharmacyOrderPaymentStatus,
+  PrescriptionStatus,
+  Prisma,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreatePharmacyOrderDto } from './dto/create-pharmacy-order.dto';
 import { PharmacyOrderResponseDto } from './dto/pharmacy-order-response.dto';
 import { PharmacyPartnerProvider } from './providers/pharmacy-partner.interface';
 import { PrescriptionService } from '../prescription/prescription.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
+import { encrypt, decrypt } from '../../common/utils/encryption.util';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CreatePrescriptionOrderDto } from './dto/create-prescription-order.dto';
+
+interface ApprovePrescriptionOrderDto {
+  partnerId: string;
+  items: Array<{
+    medicineCode: string;
+    medicineName: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  notes?: string;
+}
+
+interface RejectPrescriptionOrderDto {
+  reason: string;
+}
+
+const PAYMENT_STATUS = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+} as const;
+
+const ORDER_STATUS = {
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  PAID: 'PAID',
+} as const;
+
+const REUPLOAD_NOTE_PREFIX = '[REUPLOAD_REQUIRED]';
+
+type AdminOrderFlow = 'ALL' | 'MEDICINE' | 'PRESCRIPTION';
+
+interface AdminOrderTrackingOptions {
+  flow?: string;
+  status?: string;
+  paymentStatus?: string;
+  patientQuery?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface AdminTrackingTimelineEvent {
+  status: string;
+  timestamp: Date;
+  source: string | null;
+  actorId: string | null;
+  actorRole: Role | null;
+  actorLabel: string | null;
+}
 
 type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
@@ -20,13 +83,18 @@ type PharmacyOrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   };
 }> & {
   uploadedPrescriptionId?: string | null;
+  patientProfile?: {
+    name?: string | null;
+    user?: {
+      phone?: string | null;
+      email?: string | null;
+    } | null;
+  } | null;
 };
 
 @Injectable()
 export class PharmacyOrderService {
   private readonly logger = new Logger(PharmacyOrderService.name);
-
-  private static readonly MINIMUM_ORDER_SUBTOTAL = 120;
 
   private static readonly FREE_DELIVERY_THRESHOLD = 450;
 
@@ -39,6 +107,8 @@ export class PharmacyOrderService {
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
     private readonly prescriptionService: PrescriptionService,
+    private readonly prescriptionStorage: PrescriptionStorageService,
+    private readonly notificationsService?: NotificationsService,
   ) {}
 
   async placeOrder(
@@ -66,7 +136,9 @@ export class PharmacyOrderService {
         data: {
           userId,
           label: 'Delivery',
-          addressLine: dto.deliveryAddress.addressLine,
+          // Application-level PII encryption — address is sensitive and only
+          // ever read back through this service, which decrypts on response.
+          addressLine: encrypt(dto.deliveryAddress.addressLine),
           city: dto.deliveryAddress.city,
           state: dto.deliveryAddress.state,
           pincode: dto.deliveryAddress.pincode,
@@ -114,7 +186,6 @@ export class PharmacyOrderService {
       (sum, item) => sum + item.quantity * item.unitPrice,
       0,
     );
-    this.assertMinimumOrderSubtotal(subtotal);
     const deliveryFee = this.calculateDeliveryFee(subtotal);
     const totalAmount = Math.max(0, subtotal + deliveryFee);
 
@@ -138,6 +209,7 @@ export class PharmacyOrderService {
         deliveryFee,
         discount: 0,
         totalAmount,
+        paymentStatus: PAYMENT_STATUS.PAID,
         status: this.mapPartnerStatus(partnerResult.status),
         notes: dto.notes ?? null,
         items: {
@@ -160,15 +232,960 @@ export class PharmacyOrderService {
     return this.toResponseDto(order);
   }
 
-  private assertMinimumOrderSubtotal(subtotal: number): void {
-    if (subtotal < PharmacyOrderService.MINIMUM_ORDER_SUBTOTAL) {
-      throw new BadRequestException('Minimum order amount is Rs 120');
+  async createPrescriptionOnlyOrder(
+    userId: string,
+    dto: CreatePrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const patient = await this.getPatientProfile(userId);
+
+    if (!dto.uploadedPrescriptionId && !dto.prescriptionUrl) {
+      throw new BadRequestException(
+        'Either uploadedPrescriptionId or prescriptionUrl is required.',
+      );
+    }
+
+    let uploadedPrescriptionId: string | null = null;
+    if (dto.uploadedPrescriptionId) {
+      const uploadedPrescription =
+        await this.prisma.uploadedPrescription.findFirst({
+          where: {
+            id: dto.uploadedPrescriptionId,
+            userId,
+            status: {
+              in: [
+                PrescriptionStatus.PENDING_REVIEW,
+                PrescriptionStatus.REUPLOAD_REQUIRED,
+                PrescriptionStatus.APPROVED,
+              ],
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (!uploadedPrescription) {
+        throw new BadRequestException(
+          'Uploaded prescription not found for this patient.',
+        );
+      }
+
+      uploadedPrescriptionId = uploadedPrescription.id;
+    }
+
+    const address = await this.resolveOrderAddress(
+      userId,
+      dto.deliveryAddressId,
+    );
+
+    const order = await this.prisma.pharmacyOrder.create({
+      data: {
+        orderNumber: this.generateOrderNumber(),
+        patientProfileId: patient.id,
+        uploadedPrescriptionId,
+        pharmacyPartnerId: null,
+        partnerOrderId: null,
+        deliveryAddressId: address.id,
+        prescriptionImageUrl: null,
+        prescriptionUrl: dto.prescriptionUrl ?? null,
+        subtotal: null,
+        deliveryFee: null,
+        discount: 0,
+        totalAmount: null,
+        paymentStatus: PAYMENT_STATUS.UNPAID,
+        status: ORDER_STATUS.PENDING_APPROVAL as any,
+        notes: dto.notes ?? null,
+      } as any,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+
+    return this.toResponseDto(order);
+  }
+
+  async listPendingPrescriptionApprovals(
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    data: PharmacyOrderResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    this.assertPrescriptionFlowEnabled();
+    const where: Prisma.PharmacyOrderWhereInput = {
+      status: ORDER_STATUS.PENDING_APPROVAL as any,
+    };
+
+    const [orders, total] = await Promise.all([
+      this.prisma.pharmacyOrder.findMany({
+        where,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.pharmacyOrder.count({ where }),
+    ]);
+
+    const data = await Promise.all(
+      orders.map(async (order) => {
+        const dto = this.toResponseDto(order);
+        const fresh = await this.refreshPrescriptionSignedUrl(order);
+        if (fresh) {
+          dto.prescriptionUrl = fresh;
+          dto.prescriptionImageUrl = fresh;
+        }
+        return dto;
+      }),
+    );
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  private async refreshPrescriptionSignedUrl(
+    order: PharmacyOrderWithRelations,
+  ): Promise<string | null> {
+    const uploadedId = order.uploadedPrescriptionId;
+    if (!uploadedId) return null;
+    try {
+      const upload = await this.prisma.uploadedPrescription.findUnique({
+        where: { id: uploadedId },
+        select: { filePath: true },
+      });
+      if (!upload?.filePath) return null;
+      return await this.prescriptionStorage.getSignedUrl(upload.filePath);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to refresh signed URL for order ${order.id}: ${(err as Error).message}`,
+      );
+      return null;
     }
   }
 
-  private calculateDeliveryFee(subtotal: number): number {
-    this.assertMinimumOrderSubtotal(subtotal);
+  async listAllPrescriptionOrders(
+    page = 1,
+    limit = 20,
+    status?: string,
+  ): Promise<{
+    data: PharmacyOrderResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const where: Prisma.PharmacyOrderWhereInput =
+      status === 'REUPLOAD_REQUIRED'
+        ? {
+            status: ORDER_STATUS.REJECTED as any,
+            notes: { startsWith: REUPLOAD_NOTE_PREFIX },
+          }
+        : {
+            status: status
+              ? (status as any)
+              : {
+                  in: [
+                    ORDER_STATUS.PENDING_APPROVAL,
+                    ORDER_STATUS.APPROVED,
+                    ORDER_STATUS.REJECTED,
+                  ] as any[],
+                },
+          };
 
+    const [orders, total] = await Promise.all([
+      this.prisma.pharmacyOrder.findMany({
+        where,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.pharmacyOrder.count({ where }),
+    ]);
+
+    const data = await Promise.all(
+      orders.map(async (order) => {
+        const dto = this.toResponseDto(order);
+        const fresh = await this.refreshPrescriptionSignedUrl(order);
+        if (fresh) {
+          dto.prescriptionUrl = fresh;
+          dto.prescriptionImageUrl = fresh;
+        }
+        return dto;
+      }),
+    );
+
+    return { data, total, page, limit };
+  }
+
+  async listAdminOrderTracking(options: AdminOrderTrackingOptions): Promise<{
+    data: Array<
+      PharmacyOrderResponseDto & {
+        flow: Exclude<AdminOrderFlow, 'ALL'>;
+        timeline: AdminTrackingTimelineEvent[];
+        timestamps: {
+          createdAt: Date;
+          approvedAt: Date | null;
+          rejectedAt: Date | null;
+          paidAt: Date | null;
+          dispatchedAt: Date | null;
+          deliveredAt: Date | null;
+        };
+        prescriptionReview: {
+          status: PrescriptionStatus | null;
+          notes: string | null;
+          reviewedBy: string | null;
+          reviewedByRole: Role | null;
+          reviewedAt: Date | null;
+        } | null;
+      }
+    >;
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(200, Math.max(1, options.limit ?? 50));
+    const flow = this.normalizeAdminOrderFlow(options.flow);
+
+    const where: Prisma.PharmacyOrderWhereInput = {};
+    const andConditions: Prisma.PharmacyOrderWhereInput[] = [];
+
+    if (options.status?.trim()) {
+      where.status = options.status.trim().toUpperCase() as any;
+    }
+
+    if (options.paymentStatus?.trim()) {
+      const normalizedPayment = options.paymentStatus.trim().toUpperCase();
+      if (
+        normalizedPayment === PharmacyOrderPaymentStatus.PAID ||
+        normalizedPayment === PharmacyOrderPaymentStatus.UNPAID
+      ) {
+        where.paymentStatus = normalizedPayment as PharmacyOrderPaymentStatus;
+      }
+    }
+
+    const patientQuery = options.patientQuery?.trim();
+    if (patientQuery) {
+      andConditions.push({
+        OR: [
+          { orderNumber: { contains: patientQuery, mode: 'insensitive' } },
+          {
+            patientProfile: {
+              name: { contains: patientQuery, mode: 'insensitive' },
+            },
+          },
+          {
+            patientProfile: {
+              user: {
+                phone: { contains: patientQuery, mode: 'insensitive' },
+              },
+            },
+          },
+          {
+            patientProfile: {
+              user: {
+                email: { contains: patientQuery, mode: 'insensitive' },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (options.fromDate) {
+      const from = new Date(options.fromDate);
+      if (!Number.isNaN(from.getTime())) {
+        createdAt.gte = from;
+      }
+    }
+    if (options.toDate) {
+      const to = new Date(options.toDate);
+      if (!Number.isNaN(to.getTime())) {
+        to.setHours(23, 59, 59, 999);
+        createdAt.lte = to;
+      }
+    }
+    if (Object.keys(createdAt).length > 0) {
+      where.createdAt = createdAt;
+    }
+
+    const prescriptionFlowCondition: Prisma.PharmacyOrderWhereInput = {
+      OR: [
+        { uploadedPrescriptionId: { not: null } },
+        { prescriptionUrl: { not: null } },
+        {
+          status: {
+            in: [
+              ORDER_STATUS.PENDING_APPROVAL,
+              ORDER_STATUS.APPROVED,
+              ORDER_STATUS.REJECTED,
+            ] as any[],
+          },
+        },
+      ],
+    };
+
+    const medicineFlowCondition: Prisma.PharmacyOrderWhereInput = {
+      AND: [
+        { uploadedPrescriptionId: null },
+        { prescriptionUrl: null },
+        {
+          NOT: {
+            status: {
+              in: [
+                ORDER_STATUS.PENDING_APPROVAL,
+                ORDER_STATUS.APPROVED,
+                ORDER_STATUS.REJECTED,
+              ] as any[],
+            },
+          },
+        },
+      ],
+    };
+
+    if (flow === 'PRESCRIPTION') {
+      andConditions.push(prescriptionFlowCondition);
+    }
+
+    if (flow === 'MEDICINE') {
+      andConditions.push(medicineFlowCondition);
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    const orders = await this.prisma.pharmacyOrder.findMany({
+      where,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+        patientProfile: {
+          select: {
+            name: true,
+            user: {
+              select: {
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
+        statusHistory: {
+          orderBy: { timestamp: 'asc' },
+        },
+        uploadedPrescription: {
+          select: {
+            status: true,
+            reviewNotes: true,
+            reviewedBy: true,
+            reviewLogs: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                createdAt: true,
+                performedBy: true,
+                action: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const total = await this.prisma.pharmacyOrder.count({ where });
+
+    const actorIds = new Set<string>();
+    orders.forEach((order) => {
+      order.statusHistory.forEach((entry) => {
+        const actorId = this.extractActorIdFromHistorySource(entry.source);
+        if (actorId) {
+          actorIds.add(actorId);
+        }
+      });
+
+      const reviewActor =
+        order.uploadedPrescription?.reviewedBy ??
+        order.uploadedPrescription?.reviewLogs[0]?.performedBy ??
+        null;
+      if (reviewActor) {
+        actorIds.add(reviewActor);
+      }
+    });
+
+    const actors =
+      actorIds.size > 0
+        ? await this.prisma.user.findMany({
+            where: {
+              id: { in: Array.from(actorIds) },
+            },
+            select: {
+              id: true,
+              role: true,
+              email: true,
+              phone: true,
+            },
+          })
+        : [];
+
+    const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+
+    return {
+      data: orders.map((order) => {
+        const response = this.toResponseDto(order as any);
+        const orderFlow: Exclude<AdminOrderFlow, 'ALL'> =
+          this.isPrescriptionTrackingOrder(order) ? 'PRESCRIPTION' : 'MEDICINE';
+
+        const timeline: AdminTrackingTimelineEvent[] = order.statusHistory.map(
+          (entry) => {
+            const actorId = this.extractActorIdFromHistorySource(entry.source);
+            const actor = actorId ? actorById.get(actorId) : null;
+
+            return {
+              status: entry.status,
+              timestamp: entry.timestamp,
+              source: entry.source,
+              actorId,
+              actorRole: actor?.role ?? null,
+              actorLabel: actor?.email ?? actor?.phone ?? actorId,
+            };
+          },
+        );
+
+        const reviewLog = order.uploadedPrescription?.reviewLogs[0] ?? null;
+        const reviewedBy =
+          order.uploadedPrescription?.reviewedBy ??
+          reviewLog?.performedBy ??
+          null;
+        const reviewer = reviewedBy ? actorById.get(reviewedBy) : null;
+
+        return {
+          ...response,
+          flow: orderFlow,
+          timeline,
+          timestamps: {
+            createdAt: order.createdAt,
+            approvedAt: this.findFirstStatusTimestamp(
+              order.statusHistory,
+              'APPROVED',
+            ),
+            rejectedAt: this.findFirstStatusTimestamp(
+              order.statusHistory,
+              'REJECTED',
+            ),
+            paidAt: this.findFirstStatusTimestamp(order.statusHistory, 'PAID'),
+            dispatchedAt: this.findFirstStatusTimestamp(order.statusHistory, [
+              'DISPATCHED',
+              'SHIPPED',
+              'OUT_FOR_DELIVERY',
+            ]),
+            deliveredAt:
+              order.deliveredAt ??
+              this.findFirstStatusTimestamp(order.statusHistory, 'DELIVERED'),
+          },
+          prescriptionReview:
+            orderFlow === 'PRESCRIPTION'
+              ? {
+                  status: order.uploadedPrescription?.status ?? null,
+                  notes: order.uploadedPrescription?.reviewNotes ?? null,
+                  reviewedBy,
+                  reviewedByRole: reviewer?.role ?? null,
+                  reviewedAt: reviewLog?.createdAt ?? null,
+                }
+              : null,
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getPrescriptionOrderImageUrl(orderId: string): Promise<string | null> {
+    const order = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      select: { uploadedPrescriptionId: true, prescriptionUrl: true },
+    });
+    if (!order) return null;
+
+    if (order.uploadedPrescriptionId) {
+      const upload = await this.prisma.uploadedPrescription.findUnique({
+        where: { id: order.uploadedPrescriptionId },
+        select: { filePath: true },
+      });
+      if (upload?.filePath) {
+        try {
+          return await this.prescriptionStorage.getSignedUrl(upload.filePath);
+        } catch {
+          // fall through to prescriptionUrl
+        }
+      }
+    }
+
+    return (order as any).prescriptionUrl ?? null;
+  }
+
+  async approvePrescriptionOrder(
+    orderId: string,
+    actorUserId: string,
+    dto: ApprovePrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const existing = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if ((existing.status as string) !== ORDER_STATUS.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Only pending prescription orders can be approved.',
+      );
+    }
+
+    const partner = await this.prisma.pharmacyPartner.findFirst({
+      where: { id: dto.partnerId, isActive: true },
+      select: { id: true },
+    });
+    if (!partner) {
+      throw new BadRequestException('Pharmacy partner not found or inactive');
+    }
+
+    const subtotal = dto.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+    const deliveryFee = this.calculateDeliveryFee(subtotal);
+    const totalAmount = Math.max(0, subtotal + deliveryFee);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.pharmacyOrderItem.deleteMany({
+        where: { pharmacyOrderId: orderId },
+      });
+
+      return tx.pharmacyOrder.update({
+        where: { id: orderId },
+        data: {
+          pharmacyPartnerId: partner.id,
+          subtotal,
+          deliveryFee,
+          discount: 0,
+          totalAmount,
+          paymentStatus: PAYMENT_STATUS.UNPAID,
+          status: ORDER_STATUS.APPROVED as any,
+          notes: dto.notes ?? existing.notes,
+          items: {
+            create: dto.items.map((item) => ({
+              medicineCode: item.medicineCode,
+              medicineName: item.medicineName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.quantity * item.unitPrice,
+            })),
+          },
+        },
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+        },
+      });
+    });
+
+    await this.safeNotify(existing.patientProfile.userId, {
+      title: 'Prescription Approved',
+      message:
+        'Your prescription order is approved. Please complete payment to proceed.',
+      type: 'PRESCRIPTION_ORDER_APPROVED',
+      metadata: { orderId: updated.id },
+    });
+
+    void this.recordStatusHistory(
+      orderId,
+      ORDER_STATUS.APPROVED as any,
+      actorUserId,
+    );
+
+    return this.toResponseDto(updated);
+  }
+
+  async rejectPrescriptionOrder(
+    orderId: string,
+    actorUserId: string,
+    dto: RejectPrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const existing = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if ((existing.status as string) !== ORDER_STATUS.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Only pending prescription orders can be rejected.',
+      );
+    }
+
+    const updated = await this.prisma.pharmacyOrder.update({
+      where: { id: orderId },
+      data: {
+        status: ORDER_STATUS.REJECTED as any,
+        paymentStatus: PAYMENT_STATUS.UNPAID,
+        notes: dto.reason,
+        subtotal: null,
+        deliveryFee: null,
+        totalAmount: null,
+      } as any,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+
+    await this.safeNotify(existing.patientProfile.userId, {
+      title: 'Prescription Rejected',
+      message: `Your prescription order was rejected. Reason: ${dto.reason}`,
+      type: 'PRESCRIPTION_ORDER_REJECTED',
+      metadata: { orderId: updated.id, reason: dto.reason },
+    });
+
+    void this.recordStatusHistory(
+      orderId,
+      ORDER_STATUS.REJECTED as any,
+      actorUserId,
+    );
+
+    return this.toResponseDto(updated);
+  }
+
+  async requestPrescriptionReupload(
+    orderId: string,
+    actorUserId: string,
+    dto: RejectPrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const existing = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if ((existing.status as string) !== ORDER_STATUS.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Only pending prescription orders can be marked for reupload.',
+      );
+    }
+
+    const reason =
+      dto.reason?.trim() || 'Please upload a clearer prescription.';
+    const note = `${REUPLOAD_NOTE_PREFIX} ${reason}`;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (existing.uploadedPrescriptionId) {
+        await tx.uploadedPrescription.update({
+          where: { id: existing.uploadedPrescriptionId },
+          data: {
+            status: PrescriptionStatus.REUPLOAD_REQUIRED,
+            reviewNotes: reason,
+            reviewedBy: actorUserId,
+          },
+        });
+      }
+
+      return tx.pharmacyOrder.update({
+        where: { id: orderId },
+        data: {
+          status: ORDER_STATUS.REJECTED as any,
+          paymentStatus: PAYMENT_STATUS.UNPAID,
+          notes: note,
+          subtotal: null,
+          deliveryFee: null,
+          totalAmount: null,
+        } as any,
+        include: {
+          items: true,
+          deliveryAddress: true,
+          pharmacyPartner: true,
+          patientProfile: {
+            select: {
+              name: true,
+              user: {
+                select: {
+                  phone: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    await this.safeNotify(existing.patientProfile.userId, {
+      title: 'Prescription Reupload Needed',
+      message: `Please re-upload your prescription. Reason: ${reason}`,
+      type: 'PRESCRIPTION_REUPLOAD_REQUIRED',
+      metadata: { orderId: updated.id, reason },
+    });
+
+    void this.recordStatusHistory(
+      orderId,
+      ORDER_STATUS.REJECTED as any,
+      actorUserId,
+    );
+
+    return this.toResponseDto(updated);
+  }
+
+  async reuploadPrescriptionForOrder(
+    orderId: string,
+    userId: string,
+    dto: CreatePrescriptionOrderDto,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    if (!dto.uploadedPrescriptionId && !dto.prescriptionUrl) {
+      throw new BadRequestException(
+        'Either uploadedPrescriptionId or prescriptionUrl is required.',
+      );
+    }
+
+    const patient = await this.getPatientProfile(userId);
+    const existing = await this.prisma.pharmacyOrder.findFirst({
+      where: { id: orderId, patientProfileId: patient.id },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+
+    const isReuploadOrder =
+      (existing.status as string) === ORDER_STATUS.REJECTED &&
+      ((existing.notes ?? '').startsWith(REUPLOAD_NOTE_PREFIX) ||
+        (existing as any).uploadedPrescriptionId);
+    if (!isReuploadOrder) {
+      throw new BadRequestException(
+        'This order is not currently marked for prescription reupload.',
+      );
+    }
+
+    let uploadedPrescriptionId: string | null = null;
+    if (dto.uploadedPrescriptionId) {
+      const uploadedPrescription =
+        await this.prisma.uploadedPrescription.findFirst({
+          where: {
+            id: dto.uploadedPrescriptionId,
+            userId,
+            status: {
+              in: [
+                PrescriptionStatus.PENDING_REVIEW,
+                PrescriptionStatus.REUPLOAD_REQUIRED,
+                PrescriptionStatus.APPROVED,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+
+      if (!uploadedPrescription) {
+        throw new BadRequestException(
+          'Uploaded prescription not found for this patient.',
+        );
+      }
+
+      uploadedPrescriptionId = uploadedPrescription.id;
+      await this.prisma.uploadedPrescription.update({
+        where: { id: uploadedPrescriptionId },
+        data: {
+          status: PrescriptionStatus.PENDING_REVIEW,
+          reviewNotes: null,
+        },
+      });
+    }
+
+    const updated = await this.prisma.pharmacyOrder.update({
+      where: { id: orderId },
+      data: {
+        uploadedPrescriptionId,
+        prescriptionUrl: dto.prescriptionUrl ?? existing.prescriptionUrl,
+        status: ORDER_STATUS.PENDING_APPROVAL as any,
+        notes: dto.notes ?? null,
+        pharmacyPartnerId: null,
+        partnerOrderId: null,
+        subtotal: null,
+        deliveryFee: null,
+        totalAmount: null,
+        paymentStatus: PAYMENT_STATUS.UNPAID,
+      } as any,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+
+    return this.toResponseDto(updated);
+  }
+
+  async payOrder(
+    orderId: string,
+    userId: string,
+  ): Promise<PharmacyOrderResponseDto> {
+    this.assertPrescriptionFlowEnabled();
+    const patient = await this.getPatientProfile(userId);
+
+    const existing = await this.prisma.pharmacyOrder.findFirst({
+      where: {
+        id: orderId,
+        patientProfileId: patient.id,
+      },
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+        patientProfile: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Pharmacy order not found');
+    }
+    if ((existing.status as string) !== ORDER_STATUS.APPROVED) {
+      throw new BadRequestException('Order is not approved for payment yet.');
+    }
+    if ((existing as any).paymentStatus === PAYMENT_STATUS.PAID) {
+      throw new BadRequestException('Order is already paid.');
+    }
+    if (existing.totalAmount == null) {
+      throw new BadRequestException(
+        'Order total is not available for payment.',
+      );
+    }
+    if (!existing.pharmacyPartner) {
+      throw new BadRequestException(
+        'Order is missing assigned pharmacy partner.',
+      );
+    }
+    if (!existing.items || existing.items.length === 0) {
+      throw new BadRequestException(
+        'Order has no medicines to place with partner.',
+      );
+    }
+
+    const provider = this.resolveProvider(
+      existing.pharmacyPartner.code,
+      existing.pharmacyPartner.name,
+    );
+    const partnerResult = await provider.createOrder({
+      patientId: patient.id,
+      items: existing.items.map((item) => ({
+        medicineCode: item.medicineCode,
+        medicineName: item.medicineName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+      deliveryAddress: this.formatAddress(existing.deliveryAddress),
+    });
+
+    const mappedStatus = this.mapPartnerStatus(partnerResult.status);
+
+    const updated = await this.prisma.pharmacyOrder.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: PAYMENT_STATUS.PAID,
+        status: mappedStatus,
+        partnerOrderId: partnerResult.partnerOrderId,
+      } as any,
+      include: {
+        items: true,
+        deliveryAddress: true,
+        pharmacyPartner: true,
+      },
+    });
+
+    void this.recordStatusHistory(orderId, mappedStatus, userId);
+
+    return this.toResponseDto(updated);
+  }
+
+  private calculateDeliveryFee(subtotal: number): number {
     if (subtotal >= PharmacyOrderService.FREE_DELIVERY_THRESHOLD) {
       return 0;
     }
@@ -405,8 +1422,10 @@ export class PharmacyOrderService {
     state: string;
     pincode: string;
   }): string {
+    // Decrypt is a no-op for legacy plain-text addresses thanks to the
+    // `enc:v1:` marker check inside the utility.
     return [
-      address.addressLine,
+      decrypt(address.addressLine),
       address.city,
       address.state,
       address.pincode,
@@ -417,6 +1436,8 @@ export class PharmacyOrderService {
     const cancellableStatuses: PharmacyOrderStatus[] = [
       PharmacyOrderStatus.PENDING,
       PharmacyOrderStatus.PRESCRIPTION_REVIEW,
+      ORDER_STATUS.PENDING_APPROVAL as any,
+      ORDER_STATUS.APPROVED as any,
       PharmacyOrderStatus.CONFIRMED,
       PharmacyOrderStatus.PACKED,
     ];
@@ -431,18 +1452,25 @@ export class PharmacyOrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       patientProfileId: order.patientProfileId,
+      patientName: order.patientProfile?.name ?? null,
+      patientPhone: order.patientProfile?.user?.phone ?? null,
+      patientEmail: order.patientProfile?.user?.email ?? null,
       bookingId: order.bookingId,
       prescriptionId: order.prescriptionId,
       uploadedPrescriptionId: order.uploadedPrescriptionId,
       pharmacyPartnerId: order.pharmacyPartnerId,
-      partnerCode: order.pharmacyPartner.code,
+      partnerCode: order.pharmacyPartner?.code ?? null,
       partnerName:
-        order.pharmacyPartner.displayName || order.pharmacyPartner.name,
+        order.pharmacyPartner?.displayName ||
+        order.pharmacyPartner?.name ||
+        null,
       partnerOrderId: order.partnerOrderId,
       status: order.status,
+      paymentStatus: (order as any).paymentStatus ?? PAYMENT_STATUS.UNPAID,
       deliveryAddressId: order.deliveryAddressId,
       deliveryAddress: this.formatAddress(order.deliveryAddress),
       prescriptionImageUrl: order.prescriptionImageUrl,
+      prescriptionUrl: (order as any).prescriptionUrl ?? null,
       subtotal: order.subtotal,
       deliveryFee: order.deliveryFee,
       discount: order.discount,
@@ -464,5 +1492,140 @@ export class PharmacyOrderService {
         totalPrice: item.totalPrice,
       })),
     };
+  }
+
+  private async resolveOrderAddress(
+    userId: string,
+    deliveryAddressId?: string,
+  ) {
+    if (deliveryAddressId) {
+      const address = await this.prisma.address.findFirst({
+        where: {
+          id: deliveryAddressId,
+          userId,
+        },
+      });
+      if (!address) {
+        throw new NotFoundException('Delivery address not found');
+      }
+      return address;
+    }
+
+    const fallbackAddress = await this.prisma.address.findFirst({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+    });
+
+    if (!fallbackAddress) {
+      throw new BadRequestException(
+        'Delivery address is required. Please add an address first.',
+      );
+    }
+
+    return fallbackAddress;
+  }
+
+  private assertPrescriptionFlowEnabled(): void {
+    if (!FeatureFlags.isPrescriptionFlowEnabled()) {
+      throw new ServiceUnavailableException(
+        'Prescription approval/payment flow is currently disabled. Set ENABLE_PRESCRIPTION_FLOW=true to enable.',
+      );
+    }
+  }
+
+  private normalizeAdminOrderFlow(flow?: string): AdminOrderFlow {
+    const normalized = flow?.trim().toUpperCase();
+    if (normalized === 'MEDICINE' || normalized === 'PRESCRIPTION') {
+      return normalized;
+    }
+    return 'ALL';
+  }
+
+  private isPrescriptionTrackingOrder(order: {
+    uploadedPrescriptionId?: string | null;
+    prescriptionUrl?: string | null;
+    status: PharmacyOrderStatus;
+  }): boolean {
+    return (
+      Boolean(order.uploadedPrescriptionId) ||
+      Boolean(order.prescriptionUrl) ||
+      [
+        ORDER_STATUS.PENDING_APPROVAL,
+        ORDER_STATUS.APPROVED,
+        ORDER_STATUS.REJECTED,
+      ].includes(order.status as any)
+    );
+  }
+
+  private extractActorIdFromHistorySource(
+    source?: string | null,
+  ): string | null {
+    if (!source) {
+      return null;
+    }
+    const prefix = 'manual:';
+    return source.startsWith(prefix) ? source.slice(prefix.length) : null;
+  }
+
+  private findFirstStatusTimestamp(
+    history: Array<{ status: PharmacyOrderStatus; timestamp: Date }>,
+    statuses: string | string[],
+  ): Date | null {
+    const wanted = new Set(
+      (Array.isArray(statuses) ? statuses : [statuses]).map((status) =>
+        status.toUpperCase(),
+      ),
+    );
+
+    const match = history.find((entry) => wanted.has(entry.status));
+    return match?.timestamp ?? null;
+  }
+
+  private async safeNotify(
+    userId: string,
+    payload: {
+      title: string;
+      message: string;
+      type: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    if (!this.notificationsService) {
+      return;
+    }
+
+    try {
+      await this.notificationsService.createNotification({
+        userId,
+        title: payload.title,
+        message: payload.message,
+        type: payload.type,
+        metadata: payload.metadata ?? {},
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to create pharmacy notification for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async recordStatusHistory(
+    pharmacyOrderId: string,
+    status: PharmacyOrderStatus,
+    sourceActorId: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.pharmacyOrderStatusHistory.create({
+        data: {
+          pharmacyOrderId,
+          status,
+          source: `manual:${sourceActorId}`,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Unable to write order status history for ${pharmacyOrderId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

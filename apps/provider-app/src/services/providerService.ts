@@ -30,6 +30,13 @@ export const consultationService = {
     const r = await api.post(`/consultation/${bookingId}/summary`, data);
     return r.data;
   },
+  addPrescription: async (
+    bookingId: string,
+    data: { details?: string; fileUrl?: string },
+  ) => {
+    const r = await api.post(`/consultation/${bookingId}/prescription`, data);
+    return r.data;
+  },
 };
 
 export const referralService = {

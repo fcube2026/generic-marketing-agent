@@ -10,28 +10,70 @@ import {
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { Colors } from '../../../constants/colors';
 import { Input } from '../../../components/common/Input';
 import { Button } from '../../../components/common/Button';
 import { verificationService } from '../../../services/verificationService';
+import { patientService, AddressPayload } from '../../../services/patientService';
 import { PatientStackParamList } from '../../../navigation/PatientNavigator';
+import { usePatientKycDraft } from '../../../state/patientKycDraft';
+import { useBookingStore } from '../../../store/bookingStore';
 
 type Nav = NativeStackNavigationProp<PatientStackParamList, 'PatientKycAddress'>;
-type Props = { navigation: Nav };
+type Rt = RouteProp<PatientStackParamList, 'PatientKycAddress'>;
+type Props = { navigation: Nav; route: Rt };
 
 type Mode = 'MANUAL' | 'MAP';
 
-export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
+export const PatientKycAddressScreen: React.FC<Props> = ({ navigation, route }) => {
   const qc = useQueryClient();
+  const setSelectedAddress = useBookingStore((s) => s.setSelectedAddress);
   const [mode, setMode] = useState<Mode>('MANUAL');
-  const [addressLine, setAddressLine] = useState('');
+  // Pre-fill address from the Aadhaar OCR draft when available — every
+  // field stays editable, the draft is only a hint.
+  const ocrDraft = usePatientKycDraft((s) => s.ocr);
+  const [addressLine, setAddressLine] = useState(ocrDraft?.address ?? '');
   const [city, setCity] = useState('');
   const [stateName, setStateName] = useState('');
   const [pincode, setPincode] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [formatted, setFormatted] = useState<string | null>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  const getFallbackAddressPayload = (): AddressPayload | null => {
+    if (mode === 'MANUAL') {
+      if (!addressLine.trim() || !city.trim() || !stateName.trim() || !pincode.trim()) {
+        return null;
+      }
+      return {
+        label: 'Home',
+        addressLine: addressLine.trim(),
+        city: city.trim(),
+        state: stateName.trim(),
+        pincode: pincode.trim(),
+        lat: coords?.lat,
+        lng: coords?.lng,
+        isDefault: true,
+      };
+    }
+
+    const derivedAddressLine = addressLine.trim() || formatted?.trim();
+    if (!derivedAddressLine || !city.trim() || !stateName.trim() || !pincode.trim()) {
+      return null;
+    }
+    return {
+      label: 'Home',
+      addressLine: derivedAddressLine,
+      city: city.trim(),
+      state: stateName.trim(),
+      pincode: pincode.trim(),
+      lat: coords?.lat,
+      lng: coords?.lng,
+      isDefault: true,
+    };
+  };
 
   const fetchFromMaps = async () => {
     setFetchingLocation(true);
@@ -56,6 +98,10 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
         });
         const r = reverse[0];
         if (r) {
+          setAddressLine([r.name, r.street].filter(Boolean).join(' ').trim());
+          setCity((r.city ?? r.subregion ?? '').trim());
+          setStateName((r.region ?? '').trim());
+          setPincode((r.postalCode ?? '').trim());
           setFormatted(
             [r.name, r.street, r.city, r.region, r.postalCode]
               .filter(Boolean)
@@ -73,27 +119,52 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const mutation = useMutation({
-    mutationFn: () =>
-      verificationService.selfSubmitAddress(
+    mutationFn: async () => {
+      // When the screen was opened from the booking flow, the user only needs
+      // a delivery/visit address — skip the KYC pipeline (Aadhaar/face) and
+      // save the address directly so they can continue booking immediately.
+      if (route.params?.returnToBooking) {
+        const fallbackPayload = getFallbackAddressPayload();
+        if (!fallbackPayload) {
+          throw new Error('Please fill all address fields.');
+        }
+        const savedAddress = await patientService.addAddress(fallbackPayload);
+        return { mode: 'BOOKING_FALLBACK' as const, savedAddress };
+      }
+
+      const payload =
         mode === 'MANUAL'
           ? {
-              source: 'MANUAL',
+              source: 'MANUAL' as const,
               addressLine: addressLine.trim(),
               city: city.trim(),
               state: stateName.trim(),
               pincode: pincode.trim(),
             }
           : {
-              source: 'MAP',
+              source: 'MAP' as const,
               lat: coords!.lat,
               lng: coords!.lng,
               formatted: formatted ?? undefined,
-            },
-      ),
-    onSuccess: (data) => {
-      qc.setQueryData(['patient-kyc-status'], data);
-      qc.invalidateQueries({ queryKey: ['patient-kyc-status'] });
-      navigation.navigate('PatientKycIdUpload');
+            };
+
+      const kycStatus = await verificationService.selfSubmitAddress(payload);
+      return { mode: 'KYC' as const, kycStatus };
+    },
+    onSuccess: (result) => {
+      if (result.mode === 'KYC') {
+        qc.setQueryData(['patient-kyc-status'], result.kycStatus);
+        qc.invalidateQueries({ queryKey: ['patient-kyc-status'] });
+        navigation.navigate('PatientKycIdUpload');
+        return;
+      }
+
+      setSelectedAddress(result.savedAddress);
+      Alert.alert(
+        'Address saved',
+        'You can continue with your booking now.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      );
     },
     onError: (err: any) => {
       Alert.alert(
@@ -110,11 +181,12 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.step}>Step 2 of 5</Text>
+      {!route.params?.returnToBooking && <Text style={styles.step}>Step 3 of 5</Text>}
       <Text style={styles.title}>Your Address</Text>
       <Text style={styles.subtitle}>
-        Enter your residential address manually or fetch it from your current
-        location. Either is fine.
+        {route.params?.returnToBooking
+          ? 'Add the address where you want the doctor to visit. You can save it for future bookings too.'
+          : 'Enter your residential address manually or fetch it from your current location. Either is fine.'}
       </Text>
 
       <View style={styles.tabs}>

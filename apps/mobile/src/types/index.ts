@@ -127,6 +127,11 @@ export interface RecommendationResponse {
 
 export type PharmacyOrderStatus =
   | 'PENDING'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PAID'
+  | 'DISPATCHED'
   | 'PRESCRIPTION_REVIEW'
   | 'CONFIRMED'
   | 'PACKED'
@@ -144,6 +149,14 @@ export interface AvailabilityResult {
   reason?: string;
 }
 
+export interface MedicinePriceComparison {
+  partnerId: string;
+  partnerName: string;
+  price: number;
+  available: boolean;
+  deliveryEta?: string;
+}
+
 export interface MedicineResult {
   id: string;
   name: string;
@@ -152,6 +165,10 @@ export interface MedicineResult {
   unit?: string;
   requiresPrescription?: boolean;
   availability?: AvailabilityResult;
+  composition?: string;
+  description?: string;
+  usage?: string;
+  sideEffects?: string;
 }
 
 export interface PharmacyPartner {
@@ -184,18 +201,20 @@ export interface PharmacyOrder {
   patientProfileId: string;
   bookingId?: string | null;
   prescriptionId?: string | null;
-  pharmacyPartnerId: string;
-  partnerCode: string;
-  partnerName: string;
+  pharmacyPartnerId: string | null;
+  partnerCode: string | null;
+  partnerName: string | null;
   partnerOrderId?: string | null;
   status: string;
+  paymentStatus: 'UNPAID' | 'PAID';
   deliveryAddressId: string;
   deliveryAddress: string;
   prescriptionImageUrl?: string | null;
-  subtotal: number;
-  deliveryFee: number;
+  prescriptionUrl?: string | null;
+  subtotal: number | null;
+  deliveryFee: number | null;
   discount: number;
-  totalAmount: number;
+  totalAmount: number | null;
   estimatedDeliveryAt?: string | null;
   deliveredAt?: string | null;
   notes?: string | null;

@@ -35,16 +35,21 @@ export const ConsultationSummaryScreen: React.FC<Props> = ({ navigation, route }
 
   // Derive mock prescription / order flags from the summary response
   const prescriptionUrl: string | undefined =
-    summary?.prescriptionUrl ?? (summary?.medicinesAdvised?.length ? MOCK_PRESCRIPTION_URL : undefined);
+    summary?.prescriptionUrl ??
+    summary?.prescriptions?.[0]?.fileUrl ??
+    (summary?.medicinesAdvised?.length ? MOCK_PRESCRIPTION_URL : undefined);
   const hasOrder: boolean = summary?.hasOrder === true;
+  const orderId: string | undefined = summary?.orderId ?? undefined;
   const medicineCount: number = summary?.medicinesAdvised?.length ?? 0;
 
   const handleOrderPress = () => {
     setCtaDisabled(true);
     setTimeout(() => setCtaDisabled(false), CTA_COOLDOWN_MS);
 
-    if (hasOrder) {
-      // Navigate to order details (mock: use PharmacyOrders list as fallback)
+    if (hasOrder && orderId) {
+      navigation.navigate('OrderTracking', { orderId });
+    } else if (hasOrder) {
+      // Fallback if orderId not yet available
       navigation.navigate('PharmacyOrders');
     } else {
       navigation.navigate('PrescriptionOrder', {

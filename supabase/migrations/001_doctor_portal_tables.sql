@@ -3,8 +3,8 @@
 -- Run this in the Supabase SQL Editor (Dashboard → SQL → New Query)
 -- ============================================================
 
--- 1. DOCTORS (provider profiles)
-CREATE TABLE IF NOT EXISTS doctors (
+-- 1. PROVIDERS (provider profiles)
+CREATE TABLE IF NOT EXISTS providers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT UNIQUE NOT NULL,
   phone TEXT UNIQUE NOT NULL,
@@ -53,11 +53,11 @@ CREATE TABLE IF NOT EXISTS service_categories (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 4. BOOKINGS (doctor-patient interactions)
+-- 4. BOOKINGS (provider-patient interactions)
 CREATE TABLE IF NOT EXISTS bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id UUID NOT NULL REFERENCES patients(id),
-  doctor_id UUID NOT NULL REFERENCES doctors(id),
+  provider_id UUID NOT NULL REFERENCES providers(id),
   service_category_id UUID REFERENCES service_categories(id),
   mode TEXT NOT NULL DEFAULT 'HOME_VISIT'
     CHECK (mode IN ('HOME_VISIT', 'DOCTOR_PLACE', 'VIDEO_CONSULTATION')),
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 CREATE TABLE IF NOT EXISTS consultation_summaries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID UNIQUE NOT NULL REFERENCES bookings(id),
-  doctor_id UUID NOT NULL REFERENCES doctors(id),
+  provider_id UUID NOT NULL REFERENCES providers(id),
   patient_id UUID NOT NULL REFERENCES patients(id),
   symptoms TEXT,
   observations TEXT,
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS consultation_summaries (
 -- 6. EARNINGS / PAYMENTS
 CREATE TABLE IF NOT EXISTS earnings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id UUID NOT NULL REFERENCES doctors(id),
+  provider_id UUID NOT NULL REFERENCES providers(id),
   booking_id UUID REFERENCES bookings(id),
   amount NUMERIC(10,2) NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending'
@@ -109,12 +109,12 @@ CREATE TABLE IF NOT EXISTS earnings (
 -- ============================================================
 -- INDEXES
 -- ============================================================
-CREATE INDEX IF NOT EXISTS idx_bookings_doctor ON bookings(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_provider ON bookings(provider_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_patient ON bookings(patient_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_scheduled ON bookings(scheduled_at);
-CREATE INDEX IF NOT EXISTS idx_consultation_summaries_doctor ON consultation_summaries(doctor_id);
-CREATE INDEX IF NOT EXISTS idx_earnings_doctor ON earnings(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_consultation_summaries_provider ON consultation_summaries(provider_id);
+CREATE INDEX IF NOT EXISTS idx_earnings_provider ON earnings(provider_id);
 
 -- ============================================================
 -- ENABLE REALTIME  (allows Supabase Realtime subscriptions)
@@ -122,12 +122,12 @@ CREATE INDEX IF NOT EXISTS idx_earnings_doctor ON earnings(doctor_id);
 ALTER PUBLICATION supabase_realtime ADD TABLE bookings;
 ALTER PUBLICATION supabase_realtime ADD TABLE consultation_summaries;
 ALTER PUBLICATION supabase_realtime ADD TABLE earnings;
-ALTER PUBLICATION supabase_realtime ADD TABLE doctors;
+ALTER PUBLICATION supabase_realtime ADD TABLE providers;
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================
-ALTER TABLE doctors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE providers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE consultation_summaries ENABLE ROW LEVEL SECURITY;
@@ -138,45 +138,45 @@ ALTER TABLE service_categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can read service_categories"
   ON service_categories FOR SELECT USING (true);
 
--- Doctors can read their own profile
-CREATE POLICY "Doctors can view own profile"
-  ON doctors FOR SELECT USING (auth.uid()::text = user_id);
-CREATE POLICY "Doctors can update own profile"
-  ON doctors FOR UPDATE USING (auth.uid()::text = user_id);
+-- Providers can read their own profile
+CREATE POLICY "Providers can view own profile"
+  ON providers FOR SELECT USING (auth.uid()::text = user_id);
+CREATE POLICY "Providers can update own profile"
+  ON providers FOR UPDATE USING (auth.uid()::text = user_id);
 
 -- Patients can read their own profile
 CREATE POLICY "Patients can view own profile"
   ON patients FOR SELECT USING (auth.uid()::text = user_id);
 
--- Bookings: doctors see their bookings, patients see theirs
-CREATE POLICY "Doctors can view their bookings"
+-- Bookings: providers see their bookings, patients see theirs
+CREATE POLICY "Providers can view their bookings"
   ON bookings FOR SELECT
-  USING (doctor_id IN (SELECT id FROM doctors WHERE user_id = auth.uid()::text));
+  USING (provider_id IN (SELECT id FROM providers WHERE user_id = auth.uid()::text));
 CREATE POLICY "Patients can view their bookings"
   ON bookings FOR SELECT
   USING (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()::text));
 CREATE POLICY "Patients can create bookings"
   ON bookings FOR INSERT
   WITH CHECK (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()::text));
-CREATE POLICY "Doctors can update their bookings"
+CREATE POLICY "Providers can update their bookings"
   ON bookings FOR UPDATE
-  USING (doctor_id IN (SELECT id FROM doctors WHERE user_id = auth.uid()::text));
+  USING (provider_id IN (SELECT id FROM providers WHERE user_id = auth.uid()::text));
 
 -- Consultation summaries
-CREATE POLICY "Doctors can view their summaries"
+CREATE POLICY "Providers can view their summaries"
   ON consultation_summaries FOR SELECT
-  USING (doctor_id IN (SELECT id FROM doctors WHERE user_id = auth.uid()::text));
-CREATE POLICY "Doctors can insert summaries"
+  USING (provider_id IN (SELECT id FROM providers WHERE user_id = auth.uid()::text));
+CREATE POLICY "Providers can insert summaries"
   ON consultation_summaries FOR INSERT
-  WITH CHECK (doctor_id IN (SELECT id FROM doctors WHERE user_id = auth.uid()::text));
+  WITH CHECK (provider_id IN (SELECT id FROM providers WHERE user_id = auth.uid()::text));
 CREATE POLICY "Patients can view their summaries"
   ON consultation_summaries FOR SELECT
   USING (patient_id IN (SELECT id FROM patients WHERE user_id = auth.uid()::text));
 
 -- Earnings
-CREATE POLICY "Doctors can view their earnings"
+CREATE POLICY "Providers can view their earnings"
   ON earnings FOR SELECT
-  USING (doctor_id IN (SELECT id FROM doctors WHERE user_id = auth.uid()::text));
+  USING (provider_id IN (SELECT id FROM providers WHERE user_id = auth.uid()::text));
 
 -- ============================================================
 -- UPDATED_AT trigger (auto-update updated_at column)
@@ -189,8 +189,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER set_updated_at_doctors
-  BEFORE UPDATE ON doctors FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at_providers
+  BEFORE UPDATE ON providers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER set_updated_at_patients
   BEFORE UPDATE ON patients FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER set_updated_at_bookings

@@ -21,6 +21,7 @@ describe('PatientsService', () => {
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
       delete: jest.fn(),
     },
     booking: {
@@ -210,6 +211,8 @@ describe('PatientsService', () => {
 
       mockPrisma.address.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.address.create.mockResolvedValue(createdAddress);
+      mockPrisma.address.findMany.mockResolvedValue([{ id: 'addr-1' }]);
+      mockPrisma.address.deleteMany.mockResolvedValue({ count: 0 });
 
       const result = await service.addAddress(userId, dto);
 
@@ -225,10 +228,40 @@ describe('PatientsService', () => {
       const createdAddress = { id: 'addr-2', userId, ...nonDefaultDto };
 
       mockPrisma.address.create.mockResolvedValue(createdAddress);
+      mockPrisma.address.findMany.mockResolvedValue([{ id: 'addr-2' }]);
+      mockPrisma.address.deleteMany.mockResolvedValue({ count: 0 });
 
       await service.addAddress(userId, nonDefaultDto);
 
       expect(mockPrisma.address.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('should keep only the latest 3 addresses after adding a new one', async () => {
+      const createdAddress = { id: 'addr-4', userId, ...dto };
+      const keepIds = [{ id: 'addr-4' }, { id: 'addr-3' }, { id: 'addr-2' }];
+
+      mockPrisma.address.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.address.create.mockResolvedValue(createdAddress);
+      mockPrisma.address.findMany.mockResolvedValue(keepIds);
+      mockPrisma.address.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.addAddress(userId, dto);
+
+      expect(result).toEqual(createdAddress);
+      expect(mockPrisma.address.findMany).toHaveBeenCalledWith({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        select: { id: true },
+      });
+      expect(mockPrisma.address.deleteMany).toHaveBeenCalledWith({
+        where: {
+          userId,
+          id: { notIn: ['addr-4', 'addr-3', 'addr-2'] },
+          bookings: { none: {} },
+          pharmacyOrders: { none: {} },
+        },
+      });
     });
   });
 

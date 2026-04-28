@@ -15,6 +15,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { formatCurrency } from '../../utils/format';
@@ -70,6 +71,22 @@ const getUploadMimeType = (filename: string): string => {
   }
 };
 
+const extractApiErrorMessage = (err: unknown, fallback: string): string => {
+  const responseData = (err as any)?.response?.data;
+  const responseMessage = responseData?.message ?? responseData?.error;
+  if (Array.isArray(responseMessage)) {
+    return responseMessage.join('\n');
+  }
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+  const runtimeMessage = (err as any)?.message;
+  if (typeof runtimeMessage === 'string' && runtimeMessage.trim()) {
+    return runtimeMessage;
+  }
+  return fallback;
+};
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -94,19 +111,25 @@ const SkeletonBox: React.FC<{ width?: number | string; height?: number }> = ({
 export const PrescriptionOrderScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
+  const queryClient = useQueryClient();
   const [previewVisible, setPreviewVisible] = useState(false);
+  const reuploadOrderId = route.params?.orderId;
 
   // ---- Inline medicine search state ---------------------------------------
   const [addMedQuery, setAddMedQuery] = useState('');
   const [addMedResults, setAddMedResults] = useState<MedicineResult[]>([]);
   const [addMedLoading, setAddMedLoading] = useState(false);
   const addMedSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addMedInputRef = useRef<import('react-native').TextInput>(null);
+  const [lastAdded, setLastAdded] = useState<string | null>(null);
+  const lastAddedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     prescriptionUrl,
     isUploading,
     uploadError,
     medicines,
+    uploadedPrescriptionId,
     setPrescription,
     clearPrescription,
     setUploading,
@@ -115,6 +138,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
     setUploadedPrescriptionMeta,
     updateMedicineQuantity,
     resetOrder,
+    removeMedicine,
   } = usePharmacyOrderStore();
 
   // ---- Debounced medicine search ------------------------------------------
@@ -155,11 +179,21 @@ export const PrescriptionOrderScreen: React.FC = () => {
       }
       setAddMedQuery('');
       setAddMedResults([]);
+      // Show brief confirmation, then re-focus search for the next medicine
+      if (lastAddedTimerRef.current) clearTimeout(lastAddedTimerRef.current);
+      setLastAdded(med.name);
+      lastAddedTimerRef.current = setTimeout(() => setLastAdded(null), 2000);
+      // Re-focus the search input so the user can add another medicine immediately
+      setTimeout(() => addMedInputRef.current?.focus(), 100);
     },
     [medicines, setMedicines, updateMedicineQuantity],
   );
 
   // ---- Auto-attach prescription from navigation params ---------------------
+  useEffect(() => {
+    setUploadError(null);
+  }, [setUploadError]);
+
   useEffect(() => {
     const incomingUrl = route.params?.prescriptionUrl;
     if (incomingUrl && !prescriptionUrl) {
@@ -170,62 +204,67 @@ export const PrescriptionOrderScreen: React.FC = () => {
 
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState<string | null>(null);
-  // null = unknown / still probing; true = a recent prescription exists; false = none
-  const [hasRecentPrescription, setHasRecentPrescription] = useState<boolean | null>(null);
 
-  // ---- Probe whether a recent prescription actually exists ----------------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.get<LatestConsultationResponse | null>(
-          '/consultation/latest',
-        );
-        const data = res.data;
-        const exists = !!(
-          data &&
-          (data.prescriptionUrl || (data.medicines && data.medicines.length > 0))
-        );
-        if (!cancelled) setHasRecentPrescription(exists);
-      } catch {
-        if (!cancelled) setHasRecentPrescription(false);
+  // ---- Load all medicines from mock DB -----------------------------------
+  const loadAllMedicines = useCallback(async () => {
+    try {
+      const results = await pharmacyService.searchMedicines('');
+      if (results && results.length > 0) {
+        const mapped: PrescriptionMedicine[] = results.map((m, i) => ({
+          id: i + 1,
+          name: m.name,
+          quantity: 1,
+          unitPrice: m.price,
+        }));
+        setMedicines(mapped);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      // silently ignore — user can still add manually
+    }
+  }, [setMedicines]);
+
+  // ---- Resolve missing medicine prices -----------------------------------
+  const resolvePrices = useCallback(async (
+    inputMedicines: PrescriptionMedicine[],
+  ): Promise<PrescriptionMedicine[]> => {
+    if (inputMedicines.length === 0) return inputMedicines;
+
+    const resolved = await Promise.all(
+      inputMedicines.map(async (med) => {
+        if (med.unitPrice > 0) return med;
+        try {
+          const results = await pharmacyService.searchMedicines(med.name);
+          if (!results || results.length === 0) return med;
+          const nameLower = med.name.toLowerCase();
+          // 1. Exact match
+          const exact = results.find(
+            (item) => item.name.toLowerCase() === nameLower,
+          );
+          // 2. Catalog name starts with doctor-written name (e.g. "Paracetamol" → "Paracetamol 500mg")
+          const startsWith = results.find(
+            (item) => item.name.toLowerCase().startsWith(nameLower),
+          );
+          // 3. Doctor-written name starts with catalog name (reverse partial)
+          const reverse = results.find(
+            (item) => nameLower.startsWith(item.name.toLowerCase()),
+          );
+          const bestMatch = exact ?? startsWith ?? reverse ?? results[0];
+          if (bestMatch?.price && bestMatch.price > 0) {
+            return { ...med, unitPrice: bestMatch.price };
+          }
+        } catch {
+          // Keep original value if lookup fails.
+        }
+        return med;
+      }),
+    );
+
+    return resolved;
   }, []);
 
-  // ---- Shared: fetch medicines from latest consultation -------------------
-  const fetchConsultationMedicines = useCallback(
-    async (): Promise<boolean> => {
-      try {
-        const res = await api.get<LatestConsultationResponse | null>(
-          '/consultation/latest',
-        );
-        const data = res.data;
-        if (!data || (!data.prescriptionUrl && (!data.medicines || data.medicines.length === 0))) {
-          return false;
-        }
-        const mappedMedicines: PrescriptionMedicine[] = (data.medicines ?? [])
-          .filter((m) => m && (m.name ?? '').trim().length > 0)
-          .map((m, i) => ({
-            id: i + 1,
-            name: m!.name as string,
-            quantity: typeof m!.quantity === 'number' && m!.quantity > 0 ? m!.quantity : 1,
-            unitPrice: typeof m!.unitPrice === 'number' ? m!.unitPrice : 0,
-          }));
-        if (mappedMedicines.length > 0) {
-          setMedicines(mappedMedicines);
-          return true;
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    },
-    [setMedicines],
-  );
+  // Medicines are intentionally NOT pre-loaded on mount.
+  // They populate only after the user uploads a prescription or taps
+  // "Use Recent Prescription".
 
   // ---- Prescription upload via API -----------------------------------------
   const uploadPrescription = useCallback(
@@ -246,6 +285,10 @@ export const PrescriptionOrderScreen: React.FC = () => {
         const response = await api.post<UploadPrescriptionResponse>(
           ENDPOINTS.PHARMACY.PRESCRIPTIONS_UPLOAD,
           formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            transformRequest: (data) => data,
+          },
         );
 
         const uploadedUrl: string =
@@ -256,22 +299,19 @@ export const PrescriptionOrderScreen: React.FC = () => {
           response.data?.status ?? null,
         );
 
-        // Try to load medicines from the latest consultation, if any.
-        // Otherwise leave the medicines list as-is (user can search & add manually).
-        await fetchConsultationMedicines();
       } catch (err: unknown) {
-        const message =
-          (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message ?? 'Upload failed. Using local image.';
+        const message = extractApiErrorMessage(
+          err,
+          'Upload failed. Using local image.',
+        );
         setPrescription(uri);
         setUploadedPrescriptionMeta(null, null);
         setUploadError(message);
-        await fetchConsultationMedicines();
       } finally {
         setUploading(false);
       }
     },
-    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta, fetchConsultationMedicines],
+    [setPrescription, setUploading, setUploadError, setUploadedPrescriptionMeta],
   );
 
   // ---- Image picker helpers ------------------------------------------------
@@ -339,17 +379,19 @@ export const PrescriptionOrderScreen: React.FC = () => {
         setUploadedPrescriptionMeta(null, null);
       }
       if (mappedMedicines.length > 0) {
-        setMedicines(mappedMedicines);
+        const pricedMedicines = await resolvePrices(mappedMedicines);
+        setMedicines(pricedMedicines);
       }
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message ?? 'Could not load your recent prescription.';
+      const message = extractApiErrorMessage(
+        err,
+        'Could not load your recent prescription.',
+      );
       setRecentError(message);
     } finally {
       setRecentLoading(false);
     }
-  }, [setPrescription, setMedicines, setUploadedPrescriptionMeta]);
+  }, [resolvePrices, setPrescription, setMedicines, setUploadedPrescriptionMeta]);
 
   // ---- Checkout validation -------------------------------------------------
   const subtotal = medicines.reduce(
@@ -359,13 +401,88 @@ export const PrescriptionOrderScreen: React.FC = () => {
   const deliveryFee = calculateDeliveryFee(subtotal);
   const freeDeliveryThreshold = getFreeDeliveryThreshold();
   const total = subtotal + deliveryFee;
-  const canProceed = medicines.length > 0 && !isUploading;
+  const hasPrescription = !!uploadedPrescriptionId || !!prescriptionUrl;
+  const canProceed = (!isUploading) && (medicines.length > 0 || hasPrescription);
+
+  const placePrescriptionOrderMutation = useMutation({
+    mutationFn: pharmacyService.createPrescriptionOrder,
+    onSuccess: (order) => {
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
+      Alert.alert(
+        'Prescription Order Placed',
+        `Order #${order.orderNumber} is submitted and waiting for admin approval. Payment will be requested after approval.`,
+        [{ text: 'OK', onPress: () => navigation.navigate('PharmacyOrders') }],
+      );
+      resetOrder();
+    },
+    onError: (error: any) => {
+      const raw = error?.response?.data?.message;
+      const message = Array.isArray(raw)
+        ? raw.join('\n')
+        : raw || 'Could not place prescription order.';
+      Alert.alert('Order Failed', String(message));
+    },
+  });
+
+  const reuploadPrescriptionMutation = useMutation({
+    mutationFn: (payload: {
+      uploadedPrescriptionId?: string;
+      prescriptionUrl?: string;
+      notes?: string;
+    }) => {
+      if (!reuploadOrderId) {
+        throw new Error('Order ID missing for reupload flow.');
+      }
+      return pharmacyService.reuploadPrescriptionForOrder(reuploadOrderId, payload);
+    },
+    onSuccess: (order) => {
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['pharmacy-order', order.id] });
+      Alert.alert(
+        'Prescription Re-uploaded',
+        `Order #${order.orderNumber} is resubmitted and waiting for admin review.`,
+        [{ text: 'OK', onPress: () => navigation.navigate('PharmacyOrderDetail', { orderId: order.id }) }],
+      );
+      resetOrder();
+    },
+    onError: (error: any) => {
+      const raw = error?.response?.data?.message;
+      const message = Array.isArray(raw)
+        ? raw.join('\n')
+        : raw || 'Could not re-upload prescription.';
+      Alert.alert('Re-upload Failed', String(message));
+    },
+  });
 
   const handleProceed = () => {
-    if (medicines.length === 0) {
-      Alert.alert('No medicines', 'Please add at least one medicine.');
+    if (reuploadOrderId) {
+      if (!hasPrescription) {
+        Alert.alert(
+          'Prescription required',
+          'Please upload a corrected prescription to continue this order.',
+        );
+        return;
+      }
+      reuploadPrescriptionMutation.mutate({
+        uploadedPrescriptionId: uploadedPrescriptionId ?? undefined,
+        prescriptionUrl: prescriptionUrl ?? undefined,
+      });
       return;
     }
+
+    if (medicines.length === 0 && !hasPrescription) {
+      Alert.alert('Prescription required', 'Upload a prescription or add medicines before continuing.');
+      return;
+    }
+
+    if (medicines.length === 0 && hasPrescription) {
+      placePrescriptionOrderMutation.mutate({
+        uploadedPrescriptionId: uploadedPrescriptionId ?? undefined,
+        prescriptionUrl: prescriptionUrl ?? undefined,
+      });
+      return;
+    }
+
     // Navigate to PharmacyCheckoutScreen – data is already in Zustand store
     navigation.navigate('PharmacyCheckout', {
       cartItems: medicines.map((m) => ({
@@ -397,45 +514,39 @@ export const PrescriptionOrderScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>📋 Prescription</Text>
 
+        {reuploadOrderId && (
+          <View style={styles.reuploadHint}>
+            <Text style={styles.reuploadHintTitle}>Re-upload requested</Text>
+            <Text style={styles.reuploadHintText}>
+              Upload a corrected prescription for this existing order.
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.helperText}>
           Prescription is optional here. You can continue with medicine selection and add a prescription later if needed.
         </Text>
 
         {!prescriptionUrl && !isUploading && (
           <>
-            {hasRecentPrescription !== false ? (
-              <TouchableOpacity
-                style={[
-                  styles.sourceOption,
-                  (recentLoading || hasRecentPrescription === null) && { opacity: 0.6 },
-                ]}
-                onPress={useRecentConsultation}
-                disabled={recentLoading || hasRecentPrescription === null}
-              >
-                <Text style={styles.sourceIcon}>🩺</Text>
-                <View style={styles.sourceTextWrap}>
-                  <Text style={styles.sourceTitle}>
-                    {recentLoading
-                      ? 'Loading recent prescription…'
-                      : hasRecentPrescription === null
-                        ? 'Checking for recent prescription…'
-                        : 'Use Recent Prescription'}
-                  </Text>
-                  <Text style={styles.sourceSubtitle}>
-                    Use your last doctor-issued prescription
-                  </Text>
-                </View>
-                <Text style={styles.arrow}>→</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.noRecentBanner}>
-                <Text style={styles.noRecentText}>
-                  ℹ️ No recent prescription found
+            <TouchableOpacity
+              style={[styles.sourceOption, recentLoading && { opacity: 0.6 }]}
+              onPress={useRecentConsultation}
+              disabled={recentLoading}
+            >
+              <Text style={styles.sourceIcon}>🩺</Text>
+              <View style={styles.sourceTextWrap}>
+                <Text style={styles.sourceTitle}>
+                  {recentLoading ? 'Loading recent prescription…' : 'Use Recent Prescription'}
+                </Text>
+                <Text style={styles.sourceSubtitle}>
+                  Use your last doctor-issued prescription
                 </Text>
               </View>
-            )}
+              <Text style={styles.arrow}>→</Text>
+            </TouchableOpacity>
 
-            {recentError && hasRecentPrescription !== false && (
+            {recentError && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>ℹ️ {recentError}</Text>
               </View>
@@ -539,33 +650,38 @@ export const PrescriptionOrderScreen: React.FC = () => {
           </View>
         )}
 
-        {!isUploading &&
-          medicines.map((med) => (
-            <View key={med.id} style={styles.medicineRow}>
-              <View style={styles.medicineInfo}>
-                <Text style={styles.medicineName}>{med.name}</Text>
-                <Text style={styles.medicinePrice}>
-                  {formatCurrency(med.unitPrice)} × {med.quantity} ={' '}
-                  {formatCurrency(med.unitPrice * med.quantity)}
-                </Text>
-              </View>
-              <View style={styles.qtyControls}>
-                <TouchableOpacity
-                  style={styles.qtyBtn}
-                  onPress={() => updateMedicineQuantity(med.id, -1)}
-                >
-                  <Text style={styles.qtyBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyValue}>{med.quantity}</Text>
-                <TouchableOpacity
-                  style={styles.qtyBtn}
-                  onPress={() => updateMedicineQuantity(med.id, 1)}
-                >
-                  <Text style={styles.qtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
+        {!isUploading && medicines.map((med) => (
+          <View key={med.id} style={styles.medicineRow}>
+            <View style={styles.medicineInfo}>
+              <Text style={styles.medicineName}>{med.name}</Text>
+              <Text style={styles.medicinePrice}>
+                {formatCurrency(med.unitPrice)} × {med.quantity} ={' '}
+                {formatCurrency(med.unitPrice * med.quantity)}
+              </Text>
             </View>
-          ))}
+            <View style={styles.qtyControls}>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => updateMedicineQuantity(med.id, -1)}
+              >
+                <Text style={styles.qtyBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.qtyValue}>{med.quantity}</Text>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => updateMedicineQuantity(med.id, 1)}
+              >
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qtyBtn, styles.removeBtn]}
+                onPress={() => removeMedicine(med.id)}
+              >
+                <Text style={styles.removeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
 
         {!isUploading && medicines.length > 0 && (
           <View style={styles.subtotalRow}>
@@ -577,7 +693,14 @@ export const PrescriptionOrderScreen: React.FC = () => {
         {/* Inline add-medicine search */}
         {!isUploading && (
           <View style={styles.addMedWrap}>
-            <Text style={styles.addMedTitle}>➕ Add Medicine</Text>
+            <Text style={styles.addMedTitle}>
+              {medicines.length > 0 ? '➕ Add Another Medicine' : '➕ Add Medicine'}
+            </Text>
+            {lastAdded && (
+              <View style={styles.addedBanner}>
+                <Text style={styles.addedBannerText}>✓ {lastAdded} added — search for more below</Text>
+              </View>
+            )}
             <TextInput
               style={styles.addMedInput}
               placeholder="Search by medicine name…"
@@ -586,6 +709,7 @@ export const PrescriptionOrderScreen: React.FC = () => {
               onChangeText={setAddMedQuery}
               autoCorrect={false}
               autoCapitalize="none"
+              ref={addMedInputRef}
             />
             {addMedLoading && (
               <ActivityIndicator size="small" color={Colors.primary} style={{ marginTop: 6 }} />
@@ -630,6 +754,12 @@ export const PrescriptionOrderScreen: React.FC = () => {
             <Text style={styles.summaryLabel}>Delivery fee{subtotal >= freeDeliveryThreshold ? ' 🎉' : ''}</Text>
             <Text style={styles.summaryValue}>{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</Text>
           </View>
+          {deliveryFee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Free delivery unlock</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(freeDeliveryThreshold - subtotal)} away</Text>
+            </View>
+          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Estimated total</Text>
             <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
@@ -640,13 +770,15 @@ export const PrescriptionOrderScreen: React.FC = () => {
       <View style={styles.checkoutArea}>
         <Button
           title={
-            medicines.length === 0
-              ? 'No Medicines Selected'
-              : `Proceed to Checkout — ${formatCurrency(total)}`
+            reuploadOrderId
+              ? 'Submit Re-upload'
+              : medicines.length === 0
+                ? 'Place Prescription Order (No Payment)'
+                : `Proceed to Checkout — ${formatCurrency(total)}`
           }
           onPress={handleProceed}
           disabled={!canProceed}
-          loading={isUploading}
+          loading={isUploading || placePrescriptionOrderMutation.isPending || reuploadPrescriptionMutation.isPending}
         />
       </View>
 
@@ -710,6 +842,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  reuploadHint: {
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    backgroundColor: '#fffbeb',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  reuploadHintTitle: {
+    color: '#92400e',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  reuploadHintText: {
+    color: '#92400e',
+    fontSize: 12,
+  },
 
   // Source selection
   sourceOption: {
@@ -768,13 +917,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorText: { fontSize: 13, color: Colors.error },
-  noRecentBanner: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  noRecentText: { fontSize: 13, color: Colors.textMuted },
 
   // Preview
   previewWrap: { alignItems: 'center' },
@@ -885,6 +1027,19 @@ const styles = StyleSheet.create({
   addMedResultMfg: { fontSize: 12, color: Colors.textMuted },
   addMedResultPrice: { fontSize: 14, fontWeight: '700', color: Colors.primary },
   addMedEmpty: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic', marginTop: 8 },
+  removeBtn: {
+    backgroundColor: '#FEE2E2',
+    marginLeft: 6,
+  },
+  removeBtnText: { color: '#DC2626', fontSize: 14, fontWeight: '700' },
+  addedBanner: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  addedBannerText: { fontSize: 13, color: '#059669', fontWeight: '600' },
 
   // Pharmacy selection
   pharmacyCard: {

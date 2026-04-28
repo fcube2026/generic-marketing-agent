@@ -3,6 +3,22 @@ import { PharmacyOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { PharmacyPartnerProvider } from '../providers/pharmacy-partner.interface';
 
+/**
+ * Minimal interface for the refill scheduler so that PharmacyJobService does
+ * not need to import PharmacyJobScheduler directly (which would create a
+ * circular dependency, since PharmacyJobScheduler already imports
+ * RefillReminderData from this file).
+ */
+export interface IRefillScheduler {
+  scheduleRefillReminder(
+    orderId: string,
+    orderNumber: string,
+    patientProfileId: string,
+    deliveredAt: Date,
+    prescriptionDays?: number,
+  ): Promise<void>;
+}
+
 /** Terminal statuses that should not be polled further. */
 const TERMINAL_STATUSES: PharmacyOrderStatus[] = [
   PharmacyOrderStatus.DELIVERED,
@@ -46,6 +62,7 @@ export class PharmacyJobService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly partnerProviders: Map<string, PharmacyPartnerProvider>,
+    private readonly scheduler: IRefillScheduler | null = null,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -78,7 +95,11 @@ export class PharmacyJobService {
 
     for (const order of activeOrders) {
       try {
-        const newStatus = await this.getMockOrderStatus(order.partnerOrderId!);
+        const newStatus = await this.getProviderOrderStatus(
+          order.pharmacyPartner.code,
+          order.pharmacyPartner.name,
+          order.partnerOrderId!,
+        );
         if (!newStatus) {
           result.skipped++;
           continue;
@@ -148,6 +169,80 @@ export class PharmacyJobService {
   }
 
   /**
+   * Fetch the latest order status by routing to the correct provider for the
+   * given partner. Falls back to 'mock' when no dedicated provider is
+   * registered for the partner code (development / mock-only setup).
+   *
+   * Returns `null` when no provider is available at all.
+   */
+  async getProviderOrderStatus(
+    partnerCode: string,
+    partnerName: string,
+    partnerOrderId: string,
+  ): Promise<string | null> {
+    const provider =
+      this.partnerProviders.get(partnerCode.toLowerCase()) ??
+      this.partnerProviders.get(partnerName.toLowerCase()) ??
+      this.partnerProviders.get('mock');
+
+    if (!provider) {
+      this.logger.warn(
+        `[poll] No provider registered for partner "${partnerCode}" / "${partnerName}"`,
+      );
+      return null;
+    }
+
+    try {
+      const result = await provider.getOrderStatus(partnerOrderId);
+      return result.status;
+    } catch (err) {
+      this.logger.warn(
+        `[poll] Failed to fetch status for "${partnerOrderId}" (partner "${partnerCode}"): ${(err as Error).message}`,
+      );
+      throw err;
+    }
+  }
+
+  /**
+   * Schedule a refill reminder for an order that just reached DELIVERED status.
+   * No-op when the scheduler is not available (queues disabled / mock-only setup).
+   */
+  async scheduleRefillOnDelivery(
+    orderId: string,
+    deliveredAt: Date,
+  ): Promise<void> {
+    if (!this.scheduler) {
+      this.logger.log(
+        `[refill] Scheduler not available — skipping refill reminder for order "${orderId}"`,
+      );
+      return;
+    }
+
+    const order = await this.prisma.pharmacyOrder.findUnique({
+      where: { id: orderId },
+      select: { orderNumber: true, patientProfileId: true },
+    });
+
+    if (!order) {
+      this.logger.warn(
+        `[refill] Order "${orderId}" not found — cannot schedule refill reminder`,
+      );
+      return;
+    }
+
+    await this.scheduler.scheduleRefillReminder(
+      orderId,
+      order.orderNumber,
+      order.patientProfileId,
+      deliveredAt,
+    );
+
+    this.logger.log(
+      `[refill] Refill reminder scheduled for order "${order.orderNumber}"`,
+    );
+  }
+
+  /**
    * Atomically update the order status and insert a status history record.
    * Uses the unique(pharmacyOrderId, status) constraint for idempotency.
    */
@@ -191,6 +286,10 @@ export class PharmacyJobService {
         },
       }),
     ]);
+
+    if (newStatus === PharmacyOrderStatus.DELIVERED) {
+      await this.scheduleRefillOnDelivery(orderId, new Date());
+    }
   }
 
   // ---------------------------------------------------------------------------

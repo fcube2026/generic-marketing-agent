@@ -1,4 +1,11 @@
-import { Controller, Post, Get, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -88,6 +95,9 @@ export class VideoConsultationController {
     @Param('bookingId') bookingId: string,
     @Query() query: GenerateTokenQueryDto,
   ) {
+    if (query.role && !['host', 'guest'].includes(query.role)) {
+      throw new BadRequestException('Invalid role. Must be host or guest.');
+    }
     return this.videoConsultationService.generateToken(
       bookingId,
       user.id,

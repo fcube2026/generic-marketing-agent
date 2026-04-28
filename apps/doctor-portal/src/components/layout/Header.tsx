@@ -1,10 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import api from '@/lib/api';
 
 export default function Header() {
   const router = useRouter();
+  const [initials, setInitials] = useState('DR');
+
+  useEffect(() => {
+    api
+      .get('/providers/me')
+      .then((res) => {
+        const name: string = res.data?.name ?? '';
+        const parts = name.replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean);
+        const computed = parts.slice(0, 2).map((w: string) => w[0].toUpperCase()).join('');
+        if (computed) setInitials(computed);
+      })
+      .catch(() => {/* silently ignore */});
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('provider_token');
@@ -53,7 +68,7 @@ export default function Header() {
         {/* Avatar + logout */}
         <div className="flex items-center gap-2 pl-3 border-l border-surface-border">
           <div className="w-7 h-7 rounded-full bg-primary-lighter text-primary text-xs font-bold flex items-center justify-center">
-            AM
+            {initials}
           </div>
           <button
             onClick={handleLogout}
