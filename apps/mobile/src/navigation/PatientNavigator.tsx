@@ -22,16 +22,19 @@ import { PatientKycScreen } from '../screens/patient/PatientKycScreen';
 import { PatientKycPersonalScreen } from '../screens/patient/kyc/PatientKycPersonalScreen';
 import { PatientKycAddressScreen } from '../screens/patient/kyc/PatientKycAddressScreen';
 import { PatientKycIdUploadScreen } from '../screens/patient/kyc/PatientKycIdUploadScreen';
+import { PatientKycAadhaarScreen } from '../screens/patient/kyc/PatientKycAadhaarScreen';
 import { PatientKycFaceCaptureScreen } from '../screens/patient/kyc/PatientKycFaceCaptureScreen';
 import { PatientKycGuardianScreen } from '../screens/patient/kyc/PatientKycGuardianScreen';
 import { PatientKycReviewScreen } from '../screens/patient/kyc/PatientKycReviewScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
+import { MedicineDetailScreen } from '../screens/pharmacy/MedicineDetailScreen';
 import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
 import { PharmacyCheckoutScreen } from '../screens/pharmacy/PharmacyCheckoutScreen';
 import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
 import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
+import { NotificationSettingsScreen } from '../screens/common/NotificationSettingsScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
 
@@ -40,8 +43,9 @@ export type PatientStackParamList = {
   Onboarding: undefined;
   PatientKyc: undefined;
   PatientKycPersonal: undefined;
-  PatientKycAddress: undefined;
+  PatientKycAddress: { returnToBooking?: boolean } | undefined;
   PatientKycIdUpload: undefined;
+  PatientKycAadhaarUpload: undefined;
   PatientKycFaceCapture: undefined;
   PatientKycGuardian: undefined;
   PatientKycReview: undefined;
@@ -59,11 +63,15 @@ export type PatientStackParamList = {
   VideoConsultation: { bookingId: string };
   PostCall: { bookingId: string; durationMinutes: number; isProvider: boolean };
   MedicineSearch: undefined;
-  PrescriptionOrder: { bookingId?: string; prescriptionUrl?: string } | undefined;
+  MedicineDetail: { medicine: MedicineResult; pincode?: string };
+  PrescriptionOrder:
+    | { bookingId?: string; prescriptionUrl?: string; orderId?: string }
+    | undefined;
   PharmacyCheckout: { cartItems: { medicine: MedicineResult; quantity: number }[] };
   PharmacyOrders: undefined;
   PharmacyOrderDetail: { orderId: string };
   OrderTracking: { orderId: string };
+  NotificationSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -99,7 +107,8 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PatientKyc" component={PatientKycScreen} options={{ title: 'Identity Verification' }} />
     <Stack.Screen name="PatientKycPersonal" component={PatientKycPersonalScreen} options={{ title: 'Your Details' }} />
     <Stack.Screen name="PatientKycAddress" component={PatientKycAddressScreen} options={{ title: 'Your Address' }} />
-    <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar' }} />
+    <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar (legacy)' }} />
+    <Stack.Screen name="PatientKycAadhaarUpload" component={PatientKycAadhaarScreen} options={{ title: 'Upload Aadhaar' }} />
     <Stack.Screen name="PatientKycFaceCapture" component={PatientKycFaceCaptureScreen} options={{ title: 'Face Verification' }} />
     <Stack.Screen name="PatientKycGuardian" component={PatientKycGuardianScreen} options={{ title: 'Guardian Details' }} />
     <Stack.Screen name="PatientKycReview" component={PatientKycReviewScreen} options={{ title: 'Review & Submit' }} />
@@ -117,10 +126,12 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="VideoConsultation" component={VideoConsultationScreen} options={{ title: 'Video Consultation' }} />
     <Stack.Screen name="PostCall" component={PostCallScreen} options={{ headerShown: false, gestureEnabled: false }} />
     <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
+    <Stack.Screen name="MedicineDetail" component={MedicineDetailScreen} options={{ title: 'Medicine Details' }} />
     <Stack.Screen name="PrescriptionOrder" component={PrescriptionOrderScreen} options={{ title: 'Prescription Order' }} />
     <Stack.Screen name="PharmacyCheckout" component={PharmacyCheckoutScreen} options={{ title: 'Checkout' }} />
     <Stack.Screen name="PharmacyOrders" component={PharmacyOrdersScreen} options={{ title: 'My Orders' }} />
     <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ title: 'Track Order' }} />
+    <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
   </Stack.Navigator>
 );

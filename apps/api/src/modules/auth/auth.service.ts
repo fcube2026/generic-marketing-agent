@@ -11,11 +11,13 @@ import { Role, PasswordResetToken, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { maskPhone } from '../../common/utils/masking.util';
 
 const ADMIN_PHONE = '+0000000000'; // placeholder phone for admin user
 const MARKETING_PHONE = '+0000000001'; // placeholder phone for marketing agent user
@@ -60,16 +62,31 @@ export class AuthService implements OnModuleInit {
     if (process.env.APP_ENV === 'production') return;
     if (process.env.DISABLE_STAGING_ADMIN_BOOTSTRAP === 'true') return;
 
-    // 1. Provision the env-configured admin using phone.
-    await this.bootstrapAdmin(this.adminPassword, ADMIN_PHONE);
+    // 1. Provision the env-configured admin (may match the well-known one).
+    await this.bootstrapAdmin(this.adminEmail, this.adminPassword, ADMIN_PHONE);
 
-    // 2. Provision Zoho team accounts using phone placeholders.
-    for (const member of TEAM_ACCOUNTS) {
-      await this.bootstrapTeamMember(member.phone);
+    // 2. Always provision the well-known staging admin so the documented
+    //    defaults work even when ADMIN_EMAIL/ADMIN_PASSWORD on Railway have
+    //    drifted to other values. Skip if it's the same as the env-configured
+    //    admin to avoid duplicate work.
+    if (this.adminEmail !== WELL_KNOWN_STAGING_ADMIN_EMAIL) {
+      await this.bootstrapAdmin(
+        WELL_KNOWN_STAGING_ADMIN_EMAIL,
+        WELL_KNOWN_STAGING_ADMIN_PASSWORD,
+        WELL_KNOWN_STAGING_ADMIN_PHONE,
+      );
     }
 
-    // 3. Provision the marketing agent account using phone.
-    await this.bootstrapMarketing(MARKETING_PHONE);
+    // 3. Provision all Zoho team accounts with the default password.
+    //    Only sets password if the account doesn't have one yet —
+    //    so existing custom passwords are never overwritten.
+    for (const member of TEAM_ACCOUNTS) {
+      await this.bootstrapTeamMember(member.email, member.phone);
+    }
+
+    // 4. Provision the marketing agent account so the marketing-login
+    //    endpoint works reliably from the first deployment.
+    await this.bootstrapMarketing(this.marketingEmail, MARKETING_PHONE);
   }
 
   /**
@@ -79,31 +96,53 @@ export class AuthService implements OnModuleInit {
    * work regardless of DB drift.
    */
   private async bootstrapAdmin(
+    email: string,
     plainPassword: string,
     phonePlaceholder: string,
   ) {
     try {
       const passwordHash = await bcrypt.hash(plainPassword, 10);
-      await this.prisma.user.upsert({
-        where: { phone: phonePlaceholder },
-        create: {
-          phone: phonePlaceholder,
-          role: Role.ADMIN,
-          passwordHash,
-          isActive: true,
-        },
-        update: {
-          role: Role.ADMIN,
-          passwordHash,
-          isActive: true,
-        },
+      const existing = await this.prisma.user.findFirst({
+        where: { email },
       });
-      this.logger.log(
-        `[bootstrap] Ensured staging admin user phone=${phonePlaceholder}`,
-      );
+
+      if (!existing) {
+        await this.prisma.user.upsert({
+          where: { phone: phonePlaceholder },
+          create: {
+            phone: phonePlaceholder,
+            email,
+            role: Role.ADMIN,
+            passwordHash,
+            isActive: true,
+          },
+          update: {
+            email,
+            role: Role.ADMIN,
+            passwordHash,
+            isActive: true,
+          },
+        });
+        this.logger.log(
+          `[bootstrap] Created staging admin user email=${email}`,
+        );
+      } else {
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            role: Role.ADMIN,
+            isActive: true,
+          },
+        });
+        this.logger.log(
+          `[bootstrap] Reset staging admin password email=${email}`,
+        );
+      }
     } catch (err) {
+      // Don't crash app boot if DB/migrations aren't ready yet.
       this.logger.warn(
-        `[bootstrap] Staging admin bootstrap skipped for phone=${phonePlaceholder}: ${err.message}`,
+        `[bootstrap] Staging admin bootstrap skipped for email=${email}: ${err.message}`,
       );
     }
   }
@@ -113,23 +152,40 @@ export class AuthService implements OnModuleInit {
    * Only sets the password if the account has no passwordHash yet,
    * so a user who already changed their password keeps it.
    */
-  private async bootstrapTeamMember(phonePlaceholder: string) {
+  private async bootstrapTeamMember(email: string, phonePlaceholder: string) {
     try {
+      const existing = await this.prisma.user.findFirst({ where: { email } });
+      if (existing) {
+        // Already exists — only fix if no password hash at all
+        if (!existing.passwordHash) {
+          const passwordHash = await bcrypt.hash(TEAM_DEFAULT_PASSWORD, 10);
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: { passwordHash, role: Role.ADMIN, isActive: true },
+          });
+          this.logger.log(
+            `[bootstrap] Set initial password for team member email=${email}`,
+          );
+        }
+        return;
+      }
+      // Create new account
       const passwordHash = await bcrypt.hash(TEAM_DEFAULT_PASSWORD, 10);
       await this.prisma.user.upsert({
         where: { phone: phonePlaceholder },
         create: {
           phone: phonePlaceholder,
+          email,
           role: Role.ADMIN,
           passwordHash,
           isActive: true,
         },
-        update: { role: Role.ADMIN, passwordHash, isActive: true },
+        update: { email, role: Role.ADMIN, passwordHash, isActive: true },
       });
-      this.logger.log(`[bootstrap] Ensured team member account phone=${phonePlaceholder}`);
+      this.logger.log(`[bootstrap] Created team member account email=${email}`);
     } catch (err) {
       this.logger.warn(
-        `[bootstrap] Team member bootstrap skipped for phone=${phonePlaceholder}: ${err.message}`,
+        `[bootstrap] Team member bootstrap skipped for email=${email}: ${err.message}`,
       );
     }
   }
@@ -139,65 +195,100 @@ export class AuthService implements OnModuleInit {
    * Only sets the password if the account has no passwordHash yet,
    * so a user who already changed their password keeps it.
    */
-  private async bootstrapMarketing(phonePlaceholder: string) {
+  private async bootstrapMarketing(email: string, phonePlaceholder: string) {
     try {
+      const existing = await this.prisma.user.findFirst({ where: { email } });
+      if (existing) {
+        if (!existing.passwordHash) {
+          const passwordHash = await bcrypt.hash(
+            MARKETING_DEFAULT_PASSWORD,
+            10,
+          );
+          await this.prisma.user.update({
+            where: { id: existing.id },
+            data: {
+              passwordHash,
+              role: Role.MARKETING_AGENT,
+              isActive: true,
+            },
+          });
+          this.logger.log(
+            `[bootstrap] Set initial password for marketing agent email=${email}`,
+          );
+        }
+        return;
+      }
       const passwordHash = await bcrypt.hash(MARKETING_DEFAULT_PASSWORD, 10);
       await this.prisma.user.upsert({
         where: { phone: phonePlaceholder },
         create: {
           phone: phonePlaceholder,
+          email,
           role: Role.MARKETING_AGENT,
           passwordHash,
           isActive: true,
         },
         update: {
+          email,
           role: Role.MARKETING_AGENT,
-          passwordHash,
           isActive: true,
+          // Do not overwrite an existing passwordHash — preserve custom passwords
         },
       });
       this.logger.log(
-        `[bootstrap] Ensured marketing agent account phone=${phonePlaceholder}`,
+        `[bootstrap] Created marketing agent account email=${email}`,
       );
     } catch (err) {
       this.logger.warn(
-        `[bootstrap] Marketing agent bootstrap skipped for phone=${phonePlaceholder}: ${err.message}`,
+        `[bootstrap] Marketing agent bootstrap skipped for email=${email}: ${err.message}`,
       );
     }
   }
 
   /** Read credentials lazily so Railway env vars are guaranteed to be present */
+  private get adminEmail() {
+    return process.env.ADMIN_EMAIL || 'admin@curex24.com';
+  }
   private get adminPassword() {
     return process.env.ADMIN_PASSWORD || 'admin123';
+  }
+  private get marketingEmail() {
+    return process.env.MARKETING_EMAIL || 'marketing@curex24.com';
+  }
+  private get marketingPassword() {
+    return process.env.MARKETING_PASSWORD || 'marketing123';
   }
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
-    const phone = this.normalizePhone(dto.phone);
     const otp = this.generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     try {
       // Invalidate old OTPs for this phone
       await this.prisma.otpVerification.updateMany({
-        where: { phone, verified: false },
+        where: { phone: dto.phone, verified: false },
         data: { verified: true },
       });
 
       await this.prisma.otpVerification.create({
         data: {
-          phone,
+          phone: dto.phone,
           otp,
           expiresAt,
           verified: false,
         },
       });
     } catch (err) {
-      this.logger.error(`Failed to create OTP for phone=${phone}`, err);
+      this.logger.error(
+        `Failed to create OTP for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'OTP service temporarily unavailable. Please try again shortly.',
       );
@@ -210,7 +301,7 @@ export class AuthService implements OnModuleInit {
       process.env.APP_ENV === 'staging';
 
     if (showOtp) {
-      console.log(`OTP for ${phone}: ${otp}`);
+      console.log(`OTP for ${maskPhone(dto.phone)}: ${otp}`);
     }
 
     return {
@@ -221,12 +312,11 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const phone = this.normalizePhone(dto.phone);
     let otpRecord;
     try {
       otpRecord = await this.prisma.otpVerification.findFirst({
         where: {
-          phone,
+          phone: dto.phone,
           otp: dto.otp,
           verified: false,
           expiresAt: { gt: new Date() },
@@ -234,7 +324,10 @@ export class AuthService implements OnModuleInit {
         orderBy: { createdAt: 'desc' },
       });
     } catch (err) {
-      this.logger.error(`OTP lookup failed for phone=${phone}`, err);
+      this.logger.error(
+        `OTP lookup failed for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Verification service temporarily unavailable. Please try again shortly.',
       );
@@ -252,30 +345,15 @@ export class AuthService implements OnModuleInit {
       });
 
       // Find or create user
-      const existingUser = await this.prisma.user.findUnique({
-        where: { phone },
-        include: { patientProfile: true },
+      let user = await this.prisma.user.findUnique({
+        where: { phone: dto.phone },
       });
 
-      let user: any = existingUser;
-
-      if (!existingUser) {
+      if (!user) {
         user = await this.prisma.user.create({
           data: {
-            phone,
+            phone: dto.phone,
             role: (dto.role as Role) ?? Role.PATIENT,
-          },
-        });
-      } else if (
-        existingUser.role === Role.PATIENT &&
-        !existingUser.patientProfile
-      ) {
-        // If an existing user joined through the same mobile number, don't ask them to complete the profile.
-        // We ensure a basic profile exists for them.
-        await this.prisma.patientProfile.create({
-          data: {
-            userId: existingUser.id,
-            name: 'User', // default name to satisfy profile requirement
           },
         });
       }
@@ -293,7 +371,10 @@ export class AuthService implements OnModuleInit {
       };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      this.logger.error(`OTP verification failed for phone=${dto.phone}`, err);
+      this.logger.error(
+        `OTP verification failed for phone=${maskPhone(dto.phone)}`,
+        err,
+      );
       throw new ServiceUnavailableException(
         'Verification service temporarily unavailable. Please try again shortly.',
       );
@@ -338,13 +419,10 @@ export class AuthService implements OnModuleInit {
     }
 
     // 2. Fall back to hardcoded env var credentials (legacy)
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@curex24.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
     this.logger.debug(
-      `Admin login fallback: email match=${dto.email === adminEmail}, pw length=${adminPassword.length}, env set=${!!process.env.ADMIN_PASSWORD}`,
+      `Admin login fallback: email match=${dto.email === this.adminEmail}, pw length=${this.adminPassword.length}, env set=${!!process.env.ADMIN_PASSWORD}`,
     );
-    if (dto.email !== adminEmail || dto.password !== adminPassword) {
+    if (dto.email !== this.adminEmail || dto.password !== this.adminPassword) {
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
@@ -360,11 +438,11 @@ export class AuthService implements OnModuleInit {
 
       return {
         token,
-        user: { id: user.id, email: adminEmail, role: user.role },
+        user: { id: user.id, email: this.adminEmail, role: user.role },
       };
     } catch (err) {
       this.logger.error(
-        `Admin login failed: DB upsert for phone=${ADMIN_PHONE}`,
+        `Admin login failed: DB upsert for phone=${maskPhone(ADMIN_PHONE)}`,
         err,
       );
       throw new ServiceUnavailableException(
@@ -414,16 +492,11 @@ export class AuthService implements OnModuleInit {
     }
 
     // 2. Fall back to hardcoded env-var credentials
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@curex24.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    const marketingEmail = process.env.MARKETING_EMAIL || 'marketing@curex24.com';
-    const marketingPassword = process.env.MARKETING_PASSWORD || 'marketing123';
-
     const isMarketingCredentials =
-      dto.email === marketingEmail &&
-      dto.password === marketingPassword;
+      dto.email === this.marketingEmail &&
+      dto.password === this.marketingPassword;
     const isAdminCredentials =
-      dto.email === adminEmail && dto.password === adminPassword;
+      dto.email === this.adminEmail && dto.password === this.adminPassword;
 
     if (!isMarketingCredentials && !isAdminCredentials) {
       throw new UnauthorizedException('Invalid marketing agent credentials');
@@ -446,7 +519,7 @@ export class AuthService implements OnModuleInit {
           token,
           user: {
             id: user.id,
-            email: adminEmail,
+            email: this.adminEmail,
             role: user.role,
           },
         };
@@ -456,7 +529,7 @@ export class AuthService implements OnModuleInit {
         where: { phone: MARKETING_PHONE },
         create: {
           phone: MARKETING_PHONE,
-          email: marketingEmail,
+          email: this.marketingEmail,
           role: Role.MARKETING_AGENT,
         },
         update: { role: Role.MARKETING_AGENT },
@@ -469,7 +542,7 @@ export class AuthService implements OnModuleInit {
         token,
         user: {
           id: user.id,
-          email: marketingEmail,
+          email: this.marketingEmail,
           role: user.role,
         },
       };
@@ -484,27 +557,122 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    // Always return the same message to prevent email enumeration
+    const safeResponse = {
+      message:
+        'If that email is registered, a password reset link has been sent to it.',
+    };
 
-  private normalizePhone(phone: string): string {
-    if (!phone) return phone;
+    let user: User | null;
+    try {
+      user = await this.prisma.user.findFirst({
+        where: {
+          email: dto.email,
+          role: { in: [Role.ADMIN, Role.PHARMACIST, Role.MARKETING_AGENT] },
+          isActive: true,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `forgotPassword DB lookup failed for email=${dto.email}: ${err.message}`,
+      );
+      return safeResponse;
+    }
 
-    // If starts with + and followed by exactly 10 digits, convert to +91
-    if (phone.startsWith('+')) {
-      const digitsAfterPlus = phone.substring(1).replace(/\D/g, '');
-      if (digitsAfterPlus.length === 10) {
-        return '+91' + digitsAfterPlus;
+    if (!user) return safeResponse;
+
+    try {
+      // Invalidate previous unused tokens for this user
+      await this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await this.prisma.passwordResetToken.create({
+        data: { userId: user.id, token, expiresAt },
+      });
+
+      const adminUrl =
+        process.env.ADMIN_URL ||
+        (process.env.APP_ENV === 'production'
+          ? 'https://admin.curex24.com'
+          : 'https://admin.staging.curex24.com');
+
+      const resetUrl = `${adminUrl}/reset-password?token=${token}`;
+      const displayName = (user.email || dto.email).split('@')[0];
+
+      try {
+        await this.emailService.sendPasswordResetEmail(
+          dto.email,
+          displayName,
+          resetUrl,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Could not send reset email to ${dto.email}: ${err.message}`,
+        );
+        // Still return safe response — don't expose that email send failed
       }
+    } catch (err) {
+      this.logger.error(
+        `forgotPassword DB operation failed for email=${dto.email}: ${err.message}`,
+      );
+      // Return safe response regardless — don't expose internal errors
     }
 
-    const cleaned = phone.replace(/\D/g, '');
+    return safeResponse;
+  }
 
-    if (cleaned.length === 10) {
-      return '+91' + cleaned;
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    // Look up the reset token — propagate any DB error as 503
+    let record: PasswordResetToken | null;
+    try {
+      record = await this.prisma.passwordResetToken.findUnique({
+        where: { token: dto.token },
+      });
+    } catch (err) {
+      this.logger.error(`resetPassword DB lookup failed: ${err.message}`);
+      throw new ServiceUnavailableException(
+        'Password reset service temporarily unavailable. Please try again shortly.',
+      );
     }
-    if (cleaned.length === 12 && cleaned.startsWith('91')) {
-      return '+' + cleaned;
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException(
+        'This reset link is invalid or has expired.',
+      );
     }
-    return phone.startsWith('+') ? '+' + cleaned : cleaned;
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: record.userId },
+          data: { passwordHash },
+        }),
+        this.prisma.passwordResetToken.update({
+          where: { id: record.id },
+          data: { usedAt: new Date() },
+        }),
+      ]);
+    } catch (err) {
+      this.logger.error(
+        `resetPassword transaction failed for userId=${record.userId}: ${err.message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Password reset service temporarily unavailable. Please try again shortly.',
+      );
+    }
+
+    this.logger.log(`Password reset completed for userId=${record.userId}`);
+    return {
+      message: 'Password has been reset successfully. You can now log in.',
+    };
   }
 
   private generateOtp(): string {

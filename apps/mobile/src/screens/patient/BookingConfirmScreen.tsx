@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -6,9 +6,12 @@ import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { bookingService } from '../../services/bookingService';
+import api from '../../services/api';
+import { ENDPOINTS } from '../../constants/api';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useBookingStore } from '../../store/bookingStore';
 import { formatCurrency } from '../../utils/format';
+import { Address } from '../../types';
 
 type Props = {
   navigation: NativeStackNavigationProp<PatientStackParamList, 'BookingConfirm'>;
@@ -25,15 +28,57 @@ const getModeLabel = (mode: string) => MODE_LABELS[mode] ?? mode;
 
 export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => {
   const { providerId, mode, fee } = route.params;
-  const { selectedProvider, selectedService, selectedAddress, symptoms, scheduledAt, setLastBookingId } = useBookingStore();
+  const {
+    selectedProvider,
+    selectedService,
+    selectedAddress,
+    symptoms,
+    scheduledAt,
+    setLastBookingId,
+    setSelectedAddress,
+  } = useBookingStore();
   const [loading, setLoading] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (mode !== 'HOME_VISIT' || selectedAddress) return;
+
+    let cancelled = false;
+    const hydrateAddress = async () => {
+      setAddressLoading(true);
+      try {
+        const res = await api.get<Address[] | { data?: Address[] }>(
+          ENDPOINTS.PATIENTS.ADDRESSES,
+        );
+        const payload = res.data;
+        const addresses = Array.isArray(payload) ? payload : payload?.data ?? [];
+        const fallbackAddress =
+          addresses.find((item) => item.isDefault) ?? addresses[0] ?? null;
+
+        if (!cancelled && fallbackAddress) {
+          setSelectedAddress(fallbackAddress);
+        }
+      } catch {
+        // Keep null address and show inline guidance on confirm action.
+      } finally {
+        if (!cancelled) setAddressLoading(false);
+      }
+    };
+
+    hydrateAddress();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, selectedAddress, setSelectedAddress]);
+
   const handleConfirm = async () => {
+    if (addressLoading) return;
+
     if (mode === 'HOME_VISIT' && !selectedAddress) {
-      setError('Please select an address for home visit bookings.');
+      setError('No saved address found. Please complete Your Address first.');
       return;
     }
     setLoading(true);
@@ -157,17 +202,31 @@ export const BookingConfirmScreen: React.FC<Props> = ({ navigation, route }) => 
         <Card style={styles.errorCard}>
           <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorText}>{error}</Text>
+          {mode === 'HOME_VISIT' && !selectedAddress && (
+            <Button
+              title="Add Address"
+              onPress={() =>
+                navigation.navigate('PatientKycAddress', { returnToBooking: true })
+              }
+              style={{ marginTop: 12 }}
+            />
+          )}
           <Button
             title="Dismiss"
             onPress={() => setError(null)}
             variant="outline"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: mode === 'HOME_VISIT' && !selectedAddress ? 8 : 12 }}
           />
         </Card>
       )}
 
       <View style={styles.footer}>
-        <Button title="Confirm & Proceed to Payment" onPress={handleConfirm} loading={loading} />
+        <Button
+          title={addressLoading ? 'Loading address...' : 'Confirm & Proceed to Payment'}
+          onPress={handleConfirm}
+          loading={loading || addressLoading}
+          disabled={addressLoading}
+        />
         <Button
           title="Cancel"
           onPress={() => navigation.goBack()}

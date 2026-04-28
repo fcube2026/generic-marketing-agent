@@ -68,15 +68,69 @@ export const VideoLobbyScreen: React.FC = () => {
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  // Animated camera pulse
+  const cameraAnim = useRef(new Animated.Value(0.85)).current;
+  // Animated mic bars
+  const micBars = useRef(
+    Array.from({ length: 5 }, () => new Animated.Value(0.3)),
+  ).current;
 
   useEffect(() => {
+    // Page entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 600, easing: Easing.out(Easing.back(1)), useNativeDriver: true }),
     ]).start();
-  }, []);
 
-  // 1. Permissions & Network Logic
+    // Pulse animation for camera preview
+    const cameraLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cameraAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cameraAnim, {
+          toValue: 0.85,
+          duration: 1200,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    cameraLoop.start();
+
+    // Mic bar animations
+    const micLoops = micBars.map((bar, i) => {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 120),
+          Animated.timing(bar, {
+            toValue: 0.9,
+            duration: 400 + i * 80,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(bar, {
+            toValue: 0.2,
+            duration: 400 + i * 80,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      loop.start();
+      return loop;
+    });
+
+    return () => {
+      cameraLoop.stop();
+      micLoops.forEach((loop) => loop.stop());
+    };
+  }, [cameraAnim, micBars]);
+
+  // Run real permission and network checks
   useEffect(() => {
     let interval: NodeJS.Timeout;
 

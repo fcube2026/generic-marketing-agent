@@ -92,6 +92,10 @@ export function usePushNotifications(isAuthenticated: boolean) {
           navigation.navigate('PatientTabs', { screen: 'Diagnostics' });
           break;
 
+        case 'REFILL_REMINDER':
+          navigation.navigate('PharmacyOrders');
+          break;
+
         case 'PAYMENT_SUCCESS':
         case 'PAYMENT_REFUNDED':
           if (data.bookingId) {
@@ -117,6 +121,13 @@ export function usePushNotifications(isAuthenticated: boolean) {
             navigation.navigate('VideoLobby', { bookingId: data.bookingId });
           }
           break;
+
+        case 'PHARMACY_ORDER_STATUS_UPDATE':
+          if (data.pharmacyOrderId) {
+            navigation.navigate('OrderTracking', { orderId: data.pharmacyOrderId });
+          } else {
+            navigation.navigate('PharmacyOrders');
+          }
 
         default:
           // Navigate to notifications list
