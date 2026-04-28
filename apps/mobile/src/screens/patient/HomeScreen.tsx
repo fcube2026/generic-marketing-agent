@@ -108,6 +108,7 @@ export const HomeScreen: React.FC = () => {
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
     }, [queryClient]),
+  );
 
   const handleServicePress = (category: ServiceCategory) => {
     navigation.navigate('SelectService', { category });

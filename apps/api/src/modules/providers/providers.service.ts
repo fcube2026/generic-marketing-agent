@@ -127,6 +127,96 @@ export class ProvidersService {
     });
   }
 
+  private async findBestServiceCategory(specialization: string) {
+    if (!specialization || typeof specialization !== 'string') return null;
+
+    const normalizedSpecialization = specialization.trim().toLowerCase();
+    if (!normalizedSpecialization) return null;
+    const specializationSlug = normalizedSpecialization
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const directSlugMatch = await this.prisma.serviceCategory.findFirst({
+      where: { slug: specializationSlug },
+    });
+    if (directSlugMatch) return directSlugMatch;
+
+    const directNameMatch = await this.prisma.serviceCategory.findFirst({
+      where: {
+        name: {
+          equals: specialization,
+          mode: 'insensitive',
+        },
+      },
+    });
+    if (directNameMatch) return directNameMatch;
+
+    const categories = await this.prisma.serviceCategory.findMany();
+
+    const compactSpec = normalizedSpecialization.replace(/[^a-z0-9]/g, '');
+    const fuzzyMatch = categories.find((category) => {
+      if (!category.name || !category.slug) return false;
+      const compactName = category.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const compactSlug = category.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return (
+        compactSpec.includes(compactName) ||
+        compactSpec.includes(compactSlug) ||
+        compactName.includes(compactSpec) ||
+        compactSlug.includes(compactSpec)
+      );
+    });
+
+    return fuzzyMatch ?? null;
+  }
+
+  private async ensureProviderServiceLink(
+    providerId: string,
+    specialization: string,
+  ) {
+    const matchedCategory = await this.findBestServiceCategory(specialization);
+
+    if (matchedCategory) {
+      await this.prisma.providerService.createMany({
+        data: [{ providerId, serviceCategoryId: matchedCategory.id }],
+        skipDuplicates: true,
+      });
+
+      if (!GENERIC_SERVICE_SLUGS.includes(matchedCategory.slug)) {
+        await this.prisma.providerService.deleteMany({
+          where: {
+            providerId,
+            serviceCategory: {
+              slug: { in: GENERIC_SERVICE_SLUGS },
+            },
+            serviceCategoryId: { not: matchedCategory.id },
+          },
+        });
+      }
+
+      return;
+    }
+
+    const existingCount = await this.prisma.providerService.count({
+      where: { providerId },
+    });
+    if (existingCount > 0) return;
+
+    const fallbackCategory =
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'doctor' },
+      })) ||
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'general-medicine' },
+      }));
+
+    if (!fallbackCategory) return;
+
+    await this.prisma.providerService.createMany({
+      data: [{ providerId, serviceCategoryId: fallbackCategory.id }],
+      skipDuplicates: true,
+    });
+  }
+
   private validateServiceConfig(
     dto: CreateProviderProfileDto | UpdateProviderProfileDto,
   ) {
@@ -715,25 +805,12 @@ export class ProvidersService {
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),
         ...(mode === 'DOCTOR_PLACE' && { doctorPlaceVisitEnabled: true }),
-        ...(isVideoMode && { videoConsultationEnabled: true }),
       },
       include: {
         providerServices: { include: { serviceCategory: true } },
         user: true,
       },
     });
-
-    if (isVideoMode) {
-      // Return all video-capable providers without distance filtering,
-      // sorted by fee (ascending).
-      return providers
-        .map((provider) => ({ ...provider, distance: 0 }))
-        .sort(
-          (a, b) =>
-            a.consultationFeeVideoConsultation -
-            b.consultationFeeVideoConsultation,
-        );
-    }
 
     const withDistance = providers
       .map((provider) => {

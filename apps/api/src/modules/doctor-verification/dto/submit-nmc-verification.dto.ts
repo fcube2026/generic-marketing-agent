@@ -6,16 +6,18 @@ export class SubmitNmcVerificationDto {
   fullName: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'NMC registration number is required' })
+  @IsNotEmpty({ message: 'Registration number is required' })
   nmcRegistrationNumber: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'State council is required' })
-  stateCouncil: string;
+  stateCouncil?: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Year of admission is required' })
-  @Matches(/^\d{4}$/, { message: 'Year of admission must be a 4-digit year' })
+  @IsNotEmpty({ message: 'Year of registration is required' })
+  @Matches(/^\d{4}$/, {
+    message: 'Year of registration must be a 4-digit year',
+  })
   yearOfAdmission: string;
 
   @IsOptional()

@@ -13,6 +13,8 @@ PRISMA_BIN="./node_modules/.bin/prisma"
 # busybox /bin/sh (ash), which does not support bash arrays.
 FAILED_MIGRATIONS="20260412000000_add_doctor_verification 20260419010000_remove_placed_from_pharmacy_status"
 
+# NOTE: keep these lists space-separated — this script runs under Alpine's
+# busybox /bin/sh (ash), which does not support bash arrays.
 for FAILED_MIGRATION in $FAILED_MIGRATIONS; do
   DATABASE_URL="$DIRECT_URL" timeout 30 "$PRISMA_BIN" migrate resolve --applied "$FAILED_MIGRATION" \
     --schema=packages/database/prisma/schema.prisma 2>/dev/null || true

@@ -5,6 +5,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
 import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
+import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
 import { NotificationsService } from '../notifications/notifications.service';
 
 describe('DoctorVerificationService', () => {
@@ -47,6 +48,10 @@ describe('DoctorVerificationService', () => {
     verify: jest.fn(),
   };
 
+  const mockAadhaarProvider = {
+    validate: jest.fn().mockResolvedValue({ valid: true }),
+  };
+
   const mockNotificationsService = {
     sendNotification: jest.fn().mockResolvedValue({
       inAppId: 'notif-1',
@@ -79,6 +84,7 @@ describe('DoctorVerificationService', () => {
         { provide: NmcApiProvider, useValue: mockNmcProvider },
         { provide: SmcScraperProvider, useValue: mockSmcProvider },
         { provide: FaceVerificationProvider, useValue: mockFaceProvider },
+        { provide: AadhaarValidationProvider, useValue: mockAadhaarProvider },
         { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();

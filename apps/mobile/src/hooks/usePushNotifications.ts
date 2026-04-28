@@ -128,6 +128,7 @@ export function usePushNotifications(isAuthenticated: boolean) {
           } else {
             navigation.navigate('PharmacyOrders');
           }
+          break;
 
         default:
           // Navigate to notifications list
