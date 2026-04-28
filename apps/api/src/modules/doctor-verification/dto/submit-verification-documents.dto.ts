@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, Matches } from 'class-validator';
 
 export class SubmitVerificationDocumentsDto {
   @IsString()
@@ -12,4 +12,10 @@ export class SubmitVerificationDocumentsDto {
   @IsOptional()
   @IsString()
   licenseId?: string;
+
+  /** Optional: 12-digit Aadhaar number for API-based validation. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{12}$/, { message: 'Aadhaar number must be exactly 12 digits' })
+  aadhaarNumber?: string;
 }
