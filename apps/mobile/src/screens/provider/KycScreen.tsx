@@ -170,6 +170,8 @@ export const KycScreen: React.FC = () => {
     documents: 'pending',
     face: 'pending',
   });
+  // true when the NMC API call itself errored (distinct from a genuine not-found result)
+  const [nmcCheckError, setNmcCheckError] = useState(false);
 
   const { data: logs = [], isLoading: logsLoading } = useQuery({
     queryKey: ['verification-logs'],
@@ -195,7 +197,12 @@ export const KycScreen: React.FC = () => {
       setProgress((p) => ({ ...p, records: 'processing' }));
     },
     onSuccess: (data: any) => {
-      const anyFound = (data?.steps ?? []).some((s: PipelineStep) => s.found);
+      setNmcCheckError(false);
+      // The cached/already-approved path returns { status: 'APPROVED', cached: true }
+      // with no `steps` property — treat that as "found" so the circle shows green.
+      const isApproved = data?.status === 'APPROVED';
+      const anyFound =
+        isApproved || (data?.steps ?? []).some((s: PipelineStep) => s.found);
       setProgress((p) => ({
         ...p,
         records: anyFound ? 'done' : 'failed',
@@ -204,6 +211,7 @@ export const KycScreen: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
     },
     onError: () => {
+      setNmcCheckError(true);
       setProgress((p) => ({ ...p, records: 'failed' }));
     },
   });
@@ -551,7 +559,9 @@ export const KycScreen: React.FC = () => {
                   <Text style={styles.cardDesc}>
                     {progress.records === 'done'
                       ? 'Your registration was found in official medical authority records.'
-                      : 'Registration not found in records. Our admin team will review manually.'}
+                      : nmcCheckError
+                        ? 'Verification check encountered an issue. Our admin team will review manually.'
+                        : 'Registration not found in official records. Our admin team will review manually.'}
                   </Text>
                 </View>
               </View>
