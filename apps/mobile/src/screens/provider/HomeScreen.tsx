@@ -13,6 +13,7 @@ import { bookingService } from '../../services/bookingService';
 import { notificationService, Notification } from '../../services/notificationService';
 import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import { formatCurrency } from '../../utils/format';
+import { getCurrentLocation } from '../../utils/location';
 import { Booking, BookingStatus } from '../../types';
 
 type Nav = NativeStackNavigationProp<ProviderStackParamList>;
@@ -44,7 +45,14 @@ export const HomeScreen: React.FC = () => {
   );
 
   const availabilityMutation = useMutation({
-    mutationFn: (isAvailable: boolean) => providerService.updateAvailability(isAvailable),
+    mutationFn: async (isAvailable: boolean) => {
+      const location = isAvailable ? await getCurrentLocation() : null;
+      return providerService.updateAvailability(
+        isAvailable,
+        location?.lat,
+        location?.lng,
+      );
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['provider-profile'] }),
     onError: () => Alert.alert('Error', 'Failed to update availability'),
   });

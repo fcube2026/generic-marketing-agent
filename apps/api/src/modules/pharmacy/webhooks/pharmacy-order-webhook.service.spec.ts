@@ -3,6 +3,9 @@ import { PharmacyOrderWebhookService } from './pharmacy-order-webhook.service';
 
 describe('PharmacyOrderWebhookService', () => {
   let service: PharmacyOrderWebhookService;
+  const mockNotifications = {
+    sendNotification: jest.fn(),
+  } as any;
 
   const mockPrisma = {
     pharmacyOrder: {
@@ -17,7 +20,7 @@ describe('PharmacyOrderWebhookService', () => {
   } as any;
 
   beforeEach(() => {
-    service = new PharmacyOrderWebhookService(mockPrisma);
+    service = new PharmacyOrderWebhookService(mockPrisma, mockNotifications);
     jest.clearAllMocks();
   });
 
@@ -157,9 +160,11 @@ describe('PharmacyOrderWebhookService', () => {
         id: 'order-1',
         partnerOrderId: 'partner-order-1',
         status: PharmacyOrderStatus.PENDING,
+        patientProfile: { userId: 'user-1' },
       });
       mockPrisma.pharmacyOrderStatusHistory.findUnique.mockResolvedValue(null);
       mockPrisma.$transaction.mockResolvedValue([]);
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.handleOrderStatusWebhook(
         'mock',
@@ -171,6 +176,7 @@ describe('PharmacyOrderWebhookService', () => {
       expect(result.processed).toBe(true);
       expect(result.status).toBe(PharmacyOrderStatus.CONFIRMED);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockNotifications.sendNotification).toHaveBeenCalledTimes(1);
     });
 
     it('rejects backward status transition', async () => {
@@ -196,9 +202,11 @@ describe('PharmacyOrderWebhookService', () => {
         id: 'order-1',
         partnerOrderId: 'partner-order-1',
         status: PharmacyOrderStatus.SHIPPED,
+        patientProfile: { userId: 'user-1' },
       });
       mockPrisma.pharmacyOrderStatusHistory.findUnique.mockResolvedValue(null);
       mockPrisma.$transaction.mockResolvedValue([]);
+      mockNotifications.sendNotification.mockResolvedValue({});
 
       const result = await service.handleOrderStatusWebhook(
         'mock',
@@ -208,6 +216,26 @@ describe('PharmacyOrderWebhookService', () => {
 
       expect(result.processed).toBe(true);
       expect(result.status).toBe(PharmacyOrderStatus.CANCELLED);
+    });
+
+    it('falls back to logging when patient user is unavailable', async () => {
+      mockPrisma.pharmacyOrder.findFirst.mockResolvedValue({
+        id: 'order-1',
+        partnerOrderId: 'partner-order-1',
+        status: PharmacyOrderStatus.PENDING,
+        patientProfile: null,
+      });
+      mockPrisma.pharmacyOrderStatusHistory.findUnique.mockResolvedValue(null);
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const result = await service.handleOrderStatusWebhook(
+        'mock',
+        'partner-order-1',
+        'confirmed',
+      );
+
+      expect(result.processed).toBe(true);
+      expect(mockNotifications.sendNotification).not.toHaveBeenCalled();
     });
   });
 

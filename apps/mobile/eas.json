@@ -12,9 +12,21 @@
         "EXPO_PUBLIC_API_URL": "http://localhost:3000/api/v1"
       }
     },
+    "development-staging": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "https://api.staging.curex24.com/api/v1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ksmufpryzrozpqdejlwa.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbXVmcHJ5enJvenBxZGVqbHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjM2NzQsImV4cCI6MjA5MTQ5OTY3NH0.3-9mv7NkaL3J5b1kmC6SJRX-U6MQONkpuI_SoyDa3TU"
+      },
+      "channel": "staging"
+    },
     "staging": {
       "distribution": "internal",
       "android": {
+        "image": "ubuntu-22.04-jdk-17-ndk-r26b",
         "buildType": "apk"
       },
       "ios": {
@@ -22,6 +34,7 @@
       },
       "env": {
         "APP_ENV": "staging",
+        "EXPO_NO_DOCTOR": "1",
         "EXPO_PUBLIC_API_URL": "https://api.staging.curex24.com/api/v1",
         "EXPO_PUBLIC_SUPABASE_URL": "https://ksmufpryzrozpqdejlwa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbXVmcHJ5enJvenBxZGVqbHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjM2NzQsImV4cCI6MjA5MTQ5OTY3NH0.3-9mv7NkaL3J5b1kmC6SJRX-U6MQONkpuI_SoyDa3TU"

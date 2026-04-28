@@ -48,8 +48,13 @@ export class PharmacyService {
       }
 
       const provider = this.resolveProvider(activePartner);
-
-      return this.searchProvider(provider, query, pincode, activePartner.code);
+      const medicines = await this.searchProvider(
+        provider,
+        query,
+        pincode,
+        activePartner.code,
+      );
+      return this.enforcePrescriptionSafety(medicines);
     }
 
     const activePartners = await this.prisma.pharmacyPartner.findMany({
@@ -68,12 +73,72 @@ export class PharmacyService {
       ),
     );
 
-    return results
+    const medicines = results
       .filter(
         (r): r is PromiseFulfilledResult<MedicineResult[]> =>
           r.status === 'fulfilled',
       )
       .flatMap((r) => r.value);
+
+    return this.enforcePrescriptionSafety(medicines);
+  }
+
+  private normalizeMedicineBaseName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/\b\d+(?:\.\d+)?\s*(mg|g|mcg|iu|ml)\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private resolvePrescriptionFlag(items: MedicineResult[]): boolean {
+    const hasRxTrue = items.some((m) => m.requiresPrescription === true);
+    if (hasRxTrue) {
+      return true;
+    }
+
+    const hasRxFalse = items.some((m) => m.requiresPrescription === false);
+    if (hasRxFalse) {
+      return false;
+    }
+
+    // Fail-safe for legal compliance: unknown classification defaults to Rx.
+    return true;
+  }
+
+  private enforcePrescriptionSafety(
+    medicines: MedicineResult[],
+  ): MedicineResult[] {
+    const groups = new Map<string, MedicineResult[]>();
+
+    for (const medicine of medicines) {
+      const key = this.normalizeMedicineBaseName(medicine.name);
+      const existing = groups.get(key) ?? [];
+      existing.push(medicine);
+      groups.set(key, existing);
+    }
+
+    const sanitized: MedicineResult[] = [];
+
+    for (const [baseName, grouped] of groups) {
+      const hasMixedClassification =
+        grouped.some((m) => m.requiresPrescription === true) &&
+        grouped.some((m) => m.requiresPrescription === false);
+
+      const resolvedFlag = this.resolvePrescriptionFlag(grouped);
+
+      if (hasMixedClassification) {
+        this.logger.warn(
+          `Prescription classification conflict for "${baseName}". Enforcing requiresPrescription=${resolvedFlag}.`,
+        );
+      }
+
+      sanitized.push(
+        ...grouped.map((m) => ({ ...m, requiresPrescription: resolvedFlag })),
+      );
+    }
+
+    return sanitized;
   }
 
   async listPartners() {

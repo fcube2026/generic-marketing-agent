@@ -18,6 +18,8 @@ const PRESCRIPTION_FALLBACK_KEYWORDS = [
 
 const CANCELLABLE_STATUSES: PharmacyOrderStatus[] = [
   'PENDING',
+  'PENDING_APPROVAL',
+  'APPROVED',
   'PRESCRIPTION_REVIEW',
   'CONFIRMED',
   'PACKED',
@@ -48,13 +50,16 @@ export const calculateDeliveryFee = (subtotal: number): number => {
 export const getFreeDeliveryThreshold = (): number => FREE_DELIVERY_THRESHOLD;
 
 export const getPharmacyDisplayPricing = (order: Pick<PharmacyOrder, 'subtotal' | 'deliveryFee' | 'discount' | 'totalAmount'>) => {
-  const fallbackDeliveryFee = calculateDeliveryFee(order.subtotal);
-  const deliveryFee = order.deliveryFee > 0 || fallbackDeliveryFee === 0
-    ? order.deliveryFee
+  const subtotal = order.subtotal ?? 0;
+  const fallbackDeliveryFee = calculateDeliveryFee(subtotal);
+  const currentDeliveryFee = order.deliveryFee ?? 0;
+  const deliveryFee = currentDeliveryFee > 0 || fallbackDeliveryFee === 0
+    ? currentDeliveryFee
     : fallbackDeliveryFee;
-  const minimumExpectedTotal = Math.max(0, order.subtotal + deliveryFee - order.discount);
-  const totalAmount = order.totalAmount >= minimumExpectedTotal
-    ? order.totalAmount
+  const minimumExpectedTotal = Math.max(0, subtotal + deliveryFee - order.discount);
+  const currentTotalAmount = order.totalAmount ?? 0;
+  const totalAmount = currentTotalAmount >= minimumExpectedTotal
+    ? currentTotalAmount
     : minimumExpectedTotal;
 
   return {

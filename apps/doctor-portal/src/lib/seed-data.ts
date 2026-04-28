@@ -828,6 +828,15 @@ export function getSeedDashboardStats() {
       .flatMap((c) => c.labReports)
       .filter((r) => r.status === 'pending').length,
     totalEarnings: 48500,
+    recentConsultations: getSeedConsultationsList().slice(0, 5).map((c) => ({
+      id: c.id,
+      patientName: c.patientName,
+      patientUHID: c.patientUHID,
+      scheduledAt: c.scheduledAt,
+      status: c.status,
+      chiefComplaint: c.chiefComplaint ?? null,
+      diagnosis: c.diagnosis ?? null,
+    })),
   };
 }
 

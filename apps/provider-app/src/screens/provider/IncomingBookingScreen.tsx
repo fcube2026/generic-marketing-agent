@@ -8,23 +8,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { bookingService } from '../../services/bookingService';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
+import type { Booking } from '../../types';
 
 type Nav = NativeStackNavigationProp<ProviderStackParamList>;
 
-type BookingRequest = {
-  id: string;
-  patientName: string;
-  serviceType: string;
-  mode: 'HOME_VISIT' | 'DOCTOR_PLACE';
-  symptoms: string;
-  distance: number;
-  fee: number;
-  createdAt: string;
-};
-
 export const IncomingBookingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const [requests, setRequests] = useState<BookingRequest[]>([]);
+  const [requests, setRequests] = useState<Booking[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchRequests = useCallback(async () => {
@@ -74,19 +64,25 @@ export const IncomingBookingScreen: React.FC = () => {
     ]);
   };
 
-  const renderItem = ({ item }: { item: BookingRequest }) => (
+  const renderItem = ({ item }: { item: Booking }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.patientName}>{item.patientName}</Text>
+        <Text style={styles.patientName}>{item.patient?.name || 'Patient'}</Text>
         <View style={[styles.modeBadge, item.mode === 'HOME_VISIT' ? styles.homeVisit : styles.clinicVisit]}>
-          <Text style={styles.modeText}>{item.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.modeText}>
+            {item.mode === 'HOME_VISIT'
+              ? '🏠 Home Visit'
+              : item.mode === 'VIDEO_CONSULTATION'
+                ? '📹 Video Consultation'
+                : '🏥 Clinic Visit'}
+          </Text>
         </View>
       </View>
-      <Text style={styles.serviceType}>{item.serviceType}</Text>
-      <Text style={styles.symptoms} numberOfLines={2}>{item.symptoms}</Text>
+      <Text style={styles.serviceType}>{item.serviceCategory?.name || 'Consultation'}</Text>
+      <Text style={styles.symptoms} numberOfLines={2}>{item.symptoms || 'No symptoms shared'}</Text>
       <View style={styles.meta}>
-        <Text style={styles.metaText}>📍 {item.distance.toFixed(1)} km away</Text>
-        <Text style={styles.metaText}>💰 ₹{item.fee}</Text>
+        <Text style={styles.metaText}>🕒 {new Date(item.scheduledAt).toLocaleString('en-IN')}</Text>
+        <Text style={styles.metaText}>💰 ₹{item.totalFee}</Text>
       </View>
       <View style={styles.actions}>
         <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(item.id)}>

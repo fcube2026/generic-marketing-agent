@@ -10,6 +10,8 @@ import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 import * as bcrypt from 'bcryptjs';
 
+const GENERIC_SERVICE_SLUGS = ['doctor', 'general-medicine'];
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -125,6 +127,92 @@ export class AdminService {
     });
   }
 
+  private async ensureProviderServiceLink(
+    providerId: string,
+    specialization: string,
+  ) {
+    if (!specialization || typeof specialization !== 'string') return;
+
+    const normalizedSpecialization = specialization.trim().toLowerCase();
+    if (!normalizedSpecialization) return;
+    const specializationSlug = normalizedSpecialization
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    const directSlugMatch = await this.prisma.serviceCategory.findFirst({
+      where: { slug: specializationSlug },
+    });
+    const directNameMatch = directSlugMatch
+      ? null
+      : await this.prisma.serviceCategory.findFirst({
+          where: {
+            name: {
+              equals: specialization,
+              mode: 'insensitive',
+            },
+          },
+        });
+
+    let category = directSlugMatch || directNameMatch;
+
+    if (!category) {
+      const categories = await this.prisma.serviceCategory.findMany();
+      const compactSpec = normalizedSpecialization.replace(/[^a-z0-9]/g, '');
+      category =
+        categories.find((cat) => {
+          if (!cat.name || !cat.slug) return false;
+          const compactName = cat.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const compactSlug = cat.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (
+            compactSpec.includes(compactName) ||
+            compactSpec.includes(compactSlug) ||
+            compactName.includes(compactSpec) ||
+            compactSlug.includes(compactSpec)
+          );
+        }) || null;
+    }
+
+    if (category) {
+      await this.prisma.providerService.createMany({
+        data: [{ providerId, serviceCategoryId: category.id }],
+        skipDuplicates: true,
+      });
+
+      if (!GENERIC_SERVICE_SLUGS.includes(category.slug)) {
+        await this.prisma.providerService.deleteMany({
+          where: {
+            providerId,
+            serviceCategory: {
+              slug: { in: GENERIC_SERVICE_SLUGS },
+            },
+            serviceCategoryId: { not: category.id },
+          },
+        });
+      }
+      return;
+    }
+
+    const existingCount = await this.prisma.providerService.count({
+      where: { providerId },
+    });
+    if (existingCount > 0) return;
+
+    const fallbackCategory =
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'doctor' },
+      })) ||
+      (await this.prisma.serviceCategory.findFirst({
+        where: { slug: 'general-medicine' },
+      }));
+
+    if (!fallbackCategory) return;
+
+    await this.prisma.providerService.createMany({
+      data: [{ providerId, serviceCategoryId: fallbackCategory.id }],
+      skipDuplicates: true,
+    });
+  }
+
   async verifyProvider(providerId: string, adminId: string, notes?: string) {
     const provider = await this.prisma.providerProfile.findUnique({
       where: { id: providerId },
@@ -140,6 +228,8 @@ export class AdminService {
       where: { id: providerId },
       data: { isVerified: true, isActive: true },
     });
+
+    await this.ensureProviderServiceLink(providerId, provider.specialization);
 
     await this.prisma.adminAction.create({
       data: {
@@ -359,39 +449,30 @@ export class AdminService {
   }
 
   async getDashboardStats() {
-    const [
-      totalBookings,
-      activeProviders,
-      pendingVerification,
-      totalPatients,
-      completedBookings,
-      cancelledBookings,
-      totalEarningsAgg,
-      bookingsByStatus,
-    ] = await Promise.all([
-      this.prisma.booking.count(),
-      this.prisma.providerProfile.count({
-        where: { isActive: true, isVerified: true },
-      }),
-      this.prisma.providerProfile.count({
-        where: { isVerified: false, isActive: true },
-      }),
-      this.prisma.patientProfile.count(),
-      this.prisma.booking.count({
-        where: {
-          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-        },
-      }),
-      this.prisma.booking.count({ where: { status: 'CANCELLED' } }),
-      this.prisma.payment.aggregate({
-        where: { status: 'PAID' },
-        _sum: { amount: true },
-      }),
-      this.prisma.booking.groupBy({
-        by: ['status'],
-        _count: true,
-      }),
-    ]);
+    const totalBookings = await this.prisma.booking.count();
+    const activeProviders = await this.prisma.providerProfile.count({
+      where: { isActive: true, isVerified: true },
+    });
+    const pendingVerification = await this.prisma.providerProfile.count({
+      where: { isVerified: false, isActive: true },
+    });
+    const totalPatients = await this.prisma.patientProfile.count();
+    const completedBookings = await this.prisma.booking.count({
+      where: {
+        status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+      },
+    });
+    const cancelledBookings = await this.prisma.booking.count({
+      where: { status: 'CANCELLED' },
+    });
+    const totalEarningsAgg = await this.prisma.payment.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amount: true },
+    });
+    const bookingsByStatus = await this.prisma.booking.groupBy({
+      by: ['status'],
+      _count: true,
+    });
 
     const statusBreakdown: Record<string, number> = {};
     for (const entry of bookingsByStatus) {

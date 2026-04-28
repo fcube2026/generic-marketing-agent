@@ -27,13 +27,37 @@ export class EmailService {
     }
   }
 
+  private getFromAddress(): string {
+    return (
+      process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@curex24.com'
+    );
+  }
+
+  async sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+  }): Promise<void> {
+    const { to, subject, html, text } = params;
+    const from = this.getFromAddress();
+
+    if (!this.transporter) {
+      this.logger.warn(
+        `[EMAIL NOT SENT] to=${to}, subject=${subject}. SMTP not configured.`,
+      );
+      return;
+    }
+
+    await this.transporter.sendMail({ from, to, subject, html, text });
+  }
+
   async sendPasswordResetEmail(
     toEmail: string,
     toName: string,
     resetUrl: string,
-  ): Promise<void> {
-    const from =
-      process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@curex24.com';
+  ) {
+    const from = this.getFromAddress();
     const subject = 'Reset your Curex24 Admin password';
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:32px;background:#f9fafb;border-radius:8px;">
@@ -75,9 +99,10 @@ export class EmailService {
     try {
       await this.transporter.sendMail({ from, to: toEmail, subject, html });
       this.logger.log(`Password reset email sent to ${toEmail}`);
-    } catch (err) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `Failed to send password reset email to ${toEmail}: ${err.message}`,
+        `Failed to send password reset email to ${toEmail}: ${message}`,
       );
       throw err;
     }

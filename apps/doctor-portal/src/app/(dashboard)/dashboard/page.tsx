@@ -3,7 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { USE_SEED, getSeedDashboardStats, getSeedConsultationsList } from '@/lib/seed-data';
+import { USE_SEED, getSeedDashboardStats } from '@/lib/seed-data';
+
+interface RecentConsultation {
+  id: string;
+  patientName: string;
+  patientUHID?: string | null;
+  scheduledAt: string;
+  status: string;
+  chiefComplaint?: string | null;
+  diagnosis?: string | null;
+}
 
 interface DashboardStats {
   totalPatients: number;
@@ -13,6 +23,7 @@ interface DashboardStats {
   completedConsultations: number;
   pendingLabReports: number;
   totalEarnings: number;
+  recentConsultations: RecentConsultation[];
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -103,7 +114,8 @@ const quickActions = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const recentConsultations = USE_SEED ? getSeedConsultationsList().slice(0, 5) : [];
+
+  const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
   const fetchData = useCallback(() => {
     if (USE_SEED) {

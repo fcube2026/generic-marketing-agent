@@ -547,11 +547,91 @@ model NotificationLog {
   @@map("notification_logs")
 }
 
+model ServiceSubscription {
+  id                 String                   @id @default(cuid())
+  name               String
+  provider           String
+  category           SubscriptionCategory     @default(OTHER)
+  status             SubscriptionStatus       @default(ACTIVE)
+  billingCycle       SubscriptionBillingCycle @default(MONTHLY)
+  currency           String                   @default("INR")
+  plannedAmount      Float                    @default(0)
+  actualAmount       Float                    @default(0)
+  usageLimit         Float?
+  usageConsumed      Float?
+  usageUnit          String?
+  seatsPlanned       Int?
+  seatsUsed          Int?
+  planStartDate      DateTime?
+  planEndDate        DateTime?
+  renewalDate        DateTime?
+  reminderDays       Int                      @default(7)
+  alertEmail         String?
+  notes              String?
+  lastReminderSentAt DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  usageLogs SubscriptionUsageLog[]
+
+  @@index([status])
+  @@index([renewalDate])
+  @@index([planEndDate])
+  @@map("service_subscriptions")
+}
+
+model SubscriptionUsageLog {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  periodStart    DateTime
+  periodEnd      DateTime
+  plannedAmount  Float    @default(0)
+  actualAmount   Float    @default(0)
+  usageLimit     Float?
+  usageConsumed  Float?
+  usageUnit      String?
+  seatsPlanned   Int?
+  seatsUsed      Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  subscription ServiceSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([periodStart])
+  @@map("subscription_usage_logs")
+}
+
 enum NotificationChannel {
   PUSH
   SMS
   WHATSAPP
   EMAIL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+enum SubscriptionBillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_TIME
+}
+
+enum SubscriptionCategory {
+  INFRASTRUCTURE
+  AI
+  COMMUNICATION
+  VERIFICATION
+  DEV_TOOLS
+  PHARMACY
+  OTHER
 }
 
 enum NotificationDeliveryStatus {
@@ -642,33 +722,35 @@ model PharmacyPartner {
 }
 
 model PharmacyOrder {
-  id                     String              @id @default(cuid())
-  orderNumber            String              @unique
+  id                     String                     @id @default(cuid())
+  orderNumber            String                     @unique
   patientProfileId       String
   bookingId              String?
   prescriptionId         String?
   uploadedPrescriptionId String?
-  pharmacyPartnerId      String
+  pharmacyPartnerId      String?
   partnerOrderId         String?
   deliveryAddressId      String
   prescriptionImageUrl   String?
-  subtotal               Float
-  deliveryFee            Float               @default(0)
-  discount               Float               @default(0)
-  totalAmount            Float
-  status                 PharmacyOrderStatus @default(PENDING)
+  prescriptionUrl        String?
+  subtotal               Float?
+  deliveryFee            Float?
+  discount               Float                      @default(0)
+  totalAmount            Float?
+  paymentStatus          PharmacyOrderPaymentStatus @default(UNPAID)
+  status                 PharmacyOrderStatus        @default(PENDING)
   estimatedDeliveryAt    DateTime?
   deliveredAt            DateTime?
   notes                  String?
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
   items                PharmacyOrderItem[]
   statusHistory        PharmacyOrderStatusHistory[]
   booking              Booking?                     @relation(fields: [bookingId], references: [id])
   deliveryAddress      Address                      @relation(fields: [deliveryAddressId], references: [id])
   patientProfile       PatientProfile               @relation(fields: [patientProfileId], references: [id])
-  pharmacyPartner      PharmacyPartner              @relation(fields: [pharmacyPartnerId], references: [id])
+  pharmacyPartner      PharmacyPartner?             @relation(fields: [pharmacyPartnerId], references: [id])
   prescription         Prescription?                @relation(fields: [prescriptionId], references: [id])
   uploadedPrescription UploadedPrescription?        @relation(fields: [uploadedPrescriptionId], references: [id])
 
@@ -718,6 +800,11 @@ model PharmacyOrderStatusHistory {
 
 enum PharmacyOrderStatus {
   PENDING
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PAID
+  DISPATCHED
   PRESCRIPTION_REVIEW
   CONFIRMED
   PACKED
@@ -727,6 +814,11 @@ enum PharmacyOrderStatus {
   CANCELLED
   RETURNED
   REFUNDED
+}
+
+enum PharmacyOrderPaymentStatus {
+  UNPAID
+  PAID
 }
 
 // =======================
@@ -1068,46 +1160,56 @@ enum ReviewStatus {
 }
 
 model PatientVerification {
-  id                   String                    @id @default(cuid())
-  patientId            String                    @unique
-  status               PatientVerificationStatus @default(PENDING_OTP)
-  riskScore            Int                       @default(0)
-  riskTier             RiskTier                  @default(LOW)
-  riskTriggers         String[]
-  idType               String?
-  idTokenRef           String?
-  idVerifiedAt         DateTime?
-  idVerificationSource String?
-  ocrConfidenceScore   Float?
-  faceMatchScore       Float?
-  isMinor              Boolean                   @default(false)
-  guardianName         String?
-  guardianRelationship String?
-  guardianPhone        String?
-  guardianIdTokenRef   String?
-  guardianAadhaarLast4 String?
+  id                     String                    @id @default(cuid())
+  patientId              String                    @unique
+  status                 PatientVerificationStatus @default(PENDING_OTP)
+  riskScore              Int                       @default(0)
+  riskTier               RiskTier                  @default(LOW)
+  riskTriggers           String[]
+  idType                 String?
+  idTokenRef             String?
+  idVerifiedAt           DateTime?
+  idVerificationSource   String?
+  ocrConfidenceScore     Float?
+  faceMatchScore         Float?
+  isMinor                Boolean                   @default(false)
+  guardianName           String?
+  guardianRelationship   String?
+  guardianPhone          String?
+  guardianIdTokenRef     String?
+  guardianAadhaarLast4   String?
   // Self-serve KYC (profile-launched wizard) fields
-  fullName             String?
-  dateOfBirth          DateTime?
-  gender               String?
-  addressLine          String?
-  city                 String?
-  state                String?
-  pincode              String?
-  addressLat           Float?
-  addressLng           Float?
-  addressSource        String?
-  selfieStoragePath    String?
-  faceMatchPassed      Boolean?
-  ocrMatchPassed       Boolean?
-  submittedAt          DateTime?
-  autoApprovedAt       DateTime?
-  emergencyOverride    Boolean                   @default(false)
-  overrideReason       String?
-  overrideBy           String?
-  overrideAt           DateTime?
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
+  fullName               String?
+  dateOfBirth            DateTime?
+  gender                 String?
+  addressLine            String?
+  city                   String?
+  state                  String?
+  pincode                String?
+  addressLat             Float?
+  addressLng             Float?
+  addressSource          String?
+  selfieStoragePath      String?
+  faceMatchPassed        Boolean?
+  ocrMatchPassed         Boolean?
+  // Aadhaar KYC microservice (apps/kyc-ml) — additive fields, optional and
+  // backward-compatible. `aadhaarLast4` is the only piece of the Aadhaar
+  // number ever persisted (last 4 digits, masked). `aadhaarFaceStoragePath`
+  // points at the temporary cropped face in the private `verify_faces`
+  // bucket; it is cleared after the face-match step (success or fail) by the
+  // Python cleanup routine. `identityVerifiedAt` is set when the live selfie
+  // matches the cropped Aadhaar face above the configured threshold.
+  aadhaarLast4           String?
+  aadhaarFaceStoragePath String?
+  identityVerifiedAt     DateTime?
+  submittedAt            DateTime?
+  autoApprovedAt         DateTime?
+  emergencyOverride      Boolean                   @default(false)
+  overrideReason         String?
+  overrideBy             String?
+  overrideAt             DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
   patient               PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
   idDocuments           PatientIdDocument[]
@@ -1235,4 +1337,51 @@ model ManualReviewQueue {
   @@index([priority])
   @@index([createdAt])
   @@map("manual_review_queue")
+}
+
+// =======================
+// LOCAL PHARMACY ONBOARDING
+// =======================
+
+enum LocalPharmacyStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  SUSPENDED
+}
+
+model LocalPharmacy {
+  id              String              @id @default(cuid())
+  name            String
+  licenseNumber   String              @unique
+  address         String
+  contact         String
+  operatingHours  String?
+  status          LocalPharmacyStatus @default(PENDING)
+  documents       Json                @default("[]")
+  licenseVerified Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  inventory LocalPharmacyInventory[]
+
+  @@index([status])
+  @@index([licenseNumber])
+  @@map("local_pharmacies")
+}
+
+model LocalPharmacyInventory {
+  id           String   @id @default(cuid())
+  pharmacyId   String
+  medicineName String
+  price        Float
+  stock        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  pharmacy LocalPharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId])
+  @@index([medicineName])
+  @@map("local_pharmacy_inventory")
 }

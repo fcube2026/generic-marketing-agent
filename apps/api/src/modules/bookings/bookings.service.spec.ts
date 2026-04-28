@@ -490,6 +490,51 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('getBooking', () => {
+    it('should include derived patient uniquePatientId in response', async () => {
+      const booking = {
+        id: 'booking-1',
+        patient: { id: 'abc123456789', name: 'John Doe' },
+        provider: { id: 'provider-1', user: { id: 'provider-user-1' } },
+        serviceCategory: null,
+        address: null,
+        statusHistory: [],
+        consultationSummary: null,
+        diagnosticRequests: [],
+        referrals: [],
+        payment: null,
+      };
+
+      mockPrisma.booking.findUnique.mockResolvedValue(booking);
+
+      const result = await service.getBooking('booking-1', 'user-1');
+
+      expect(result.patient.uniquePatientId).toBe('PT-23456789');
+      expect(mockPrisma.booking.findUnique).toHaveBeenCalledWith({
+        where: { id: 'booking-1' },
+        include: {
+          patient: true,
+          provider: { include: { user: true } },
+          serviceCategory: true,
+          address: true,
+          statusHistory: { orderBy: { changedAt: 'asc' } },
+          consultationSummary: { include: { prescriptions: true } },
+          diagnosticRequests: { include: { labResults: true } },
+          referrals: true,
+          payment: true,
+        },
+      });
+    });
+
+    it('should throw NotFoundException when booking does not exist', async () => {
+      mockPrisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBooking('missing', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('cancelBooking', () => {
     const scheduledAt = new Date('2024-01-01T10:00:00Z');
 

@@ -154,6 +154,18 @@ export class PrescriptionService {
       prescriptionId: prescription.id,
     });
 
+    await this.recordAuditLog({
+      userId,
+      action: 'PRESCRIPTION_UPLOADED',
+      entityId: prescription.id,
+      meta: {
+        fileName: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        assignedReviewerId,
+      },
+    });
+
     void this.notificationsService
       .createNotification({
         userId,
@@ -192,12 +204,14 @@ export class PrescriptionService {
     limit = 20,
     sortBy: 'createdAt' | 'updatedAt' = 'createdAt',
     order: 'asc' | 'desc' = 'asc',
+    status: 'ALL' | PrescriptionStatus = PrescriptionStatus.PENDING_REVIEW,
   ) {
     const skip = (page - 1) * limit;
+    const where = status === 'ALL' ? {} : { status };
 
     const [items, total] = await Promise.all([
       this.prisma.uploadedPrescription.findMany({
-        where: { status: PrescriptionStatus.PENDING_REVIEW },
+        where,
         include: {
           user: { select: { id: true, phone: true, email: true } },
           assignedReviewer: {
@@ -209,7 +223,7 @@ export class PrescriptionService {
         take: limit,
       }),
       this.prisma.uploadedPrescription.count({
-        where: { status: PrescriptionStatus.PENDING_REVIEW },
+        where,
       }),
     ]);
 
@@ -253,14 +267,64 @@ export class PrescriptionService {
   /**
    * Fetch a single prescription by ID and generate a short-lived signed URL
    * for secure file access. Only admins may call this.
+   *
+   * @param prescriptionId  The prescription to fetch.
+   * @param actorUserId     Optional ID of the user requesting access. When
+   *                        provided, an audit log entry is written so that
+   *                        signed-URL access is traceable.
    */
-  async getDetails(prescriptionId: string) {
+  async getDetails(prescriptionId: string, actorUserId?: string) {
     const prescription = await this.findOrFail(prescriptionId);
 
     const fileUrl = await this.storage.getSignedUrl(prescription.filePath);
 
     const now = Date.now();
     const ageMs = now - prescription.createdAt.getTime();
+
+    if (actorUserId) {
+      await this.recordAuditLog({
+        userId: actorUserId,
+        action: 'PRESCRIPTION_VIEWED',
+        entityId: prescription.id,
+        meta: {
+          ownerUserId: prescription.userId,
+          status: prescription.status,
+        },
+      });
+    }
+
+    // Pull the full audit trail (upload, view, approve, reject, reupload,
+    // assignment changes, etc.) so the admin UI can show review history.
+    const auditEntries = await this.prisma.auditLog.findMany({
+      where: { entity: 'PRESCRIPTION', entityId: prescriptionId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, phone: true, email: true, role: true } },
+      },
+    });
+
+    const history = auditEntries.map((entry) => {
+      const meta = (entry.meta ?? {}) as Record<string, unknown>;
+      const notes =
+        typeof meta.notes === 'string' && meta.notes.trim().length > 0
+          ? (meta.notes as string)
+          : null;
+      return {
+        id: entry.id,
+        action: entry.action,
+        actorUserId: entry.userId,
+        actor: entry.user
+          ? {
+              id: entry.user.id,
+              phone: entry.user.phone,
+              email: entry.user.email,
+              role: entry.user.role,
+            }
+          : null,
+        notes,
+        createdAt: entry.createdAt,
+      };
+    });
 
     return {
       ...prescription,
@@ -270,6 +334,7 @@ export class PrescriptionService {
         elapsedMs: ageMs,
         breached: ageMs > SLA_TARGET_MS,
       },
+      history,
     };
   }
 
@@ -365,6 +430,18 @@ export class PrescriptionService {
       action,
       adminUserId: actor.id,
       newStatus,
+    });
+
+    await this.recordAuditLog({
+      userId: actor.id,
+      action: this.actionToAuditAction(action),
+      entityId: prescriptionId,
+      meta: {
+        ownerUserId: prescription.userId,
+        previousStatus: prescription.status,
+        newStatus,
+        notes: notes ?? null,
+      },
     });
 
     // Mock notification (simulates push/email to patient)
@@ -567,5 +644,49 @@ export class PrescriptionService {
           `Failed to notify user ${userId} for prescription ${prescriptionId}: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
+  }
+
+  /**
+   * Map a verification action to the corresponding AuditLog action string.
+   */
+  private actionToAuditAction(action: VerifyAction): string {
+    switch (action) {
+      case VerifyAction.APPROVE:
+        return 'PRESCRIPTION_APPROVED';
+      case VerifyAction.REJECT:
+        return 'PRESCRIPTION_REJECTED';
+      case VerifyAction.REUPLOAD:
+        return 'PRESCRIPTION_REUPLOAD_REQUIRED';
+    }
+  }
+
+  /**
+   * Best-effort audit log writer for prescription lifecycle events.
+   *
+   * Failures are swallowed and logged at WARN level so that a problem with
+   * the audit subsystem can never break the main flow (upload, view,
+   * verification).
+   */
+  private async recordAuditLog(input: {
+    userId: string;
+    action: string;
+    entityId: string;
+    meta?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          userId: input.userId,
+          action: input.action,
+          entity: 'PRESCRIPTION',
+          entityId: input.entityId,
+          meta: (input.meta ?? {}) as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to write audit log (action=${input.action}, prescriptionId=${input.entityId}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }

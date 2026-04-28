@@ -49,6 +49,7 @@ interface PharmacyOrderState {
     status: UploadedPrescriptionStatus | null,
   ) => void;
   updateMedicineQuantity: (id: number, delta: number) => void;
+  removeMedicine: (id: number) => void;
   selectPharmacy: (pharmacy: MockPharmacy | null) => void;
   resetOrder: () => void;
 }
@@ -126,6 +127,11 @@ export const usePharmacyOrderStore = create<PharmacyOrderState>((set) => ({
         )
         .filter((m) => m.quantity > 0),
     })),
+
+    removeMedicine: (id) =>
+      set((state) => ({
+        medicines: state.medicines.filter((m) => m.id !== id),
+      })),
 
   selectPharmacy: (pharmacy) => set({ selectedPharmacy: pharmacy }),
 

@@ -1,6 +1,19 @@
-import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ConsultationService } from './consultation.service';
 import { CreateConsultationSummaryDto } from './dto/create-consultation-summary.dto';
+import { AddConsultationPrescriptionDto } from './dto/add-consultation-prescription.dto';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 
 @Controller('consultation')
@@ -37,5 +50,44 @@ export class ConsultationController {
   @Get(':bookingId/summary')
   getSummary(@Param('bookingId') bookingId: string) {
     return this.consultationService.getSummary(bookingId);
+  }
+
+  @Post(':bookingId/prescription')
+  addPrescription(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: any,
+    @Body() dto: AddConsultationPrescriptionDto,
+  ) {
+    return this.consultationService.addPrescription(bookingId, user.id, dto);
+  }
+
+  @Post(':bookingId/prescription/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  addPrescriptionFile(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: any,
+    @UploadedFile()
+    file: {
+      originalname: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    },
+    @Body('details') details?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided.');
+    }
+    return this.consultationService.addPrescriptionWithFile(
+      bookingId,
+      user.id,
+      file,
+      details,
+    );
   }
 }

@@ -231,6 +231,15 @@ jobs:
           DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
           DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
+      - name: Verify staging migration status
+        if: steps.check-secrets.outputs.skip != 'true'
+        id: migrate-status
+        continue-on-error: true
+        run: cd packages/database && pnpm exec prisma migrate status --schema prisma/schema.prisma
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
+
       - name: Report migration result
         if: steps.check-secrets.outputs.skip != 'true' && steps.migrate.outcome == 'failure'
         run: |
@@ -240,6 +249,18 @@ jobs:
           echo "Database migration failed during CI. The API container will retry migrations on startup via \`apps/api/docker-entrypoint.sh\`." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Action required:** Verify \`STAGING_DIRECT_URL\` secret is a valid PostgreSQL connection string (e.g. \`postgresql://postgres:PASSWORD@db.XXX.supabase.co:5432/postgres\`)." >> $GITHUB_STEP_SUMMARY
+
+      - name: Report migration status verification
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          if [ "${{ steps.migrate-status.outcome }}" = "success" ]; then
+            echo "## ✅ Staging Migration Status" >> $GITHUB_STEP_SUMMARY
+            echo "Prisma migration status check completed successfully against staging database." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::Prisma migration status check failed against staging database."
+            echo "## ⚠️ Staging Migration Status" >> $GITHUB_STEP_SUMMARY
+            echo "Prisma migration status check failed. Review logs to confirm all migrations are applied in staging." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Install Railway CLI
         if: steps.check-secrets.outputs.skip != 'true'
