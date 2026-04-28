@@ -41,7 +41,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/auth/verify-otp', { phone, otp });
+      const { data } = await api.post('/auth/verify-otp', { phone, otp, role: 'PROVIDER' });
+
+      if (data.user.role !== 'PROVIDER') {
+        setError('Access denied. This portal is for registered doctors only.');
+        return;
+      }
 
       localStorage.setItem('provider_token', data.token);
       localStorage.setItem(

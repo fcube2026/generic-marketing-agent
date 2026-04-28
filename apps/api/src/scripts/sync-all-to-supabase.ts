@@ -11,7 +11,7 @@ async function main() {
   const syncService = app.get(SupabaseSyncService);
 
   console.log('Starting full data sync to Supabase...');
-  
+
   if (!syncService.isEnabled()) {
     console.error('Supabase sync is disabled. Check your env vars.');
     await app.close();
@@ -28,8 +28,7 @@ async function main() {
   }
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

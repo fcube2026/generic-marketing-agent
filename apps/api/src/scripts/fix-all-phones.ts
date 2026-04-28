@@ -13,7 +13,7 @@ async function main() {
   let updatedCount = 0;
 
   for (const user of users) {
-    let phone = user.phone;
+    const phone = user.phone;
     let newPhone = phone;
 
     // Remove all letters and special chars, keep digits and leading +
@@ -27,16 +27,16 @@ async function main() {
       // Rule: 12 digits starting with 91 -> +91
       newPhone = '+' + cleaned;
     } else if (hasPlus && cleaned.length > 10) {
-       // If it had a + but is not 91 prefix (e.g. +1111111111)
-       // The user said "add +91 instead of +"
-       // If it was + followed by 10 digits, we want +91 + those 10 digits.
-       // Let's take the last 10 digits if it's > 10 and had a +.
-       const last10 = cleaned.slice(-10);
-       newPhone = '+91' + last10;
+      // If it had a + but is not 91 prefix (e.g. +1111111111)
+      // The user said "add +91 instead of +"
+      // If it was + followed by 10 digits, we want +91 + those 10 digits.
+      // Let's take the last 10 digits if it's > 10 and had a +.
+      const last10 = cleaned.slice(-10);
+      newPhone = '+91' + last10;
     } else if (cleaned.length > 10) {
-       // No + but > 10 digits, maybe it starts with 0?
-       const last10 = cleaned.slice(-10);
-       newPhone = '+91' + last10;
+      // No + but > 10 digits, maybe it starts with 0?
+      const last10 = cleaned.slice(-10);
+      newPhone = '+91' + last10;
     }
 
     if (newPhone !== user.phone) {
@@ -48,7 +48,9 @@ async function main() {
         console.log(`Updated user ${user.id}: ${user.phone} -> ${newPhone}`);
         updatedCount++;
       } catch (err) {
-        console.error(`Failed to update user ${user.id} (${user.phone}): ${err.message}`);
+        console.error(
+          `Failed to update user ${user.id} (${user.phone}): ${err.message}`,
+        );
       }
     }
   }

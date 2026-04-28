@@ -115,6 +115,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [doctorName, setDoctorName] = useState('Doctor');
+  const [profileNotFound, setProfileNotFound] = useState(false);
 
   const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
@@ -135,7 +136,9 @@ export default function DashboardPage() {
         }
       })
       .catch((err) => {
-        if (err?.response?.status !== 401) {
+        if (err?.response?.status === 404) {
+          setProfileNotFound(true);
+        } else if (err?.response?.status !== 401) {
           console.error('[Doctor Dashboard] Error:', err?.message);
         }
       })
@@ -154,6 +157,21 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
           <p className="text-sm text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileNotFound) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-2xl">⚠️</div>
+          <h2 className="text-lg font-semibold text-navy">Doctor profile not set up</h2>
+          <p className="text-sm text-gray-500">
+            Your account is registered but no doctor profile has been created yet.
+            Please contact the Curex24 admin team to complete your onboarding.
+          </p>
         </div>
       </div>
     );
