@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
 import { PatientVerificationService } from '../patient-verification/patient-verification.service';
 import { ConfigService } from '@nestjs/config';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
 describe('BookingsService', () => {
   let service: BookingsService;
@@ -67,6 +68,12 @@ describe('BookingsService', () => {
     }),
   };
 
+  const mockSupabaseSync = {
+    syncPatient: jest.fn().mockResolvedValue(undefined),
+    syncProvider: jest.fn().mockResolvedValue(undefined),
+    syncBooking: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,11 +89,33 @@ describe('BookingsService', () => {
           useValue: mockPatientVerification,
         },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: SupabaseSyncService, useValue: mockSupabaseSync },
       ],
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    // Re-initialise default mock return values that individual tests may omit.
+    mockConfig.get.mockImplementation((key: string, defaultValue?: any) => {
+      if (key === 'PATIENT_VERIFICATION_REQUIRED') return 'false';
+      return defaultValue;
+    });
+    mockPatientVerification.isPatientVerified.mockResolvedValue(true);
+    mockVideoReminder.scheduleReminders.mockResolvedValue(undefined);
+    mockVideoReminder.cancelReminders.mockResolvedValue(undefined);
+    mockSupabaseSync.syncPatient.mockResolvedValue(undefined);
+    mockSupabaseSync.syncProvider.mockResolvedValue(undefined);
+    mockSupabaseSync.syncBooking.mockResolvedValue(undefined);
+    mockNotifications.sendNotification.mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    });
+    mockNotifications.createNotification.mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    });
   });
 
   it('should be defined', () => {
@@ -285,6 +314,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification
         .mockResolvedValueOnce(bookingWithRelations); // for acceptBooking notification
@@ -328,6 +358,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -367,6 +398,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -396,6 +428,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification (empty for DECLINED)
         .mockResolvedValueOnce(bookingWithRelations); // for declineBooking notification
@@ -435,6 +468,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -456,10 +490,13 @@ describe('BookingsService', () => {
     });
 
     it('should throw if booking is not in REQUESTED status', async () => {
-      mockPrisma.booking.findUnique.mockResolvedValue({
-        id: 'booking-1',
-        status: 'ACCEPTED',
-      });
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          id: 'booking-1',
+          status: 'ACCEPTED',
+          provider: { userId: 'user-1' },
+        }) // for assertBookingProvider
+        .mockResolvedValue({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus
 
       await expect(
         service.declineBooking('booking-1', 'user-1'),

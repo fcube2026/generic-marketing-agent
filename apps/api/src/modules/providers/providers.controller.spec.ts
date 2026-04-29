@@ -176,6 +176,7 @@ describe('ProvidersController', () => {
         77.5946,
         'doctor',
         undefined,
+        undefined,
       );
     });
 

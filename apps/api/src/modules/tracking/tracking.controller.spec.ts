@@ -49,7 +49,8 @@ describe('TrackingController', () => {
         'provider-user-1',
         dto,
       );
-      expect(result.bookingId).toBe('booking-1');
+      // result is a union – narrow to the success branch for the assertion
+      expect((result as { bookingId: string }).bookingId).toBe('booking-1');
     });
   });
 
