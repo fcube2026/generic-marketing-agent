@@ -207,7 +207,15 @@ export class VideoConsultationReminderService {
       ];
       for (const jobId of jobIds) {
         const job = await this.reminderQueue.getJob(jobId);
-        if (job) await job.remove();
+        if (job) {
+          try {
+            await job.remove();
+          } catch (err) {
+            this.logger.warn(
+              `Failed to remove reminder job ${jobId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+        }
       }
     } else {
       const timeouts = this.activeTimeouts.get(bookingId);

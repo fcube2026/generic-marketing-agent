@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProvidersService } from './providers.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
 describe('ProvidersService', () => {
   let service: ProvidersService;
@@ -33,11 +34,19 @@ describe('ProvidersService', () => {
     },
   };
 
+  const mockSupabaseSync = {
+    syncPatient: jest.fn().mockResolvedValue(undefined),
+    syncProvider: jest.fn().mockResolvedValue(undefined),
+    syncBooking: jest.fn().mockResolvedValue(undefined),
+    syncVideoSession: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProvidersService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SupabaseSyncService, useValue: mockSupabaseSync },
       ],
     }).compile();
 
