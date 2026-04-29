@@ -165,12 +165,25 @@ export class NmcApiProvider {
   ): NmcVerificationResult {
     switch (this.provider) {
       case 'surepass': {
-        // Surepass response shape:
-        // { success: true, status_code: 200, data: { results: [{ full_name, registration_number, ... }] } }
+        // Surepass doctor-verification endpoint has two response shapes depending
+        // on the API version / endpoint variant:
+        //
+        // Shape A (results array — older /nmc/verify variants):
+        //   { success: true, data: { results: [{ full_name, registration_number, ... }] } }
+        //
+        // Shape B (direct object — /doctor/doctor-verification endpoint):
+        //   { success: true, data: { registration_number, full_name, qualification, ... } }
+        //
+        // We support both: prefer the array when present, fall back to the
+        // direct object so that neither shape causes a spurious "not found".
         const payload = (data.data ?? {}) as Record<string, unknown>;
         const results = Array.isArray(payload.results) ? payload.results : [];
-        const first = (results[0] ?? {}) as Record<string, unknown>;
-        const found = data.success === true && results.length > 0;
+        // For shape B the payload itself IS the result object
+        const first = (results[0] ?? payload) as Record<string, unknown>;
+        const found =
+          data.success === true &&
+          (results.length > 0 ||
+            !!(payload.registration_number ?? payload.full_name));
         return {
           found,
           registrationNumber: first.registration_number as string | undefined,

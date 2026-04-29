@@ -1,15 +1,33 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
+import type { Request } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
-  // `rawBody: true` enables `req.rawBody` (Buffer) for endpoints that need
-  // the unmodified request body — required for webhook HMAC signature
-  // verification (e.g. pharmacy partner webhooks).
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // Disable NestJS's automatic body-parser registration so we can configure
+  // the limits ourselves.  The default 100 kb JSON limit is too small for
+  // base64-encoded face-selfie payloads (typically 200 KB – 2 MB).
+  // We re-implement the rawBody capture that would normally come from
+  // `rawBody: true` so that the pharmacy webhook HMAC verification keeps
+  // working (it reads `req.rawBody` as a Buffer).
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // 10 MB JSON body limit — large enough for base64 selfie images.
+  // The `verify` callback stores the raw bytes so pharmacy webhooks can
+  // validate the HMAC signature against the original unmodified body.
+  app.use(
+    json({
+      limit: '10mb',
+      verify: (req: Request & { rawBody?: Buffer }, _res, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
