@@ -103,10 +103,10 @@ export default function VideoConsultationDetailPage() {
     setError(null);
     try {
       const res = await api.get(`/video-sessions/${bookingId}/token`);
-      const { token, roomId } = res.data as { token: string; roomId: string };
-      window.open(`https://app.100ms.live/preview/${roomId}?token=${token}`, '_blank');
+      const { jitsiUrl } = res.data as { jitsiUrl: string; roomId: string };
+      window.open(jitsiUrl, '_blank');
     } catch {
-      setError('Failed to get join token. Please try again.');
+      setError('Failed to get join details. Please try again.');
     }
   };
 
@@ -192,7 +192,7 @@ export default function VideoConsultationDetailPage() {
           <div className="text-center py-8">
             <div className="text-4xl mb-3">📹</div>
             <p className="text-gray-500 text-sm">
-              No video room created yet. Use the button below to set up the 100ms room.
+            No video room created yet. Use the button below to set up the Jitsi room.
             </p>
           </div>
         ) : (
@@ -258,7 +258,7 @@ export default function VideoConsultationDetailPage() {
             onClick={handleJoin}
             className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition"
           >
-            🎥 Join Video Call (100ms)
+            🎥 Join Video Call (Jitsi)
           </button>
         )}
 

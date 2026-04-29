@@ -1,18 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class GenerateTokenResponseDto {
-  @ApiProperty({ description: '100ms auth token for joining the video room' })
-  token: string;
+  @ApiProperty({ description: 'Jitsi meet URL for joining the video room' })
+  jitsiUrl: string;
 
   @ApiProperty({
-    example: '6448048ac66abd53ccdf08f3',
-    description: '100ms Room ID',
+    example: 'curex-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    description: 'Jitsi room identifier',
   })
   roomId: string;
 
   @ApiProperty({
     example: 'host',
-    description: '100ms role assigned to this token',
+    description:
+      'Role assigned to this participant (host = provider, guest = patient)',
   })
   role: string;
 }
