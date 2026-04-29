@@ -133,6 +133,8 @@ export const VideoLobbyScreen: React.FC = () => {
   // Run real permission and network checks
   useEffect(() => {
     let interval: NodeJS.Timeout;
+    let abortTimeoutId: NodeJS.Timeout | null = null;
+    let unmounted = false;
 
     const runChecks = async () => {
       // Camera
@@ -160,37 +162,50 @@ export const VideoLobbyScreen: React.FC = () => {
       }
 
       // Network
-      checkNetwork();
-      interval = setInterval(checkNetwork, 10000); // Check every 10s
+      if (!unmounted) {
+        checkNetwork();
+        interval = setInterval(checkNetwork, 10000); // Check every 10s
+      }
     };
 
     const checkNetwork = async () => {
       const start = Date.now();
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        await api.head('/health', { signal: controller.signal });
-        
-        clearTimeout(timeoutId);
-        const latency = Date.now() - start;
-        setNetworkOk(true);
+        abortTimeoutId = setTimeout(() => controller.abort(), 5000);
 
-        if (latency < 400) {
-          updateCheck('network', 'ok', 'Excellent (Fast)');
-        } else if (latency < 1000) {
-          updateCheck('network', 'warning', 'Moderate (May Lag)');
-        } else {
-          updateCheck('network', 'error', 'Poor (Use Audio-Only)');
+        await api.head('/health', { signal: controller.signal });
+
+        clearTimeout(abortTimeoutId);
+        abortTimeoutId = null;
+        const latency = Date.now() - start;
+        if (!unmounted) {
+          setNetworkOk(true);
+
+          if (latency < 400) {
+            updateCheck('network', 'ok', 'Excellent (Fast)');
+          } else if (latency < 1000) {
+            updateCheck('network', 'warning', 'Moderate (May Lag)');
+          } else {
+            updateCheck('network', 'error', 'Poor (Use Audio-Only)');
+          }
         }
       } catch {
-        setNetworkOk(false);
-        updateCheck('network', 'denied', 'No Connection');
+        if (!unmounted) {
+          setNetworkOk(false);
+          updateCheck('network', 'denied', 'No Connection');
+        }
       }
     };
 
     runChecks();
-    return () => clearInterval(interval);
+    return () => {
+      unmounted = true;
+      if (abortTimeoutId !== null) {
+        clearTimeout(abortTimeoutId);
+      }
+      clearInterval(interval);
+    };
   }, [cameraPermission, micPermissionResponse]);
 
   const updateCheck = (id: string, status: CheckStatus, message?: string) => {

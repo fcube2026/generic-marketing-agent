@@ -64,7 +64,9 @@ jest.mock('../../../services/bookingService', () => ({
     getBookingById: jest.fn(),
     getVideoSession: jest.fn(),
     startVideoSession: jest.fn(() => Promise.resolve()),
-    getVideoToken: jest.fn(() => Promise.resolve({ roomId: 'room-test-abc' })),
+    getVideoToken: jest.fn(() =>
+      Promise.resolve({ jitsiUrl: 'https://meet.jit.si/room-test-abc', roomId: 'room-test-abc' }),
+    ),
     endVideoSession: jest.fn(() => Promise.resolve({ duration: 300 })),
   },
 }));
