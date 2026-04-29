@@ -95,7 +95,28 @@ describe('BookingsService', () => {
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    // Re-initialise default mock return values that individual tests may omit.
+    mockConfig.get.mockImplementation((key: string, defaultValue?: any) => {
+      if (key === 'PATIENT_VERIFICATION_REQUIRED') return 'false';
+      return defaultValue;
+    });
+    mockPatientVerification.isPatientVerified.mockResolvedValue(true);
+    mockVideoReminder.scheduleReminders.mockResolvedValue(undefined);
+    mockVideoReminder.cancelReminders.mockResolvedValue(undefined);
+    mockSupabaseSync.syncPatient.mockResolvedValue(undefined);
+    mockSupabaseSync.syncProvider.mockResolvedValue(undefined);
+    mockSupabaseSync.syncBooking.mockResolvedValue(undefined);
+    mockNotifications.sendNotification.mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    });
+    mockNotifications.createNotification.mockResolvedValue({
+      inAppId: 'notif-1',
+      pushSent: true,
+      smsSent: false,
+    });
   });
 
   it('should be defined', () => {

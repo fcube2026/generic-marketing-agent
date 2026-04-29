@@ -88,6 +88,7 @@ const baseOrder: PharmacyOrder = {
 
 describe('OrderTrackingScreen', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     mockUseRoute.mockReturnValue({ params: { orderId: 'order-1' } });
   });
