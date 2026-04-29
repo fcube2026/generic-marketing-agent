@@ -72,6 +72,7 @@ describe('BookingsService', () => {
     syncPatient: jest.fn().mockResolvedValue(undefined),
     syncProvider: jest.fn().mockResolvedValue(undefined),
     syncBooking: jest.fn().mockResolvedValue(undefined),
+    syncVideoSession: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -496,7 +497,7 @@ describe('BookingsService', () => {
           status: 'ACCEPTED',
           provider: { userId: 'user-1' },
         }) // for assertBookingProvider
-        .mockResolvedValue({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus
+        .mockResolvedValueOnce({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus status check
 
       await expect(
         service.declineBooking('booking-1', 'user-1'),

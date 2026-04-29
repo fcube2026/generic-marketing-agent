@@ -4,7 +4,6 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   VideoWebhookEventDto,
@@ -17,33 +16,15 @@ const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'EXPIRED'] as const;
 @Injectable()
 export class VideoWebhookService {
   private readonly logger = new Logger(VideoWebhookService.name);
-  private readonly mockMode: boolean;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    this.mockMode =
-      this.config.get<string>('VIDEO_MOCK_MODE', 'false') === 'true';
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Entry point for processing an incoming webhook event.
-   *
-   * In a real 100ms integration you would verify the request signature here
-   * before dispatching. In mock mode the verification step is skipped but the
-   * method signature is already shaped to accept the raw request headers so
-   * that adding verification later requires only a minimal change.
+   * Entry point for processing an incoming video lifecycle webhook event.
    */
   async handleEvent(
     event: VideoWebhookEventDto,
-    _rawSignature?: string,
   ): Promise<{ processed: boolean; message: string }> {
-    if (!this.mockMode) {
-      // Placeholder: real signature verification goes here.
-      // throw new UnauthorizedException('Invalid webhook signature');
-    }
-
     this.logger.log(
       `Received video webhook event: ${event.type} — data: ${JSON.stringify(event.data)}`,
     );

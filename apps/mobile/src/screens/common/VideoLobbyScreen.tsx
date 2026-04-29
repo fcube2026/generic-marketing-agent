@@ -125,6 +125,10 @@ export const VideoLobbyScreen: React.FC = () => {
     });
 
     return () => {
+      fadeAnim.stopAnimation();
+      slideAnim.stopAnimation();
+      cameraAnim.stopAnimation();
+      micBars.forEach(bar => bar.stopAnimation());
       cameraLoop.stop();
       micLoops.forEach((loop) => loop.stop());
     };
@@ -133,6 +137,8 @@ export const VideoLobbyScreen: React.FC = () => {
   // Run real permission and network checks
   useEffect(() => {
     let interval: NodeJS.Timeout;
+    let abortTimeoutId: NodeJS.Timeout | null = null;
+    let unmounted = false;
 
     const runChecks = async () => {
       // Camera
@@ -160,37 +166,50 @@ export const VideoLobbyScreen: React.FC = () => {
       }
 
       // Network
-      checkNetwork();
-      interval = setInterval(checkNetwork, 10000); // Check every 10s
+      if (!unmounted) {
+        checkNetwork();
+        interval = setInterval(checkNetwork, 10000); // Check every 10s
+      }
     };
 
     const checkNetwork = async () => {
       const start = Date.now();
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        await api.head('/health', { signal: controller.signal });
-        
-        clearTimeout(timeoutId);
-        const latency = Date.now() - start;
-        setNetworkOk(true);
+        abortTimeoutId = setTimeout(() => controller.abort(), 5000);
 
-        if (latency < 400) {
-          updateCheck('network', 'ok', 'Excellent (Fast)');
-        } else if (latency < 1000) {
-          updateCheck('network', 'warning', 'Moderate (May Lag)');
-        } else {
-          updateCheck('network', 'error', 'Poor (Use Audio-Only)');
+        await api.head('/health', { signal: controller.signal });
+
+        clearTimeout(abortTimeoutId);
+        abortTimeoutId = null;
+        const latency = Date.now() - start;
+        if (!unmounted) {
+          setNetworkOk(true);
+
+          if (latency < 400) {
+            updateCheck('network', 'ok', 'Excellent (Fast)');
+          } else if (latency < 1000) {
+            updateCheck('network', 'warning', 'Moderate (May Lag)');
+          } else {
+            updateCheck('network', 'error', 'Poor (Use Audio-Only)');
+          }
         }
       } catch {
-        setNetworkOk(false);
-        updateCheck('network', 'denied', 'No Connection');
+        if (!unmounted) {
+          setNetworkOk(false);
+          updateCheck('network', 'denied', 'No Connection');
+        }
       }
     };
 
     runChecks();
-    return () => clearInterval(interval);
+    return () => {
+      unmounted = true;
+      if (abortTimeoutId !== null) {
+        clearTimeout(abortTimeoutId);
+      }
+      clearInterval(interval);
+    };
   }, [cameraPermission, micPermissionResponse]);
 
   const updateCheck = (id: string, status: CheckStatus, message?: string) => {
@@ -245,8 +264,8 @@ export const VideoLobbyScreen: React.FC = () => {
       // 1. Notify backend that the session is starting
       await bookingService.startVideoSession(bookingId).catch(() => undefined);
 
-      // 2. Build the Jitsi URL
-      const { roomId } = await bookingService.getVideoToken(bookingId);
+      // 2. Get the secure Jitsi URL from the backend
+      const { jitsiUrl } = await bookingService.getVideoToken(bookingId);
       const isProvider = booking?.provider?.userId === currentUser?.id; 
       const displayName = isProvider ? 'Doctor' : 'Patient';
       
@@ -257,12 +276,12 @@ export const VideoLobbyScreen: React.FC = () => {
         audioOnly ? 'config.startAudioOnly=true' : 'config.startVideoMuted=false'
       ].join('&');
 
-      const jitsiUrl = `https://meet.jit.si/${roomId}#${config}`;
+      const fullUrl = `${jitsiUrl}#${config}`;
 
       // 3. Open in Browser
-      const supported = await Linking.canOpenURL(jitsiUrl);
+      const supported = await Linking.canOpenURL(fullUrl);
       if (supported) {
-        await Linking.openURL(jitsiUrl);
+        await Linking.openURL(fullUrl);
         setCallStartTime(Date.now());
         Alert.alert(
           audioOnly ? 'Audio Consultation Started' : 'Video Consultation Started',

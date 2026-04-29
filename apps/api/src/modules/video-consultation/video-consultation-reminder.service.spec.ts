@@ -16,10 +16,9 @@ const mockQueue = {
   getJob: jest.fn(),
 };
 
-const mockNotificationsService = {
-  sendNotification: jest
-    .fn()
-    .mockResolvedValue({ inAppId: 'n-1', pushSent: true, smsSent: false }),
+const mockNotifications = {
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  sendNotification: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('VideoConsultationReminderService', () => {
@@ -35,7 +34,7 @@ describe('VideoConsultationReminderService', () => {
         },
         {
           provide: NotificationsService,
-          useValue: mockNotificationsService,
+          useValue: mockNotifications,
         },
       ],
     }).compile();
@@ -134,7 +133,7 @@ describe('VideoConsultationReminderService', () => {
       const moduleNoQueue: TestingModule = await Test.createTestingModule({
         providers: [
           VideoConsultationReminderService,
-          { provide: NotificationsService, useValue: mockNotificationsService },
+          { provide: NotificationsService, useValue: mockNotifications },
         ],
       }).compile();
 
@@ -198,7 +197,7 @@ describe('VideoConsultationReminderService', () => {
       const moduleNoQueue: TestingModule = await Test.createTestingModule({
         providers: [
           VideoConsultationReminderService,
-          { provide: NotificationsService, useValue: mockNotificationsService },
+          { provide: NotificationsService, useValue: mockNotifications },
         ],
       }).compile();
 

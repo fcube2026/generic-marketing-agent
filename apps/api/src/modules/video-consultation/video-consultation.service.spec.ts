@@ -111,7 +111,7 @@ describe('VideoConsultationService', () => {
       const newSession = {
         id: 'session-1',
         bookingId: 'booking-1',
-        roomId: 'room-uuid',
+        roomId: 'curex-abcdef1234567890abcdef1234567890',
         status: 'CREATED',
         creatorUserId: 'provider-1',
       };
@@ -122,7 +122,7 @@ describe('VideoConsultationService', () => {
       expect(prisma.videoSession.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           bookingId: 'booking-1',
-          roomId: expect.stringMatching(/^room-/),
+          roomId: expect.stringMatching(/^curex-/),
           status: 'CREATED',
           creatorUserId: 'provider-1',
         }),
@@ -172,14 +172,14 @@ describe('VideoConsultationService', () => {
       });
       const existingSession = {
         id: 'session-1',
-        roomId: 'room-123',
+        roomId: 'curex-abcdef1234567890',
         bookingId: 'booking-1',
       };
       prisma.videoSession.findUnique.mockResolvedValue(existingSession);
 
       const updatedSession = {
         ...existingSession,
-        sessionToken: 'mock-token-room-123-patient-1-guest',
+        sessionToken: 'https://meet.jit.si/curex-abcdef1234567890',
       };
       prisma.videoSession.update.mockResolvedValue(updatedSession);
 
@@ -188,17 +188,15 @@ describe('VideoConsultationService', () => {
       expect(prisma.videoSession.update).toHaveBeenCalledWith({
         where: { bookingId: 'booking-1' },
         data: {
-          sessionToken: expect.stringContaining(
-            'mock-token-room-123-patient-1',
-          ),
+          sessionToken: 'https://meet.jit.si/curex-abcdef1234567890',
         },
       });
       expect(supabaseSync.syncVideoSession).toHaveBeenCalledWith(
         updatedSession,
       );
       expect(result).toEqual({
-        token: 'mock-token-room-123-patient-1-guest',
-        roomId: 'room-123',
+        jitsiUrl: 'https://meet.jit.si/curex-abcdef1234567890',
+        roomId: 'curex-abcdef1234567890',
         role: 'guest',
       });
     });
@@ -209,7 +207,9 @@ describe('VideoConsultationService', () => {
         patient: { userId: 'patient-1' },
         provider: { userId: 'provider-1' },
       });
-      prisma.videoSession.findUnique.mockResolvedValue({ roomId: 'room-123' });
+      prisma.videoSession.findUnique.mockResolvedValue({
+        roomId: 'curex-abcdef1234567890',
+      });
       prisma.videoSession.update.mockResolvedValue({});
 
       const result = await service.generateToken(
@@ -218,7 +218,9 @@ describe('VideoConsultationService', () => {
         'host',
       );
       expect(result.role).toBe('host');
-      expect(result.token).toContain('-host');
+      expect(result.jitsiUrl).toBe(
+        'https://meet.jit.si/curex-abcdef1234567890',
+      );
     });
   });
 });

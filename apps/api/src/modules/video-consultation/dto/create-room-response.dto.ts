@@ -8,8 +8,8 @@ export class CreateRoomResponseDto {
   bookingId: string;
 
   @ApiProperty({
-    example: '6448048ac66abd53ccdf08f3',
-    description: '100ms Room ID',
+    example: 'curex-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    description: 'Cryptographically secure Jitsi room identifier',
   })
   roomId: string;
 

@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { VideoWebhookService } from './video-webhook.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { VideoWebhookEventDto } from './dto/video-webhook-event.dto';
@@ -19,19 +18,11 @@ describe('VideoWebhookService', () => {
     },
   };
 
-  const makeMockConfig = (mockMode: boolean) => ({
-    get: jest.fn((key: string, defaultVal?: string) => {
-      if (key === 'VIDEO_MOCK_MODE') return mockMode ? 'true' : 'false';
-      return defaultVal ?? '';
-    }),
-  });
-
-  const buildModule = async (mockMode = true) => {
+  const buildModule = async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideoWebhookService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: ConfigService, useValue: makeMockConfig(mockMode) },
       ],
     }).compile();
     return module.get<VideoWebhookService>(VideoWebhookService);
@@ -55,7 +46,7 @@ describe('VideoWebhookService', () => {
   ): VideoWebhookEventDto => ({ type, data }) as VideoWebhookEventDto;
 
   beforeEach(async () => {
-    service = await buildModule(true);
+    service = await buildModule();
     jest.clearAllMocks();
   });
 

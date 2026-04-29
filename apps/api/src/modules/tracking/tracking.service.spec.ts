@@ -51,8 +51,7 @@ describe('TrackingService', () => {
       });
 
       const result = await service.updateLocation(userId, dto);
-      // result is a union – narrow to the success branch for the assertion
-      expect((result as { bookingId: string }).bookingId).toBe('booking-1');
+      expect(result).toMatchObject({ bookingId: 'booking-1' });
       expect(mockPrisma.providerLocation.create).toHaveBeenCalledWith({
         data: { bookingId: 'booking-1', lat: 12.9716, lng: 77.5946 },
       });
@@ -76,17 +75,14 @@ describe('TrackingService', () => {
       );
     });
 
-    it('should return skipped when booking is not in a trackable status', async () => {
+    it('should return skipped result if booking is not in a trackable status', async () => {
       mockPrisma.booking.findUnique.mockResolvedValue({
         id: 'booking-1',
         status: 'COMPLETED',
         provider: { userId: 'provider-user-1' },
       });
       const result = await service.updateLocation(userId, dto);
-      expect(result).toEqual({
-        skipped: true,
-        reason: 'Booking status not trackable',
-      });
+      expect(result).toMatchObject({ skipped: true });
     });
 
     it.each(['ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'])(

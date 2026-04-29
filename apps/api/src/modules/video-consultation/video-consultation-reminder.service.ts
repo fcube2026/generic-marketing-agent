@@ -210,8 +210,10 @@ export class VideoConsultationReminderService {
         if (job) {
           try {
             await job.remove();
-          } catch {
-            // Job may have already been processed; ignore removal failures.
+          } catch (err) {
+            this.logger.warn(
+              `Failed to remove reminder job ${jobId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
         }
       }

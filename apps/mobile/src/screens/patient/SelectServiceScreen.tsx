@@ -75,9 +75,6 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
     }
     setLoading(true);
     try {
-      const location = await getCurrentLocation();
-      const resolvedLocation = location ?? MOCK_LOCATION;
-
       setSelectedService(category);
       setSelectedMode(mode);
       storeSetSymptoms(symptoms);
@@ -88,12 +85,27 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
         let hour = selectedHour;
         if (selectedAmPm === 'PM' && hour !== 12) hour += 12;
         if (selectedAmPm === 'AM' && hour === 12) hour = 0;
-        
+
         finalDate.setHours(hour, selectedMinute, 0, 0);
         storeSetScheduledAt(finalDate);
       } else {
         storeSetScheduledAt(null);
       }
+
+      // Video consultations are location-independent — skip GPS entirely.
+      if (mode === 'VIDEO_CONSULTATION') {
+        navigation.navigate('ProviderList', {
+          categoryId: category.id,
+          serviceId: category.id,
+          categorySlug: category.slug,
+          mode,
+        });
+        return;
+      }
+
+      // Home Visit / Clinic require the patient's location for distance sorting.
+      const location = await getCurrentLocation();
+      const resolvedLocation = location ?? MOCK_LOCATION;
 
       navigation.navigate('ProviderList', {
         categoryId: category.id,
@@ -270,10 +282,17 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.locationRow}>
-          <Text style={styles.locationIcon}>📍</Text>
-          <Text style={styles.locationText}>Using your current location</Text>
-        </View>
+        {mode === 'VIDEO_CONSULTATION' ? (
+          <View style={styles.locationRow}>
+            <Text style={styles.locationIcon}>📹</Text>
+            <Text style={styles.locationText}>Video call — location not required</Text>
+          </View>
+        ) : (
+          <View style={styles.locationRow}>
+            <Text style={styles.locationIcon}>📍</Text>
+            <Text style={styles.locationText}>Using your current location</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.footer}>

@@ -181,6 +181,11 @@ jobs:
 
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
+        env:
+          # The VideoLobbyScreen suite (expo-camera + Animated animations) needs
+          # ~2 GB heap. Raise the V8 limit on the worker process so it doesn't
+          # hit the default 2 GB ceiling on the ubuntu-latest 7 GB runner.
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
   admin-smoke-tests:
     name: Admin Smoke Tests (Dev)

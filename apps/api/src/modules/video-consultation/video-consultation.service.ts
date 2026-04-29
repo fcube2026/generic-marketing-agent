@@ -5,17 +5,12 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
-/**
- * Mock-only video consultation service.
- *
- * The real 100ms/LiveKit integrations have been removed to maintain
- * a stable JS-only environment. All rooms and tokens returned
- * by this service are deterministic mock values.
- */
+const JITSI_HOST = 'https://meet.jit.si';
+
 @Injectable()
 export class VideoConsultationService {
   private readonly logger = new Logger(VideoConsultationService.name);
@@ -23,11 +18,7 @@ export class VideoConsultationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabaseSync: SupabaseSyncService,
-  ) {
-    this.logger.warn(
-      'VideoConsultationService is running in MOCK mode — all video sessions are mock values.',
-    );
-  }
+  ) {}
 
   private async getBookingWithParticipants(bookingId: string) {
     return this.prisma.booking.findUnique({
@@ -73,7 +64,7 @@ export class VideoConsultationService {
     });
     if (existing) return existing;
 
-    const roomId = `room-${randomUUID()}`;
+    const roomId = `curex-${randomBytes(16).toString('hex')}`;
 
     const session = await this.prisma.videoSession.create({
       data: {
@@ -103,14 +94,14 @@ export class VideoConsultationService {
       );
     }
 
-    const token = `mock-token-${session.roomId}-${userId}-${tokenRole}`;
+    const jitsiUrl = `${JITSI_HOST}/${session.roomId}`;
 
     const updated = await this.prisma.videoSession.update({
       where: { bookingId },
-      data: { sessionToken: token },
+      data: { sessionToken: jitsiUrl },
     });
     await this.supabaseSync.syncVideoSession(updated);
 
-    return { token, roomId: session.roomId, role: tokenRole };
+    return { jitsiUrl, roomId: session.roomId, role: tokenRole };
   }
 }
