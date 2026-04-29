@@ -5,12 +5,6 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { USE_SEED, getSeedConsultationsList } from '@/lib/seed-data';
 
-interface VideoSession {
-  id: string;
-  status: string;
-  roomId: string;
-}
-
 interface ConsultationRow {
   id: string;
   patientName: string;
@@ -26,7 +20,6 @@ interface ConsultationRow {
   durationMin?: number;
   prescription?: unknown[];
   labReports?: unknown[];
-  videoSession?: VideoSession;
 }
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
@@ -37,19 +30,8 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 };
 
 const typeLabel: Record<string, string> = {
-  in_person:           'In-Person',
-  VIDEO_CONSULTATION:  'Video',
-  video:               'Video',
-  teleconsult:         'Teleconsult',
-};
-
-const sessionStatusCls: Record<string, string> = {
-  CREATED:     'badge-gray',
-  WAITING:     'badge-amber',
-  IN_PROGRESS: 'badge-red',
-  COMPLETED:   'badge-green',
-  FAILED:      'badge-red',
-  EXPIRED:     'badge-gray',
+  in_person:   'In-Person',
+  teleconsult: 'Teleconsult',
 };
 
 export default function ConsultationsPage() {
@@ -163,7 +145,6 @@ export default function ConsultationsPage() {
           >
             <option value="all">All Types</option>
             <option value="in_person">In-Person</option>
-            <option value="video">Video</option>
             <option value="teleconsult">Teleconsult</option>
           </select>
         </div>
@@ -250,14 +231,6 @@ export default function ConsultationsPage() {
                     {/* Status */}
                     <td>
                       <span className={sc.cls}>{sc.label}</span>
-                      {/* Video session status */}
-                      {c.videoSession && (
-                        <div className="mt-1">
-                          <span className={`${sessionStatusCls[c.videoSession.status] ?? 'badge-gray'} text-[9px]`}>
-                            {c.videoSession.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                      )}
                     </td>
 
                     {/* Rx / Labs */}
@@ -284,14 +257,6 @@ export default function ConsultationsPage() {
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary-dark transition"
                           >
                             Details →
-                          </Link>
-                        )}
-                        {(c.type === 'VIDEO_CONSULTATION' || c.type === 'video') && (
-                          <Link
-                            href={`/video-consultations/${c.id}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 border border-primary/30 text-primary text-xs font-semibold rounded-lg hover:bg-primary-lighter transition"
-                          >
-                            🎥 Join
                           </Link>
                         )}
                       </div>

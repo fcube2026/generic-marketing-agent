@@ -24,7 +24,6 @@ const BOOKING_NOTIFICATION_TYPES = new Set([
   'CONSULTATION_COMPLETED',
   'PAYMENT_SUCCESS',
   'PAYMENT_REFUNDED',
-  'VIDEO_CONSULTATION_REMINDER',
 ]);
 
 function invalidateBookingCaches(
@@ -38,7 +37,6 @@ function invalidateBookingCaches(
   queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
   if (bookingId) {
     queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
-    queryClient.invalidateQueries({ queryKey: ['video-session', bookingId] });
   }
 }
 
@@ -114,12 +112,6 @@ export function usePushNotifications(isAuthenticated: boolean) {
         case 'PAYOUT_PROCESSED':
           // Navigate to earnings/payouts
           navigation.navigate('ProviderTabs', { screen: 'Earnings' });
-          break;
-
-        case 'VIDEO_CONSULTATION_REMINDER':
-          if (data.bookingId) {
-            navigation.navigate('VideoLobby', { bookingId: data.bookingId });
-          }
           break;
 
         case 'PHARMACY_ORDER_STATUS_UPDATE':

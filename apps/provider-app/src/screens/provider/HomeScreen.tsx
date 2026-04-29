@@ -47,19 +47,7 @@ export const HomeScreen: React.FC = () => {
   });
 
   const pendingBookings = (bookings || []).filter((b) => b.status === 'REQUESTED');
-  const activeVideoBookings = (bookings || []).filter(
-    (b) =>
-      b.mode === 'VIDEO_CONSULTATION' &&
-      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
-  );
 
-  const handleVideoConsultationPress = () => {
-    if (activeVideoBookings.length > 0) {
-      navigation.navigate('VideoConsultation', { bookingId: activeVideoBookings[0].id });
-    } else {
-      navigation.navigate('InstantMeeting');
-    }
-  };
   const todayBookings = (bookings || []).filter(
     (b) => new Date(b.scheduledAt).toDateString() === new Date().toDateString()
   );
@@ -128,20 +116,6 @@ export const HomeScreen: React.FC = () => {
           <Text style={styles.statLabel}>Pending</Text>
         </Card>
       </View>
-
-      {/* Video Consultation Quick Access */}
-      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultations</Text>
-          <Text style={styles.videoCardSub}>
-            {activeVideoBookings.length > 0
-              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'Tap to start an instant meeting'}
-          </Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
 
       {pendingBookings.length > 0 && (
         <View style={styles.section}>
@@ -218,12 +192,6 @@ const styles = StyleSheet.create({
   bookingItemLeft: {},
   bookingPatient: { fontSize: 15, fontWeight: '600', color: Colors.text },
   bookingService: { fontSize: 13, color: Colors.textMuted },
-  videoCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EDE9FE', borderRadius: 12, margin: 16, marginTop: 16, marginBottom: 4, padding: 16, borderLeftWidth: 4, borderLeftColor: '#7C3AED' },
-  videoCardIcon: { fontSize: 28, marginRight: 12 },
-  videoCardContent: { flex: 1 },
-  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  videoCardSub: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
-  videoCardArrow: { fontSize: 18, color: '#7C3AED', fontWeight: '700' },
   onboardingPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: Colors.background },
   onboardingIcon: { fontSize: 72, marginBottom: 20 },
   onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },

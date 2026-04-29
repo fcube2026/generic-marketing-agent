@@ -107,7 +107,6 @@ const consultationStatusCls: Record<string, string> = {
 const quickActions = [
   { href: '/patients', label: 'Patient Records', desc: 'Search & manage patients by UHID', icon: '👥', color: 'border-teal/30 hover:border-teal bg-teal-light/20' },
   { href: '/consultations', label: 'Consultations', desc: 'View and manage all consultations', icon: '📋', color: 'border-primary/30 hover:border-primary bg-primary-lighter/30' },
-  { href: '/video-consultations', label: 'Video Calls', desc: 'Join or schedule video consultations', icon: '🎥', color: 'border-purple-300 hover:border-purple-500 bg-purple-50' },
   { href: '/earnings', label: 'Earnings', desc: 'Track your revenue and payouts', icon: '💰', color: 'border-amber-300 hover:border-amber-500 bg-amber-50' },
 ];
 

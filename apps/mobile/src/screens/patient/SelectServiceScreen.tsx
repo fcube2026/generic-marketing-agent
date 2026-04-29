@@ -49,7 +49,7 @@ const DATE_SLOTS = GENERATE_DATE_SLOTS();
 
 export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
   const { category } = route.params;
-  const [mode, setMode] = useState<'VIDEO_CONSULTATION' | 'HOME_VISIT' | 'DOCTOR_PLACE' | null>(null);
+  const [mode, setMode] = useState<'HOME_VISIT' | 'DOCTOR_PLACE' | null>(null);
   const [symptoms, setSymptoms] = useState('');
   const [timing, setTiming] = useState<'now' | 'later'>('now');
   
@@ -90,17 +90,6 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
         storeSetScheduledAt(finalDate);
       } else {
         storeSetScheduledAt(null);
-      }
-
-      // Video consultations are location-independent — skip GPS entirely.
-      if (mode === 'VIDEO_CONSULTATION') {
-        navigation.navigate('ProviderList', {
-          categoryId: category.id,
-          serviceId: category.id,
-          categorySlug: category.slug,
-          mode,
-        });
-        return;
       }
 
       // Home Visit / Clinic require the patient's location for distance sorting.
@@ -150,14 +139,6 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Select Consultation Type</Text>
         <View style={styles.modeRow}>
-          <TouchableOpacity
-            style={[styles.modeBtn, mode === 'VIDEO_CONSULTATION' && styles.modeBtnActive]}
-            onPress={() => setMode('VIDEO_CONSULTATION')}
-          >
-            <Text style={styles.modeIcon}>📹</Text>
-            <Text style={[styles.modeLabel, mode === 'VIDEO_CONSULTATION' && styles.modeLabelActive]}>Video</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.modeBtn, mode === 'HOME_VISIT' && styles.modeBtnActive]}
             onPress={() => setMode('HOME_VISIT')}
@@ -282,17 +263,10 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.section}>
-        {mode === 'VIDEO_CONSULTATION' ? (
-          <View style={styles.locationRow}>
-            <Text style={styles.locationIcon}>📹</Text>
-            <Text style={styles.locationText}>Video call — location not required</Text>
-          </View>
-        ) : (
-          <View style={styles.locationRow}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.locationText}>Using your current location</Text>
-          </View>
-        )}
+        <View style={styles.locationRow}>
+          <Text style={styles.locationIcon}>📍</Text>
+          <Text style={styles.locationText}>Using your current location</Text>
+        </View>
       </View>
 
       <View style={styles.footer}>

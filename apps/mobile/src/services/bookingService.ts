@@ -76,33 +76,6 @@ export const bookingService = {
     return r.data;
   },
 
-  getVideoSession: async (bookingId: string) => {
-    const r = await api.get(`/video-sessions/${bookingId}`);
-    return r.data;
-  },
-
-  createVideoRoom: async (bookingId: string) => {
-    const r = await api.post(`/video-sessions/${bookingId}/create`);
-    return r.data;
-  },
-
-  getVideoToken: async (bookingId: string, role?: string) => {
-    const r = await api.get(`/video-sessions/${bookingId}/token`, {
-      params: role ? { role } : {},
-    });
-    return r.data as { jitsiUrl: string; roomId: string; role: string };
-  },
-
-  startVideoSession: async (bookingId: string) => {
-    const r = await api.post(`/video-sessions/${bookingId}/start`);
-    return r.data;
-  },
-
-  endVideoSession: async (bookingId: string) => {
-    const r = await api.post(`/video-sessions/${bookingId}/end`);
-    return r.data;
-  },
-
   submitRating: async (bookingId: string, rating: number) => {
     // Mock endpoint for rating submission
     const r = await api.post(`/bookings/${bookingId}/rating`, { rating });

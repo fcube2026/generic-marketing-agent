@@ -19,7 +19,6 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 const modeLabel: Record<string, string> = {
   HOME_VISIT:          'Home Visit',
   DOCTOR_PLACE_VISIT:  'Clinic Visit',
-  VIDEO_CONSULTATION:  'Video',
   TELECONSULT:         'Teleconsult',
 };
 
@@ -50,7 +49,6 @@ interface Consultation {
   symptoms: string | null;
   totalFee: number;
   serviceCategory: string;
-  videoSession: { id: string; status: string; roomId: string } | null;
   summary: {
     diagnosis: string | null;
     observations: string | null;
@@ -140,9 +138,6 @@ function ConsultationCard({ consultation }: { consultation: Consultation }) {
 
       <div className="flex items-center justify-between text-xs text-gray-400 border-t border-surface-border pt-2">
         <span>Fee: <span className="font-semibold text-gray-700">₹{consultation.totalFee}</span></span>
-        {consultation.videoSession && (
-          <span className="badge badge-purple text-[10px]">📹 {consultation.videoSession.status}</span>
-        )}
       </div>
     </div>
   );

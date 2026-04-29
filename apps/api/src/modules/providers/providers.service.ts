@@ -341,7 +341,6 @@ export class ProvidersService {
         patient: true;
         consultationSummary: { include: { prescriptions: true } };
         diagnosticRequests: true;
-        videoSession: true;
       };
     }>,
   ) {
@@ -366,7 +365,6 @@ export class ProvidersService {
       diagnosis: booking.consultationSummary?.diagnosis ?? null,
       prescription: booking.consultationSummary?.prescriptions ?? [],
       labReports: booking.diagnosticRequests ?? [],
-      videoSession: booking.videoSession ?? null,
     };
   }
 
@@ -442,7 +440,6 @@ export class ProvidersService {
           patient: true,
           consultationSummary: { include: { prescriptions: true } },
           diagnosticRequests: true,
-          videoSession: true,
         },
         orderBy: { scheduledAt: 'desc' },
         take: 5,
@@ -475,7 +472,6 @@ export class ProvidersService {
         patient: true,
         consultationSummary: { include: { prescriptions: true } },
         diagnosticRequests: true,
-        videoSession: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
@@ -549,7 +545,6 @@ export class ProvidersService {
         patient: { include: { user: true } },
         serviceCategory: true,
         consultationSummary: { include: { prescriptions: true } },
-        videoSession: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
@@ -577,13 +572,6 @@ export class ProvidersService {
         symptoms: b.symptoms,
         totalFee: b.totalFee,
         serviceCategory: b.serviceCategory.name,
-        videoSession: b.videoSession
-          ? {
-              id: b.videoSession.id,
-              status: b.videoSession.status,
-              roomId: b.videoSession.roomId,
-            }
-          : null,
         summary: b.consultationSummary
           ? {
               diagnosis: b.consultationSummary.diagnosis,
@@ -664,19 +652,13 @@ export class ProvidersService {
       (normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
       !!serviceId;
 
-    const isVideoMode = mode === 'VIDEO_CONSULTATION';
-
     const providers = await this.prisma.providerProfile.findMany({
       where: {
         isAvailable: true,
         isActive: true,
         isVerified: true,
-        // For video consultations location is irrelevant — skip the
-        // lat/lng requirement so all available doctors are returned.
-        ...(!isVideoMode && {
-          currentLat: { not: null },
-          currentLng: { not: null },
-        }),
+        currentLat: { not: null },
+        currentLng: { not: null },
         ...(shouldApplyCategoryFilter && {
           OR: [
             ...(serviceId

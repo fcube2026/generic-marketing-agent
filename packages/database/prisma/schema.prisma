@@ -76,28 +76,26 @@ model PatientProfile {
 }
 
 model ProviderProfile {
-  id                               String   @id @default(cuid())
-  userId                           String   @unique
-  name                             String
-  bio                              String?
-  specialization                   String
-  contactInfo                      String   @default("")
-  clinicAddress                    String   @default("")
-  licenseNumber                    String?
-  isVerified                       Boolean  @default(false)
-  isActive                         Boolean  @default(true)
-  homeVisitEnabled                 Boolean  @default(false)
-  doctorPlaceVisitEnabled          Boolean  @default(false)
-  serviceRadius                    Float    @default(10)
-  consultationFeeHomeVisit         Float    @default(0)
-  consultationFeeDoctorPlace       Float    @default(0)
-  currentLat                       Float?
-  currentLng                       Float?
-  isAvailable                      Boolean  @default(false)
-  createdAt                        DateTime @default(now())
-  updatedAt                        DateTime @updatedAt
-  videoConsultationEnabled         Boolean  @default(false) // ✅ restore
-  consultationFeeVideoConsultation Float    @default(0)
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  name                       String
+  bio                        String?
+  specialization             String
+  contactInfo                String   @default("")
+  clinicAddress              String   @default("")
+  licenseNumber              String?
+  isVerified                 Boolean  @default(false)
+  isActive                   Boolean  @default(true)
+  homeVisitEnabled           Boolean  @default(false)
+  doctorPlaceVisitEnabled    Boolean  @default(false)
+  serviceRadius              Float    @default(10)
+  consultationFeeHomeVisit   Float    @default(0)
+  consultationFeeDoctorPlace Float    @default(0)
+  currentLat                 Float?
+  currentLng                 Float?
+  isAvailable                Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenses          ProviderLicense[]
@@ -247,7 +245,6 @@ model Booking {
   providerLocations    ProviderLocation[]
   referrals            Referral[]
   pharmacyOrders       PharmacyOrder[]
-  videoSession         VideoSession?
   clinicalIntake       ClinicalIntake?
   consentRecord        ConsentRecord?
   visitOtp             VisitOtp?
@@ -853,35 +850,6 @@ model doctor_onboarding_questionnaire {
   guidelines_agreement  String?
 
   @@map("doctor_onboarding_questionnaire")
-}
-
-enum VideoSessionStatus {
-  CREATED
-  WAITING
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  EXPIRED
-}
-
-model VideoSession {
-  id            String             @id @default(cuid())
-  bookingId     String?            @unique
-  roomId        String             @unique
-  sessionToken  String?
-  status        VideoSessionStatus @default(CREATED)
-  startedAt     DateTime?
-  endedAt       DateTime?
-  duration      Int?
-  creatorUserId String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  booking       Booking?           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  @@index([bookingId])
-  @@index([status])
-  @@index([creatorUserId])
-  @@map("video_sessions")
 }
 
 // =======================
