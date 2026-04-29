@@ -840,7 +840,7 @@ jobs:
             --non-interactive \
             --no-wait \
             --json \
-            2>/dev/null | tee /tmp/eas-build-output.json || true
+            2>/dev/null | tee /tmp/eas-build-output.json
 
           BUILD_ID=$(python3 -c "
           import sys, json
