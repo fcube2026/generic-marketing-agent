@@ -49,7 +49,7 @@ describe('TrackingController', () => {
         'provider-user-1',
         dto,
       );
-      expect(result).toHaveProperty('bookingId', 'booking-1');
+      expect(result).toMatchObject({ bookingId: 'booking-1' });
     });
   });
 

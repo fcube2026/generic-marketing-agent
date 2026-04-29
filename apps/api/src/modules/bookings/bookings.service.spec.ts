@@ -72,6 +72,7 @@ describe('BookingsService', () => {
     syncPatient: jest.fn().mockResolvedValue(undefined),
     syncProvider: jest.fn().mockResolvedValue(undefined),
     syncBooking: jest.fn().mockResolvedValue(undefined),
+    syncVideoSession: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -293,10 +294,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce({
-          ...booking,
-          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
-        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification
         .mockResolvedValueOnce(bookingWithRelations); // for acceptBooking notification
@@ -340,10 +338,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce({
-          ...booking,
-          provider: { id: 'provider-1', userId: 'user-1' },
-        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -383,10 +378,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce({
-          ...booking,
-          provider: { id: 'provider-1', userId: 'user-1' },
-        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -416,10 +408,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce({
-          ...booking,
-          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
-        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification (empty for DECLINED)
         .mockResolvedValueOnce(bookingWithRelations); // for declineBooking notification
@@ -459,10 +448,7 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
-        .mockResolvedValueOnce({
-          ...booking,
-          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
-        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ ...booking, provider: { userId: 'user-1' } }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -489,8 +475,8 @@ describe('BookingsService', () => {
           id: 'booking-1',
           status: 'ACCEPTED',
           provider: { userId: 'user-1' },
-        }) // for assertBookingProvider - passes
-        .mockResolvedValue({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus - throws BadRequestException
+        }) // for assertBookingProvider
+        .mockResolvedValueOnce({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus status check
 
       await expect(
         service.declineBooking('booking-1', 'user-1'),

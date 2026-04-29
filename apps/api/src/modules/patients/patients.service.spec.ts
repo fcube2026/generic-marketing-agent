@@ -33,6 +33,8 @@ describe('PatientsService', () => {
   const mockSupabaseSync = {
     syncPatient: jest.fn().mockResolvedValue(undefined),
     syncProvider: jest.fn().mockResolvedValue(undefined),
+    syncBooking: jest.fn().mockResolvedValue(undefined),
+    syncVideoSession: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {

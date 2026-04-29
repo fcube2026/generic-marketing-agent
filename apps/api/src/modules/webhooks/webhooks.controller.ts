@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -16,26 +16,23 @@ export class WebhooksController {
   constructor(private readonly videoWebhookService: VideoWebhookService) {}
 
   /**
-   * Receives mock (or real) video session lifecycle events and updates
+   * Receives video session lifecycle events and updates
    * VideoSession / Booking statuses accordingly.
    *
-   * In VIDEO_MOCK_MODE=true the endpoint accepts any well-formed payload
-   * without signature verification, allowing easy local testing.
-   *
-   * When VIDEO_MOCK_MODE is disabled (production), a real 100ms signature
-   * header can be verified inside VideoWebhookService.handleEvent without
-   * any change to this controller.
+   * This endpoint processes events emitted by external video infrastructure
+   * (e.g. a Jitsi Jicofo webhook or an internal session management service).
+   * Signature verification can be added inside VideoWebhookService.handleEvent
+   * without changing this controller.
    */
   @Public()
-  @Post('video-mock')
+  @Post('video-events')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Handle video session lifecycle event (mock mode)',
+    summary: 'Handle video session lifecycle event',
     description:
-      'Internal endpoint for simulating 100ms video session lifecycle events. ' +
+      'Endpoint for video session lifecycle events. ' +
       'Processes events such as session.started, session.ended, participant.joined, ' +
-      'and participant.left, updating VideoSession and Booking statuses accordingly. ' +
-      'In VIDEO_MOCK_MODE=true, signature verification is skipped.',
+      'and participant.left, updating VideoSession and Booking statuses accordingly.',
   })
   @ApiOkResponse({
     description: 'Event processed',
@@ -49,10 +46,7 @@ export class WebhooksController {
   @ApiNotFoundResponse({
     description: 'VideoSession not found for the given room_id or booking_id',
   })
-  handleVideoEvent(
-    @Body() event: VideoWebhookEventDto,
-    @Headers('x-100ms-signature') signature?: string,
-  ) {
-    return this.videoWebhookService.handleEvent(event, signature);
+  handleVideoEvent(@Body() event: VideoWebhookEventDto) {
+    return this.videoWebhookService.handleEvent(event);
   }
 }

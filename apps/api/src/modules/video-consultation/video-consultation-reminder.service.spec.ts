@@ -17,6 +17,7 @@ const mockQueue = {
 };
 
 const mockNotifications = {
+  createNotification: jest.fn().mockResolvedValue(undefined),
   sendNotification: jest.fn().mockResolvedValue(undefined),
 };
 

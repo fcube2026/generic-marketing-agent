@@ -245,8 +245,8 @@ export const VideoLobbyScreen: React.FC = () => {
       // 1. Notify backend that the session is starting
       await bookingService.startVideoSession(bookingId).catch(() => undefined);
 
-      // 2. Build the Jitsi URL
-      const { roomId } = await bookingService.getVideoToken(bookingId);
+      // 2. Get the secure Jitsi URL from the backend
+      const { jitsiUrl } = await bookingService.getVideoToken(bookingId);
       const isProvider = booking?.provider?.userId === currentUser?.id; 
       const displayName = isProvider ? 'Doctor' : 'Patient';
       
@@ -257,12 +257,12 @@ export const VideoLobbyScreen: React.FC = () => {
         audioOnly ? 'config.startAudioOnly=true' : 'config.startVideoMuted=false'
       ].join('&');
 
-      const jitsiUrl = `https://meet.jit.si/${roomId}#${config}`;
+      const fullUrl = `${jitsiUrl}#${config}`;
 
       // 3. Open in Browser
-      const supported = await Linking.canOpenURL(jitsiUrl);
+      const supported = await Linking.canOpenURL(fullUrl);
       if (supported) {
-        await Linking.openURL(jitsiUrl);
+        await Linking.openURL(fullUrl);
         setCallStartTime(Date.now());
         Alert.alert(
           audioOnly ? 'Audio Consultation Started' : 'Video Consultation Started',

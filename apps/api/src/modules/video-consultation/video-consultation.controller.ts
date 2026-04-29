@@ -33,14 +33,14 @@ export class VideoConsultationController {
   ) {}
 
   /**
-   * Create a 100ms video room for the given booking.
+   * Create a Jitsi video room for the given booking.
    * Only the patient or provider of the booking may call this endpoint.
    * The booking must be in ACCEPTED status.
    */
   @ApiOperation({
     summary: 'Create video room',
     description:
-      'Creates a 100ms video room for the booking and persists a VideoSession record. ' +
+      'Creates a secure Jitsi video room for the booking and persists a VideoSession record. ' +
       'Only the patient or provider of the booking may call this. ' +
       'The booking must be in ACCEPTED status. Idempotent — returns the existing session if already created.',
   })
@@ -62,14 +62,14 @@ export class VideoConsultationController {
   }
 
   /**
-   * Generate a short-lived join token for the given booking's video room.
+   * Generate Jitsi connection details for the given booking's video room.
    * Only the patient or provider of the booking may call this endpoint.
    * The room must already have been created via POST /:bookingId/create.
    */
   @ApiOperation({
-    summary: 'Generate video join token',
+    summary: 'Get Jitsi connection details',
     description:
-      'Generates a short-lived 100ms auth token so the caller can join the video room. ' +
+      'Returns the secure Jitsi meet URL so the caller can join the video room. ' +
       'Only the patient or provider of the booking may call this. ' +
       'The room must first be created via POST /video-sessions/:bookingId/create.',
   })
@@ -77,10 +77,10 @@ export class VideoConsultationController {
   @ApiQuery({
     name: 'role',
     required: false,
-    description: 'Override the default 100ms role (host/guest)',
+    description: 'Override the default participant role (host/guest)',
   })
   @ApiOkResponse({
-    description: 'Join token generated successfully',
+    description: 'Jitsi connection details returned successfully',
     type: GenerateTokenResponseDto,
   })
   @ApiForbiddenResponse({

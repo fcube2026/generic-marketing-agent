@@ -90,7 +90,7 @@ export const bookingService = {
     const r = await api.get(`/video-sessions/${bookingId}/token`, {
       params: role ? { role } : {},
     });
-    return r.data as { token: string; roomId: string; role: string };
+    return r.data as { jitsiUrl: string; roomId: string; role: string };
   },
 
   startVideoSession: async (bookingId: string) => {
