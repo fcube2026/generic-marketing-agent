@@ -1,4 +1,5 @@
 import React from 'react';
+import { Linking } from 'react-native';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { VideoLobbyScreen } from '../VideoLobbyScreen';
 
@@ -13,12 +14,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // ── expo-camera ───────────────────────────────────────────────────────────────
+// IMPORTANT: useCameraPermissions/useMicrophonePermissions must return
+// STABLE object references between renders, otherwise the VideoLobbyScreen
+// useEffect([cameraPermission, micPermissionResponse]) treats every render
+// as a dependency change, triggering an infinite re-render → OOM.
 jest.mock('expo-camera', () => {
   const { View } = require('react-native');
+  const perm = { granted: true, canAskAgain: true };
+  const reqCam = jest.fn().mockResolvedValue(perm);
+  const reqMic = jest.fn().mockResolvedValue(perm);
   return {
     CameraView: View,
-    useCameraPermissions: jest.fn(() => [{ granted: true }, jest.fn()]),
-    useMicrophonePermissions: jest.fn(() => [{ granted: true }, jest.fn()]),
+    useCameraPermissions: jest.fn(() => [perm, reqCam]),
+    useMicrophonePermissions: jest.fn(() => [perm, reqMic]),
     Camera: {
       requestCameraPermissionsAsync: jest.fn(() =>
         Promise.resolve({ status: 'granted' }),
@@ -36,14 +44,28 @@ jest.mock('expo-av', () => ({
   },
 }));
 
-// ── fetch (network check) ─────────────────────────────────────────────────────
-global.fetch = jest.fn(() => Promise.resolve({ ok: true } as Response));
+// ── api (network health check) ────────────────────────────────────────────────
+jest.mock('../../../services/api', () => ({
+  default: {
+    head: jest.fn(() => Promise.reject(new Error('no network in tests'))),
+  },
+}));
+
+// ── useAuthStore ──────────────────────────────────────────────────────────────
+jest.mock('../../../store/authStore', () => ({
+  useAuthStore: jest.fn((selector: (s: { user: { id: string } }) => unknown) =>
+    selector({ user: { id: 'user-patient-1' } }),
+  ),
+}));
 
 // ── bookingService ────────────────────────────────────────────────────────────
 jest.mock('../../../services/bookingService', () => ({
   bookingService: {
     getBookingById: jest.fn(),
     getVideoSession: jest.fn(),
+    startVideoSession: jest.fn(() => Promise.resolve()),
+    getVideoToken: jest.fn(() => Promise.resolve({ roomId: 'room-test-abc' })),
+    endVideoSession: jest.fn(() => Promise.resolve({ duration: 300 })),
   },
 }));
 
@@ -52,7 +74,7 @@ const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: mockGoBack, replace: jest.fn() }),
   useRoute: () => ({ params: { bookingId: 'booking-123' } }),
 }));
 
@@ -97,9 +119,11 @@ jest.mock('../../../components/booking/BookingStatusBadge', () => ({
 const BOOKING = {
   id: 'booking-123',
   status: 'ACCEPTED',
-  scheduledAt: '2026-05-01T10:00:00Z',
+  // Use a date firmly in the past so isFuture=false and isTimeReady=true on
+  // every test run, ensuring the join-button text doesn't depend on real time.
+  scheduledAt: '2020-01-15T10:00:00Z',
   totalFee: 500,
-  provider: { name: 'Dr. Smith' },
+  provider: { name: 'Dr. Smith', userId: 'user-provider-1' },
   serviceCategory: { name: 'General Consultation' },
 };
 
@@ -127,20 +151,24 @@ function setupQuery(booking: unknown, session: unknown, loading = false) {
 describe('VideoLobbyScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Re-establish Linking spies after clearAllMocks wipes call history.
+    jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   });
 
   it('shows loading spinner while data is fetching', () => {
     setupQuery(undefined, undefined, true);
     render(<VideoLobbyScreen />);
-    expect(screen.getByText('Preparing lobby...')).toBeTruthy();
+    expect(screen.getByText('Preparing Lobby...')).toBeTruthy();
   });
 
   it('renders pre-call check labels', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
-    expect(screen.getByText('Camera Permission')).toBeTruthy();
-    expect(screen.getByText('Microphone Permission')).toBeTruthy();
-    expect(screen.getByText('Network Connectivity')).toBeTruthy();
+    expect(screen.getByText('Camera')).toBeTruthy();
+    expect(screen.getByText('Microphone')).toBeTruthy();
+    expect(screen.getByText('Connection')).toBeTruthy();
   });
 
   it('renders booking details when available', () => {
@@ -151,99 +179,108 @@ describe('VideoLobbyScreen', () => {
     expect(screen.getByText(/Formatted/)).toBeTruthy();
   });
 
-  it('renders session status badge when session exists', () => {
+  it('renders the screen header title', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
-    expect(screen.getByText('📹 Session Status')).toBeTruthy();
-    expect(screen.getByText('⏳ Waiting')).toBeTruthy();
+    expect(screen.getByText('Video Consultation')).toBeTruthy();
   });
 
-  it('shows "no session" message when session is absent', () => {
+  it('shows "Start Session Now" when no active session exists', () => {
+    // Session is null; scheduledAt is in the past → isTimeReady=true, button
+    // is enabled and shows 'Start Session Now'.
     setupQuery(BOOKING, null);
     render(<VideoLobbyScreen />);
-    expect(
-      screen.getByText(/The video room will be ready once the provider sets up the session/),
-    ).toBeTruthy();
+    expect(screen.getByText('Start Session Now')).toBeTruthy();
   });
 
-  it('initially shows "Running checks…" on Join button', () => {
+  it('shows scheduled time label', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
-    expect(screen.getByText('⏳ Running checks…')).toBeTruthy();
+    expect(screen.getByText('📅 SCHEDULED TIME')).toBeTruthy();
   });
 
-  it('enables Join button after checks complete', async () => {
-    setupQuery(BOOKING, SESSION);
-    render(<VideoLobbyScreen />);
-
-    await waitFor(() => {
-      expect(screen.getByText('🎥 Join Call')).toBeTruthy();
-    });
-  });
-
-  it('navigates to VideoConsultation on join', async () => {
+  it('enables join button after permission checks complete', async () => {
+    // After useEffect runs and micPermission is set to true, canJoin becomes
+    // true with an active session and an ACCEPTED booking.
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('🎥 Join Call')).toBeTruthy();
+      expect(screen.getByText('Join Consultation Now')).toBeTruthy();
     });
-
-    fireEvent.press(screen.getByText('🎥 Join Call'));
-    expect(mockNavigate).toHaveBeenCalledWith('VideoConsultation', { bookingId: 'booking-123' });
   });
 
-  it('navigates back on Back button press', () => {
+  it('calls Linking.openURL with Jitsi URL on join', async () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
-    fireEvent.press(screen.getByText('← Back'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Join Consultation Now')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('Join Consultation Now'));
+      // Flush the async handleJoinCall promise chain
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      expect.stringContaining('https://meet.jit.si/'),
+    );
+  });
+
+  it('navigates back when ✕ button is pressed', () => {
+    setupQuery(BOOKING, SESSION);
+    render(<VideoLobbyScreen />);
+    // ✕ appears in the header back button AND in any 'denied' check circle;
+    // the header comes first in the render tree so index [0] is the back button.
+    fireEvent.press(screen.getAllByText('✕')[0]);
     expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
-  it('toggles mic off when mic button is pressed', () => {
+  it('toggles mic to muted when mic control is pressed', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
-    fireEvent.press(screen.getByText('Mic On'));
-    expect(screen.getByText('Mic Off')).toBeTruthy();
+    // Control emoji is '🎤' (no trailing text); overlay shows '🎤 Audio Live'
+    fireEvent.press(screen.getByText('🎤'));
+    expect(screen.getByText('🔇')).toBeTruthy();
   });
 
-  it('toggles camera off when camera button is pressed', () => {
+  it('toggles camera to off when camera control is pressed', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
-    fireEvent.press(screen.getByText('Cam On'));
-    expect(screen.getByText('Cam Off')).toBeTruthy();
+    fireEvent.press(screen.getByText('📷'));
+    expect(screen.getAllByText('📵').length).toBeGreaterThan(0);
   });
 
-  it('toggles mic back on after second press', () => {
+  it('toggles mic back to active after second press', () => {
     setupQuery(BOOKING, SESSION);
     render(<VideoLobbyScreen />);
 
-    fireEvent.press(screen.getByText('Mic On'));
-    fireEvent.press(screen.getByText('Mic Off'));
-    expect(screen.getByText('Mic On')).toBeTruthy();
+    fireEvent.press(screen.getByText('🎤'));
+    fireEvent.press(screen.getByText('🔇'));
+    expect(screen.getByText('🎤')).toBeTruthy();
   });
 
-  it('shows "Session Not Ready" when session status is terminal', async () => {
+  it('join button shows "Start Session Now" for a terminal session', async () => {
+    // COMPLETED session → sessionActive=false; scheduledAt in past → isTimeReady=true
+    // canJoin=true but button text 'Start Session Now' (no active session to join).
     const completedSession = { ...SESSION, status: 'COMPLETED' };
     setupQuery(BOOKING, completedSession);
     render(<VideoLobbyScreen />);
 
     await waitFor(() => {
-      expect(screen.getByText('🔒 Session Not Ready')).toBeTruthy();
+      expect(screen.getByText('Start Session Now')).toBeTruthy();
     });
   });
 
-  it('shows booking details section title', () => {
-    setupQuery(BOOKING, SESSION);
-    render(<VideoLobbyScreen />);
-    expect(screen.getByText('📋 Booking Details')).toBeTruthy();
-  });
-
-  it('shows "Booking details unavailable" when booking is null', () => {
+  it('shows error message when booking fails to load', () => {
     setupQuery(null, SESSION);
     render(<VideoLobbyScreen />);
-    expect(screen.getByText('Booking details unavailable')).toBeTruthy();
+    expect(screen.getByText(/Failed to load booking details/)).toBeTruthy();
   });
 });
