@@ -102,7 +102,8 @@ export class SupabaseSyncService {
     serviceRadius?: number;
   }): Promise<void> {
     if (!this.enabled || !this.client) return;
-    const phone = provider.phone ?? (await this.lookupUserPhone(provider.userId));
+    const phone =
+      provider.phone ?? (await this.lookupUserPhone(provider.userId));
     const row = {
       source_id: provider.id,
       user_id: provider.userId,
@@ -267,7 +268,8 @@ export class SupabaseSyncService {
         videoConsultationEnabled: provider.videoConsultationEnabled,
         consultationFeeHomeVisit: provider.consultationFeeHomeVisit,
         consultationFeeDoctorPlace: provider.consultationFeeDoctorPlace,
-        consultationFeeVideoConsultation: provider.consultationFeeVideoConsultation,
+        consultationFeeVideoConsultation:
+          provider.consultationFeeVideoConsultation,
         currentLat: provider.currentLat,
         currentLng: provider.currentLng,
         serviceRadius: provider.serviceRadius,

@@ -6,7 +6,11 @@ import { SupabaseSyncModule } from '../common/supabase/supabase-sync.module';
 import { SupabaseSyncService } from '../common/supabase/supabase-sync.service';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, SupabaseSyncModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    SupabaseSyncModule,
+  ],
 })
 class BackfillSupabaseSyncCliModule {}
 

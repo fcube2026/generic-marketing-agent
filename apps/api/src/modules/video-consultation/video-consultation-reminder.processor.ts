@@ -35,11 +35,11 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
 
     const deepLink = `/consultation/lobby/${bookingId}`;
     // Mobile navigation expects 'VideoLobby' screen name in data payload
-    const data = { 
+    const data = {
       type: 'VIDEO_CONSULTATION_REMINDER',
       bookingId,
       screen: 'VideoLobby',
-      deepLink 
+      deepLink,
     };
 
     const is5min = reminderType === '5min';
@@ -74,7 +74,9 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
         },
       );
     } catch (error) {
-      this.logger.error(`Failed to notify patient for booking ${bookingId}: ${error}`);
+      this.logger.error(
+        `Failed to notify patient for booking ${bookingId}: ${error}`,
+      );
     }
 
     try {
@@ -93,9 +95,13 @@ export class VideoConsultationReminderProcessor extends WorkerHost {
         },
       );
     } catch (error) {
-      this.logger.error(`Failed to notify provider for booking ${bookingId}: ${error}`);
+      this.logger.error(
+        `Failed to notify provider for booking ${bookingId}: ${error}`,
+      );
     }
 
-    this.logger.log(`Processed ${reminderType} reminder for booking ${bookingId}`);
+    this.logger.log(
+      `Processed ${reminderType} reminder for booking ${bookingId}`,
+    );
   }
 }

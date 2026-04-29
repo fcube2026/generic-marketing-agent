@@ -9,10 +9,14 @@ const prisma = new PrismaClient();
 async function main() {
   const id = 'cmo8on5nr000211ptf27s1sd3';
   const bookings = await prisma.booking.findMany({
-    where: { OR: [ { patient: { userId: id } }, { provider: { userId: id } } ] },
+    where: { OR: [{ patient: { userId: id } }, { provider: { userId: id } }] },
   });
-  const patientProfile = await prisma.patientProfile.findUnique({ where: { userId: id } });
-  const providerProfile = await prisma.providerProfile.findUnique({ where: { userId: id } });
+  const patientProfile = await prisma.patientProfile.findUnique({
+    where: { userId: id },
+  });
+  const providerProfile = await prisma.providerProfile.findUnique({
+    where: { userId: id },
+  });
 
   console.log('New User ID:', id);
   console.log('Bookings count:', bookings.length);
