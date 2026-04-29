@@ -70,11 +70,7 @@ export const IncomingBookingScreen: React.FC = () => {
         <Text style={styles.patientName}>{item.patient?.name || 'Patient'}</Text>
         <View style={[styles.modeBadge, item.mode === 'HOME_VISIT' ? styles.homeVisit : styles.clinicVisit]}>
           <Text style={styles.modeText}>
-            {item.mode === 'HOME_VISIT'
-              ? '🏠 Home Visit'
-              : item.mode === 'VIDEO_CONSULTATION'
-                ? '📹 Video Consultation'
-                : '🏥 Clinic Visit'}
+            {item.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}
           </Text>
         </View>
       </View>

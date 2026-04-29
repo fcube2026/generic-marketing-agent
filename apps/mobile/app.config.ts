@@ -38,7 +38,7 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     supportsTablet: true,
     bundleIdentifier: getBundleId(),
     infoPlist: {
-      NSCameraUsageDescription: 'Allow Curex24 to access your camera for video consultations and document upload.',
+      NSCameraUsageDescription: 'Allow Curex24 to access your camera for document upload.',
       NSPhotoLibraryUsageDescription: 'Allow Curex24 to access your photos for document upload.',
       NSPhotoLibraryAddUsageDescription: 'Allow Curex24 to save photos to your library.',
       UIBackgroundModes: ['remote-notification'],

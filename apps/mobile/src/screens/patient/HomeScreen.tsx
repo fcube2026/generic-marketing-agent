@@ -22,7 +22,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PatientStackParamList } from '../../navigation/PatientNavigator';
 import { useNavigation } from '@react-navigation/native';
 import { patientService } from '../../services/patientService';
-import { notificationService, Notification } from '../../services/notificationService';
 import { PatientProfile } from '../../types';
 import { pharmacyService } from '../../services/pharmacyService';
 
@@ -81,17 +80,6 @@ export const HomeScreen: React.FC = () => {
     staleTime: 0,
   });
 
-  const { data: notifications } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
-    enabled: isProfileComplete,
-    queryFn: notificationService.getNotifications,
-    refetchInterval: 5000, // Poll every 5 seconds for reminders
-  });
-
-  const latestReminder = (notifications || []).find(
-    n => !n.isRead && n.type === 'VIDEO_CONSULTATION_REMINDER'
-  );
-
   const { data: pharmacyOrders } = useQuery<PharmacyOrder[]>({
     queryKey: ['pharmacy-orders'],
     enabled: isProfileComplete,
@@ -112,18 +100,6 @@ export const HomeScreen: React.FC = () => {
 
   const handleServicePress = (category: ServiceCategory) => {
     navigation.navigate('SelectService', { category });
-  };
-
-  const activeVideoBookings = (recentBookings || []).filter(
-    (b: Booking) =>
-      b.mode === 'VIDEO_CONSULTATION' &&
-      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
-  );
-
-  const handleVideoConsultationPress = () => {
-    if (activeVideoBookings.length > 0) {
-      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-    }
   };
 
   if (profileLoading || (canUsePatientApp && isLoading)) {
@@ -151,25 +127,6 @@ export const HomeScreen: React.FC = () => {
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
       <VerificationBanner />
-
-      {latestReminder && (
-        <TouchableOpacity 
-          style={styles.reminderBanner}
-          onPress={() => {
-            notificationService.markAsRead(latestReminder.id);
-            queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            if (latestReminder.metadata?.bookingId) {
-              navigation.navigate('VideoLobby', { bookingId: latestReminder.metadata.bookingId });
-            }
-          }}
-        >
-          <View style={styles.reminderContent}>
-            <Text style={styles.reminderTitle}>{latestReminder.title}</Text>
-            <Text style={styles.reminderMessage}>{latestReminder.message}</Text>
-          </View>
-          <Text style={styles.reminderAction}>JOIN ➔</Text>
-        </TouchableOpacity>
-      )}
 
       {showRefillBanner && (
         <View style={styles.refillBanner}>
@@ -224,19 +181,6 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
-      {activeVideoBookings.length > 0 && (
-        <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-          <Text style={styles.videoCardIcon}>📹</Text>
-          <View style={styles.videoCardContent}>
-            <Text style={styles.videoCardTitle}>Resume Video Consultation</Text>
-            <Text style={styles.videoCardSub}>
-              {`${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`}
-            </Text>
-          </View>
-          <Text style={styles.videoCardArrow}>→</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Prescription Order Quick Access */}
       <TouchableOpacity
         style={styles.videoCard}
@@ -280,21 +224,14 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
           {recentBookings.slice(0, 3).map((booking: any) => {
-            const isVideo = booking.mode === 'VIDEO_CONSULTATION';
             return (
               <TouchableOpacity
                 key={booking.id}
                 style={styles.bookingItem}
-                onPress={() =>
-                  isVideo
-                    ? navigation.navigate('VideoLobby', { bookingId: booking.id })
-                    : navigation.navigate('Tracking', { bookingId: booking.id })
-                }
+                onPress={() => navigation.navigate('Tracking', { bookingId: booking.id })}
               >
                 <View>
-                  <Text style={styles.bookingProvider}>
-                    {isVideo ? '📹 ' : ''}{booking.provider?.name || 'Provider'}
-                  </Text>
+                  <Text style={styles.bookingProvider}>{booking.provider?.name || 'Provider'}</Text>
                   <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
                 </View>
                 <View>
@@ -415,46 +352,6 @@ const styles = StyleSheet.create({
   videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   videoCardArrow: { fontSize: 18, color: Colors.textMuted },
-  reminderBanner: {
-    backgroundColor: '#F59E0B',
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  reminderContent: {
-    flex: 1,
-  },
-  reminderTitle: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  reminderMessage: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  reminderAction: {
-    color: Colors.white,
-    fontWeight: '900',
-    fontSize: 14,
-    marginLeft: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
   refillBanner: {
     flexDirection: 'row',
     alignItems: 'center',

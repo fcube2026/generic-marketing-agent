@@ -37,7 +37,6 @@ interface RecentBooking {
 
 function formatBookingMode(mode: string): string {
   if (mode === 'HOME_VISIT') return '🏠 Home';
-  if (mode === 'VIDEO_CONSULTATION') return '🎥 Video';
   return '🏥 Clinic';
 }
 

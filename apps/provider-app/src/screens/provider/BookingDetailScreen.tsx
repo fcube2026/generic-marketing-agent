@@ -105,11 +105,6 @@ export const BookingDetailScreen: React.FC = () => {
   const currentStep = STATUS_ORDER.indexOf(booking.status);
 
   const getNextAction = () => {
-    if (booking.mode === 'VIDEO_CONSULTATION') {
-      if (booking.status === 'ACCEPTED' || booking.status === 'IN_PROGRESS') {
-        return { label: '🎥 Go to Video Session', nav: 'VideoConsultation' as const };
-      }
-    }
     switch (booking.status) {
       case 'ACCEPTED': return { label: '🚗 Start Journey', next: 'ON_THE_WAY' };
       case 'ON_THE_WAY': return { label: '📍 Mark Arrived', next: 'ARRIVED' };
@@ -152,7 +147,7 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.infoText}>Name: {booking.patient?.name || 'Patient'}</Text>
           <Text style={styles.infoText}>Phone: {booking.patient?.phone ? `+91 ****${booking.patient.phone.slice(-4)}` : '—'}</Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
-          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '📹 Video Consultation' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
         </View>
 
@@ -211,9 +206,7 @@ export const BookingDetailScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
             onPress={() => {
-              if ('nav' in nextAction && nextAction.nav === 'VideoConsultation') {
-                navigation.navigate('VideoConsultation', { bookingId });
-              } else if ('next' in nextAction) {
+              if ('next' in nextAction) {
                 updateStatus(nextAction.next);
               }
             }}

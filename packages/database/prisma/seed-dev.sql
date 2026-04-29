@@ -15,22 +15,22 @@ ON CONFLICT (phone) DO UPDATE SET role = 'PROVIDER', "updatedAt" = NOW();
 INSERT INTO provider_profiles (
   id, "userId", name, specialization, "contactInfo", "clinicAddress",
   "isVerified", "isActive", "isAvailable",
-  "homeVisitEnabled", "doctorPlaceVisitEnabled", "videoConsultationEnabled",
-  "consultationFeeVideoConsultation", "consultationFeeHomeVisit", "consultationFeeDoctorPlace",
+  "homeVisitEnabled", "doctorPlaceVisitEnabled",
+  "consultationFeeHomeVisit", "consultationFeeDoctorPlace",
   "currentLat", "currentLng", "serviceRadius",
   "createdAt", "updatedAt"
 ) VALUES
   ('demo-prov-1', 'demo-user-1', 'Dr. Asha Verma',  'General Medicine', '+919000000001', 'Connaught Place, New Delhi',
-   true, true, true, true, true, true, 300, 700, 400, 28.6139, 77.2090, 25, NOW(), NOW()),
+   true, true, true, true, true, 700, 400, 28.6139, 77.2090, 25, NOW(), NOW()),
   ('demo-prov-2', 'demo-user-2', 'Dr. Rohan Mehta', 'Pediatrics',       '+919000000002', 'Karol Bagh, New Delhi',
-   true, true, true, true, true, true, 350, 800, 450, 28.6519, 77.1909, 20, NOW(), NOW()),
+   true, true, true, true, true, 800, 450, 28.6519, 77.1909, 20, NOW(), NOW()),
   ('demo-prov-3', 'demo-user-3', 'Dr. Priya Singh', 'Dermatology',      '+919000000003', 'Saket, New Delhi',
-   true, true, true, true, true, true, 400, 900, 500, 28.5245, 77.2066, 30, NOW(), NOW()),
+   true, true, true, true, true, 900, 500, 28.5245, 77.2066, 30, NOW(), NOW()),
   ('demo-prov-4', 'demo-user-4', 'Dr. Arjun Kapoor','Physiotherapy',    '+919000000004', 'Dwarka, New Delhi',
-   true, true, true, true, true, true, 250, 600, 350, 28.5921, 77.0460, 25, NOW(), NOW())
+   true, true, true, true, true, 600, 350, 28.5921, 77.0460, 25, NOW(), NOW())
 ON CONFLICT ("userId") DO UPDATE SET
   "isVerified" = true, "isActive" = true, "isAvailable" = true,
-  "homeVisitEnabled" = true, "doctorPlaceVisitEnabled" = true, "videoConsultationEnabled" = true,
+  "homeVisitEnabled" = true, "doctorPlaceVisitEnabled" = true,
   "currentLat" = EXCLUDED."currentLat", "currentLng" = EXCLUDED."currentLng",
   "serviceRadius" = EXCLUDED."serviceRadius",
   "updatedAt" = NOW();

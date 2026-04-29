@@ -10,7 +10,6 @@ import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge'
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { providerService } from '../../services/providerService';
 import { bookingService } from '../../services/bookingService';
-import { notificationService, Notification } from '../../services/notificationService';
 import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 import { formatCurrency } from '../../utils/format';
 import { getCurrentLocation } from '../../utils/location';
@@ -33,17 +32,6 @@ export const HomeScreen: React.FC = () => {
     refetchInterval: 15000,
   });
 
-  const { data: notifications } = useQuery<Notification[]>({
-    queryKey: ['notifications'],
-    enabled: !!profile,
-    queryFn: notificationService.getNotifications,
-    refetchInterval: 5000, // Poll every 5 seconds for reminders
-  });
-
-  const latestReminder = (notifications || []).find(
-    n => !n.isRead && n.type === 'VIDEO_CONSULTATION_REMINDER'
-  );
-
   const availabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
       const location = isAvailable ? await getCurrentLocation() : null;
@@ -65,23 +53,6 @@ export const HomeScreen: React.FC = () => {
     .filter((b) => b.status === 'COMPLETED' || b.status === 'CLOSED')
     .reduce((sum, b) => sum + b.totalFee * 0.8, 0);
 
-  const activeVideoBookings = (bookings || []).filter(
-    (b) =>
-      b.mode === 'VIDEO_CONSULTATION' &&
-      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
-  );
-
-  const handleVideoConsultationPress = () => {
-    if (activeVideoBookings.length > 0) {
-      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-    } else {
-      Alert.alert(
-        'Video Consultations',
-        'You have no active video bookings. Accept a video consultation booking to start a session.',
-      );
-    }
-  };
-
   if (profileLoading) return <LoadingSpinner fullScreen />;
 
   if (!profile) {
@@ -102,24 +73,6 @@ export const HomeScreen: React.FC = () => {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
     >
-      {latestReminder && (
-        <TouchableOpacity
-          style={styles.reminderBanner}
-          onPress={() => {
-            notificationService.markAsRead(latestReminder.id);
-            queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            if (latestReminder.metadata?.bookingId) {
-              navigation.navigate('VideoLobby', { bookingId: latestReminder.metadata.bookingId });
-            }
-          }}
-        >
-          <View style={styles.reminderContent}>
-            <Text style={styles.reminderTitle}>{latestReminder.title}</Text>
-            <Text style={styles.reminderMessage}>{latestReminder.message}</Text>
-          </View>
-          <Text style={styles.reminderAction}>JOIN ➔</Text>
-        </TouchableOpacity>
-      )}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Welcome back,</Text>
@@ -148,7 +101,6 @@ export const HomeScreen: React.FC = () => {
             >
               <View style={styles.bookingAlertContent}>
                 <Text style={styles.bookingAlertPatient}>
-                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : '🏠 '}
                   {booking.patient?.name || 'Patient'}
                 </Text>
                 <Text style={styles.bookingAlertService}>{booking.serviceCategory?.name}</Text>
@@ -191,20 +143,6 @@ export const HomeScreen: React.FC = () => {
         </Card>
       </View>
 
-      {/* Video Consultation Quick Access */}
-      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultations</Text>
-          <Text style={styles.videoCardSub}>
-            {activeVideoBookings.length > 0
-              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'View your video consultation bookings'}
-          </Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
-
       {todayBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
@@ -216,7 +154,6 @@ export const HomeScreen: React.FC = () => {
             >
               <View style={styles.bookingItemLeft}>
                 <Text style={styles.bookingPatient}>
-                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
                   {booking.patient?.name || 'Patient'}
                 </Text>
                 <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
@@ -271,71 +208,10 @@ const styles = StyleSheet.create({
   bookingItemLeft: {},
   bookingPatient: { fontSize: 15, fontWeight: '600', color: Colors.text },
   bookingService: { fontSize: 13, color: Colors.textMuted },
-  videoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-  },
-  videoCardIcon: { fontSize: 28, marginRight: 14 },
-  videoCardContent: { flex: 1 },
-  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
   onboardingPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: Colors.background },
   onboardingIcon: { fontSize: 72, marginBottom: 20 },
   onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },
   onboardingSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 22 },
   onboardingBtn: { backgroundColor: Colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
   onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
-  reminderBanner: {
-    backgroundColor: '#F59E0B',
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#F59E0B',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  reminderContent: {
-    flex: 1,
-  },
-  reminderTitle: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  reminderMessage: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  reminderAction: {
-    color: Colors.white,
-    fontWeight: '900',
-    fontSize: 14,
-    marginLeft: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
 });

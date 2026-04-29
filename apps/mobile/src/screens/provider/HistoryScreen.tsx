@@ -61,11 +61,7 @@ export const HistoryScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.bookingCard}
         onPress={() => {
-          if (item.mode === 'VIDEO_CONSULTATION') {
-            navigation.navigate('VideoLobby', { bookingId: item.id });
-          } else {
-            navigation.navigate('BookingDetail', { bookingId: item.id });
-          }
+          navigation.navigate('BookingDetail', { bookingId: item.id });
         }}
         activeOpacity={0.7}
       >
@@ -89,7 +85,7 @@ export const HistoryScreen: React.FC = () => {
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Mode</Text>
             <Text style={styles.metaValue}>
-              {item.mode === 'HOME_VISIT' ? '🏠 Home' : item.mode === 'VIDEO_CONSULTATION' ? '🎥 Video' : '🏥 Clinic'}
+              {item.mode === 'HOME_VISIT' ? '🏠 Home' : '🏥 Clinic'}
             </Text>
           </View>
           <View style={styles.metaItem}>

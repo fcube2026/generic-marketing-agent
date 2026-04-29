@@ -9,7 +9,6 @@ export enum Role {
 export enum BookingMode {
   HOME_VISIT = 'HOME_VISIT',
   DOCTOR_PLACE = 'DOCTOR_PLACE',
-  VIDEO_CONSULTATION = 'VIDEO_CONSULTATION',
 }
 
 export enum BookingStatus {

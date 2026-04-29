@@ -57,18 +57,14 @@ export const HistoryScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.item}
               onPress={() => {
-                if (item.mode === 'VIDEO_CONSULTATION') {
-                  navigation.navigate('VideoLobby', { bookingId: item.id });
-                } else {
-                  navigation.navigate('Tracking', { bookingId: item.id });
-                }
+                navigation.navigate('Tracking', { bookingId: item.id });
               }}
             >
               <View style={styles.itemHeader}>
                 <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
                 <BookingStatusBadge status={item.status as BookingStatus} />
               </View>
-              <Text style={styles.service}>{item.serviceCategory?.name}{item.mode === 'VIDEO_CONSULTATION' ? ' 🎥' : ''}</Text>
+              <Text style={styles.service}>{item.serviceCategory?.name}</Text>
               <View style={styles.itemFooter}>
                 <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
                 <PaymentStatusBadge status={item.paymentStatus as PaymentStatus} />

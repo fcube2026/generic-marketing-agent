@@ -20,7 +20,7 @@ const DEMO_PROVIDERS = [
     clinicAddress: 'Connaught Place, New Delhi',
     lat: 28.6139,
     lng: 77.209,
-    fees: { video: 300, home: 700, clinic: 400 },
+    fees: { home: 700, clinic: 400 },
     radius: 25,
   },
   {
@@ -30,7 +30,7 @@ const DEMO_PROVIDERS = [
     clinicAddress: 'Karol Bagh, New Delhi',
     lat: 28.6519,
     lng: 77.1909,
-    fees: { video: 350, home: 800, clinic: 450 },
+    fees: { home: 800, clinic: 450 },
     radius: 20,
   },
   {
@@ -40,7 +40,7 @@ const DEMO_PROVIDERS = [
     clinicAddress: 'Saket, New Delhi',
     lat: 28.5245,
     lng: 77.2066,
-    fees: { video: 400, home: 900, clinic: 500 },
+    fees: { home: 900, clinic: 500 },
     radius: 30,
   },
   {
@@ -50,7 +50,7 @@ const DEMO_PROVIDERS = [
     clinicAddress: 'Dwarka, New Delhi',
     lat: 28.5921,
     lng: 77.046,
-    fees: { video: 250, home: 600, clinic: 350 },
+    fees: { home: 600, clinic: 350 },
     radius: 25,
   },
 ];
@@ -82,8 +82,6 @@ async function main() {
         isAvailable: true,
         homeVisitEnabled: true,
         doctorPlaceVisitEnabled: true,
-        videoConsultationEnabled: true,
-        consultationFeeVideoConsultation: p.fees.video,
         consultationFeeHomeVisit: p.fees.home,
         consultationFeeDoctorPlace: p.fees.clinic,
         currentLat: p.lat,
@@ -101,8 +99,6 @@ async function main() {
         isAvailable: true,
         homeVisitEnabled: true,
         doctorPlaceVisitEnabled: true,
-        videoConsultationEnabled: true,
-        consultationFeeVideoConsultation: p.fees.video,
         consultationFeeHomeVisit: p.fees.home,
         consultationFeeDoctorPlace: p.fees.clinic,
         currentLat: p.lat,

@@ -4,7 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * Mirrors core Prisma writes (patients, providers, bookings, video sessions)
+ * Mirrors core Prisma writes (patients, providers, bookings)
  * to the Supabase Postgres tables defined in supabase/migrations/.
  *
  * - All operations are best-effort: errors are logged but never thrown so
@@ -93,10 +93,8 @@ export class SupabaseSyncService {
     isAvailable?: boolean;
     homeVisitEnabled?: boolean;
     doctorPlaceVisitEnabled?: boolean;
-    videoConsultationEnabled?: boolean;
     consultationFeeHomeVisit?: number;
     consultationFeeDoctorPlace?: number;
-    consultationFeeVideoConsultation?: number;
     currentLat?: number | null;
     currentLng?: number | null;
     serviceRadius?: number;
@@ -117,10 +115,8 @@ export class SupabaseSyncService {
       is_available: !!provider.isAvailable,
       home_visit_enabled: !!provider.homeVisitEnabled,
       doctor_place_visit_enabled: !!provider.doctorPlaceVisitEnabled,
-      video_consultation_enabled: !!provider.videoConsultationEnabled,
       consultation_fee_home_visit: provider.consultationFeeHomeVisit ?? 0,
       consultation_fee_doctor_place: provider.consultationFeeDoctorPlace ?? 0,
-      consultation_fee_video: provider.consultationFeeVideoConsultation ?? 0,
       current_lat: provider.currentLat ?? null,
       current_lng: provider.currentLng ?? null,
       service_radius: provider.serviceRadius ?? 10,
@@ -177,47 +173,12 @@ export class SupabaseSyncService {
     }
   }
 
-  // ------------------------------------------------------------- video session
-  async syncVideoSession(session: {
-    id: string;
-    bookingId?: string | null;
-    roomId: string;
-    sessionToken?: string | null;
-    status: string;
-    startedAt?: Date | null;
-    endedAt?: Date | null;
-    duration?: number | null;
-    creatorUserId?: string | null;
-  }): Promise<void> {
-    if (!this.enabled || !this.client) return;
-    const row = {
-      source_id: session.id,
-      booking_source_id: session.bookingId ?? null,
-      room_id: session.roomId,
-      session_token: session.sessionToken ?? null,
-      status: session.status,
-      started_at: session.startedAt ? session.startedAt.toISOString() : null,
-      ended_at: session.endedAt ? session.endedAt.toISOString() : null,
-      duration: session.duration ?? null,
-      creator_user_id: session.creatorUserId ?? null,
-    };
-    const { error } = await this.client
-      .from('video_sessions')
-      .upsert(row, { onConflict: 'source_id' });
-    if (error) {
-      this.logger.warn(
-        `syncVideoSession(${session.id}) failed: [${error.code}] ${error.message}${
-          error.details ? ` - ${error.details}` : ''
-        }`,
-      );
-    }
-  }
+  // ------------------------------------------------------------- video session removed
 
   async backfillCoreData(): Promise<{
     patients: number;
     providers: number;
     bookings: number;
-    videoSessions: number;
   }> {
     if (!this.enabled || !this.client) {
       throw new Error(
@@ -225,7 +186,7 @@ export class SupabaseSyncService {
       );
     }
 
-    const [patients, providers, bookings, videoSessions] = await Promise.all([
+    const [patients, providers, bookings] = await Promise.all([
       this.prisma.patientProfile.findMany({
         include: { user: { select: { phone: true, email: true } } },
         orderBy: { createdAt: 'asc' },
@@ -235,7 +196,6 @@ export class SupabaseSyncService {
         orderBy: { createdAt: 'asc' },
       }),
       this.prisma.booking.findMany({ orderBy: { createdAt: 'asc' } }),
-      this.prisma.videoSession.findMany({ orderBy: { createdAt: 'asc' } }),
     ]);
 
     for (const patient of patients) {
@@ -265,11 +225,8 @@ export class SupabaseSyncService {
         isAvailable: provider.isAvailable,
         homeVisitEnabled: provider.homeVisitEnabled,
         doctorPlaceVisitEnabled: provider.doctorPlaceVisitEnabled,
-        videoConsultationEnabled: provider.videoConsultationEnabled,
         consultationFeeHomeVisit: provider.consultationFeeHomeVisit,
         consultationFeeDoctorPlace: provider.consultationFeeDoctorPlace,
-        consultationFeeVideoConsultation:
-          provider.consultationFeeVideoConsultation,
         currentLat: provider.currentLat,
         currentLng: provider.currentLng,
         serviceRadius: provider.serviceRadius,
@@ -280,15 +237,10 @@ export class SupabaseSyncService {
       await this.syncBooking(booking);
     }
 
-    for (const session of videoSessions) {
-      await this.syncVideoSession(session);
-    }
-
     return {
       patients: patients.length,
       providers: providers.length,
       bookings: bookings.length,
-      videoSessions: videoSessions.length,
     };
   }
 
