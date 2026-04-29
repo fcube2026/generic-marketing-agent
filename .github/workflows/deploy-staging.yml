@@ -781,3 +781,103 @@ jobs:
           echo "**Includes:** Video consultation screens (patient + provider), VideoLobbyScreen" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> Install the latest staging build from EAS then open the app to receive this update." >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────
+  # Trigger a new native EAS build for Android (staging profile)
+  # Produces a downloadable APK via EAS Build service.
+  # ────────────────────────────────────────────────────────────
+  eas-build-android-staging:
+    name: EAS Build → Android APK (staging profile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, test]
+    permissions:
+      contents: read
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check if EXPO_TOKEN is configured
+        id: check-secrets
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "⚠️ EXPO_TOKEN not configured — skipping EAS build"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.check-secrets.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install EAS CLI
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: pnpm add -g eas-cli
+
+      - name: Queue EAS build (staging profile, Android APK)
+        if: steps.check-secrets.outputs.skip != 'true'
+        id: eas-build
+        run: |
+          cd apps/mobile
+          eas build \
+            --profile staging \
+            --platform android \
+            --non-interactive \
+            --no-wait \
+            --json \
+            2>/dev/null | tee /tmp/eas-build-output.json || true
+
+          BUILD_ID=$(python3 -c "
+          import sys, json
+          try:
+            data = json.load(open('/tmp/eas-build-output.json'))
+            builds = data if isinstance(data, list) else [data]
+            print(builds[0]['id'])
+          except Exception:
+            print('')
+          " 2>/dev/null || echo "")
+
+          if [ -n "$BUILD_ID" ]; then
+            echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+            echo "build_url=https://expo.dev/accounts/curex24/projects/curex24/builds/$BUILD_ID" >> $GITHUB_OUTPUT
+          else
+            echo "build_url=https://expo.dev/accounts/curex24/projects/curex24/builds" >> $GITHUB_OUTPUT
+          fi
+        env:
+          APP_ENV: staging
+          EXPO_PUBLIC_API_URL: https://api.staging.curex24.com/api/v1
+          EXPO_PUBLIC_SUPABASE_URL: https://ksmufpryzrozpqdejlwa.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbXVmcHJ5enJvenBxZGVqbHdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MjM2NzQsImV4cCI6MjA5MTQ5OTY3NH0.3-9mv7NkaL3J5b1kmC6SJRX-U6MQONkpuI_SoyDa3TU
+
+      - name: EAS build staging summary
+        if: steps.check-secrets.outputs.skip != 'true'
+        run: |
+          echo "## 📱 EAS Build Queued — Android APK (staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Profile | \`staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Android APK |" >> $GITHUB_STEP_SUMMARY
+          echo "| Distribution | internal |" >> $GITHUB_STEP_SUMMARY
+          echo "| Channel | \`staging\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build URL | ${{ steps.eas-build.outputs.build_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Install APK:** Once the build completes on EAS (~10–20 min), download the APK from the Build URL above." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Includes:** Video consultation screens — patient VideoConsultationScreen, provider VideoConsultationScreen, VideoLobbyScreen" >> $GITHUB_STEP_SUMMARY
