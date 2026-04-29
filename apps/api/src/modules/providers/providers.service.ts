@@ -441,6 +441,8 @@ export class ProvidersService {
           consultationSummary: { include: { prescriptions: true } },
           diagnosticRequests: true,
         },
+        orderBy: { scheduledAt: 'desc' },
+        take: 5,
       }),
     ]);
 
