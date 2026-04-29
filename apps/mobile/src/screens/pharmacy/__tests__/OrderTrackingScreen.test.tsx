@@ -13,6 +13,13 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// Use fake timers so that Animated timers (from the Timeline component) do not
+// fire after each test's environment is torn down, causing spurious
+// "Jest environment already torn down" ReferenceErrors.
+// We skip faking setInterval so that @tanstack/react-query can use its
+// internal polling/GC intervals without interference.
+jest.useFakeTimers({ doNotFake: ['setInterval', 'clearInterval'] });
+
 const mockUseRoute = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
@@ -82,6 +89,14 @@ describe('OrderTrackingScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseRoute.mockReturnValue({ params: { orderId: 'order-1' } });
+  });
+
+  afterEach(() => {
+    // Flush and clear all pending timers (e.g. Animated callbacks) so they
+    // don't fire after the test environment is torn down.
+    act(() => {
+      jest.runAllTimers();
+    });
   });
 
   it('renders the loading state while the order is being fetched', async () => {

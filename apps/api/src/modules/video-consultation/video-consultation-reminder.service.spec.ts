@@ -5,6 +5,7 @@ import {
 } from './video-consultation-reminder.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { REMINDER_QUEUE } from '../../common/queue/queue.module';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockJob = {
   remove: jest.fn().mockResolvedValue(undefined),
@@ -13,6 +14,10 @@ const mockJob = {
 const mockQueue = {
   add: jest.fn().mockResolvedValue({ id: 'job-1' }),
   getJob: jest.fn(),
+};
+
+const mockNotifications = {
+  sendNotification: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('VideoConsultationReminderService', () => {
@@ -25,6 +30,10 @@ describe('VideoConsultationReminderService', () => {
         {
           provide: getQueueToken(REMINDER_QUEUE),
           useValue: mockQueue,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotifications,
         },
       ],
     }).compile();
@@ -121,7 +130,10 @@ describe('VideoConsultationReminderService', () => {
 
     it('should not add jobs when queue is unavailable', async () => {
       const moduleNoQueue: TestingModule = await Test.createTestingModule({
-        providers: [VideoConsultationReminderService],
+        providers: [
+          VideoConsultationReminderService,
+          { provide: NotificationsService, useValue: mockNotifications },
+        ],
       }).compile();
 
       const serviceNoQueue =
@@ -182,7 +194,10 @@ describe('VideoConsultationReminderService', () => {
 
     it('should do nothing when queue is unavailable', async () => {
       const moduleNoQueue: TestingModule = await Test.createTestingModule({
-        providers: [VideoConsultationReminderService],
+        providers: [
+          VideoConsultationReminderService,
+          { provide: NotificationsService, useValue: mockNotifications },
+        ],
       }).compile();
 
       const serviceNoQueue =

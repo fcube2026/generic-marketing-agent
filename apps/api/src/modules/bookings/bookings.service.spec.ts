@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
 import { PatientVerificationService } from '../patient-verification/patient-verification.service';
 import { ConfigService } from '@nestjs/config';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
 describe('BookingsService', () => {
   let service: BookingsService;
@@ -67,6 +68,12 @@ describe('BookingsService', () => {
     }),
   };
 
+  const mockSupabaseSync = {
+    syncPatient: jest.fn().mockResolvedValue(undefined),
+    syncProvider: jest.fn().mockResolvedValue(undefined),
+    syncBooking: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,6 +89,7 @@ describe('BookingsService', () => {
           useValue: mockPatientVerification,
         },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: SupabaseSyncService, useValue: mockSupabaseSync },
       ],
     }).compile();
 
@@ -285,6 +293,10 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          ...booking,
+          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
+        }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification
         .mockResolvedValueOnce(bookingWithRelations); // for acceptBooking notification
@@ -328,6 +340,10 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          ...booking,
+          provider: { id: 'provider-1', userId: 'user-1' },
+        }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -367,6 +383,10 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          ...booking,
+          provider: { id: 'provider-1', userId: 'user-1' },
+        }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -396,6 +416,10 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          ...booking,
+          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
+        }) // for assertBookingProvider
         .mockResolvedValueOnce(booking) // for updateBookingStatus status check
         .mockResolvedValueOnce(bookingWithRelations) // for updateBookingStatus notification (empty for DECLINED)
         .mockResolvedValueOnce(bookingWithRelations); // for declineBooking notification
@@ -435,6 +459,10 @@ describe('BookingsService', () => {
       };
 
       mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          ...booking,
+          provider: { id: 'provider-1', userId: 'user-1', name: 'Dr. Smith' },
+        }) // for assertBookingProvider
         .mockResolvedValueOnce(booking)
         .mockResolvedValueOnce(bookingWithRelations)
         .mockResolvedValueOnce(bookingWithRelations);
@@ -456,10 +484,13 @@ describe('BookingsService', () => {
     });
 
     it('should throw if booking is not in REQUESTED status', async () => {
-      mockPrisma.booking.findUnique.mockResolvedValue({
-        id: 'booking-1',
-        status: 'ACCEPTED',
-      });
+      mockPrisma.booking.findUnique
+        .mockResolvedValueOnce({
+          id: 'booking-1',
+          status: 'ACCEPTED',
+          provider: { userId: 'user-1' },
+        }) // for assertBookingProvider - passes
+        .mockResolvedValue({ id: 'booking-1', status: 'ACCEPTED' }); // for updateBookingStatus - throws BadRequestException
 
       await expect(
         service.declineBooking('booking-1', 'user-1'),
