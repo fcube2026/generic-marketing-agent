@@ -152,17 +152,11 @@ function setupQuery(booking: unknown, session: unknown, loading = false) {
 
 describe('VideoLobbyScreen', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     jest.clearAllMocks();
 
     // Re-establish Linking spies after clearAllMocks wipes call history.
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
   });
 
   it('shows loading spinner while data is fetching', () => {

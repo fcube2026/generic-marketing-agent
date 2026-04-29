@@ -88,16 +88,16 @@ const baseOrder: PharmacyOrder = {
 
 describe('OrderTrackingScreen', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
+    jest.useFakeTimers({ doNotFake: ['setInterval', 'clearInterval'] });
     jest.clearAllMocks();
     mockUseRoute.mockReturnValue({ params: { orderId: 'order-1' } });
   });
 
   afterEach(() => {
-    // Flush and clear all pending timers (e.g. Animated callbacks) so they
-    // don't fire after the test environment is torn down.
+    // Clear all pending timers (e.g. Animated callbacks) so they don't fire
+    // after the test environment is torn down.
     act(() => {
-      jest.runAllTimers();
+      jest.clearAllTimers();
     });
   });
 
