@@ -125,6 +125,10 @@ export const VideoLobbyScreen: React.FC = () => {
     });
 
     return () => {
+      fadeAnim.stopAnimation();
+      slideAnim.stopAnimation();
+      cameraAnim.stopAnimation();
+      micBars.forEach(bar => bar.stopAnimation());
       cameraLoop.stop();
       micLoops.forEach((loop) => loop.stop());
     };
