@@ -1,9 +1,10 @@
 module.exports = {
   preset: 'jest-expo',
   rootDir: __dirname,
-  // Limit parallelism so the Jest worker pool doesn't exhaust the ~2 GB
-  // heap available on GitHub Actions (ubuntu-latest) runners.
-  maxWorkers: 2,
+  // Run only one worker at a time. The VideoLobbyScreen suite alone peaks at
+  // ~2 GB; with 2 concurrent workers the combined footprint triggers the OOM
+  // killer on the 7 GB GitHub Actions ubuntu-latest runner.
+  maxWorkers: 1,
   workerIdleMemoryLimit: '512MB',
   setupFilesAfterEnv: ['@testing-library/react-native/extend-expect'],
   transformIgnorePatterns: [
