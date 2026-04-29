@@ -1,10 +1,11 @@
 module.exports = {
   preset: 'jest-expo',
   rootDir: __dirname,
-  // Run only one worker at a time. The VideoLobbyScreen suite alone peaks at
-  // ~2 GB; with 2 concurrent workers the combined footprint triggers the OOM
-  // killer on the 7 GB GitHub Actions ubuntu-latest runner.
-  maxWorkers: 1,
+  // The real-timer Animated.loop callbacks from VideoLobbyScreen once caused
+  // an OOM at maxWorkers:2. That root cause (unstable useCameraPermissions
+  // mock references → infinite re-render loop) is now fixed in the test file,
+  // so 2 workers is safe again for faster local and CI runs.
+  maxWorkers: 2,
   workerIdleMemoryLimit: '512MB',
   setupFilesAfterEnv: ['@testing-library/react-native/extend-expect'],
   transformIgnorePatterns: [
