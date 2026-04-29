@@ -16,8 +16,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Use fake timers so that Animated timers (from the Timeline component) do not
 // fire after each test's environment is torn down, causing spurious
 // "Jest environment already torn down" ReferenceErrors.
-// We skip faking setInterval so that @tanstack/react-query can use its
-// internal polling/GC intervals without interference.
+// We skip faking setInterval/clearInterval (as a pair) so that
+// @tanstack/react-query can use its internal polling/GC intervals without
+// interference.
 jest.useFakeTimers({ doNotFake: ['setInterval', 'clearInterval'] });
 
 const mockUseRoute = jest.fn();
