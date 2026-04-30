@@ -44,6 +44,7 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const isHomeVisit = booking?.mode === 'HOME_VISIT';
   const isDoctorPlace = booking?.mode === 'DOCTOR_PLACE';
+  const isVideoConsultation = booking?.mode === 'VIDEO_CONSULTATION';
   const isTrackable =
     isHomeVisit &&
     !!booking?.status &&
@@ -271,6 +272,14 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
         />
       )}
 
+      {isVideoConsultation && (booking.status === 'ACCEPTED' || booking.status === 'IN_PROGRESS') && (
+        <Button
+          title="📹 Join Video Call"
+          onPress={() => navigation.navigate('VideoLobby', { bookingId })}
+          style={styles.videoBtn}
+        />
+      )}
+
       {booking.status === 'DECLINED' && (
         <Card style={styles.errorCard}>
           <Text style={styles.errorCardTitle}>Booking Declined</Text>
@@ -343,6 +352,7 @@ const styles = StyleSheet.create({
   providerSpec: { fontSize: 14, color: Colors.textMuted },
   addressText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
   summaryBtn: { marginHorizontal: 16, marginBottom: 12 },
+  videoBtn: { marginHorizontal: 16, marginBottom: 12 },
   cancelBtn: { marginHorizontal: 16, marginBottom: 16 },
   errorCard: { marginHorizontal: 16, marginBottom: 12, backgroundColor: '#FEE2E2' },
   errorCardTitle: { fontSize: 16, fontWeight: '700', color: Colors.error, marginBottom: 4 },

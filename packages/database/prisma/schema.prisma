@@ -261,6 +261,7 @@ model Booking {
   clinicalIntake       ClinicalIntake?
   consentRecord        ConsentRecord?
   visitOtp             VisitOtp?
+  videoSession         VideoSession?
 
   @@index([patientId])
   @@index([providerId])
@@ -708,6 +709,34 @@ enum LicenseStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum VideoSessionStatus {
+  CREATED
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model VideoSession {
+  id           String             @id @default(cuid())
+  bookingId    String             @unique
+  roomId       String             @unique
+  sessionToken String?
+  status       VideoSessionStatus @default(CREATED)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  duration     Int?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("video_sessions")
 }
 
 // =======================

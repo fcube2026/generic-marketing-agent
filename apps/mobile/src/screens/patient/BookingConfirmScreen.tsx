@@ -21,6 +21,7 @@ type Props = {
 const MODE_LABELS: Record<string, string> = {
   HOME_VISIT: '🏠 Home Visit',
   DOCTOR_PLACE: '🏥 Clinic Visit',
+  VIDEO_CONSULTATION: '📹 Video Consultation',
 };
 
 const getModeLabel = (mode: string) => MODE_LABELS[mode] ?? mode;

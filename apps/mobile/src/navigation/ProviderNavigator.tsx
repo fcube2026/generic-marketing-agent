@@ -15,6 +15,7 @@ import { ProfileScreen } from '../screens/provider/ProfileScreen';
 import { SafetyChecklistScreen } from '../screens/provider/SafetyChecklistScreen';
 import { VisitOtpScreen } from '../screens/provider/VisitOtpScreen';
 import { Colors } from '../constants/colors';
+import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 
 export type ProviderStackParamList = {
   Tabs: undefined;
@@ -26,6 +27,7 @@ export type ProviderStackParamList = {
   VisitOtp: { bookingId: string };
   ConsultationForm: { bookingId: string };
   Kyc: undefined;
+  VideoLobby: { bookingId: string };
 };
 
 const Stack = createNativeStackNavigator<ProviderStackParamList>();
@@ -62,5 +64,6 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="VisitOtp" component={VisitOtpScreen} options={{ title: 'Visit Verification' }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
+    <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Consultation' }} />
   </Stack.Navigator>
 );
