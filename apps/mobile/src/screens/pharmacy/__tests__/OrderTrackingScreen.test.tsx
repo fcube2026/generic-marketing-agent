@@ -10,7 +10,7 @@
  * and mock pharmacyService + navigation only.
  */
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react-native';
+import { render, screen, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Use fake timers so that Animated timers (from the Timeline component) do not
@@ -129,9 +129,12 @@ describe('OrderTrackingScreen', () => {
     await act(async () => {
       jest.runOnlyPendingTimers();
     });
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading your order/i)).toBeNull();
-    });
+    // Assert synchronously: act() guarantees all queued React work is committed
+    // before it returns, so we can assert without waitFor. Using waitFor here
+    // would call jest.advanceTimersByTime(50) in a loop, which cascades
+    // infinitely through Animated.spring's rAF-as-setTimeout(0) callbacks and
+    // causes a flaky 5 s Jest timeout in CI under load.
+    expect(screen.queryByText(/Loading your order/i)).toBeNull();
   });
 
   it('renders the timeline and order details for a placed order', async () => {
