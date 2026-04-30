@@ -105,8 +105,9 @@ export class NmcApiProvider {
 
     const data = (await response.json()) as Record<string, unknown>;
 
-    console.log('=== SUREPASS RESPONSE ===');
-    console.log(JSON.stringify(data, null, 2));
+    this.logger.debug(
+      `=== SUREPASS RESPONSE ===\n${JSON.stringify(data, null, 2)}`,
+    );
 
     if (!response.ok) {
       this.logger.warn(
@@ -128,7 +129,9 @@ export class NmcApiProvider {
         // expects registration_number and registration_year as payload keys.
         return {
           registration_number: req.memberId,
-          registration_year: req.yearOfAdmission,
+          ...(req.yearOfAdmission
+            ? { registration_year: req.yearOfAdmission }
+            : {}),
         };
       case 'decentro':
         return {
