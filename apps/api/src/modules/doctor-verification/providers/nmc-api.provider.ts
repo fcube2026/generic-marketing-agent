@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { sanitizeHeaderValue } from './sanitize-header-value';
+
 export interface NmcVerificationRequest {
   memberId: string;
   stateCouncil: string;
@@ -41,8 +43,8 @@ export class NmcApiProvider {
 
   constructor(private config: ConfigService) {
     this.provider = config.get<string>('NMC_API_PROVIDER', 'mock');
-    this.apiUrl = config.get<string>('NMC_API_URL');
-    this.apiKey = config.get<string>('NMC_API_KEY');
+    this.apiUrl = sanitizeHeaderValue(config.get<string>('NMC_API_URL'));
+    this.apiKey = sanitizeHeaderValue(config.get<string>('NMC_API_KEY'));
   }
 
   async verify(req: NmcVerificationRequest): Promise<NmcVerificationResult> {

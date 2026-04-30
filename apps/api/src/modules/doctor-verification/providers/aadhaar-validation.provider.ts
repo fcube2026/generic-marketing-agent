@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { sanitizeHeaderValue } from './sanitize-header-value';
+
 export interface AadhaarValidationResult {
   valid: boolean;
   aadhaarNumber?: string;
@@ -32,8 +34,8 @@ export class AadhaarValidationProvider {
 
   constructor(private config: ConfigService) {
     this.provider = config.get<string>('AADHAAR_API_PROVIDER', 'mock');
-    this.apiUrl = config.get<string>('AADHAAR_API_URL');
-    this.apiKey = config.get<string>('AADHAAR_API_KEY');
+    this.apiUrl = sanitizeHeaderValue(config.get<string>('AADHAAR_API_URL'));
+    this.apiKey = sanitizeHeaderValue(config.get<string>('AADHAAR_API_KEY'));
   }
 
   async validate(aadhaarNumber: string): Promise<AadhaarValidationResult> {
