@@ -110,14 +110,15 @@ export default function Sidebar() {
     >
       {/* Brand header */}
       <div className="px-5 py-5 border-b border-surface-border bg-gradient-to-br from-primary-dark to-primary">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center overflow-hidden p-1">
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 rounded-lg bg-white/10 px-2 py-1.5">
             <Image
               src="/curex-logo.png"
               alt="Curex24 logo"
-              width={36}
-              height={36}
-              className="h-full w-full object-contain"
+              width={116}
+              height={44}
+              className="h-8 w-auto object-contain"
+              unoptimized
               priority
             />
           </div>
