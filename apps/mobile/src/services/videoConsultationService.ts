@@ -15,4 +15,18 @@ export const videoConsultationService = {
     const r = await api.get<VideoToken>(`/video-sessions/${bookingId}/token`);
     return r.data;
   },
+
+  /**
+   * Marks the video session as IN_PROGRESS (call started).
+   */
+  startSession: async (bookingId: string): Promise<void> => {
+    await api.patch(`/video-sessions/${bookingId}/status`, { status: 'IN_PROGRESS' });
+  },
+
+  /**
+   * Marks the video session as COMPLETED (call ended).
+   */
+  endSession: async (bookingId: string): Promise<void> => {
+    await api.patch(`/video-sessions/${bookingId}/status`, { status: 'COMPLETED' });
+  },
 };
