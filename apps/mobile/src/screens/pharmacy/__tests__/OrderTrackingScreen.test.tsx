@@ -119,9 +119,9 @@ describe('OrderTrackingScreen', () => {
     });
     // React Query v5 schedules state-update notifications via setTimeout(0).
     // With fake timers active those callbacks are never fired automatically, so
-    // we must flush them (and any Animated frame timers) inside act so that
-    // React commits the loaded state before the waitFor assertion runs.
-    act(() => {
+    // we must flush them (and any Animated frame timers) inside an *async* act
+    // so that React commits the loaded state before the waitFor assertion runs.
+    await act(async () => {
       jest.runAllTimers();
     });
     await waitFor(() => {
