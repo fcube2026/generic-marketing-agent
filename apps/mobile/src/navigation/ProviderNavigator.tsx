@@ -14,6 +14,7 @@ import { EarningsScreen } from '../screens/provider/EarningsScreen';
 import { ProfileScreen } from '../screens/provider/ProfileScreen';
 import { SafetyChecklistScreen } from '../screens/provider/SafetyChecklistScreen';
 import { VisitOtpScreen } from '../screens/provider/VisitOtpScreen';
+import { VideoConsultationsScreen } from '../screens/provider/VideoConsultationsScreen';
 import { Colors } from '../constants/colors';
 import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 
@@ -27,6 +28,7 @@ export type ProviderStackParamList = {
   VisitOtp: { bookingId: string };
   ConsultationForm: { bookingId: string };
   Kyc: undefined;
+  VideoConsultations: undefined;
   VideoLobby: { bookingId: string };
 };
 
@@ -64,6 +66,7 @@ export const ProviderNavigator: React.FC = () => (
     <Stack.Screen name="VisitOtp" component={VisitOtpScreen} options={{ title: 'Visit Verification' }} />
     <Stack.Screen name="ConsultationForm" component={ConsultationFormScreen} options={{ title: 'Consultation Summary' }} />
     <Stack.Screen name="Kyc" component={KycScreen} options={{ title: 'KYC Verification' }} />
+    <Stack.Screen name="VideoConsultations" component={VideoConsultationsScreen} options={{ title: 'Video Consultations' }} />
     <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Consultation' }} />
   </Stack.Navigator>
 );

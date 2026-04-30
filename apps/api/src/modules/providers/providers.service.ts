@@ -650,6 +650,26 @@ export class ProvidersService {
     });
   }
 
+  async getActiveVideoConsultations(userId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    return this.prisma.booking.findMany({
+      where: {
+        providerId: profile.id,
+        mode: 'VIDEO_CONSULTATION',
+        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      include: {
+        patient: true,
+        serviceCategory: true,
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
+
   async getNearbyProviders(
     lat: number | null,
     lng: number | null,

@@ -163,6 +163,19 @@ export const HomeScreen: React.FC = () => {
           ))}
         </View>
       )}
+
+      {/* Video Consultations Quick Access */}
+      <TouchableOpacity
+        style={styles.videoCard}
+        onPress={() => navigation.navigate('VideoConsultations')}
+      >
+        <Text style={styles.videoCardIcon}>📹</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Video Consultations</Text>
+          <Text style={styles.videoCardSub}>View active video consultation bookings</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -214,4 +227,26 @@ const styles = StyleSheet.create({
   onboardingSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 22 },
   onboardingBtn: { backgroundColor: Colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
   onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
+  videoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563EB',
+  },
+  videoCardIcon: { fontSize: 28, marginRight: 14 },
+  videoCardContent: { flex: 1 },
+  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
 });

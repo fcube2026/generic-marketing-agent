@@ -86,6 +86,11 @@ export class ProvidersController {
     return this.providersService.getIncomingRequests(user.id);
   }
 
+  @Get('me/video-consultations')
+  getActiveVideoConsultations(@CurrentUser() user: any) {
+    return this.providersService.getActiveVideoConsultations(user.id);
+  }
+
   @Public()
   @Get('nearby')
   getNearbyProviders(@Query() query: SearchNearbyProvidersDto) {

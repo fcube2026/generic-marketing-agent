@@ -21,11 +21,18 @@ type Props = {
   route: RouteProp<PatientStackParamList, 'Tracking'>;
 };
 
-const STATUS_STEPS: BookingStatus[] = [
+const STATUS_STEPS_PHYSICAL: BookingStatus[] = [
   'REQUESTED',
   'ACCEPTED',
   'ON_THE_WAY',
   'ARRIVED',
+  'IN_PROGRESS',
+  'COMPLETED',
+];
+
+const STATUS_STEPS_VIDEO: BookingStatus[] = [
+  'REQUESTED',
+  'ACCEPTED',
   'IN_PROGRESS',
   'COMPLETED',
 ];
@@ -45,6 +52,7 @@ export const TrackingScreen: React.FC<Props> = ({ navigation, route }) => {
   const isHomeVisit = booking?.mode === 'HOME_VISIT';
   const isDoctorPlace = booking?.mode === 'DOCTOR_PLACE';
   const isVideoConsultation = booking?.mode === 'VIDEO_CONSULTATION';
+  const STATUS_STEPS = isVideoConsultation ? STATUS_STEPS_VIDEO : STATUS_STEPS_PHYSICAL;
   const isTrackable =
     isHomeVisit &&
     !!booking?.status &&

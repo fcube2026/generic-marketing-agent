@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
@@ -184,15 +183,7 @@ export const HomeScreen: React.FC = () => {
       {/* Video Consultation Quick Access */}
       <TouchableOpacity
         style={[styles.videoCard, styles.videoCardHighlight]}
-        onPress={() => {
-          const videoCategory: ServiceCategory = {
-            id: 'video-consultation',
-            name: 'Video Consultation',
-            slug: 'video-consultation',
-            description: 'Consult a doctor online from anywhere',
-          };
-          navigation.navigate('SelectService', { category: videoCategory });
-        }}
+        onPress={() => navigation.navigate('VideoConsultations')}
       >
         <Text style={styles.videoCardIcon}>📹</Text>
         <View style={styles.videoCardContent}>
