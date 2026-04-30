@@ -115,13 +115,11 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
         fee: provider.consultationFeeDoctorPlace,
       });
     }
-    if (provider.videoConsultationEnabled) {
-      modes.push({
-        label: `📹 Video Consultation — ${formatCurrency(provider.consultationFeeVideoConsultation)}`,
-        mode: 'VIDEO_CONSULTATION',
-        fee: provider.consultationFeeVideoConsultation,
-      });
-    }
+    modes.push({
+      label: `📹 Video Consultation — ${formatCurrency(provider.consultationFeeVideoConsultation)}`,
+      mode: 'VIDEO_CONSULTATION',
+      fee: provider.consultationFeeVideoConsultation,
+    });
 
     if (modes.length === 0) return;
 

@@ -181,6 +181,19 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Video Consultation Quick Access */}
+      <TouchableOpacity
+        style={[styles.videoCard, styles.videoCardHighlight]}
+        onPress={() => navigation.navigate('SelectService', { category: { id: 'video', name: 'Video Consultation', slug: 'video-consultation', description: 'Consult a doctor online from anywhere' } as any })}
+      >
+        <Text style={styles.videoCardIcon}>📹</Text>
+        <View style={styles.videoCardContent}>
+          <Text style={styles.videoCardTitle}>Video Consultation</Text>
+          <Text style={styles.videoCardSub}>Consult a doctor online from anywhere</Text>
+        </View>
+        <Text style={styles.videoCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {/* Prescription Order Quick Access */}
       <TouchableOpacity
         style={styles.videoCard}
@@ -346,6 +359,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     borderLeftWidth: 4,
     borderLeftColor: Colors.primary,
+  },
+  videoCardHighlight: {
+    borderLeftColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
   },
   videoCardIcon: { fontSize: 28, marginRight: 14 },
   videoCardContent: { flex: 1 },
