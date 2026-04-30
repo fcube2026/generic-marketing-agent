@@ -59,7 +59,7 @@ export default function EarningsPage() {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <p className="text-sm text-gray-500">Last Payout</p>
-          <p className="text-3xl font-bold text-green-600 mt-2">
+          <p className="text-3xl font-bold text-primary mt-2">
             {formatCurrency(summary?.lastPayout ?? 0)}
           </p>
           {summary?.lastPayoutDate && (
