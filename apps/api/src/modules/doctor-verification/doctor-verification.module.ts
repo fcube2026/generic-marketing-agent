@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { DoctorVerificationController } from './doctor-verification.controller';
 import { NmcApiProvider } from './providers/nmc-api.provider';
-import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
 import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,7 +11,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [
     DoctorVerificationService,
     NmcApiProvider,
-    SmcScraperProvider,
     FaceVerificationProvider,
     AadhaarValidationProvider,
   ],

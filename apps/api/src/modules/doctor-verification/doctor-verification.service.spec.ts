@@ -3,7 +3,6 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
-import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
 import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -41,10 +40,6 @@ describe('DoctorVerificationService', () => {
 
   const mockNmcProvider = {
     verify: jest.fn(),
-  };
-
-  const mockSmcProvider = {
-    verify: jest.fn().mockResolvedValue({ found: false }),
   };
 
   const mockFaceProvider = {
@@ -85,7 +80,6 @@ describe('DoctorVerificationService', () => {
         DoctorVerificationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NmcApiProvider, useValue: mockNmcProvider },
-        { provide: SmcScraperProvider, useValue: mockSmcProvider },
         { provide: FaceVerificationProvider, useValue: mockFaceProvider },
         { provide: AadhaarValidationProvider, useValue: mockAadhaarProvider },
         { provide: NotificationsService, useValue: mockNotificationsService },
@@ -272,12 +266,11 @@ describe('DoctorVerificationService', () => {
       mockPrisma.providerLicense.findUnique.mockResolvedValue(mockLicense);
 
       mockNmcProvider.verify.mockRejectedValue(new Error('API timeout'));
-      mockSmcProvider.verify.mockResolvedValue({ found: false });
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       const result = await service.submitForVerification('user-1', dto);
 
-      // Pipeline gracefully degrades: NMC API error → SMC not found → NOT_FOUND status
+      // Pipeline gracefully degrades: Surepass API error → NOT_FOUND status
       expect(result.status).toBe('NOT_FOUND');
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
