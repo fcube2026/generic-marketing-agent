@@ -179,4 +179,28 @@ export class PatientsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async getActiveVideoConsultations(userId: string) {
+    const patientProfile = await this.prisma.patientProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!patientProfile) {
+      return [];
+    }
+
+    return this.prisma.booking.findMany({
+      where: {
+        patientId: patientProfile.id,
+        mode: 'VIDEO_CONSULTATION',
+        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      include: {
+        provider: true,
+        serviceCategory: true,
+        payment: true,
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
 }

@@ -69,4 +69,9 @@ export class PatientsController {
   getMyBookings(@CurrentUser() user: any) {
     return this.patientsService.getMyBookings(user.id);
   }
+
+  @Get('me/video-consultations')
+  getActiveVideoConsultations(@CurrentUser() user: any) {
+    return this.patientsService.getActiveVideoConsultations(user.id);
+  }
 }

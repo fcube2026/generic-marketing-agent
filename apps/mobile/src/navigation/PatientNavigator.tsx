@@ -24,6 +24,7 @@ import { PatientKycAadhaarScreen } from '../screens/patient/kyc/PatientKycAadhaa
 import { PatientKycFaceCaptureScreen } from '../screens/patient/kyc/PatientKycFaceCaptureScreen';
 import { PatientKycGuardianScreen } from '../screens/patient/kyc/PatientKycGuardianScreen';
 import { PatientKycReviewScreen } from '../screens/patient/kyc/PatientKycReviewScreen';
+import { VideoConsultationsScreen } from '../screens/patient/VideoConsultationsScreen';
 import { MedicineSearchScreen } from '../screens/pharmacy/MedicineSearchScreen';
 import { MedicineDetailScreen } from '../screens/pharmacy/MedicineDetailScreen';
 import { PrescriptionOrderScreen } from '../screens/pharmacy/PrescriptionOrderScreen';
@@ -57,6 +58,7 @@ export type PatientStackParamList = {
   Payment: { bookingId: string; amount: number };
   Tracking: { bookingId: string };
   ConsultationSummary: { bookingId: string };
+  VideoConsultations: undefined;
   MedicineSearch: undefined;
   MedicineDetail: { medicine: MedicineResult; pincode?: string };
   PrescriptionOrder:
@@ -118,6 +120,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
     <Stack.Screen name="Tracking" component={TrackingScreen} options={{ title: 'Track Provider' }} />
     <Stack.Screen name="ConsultationSummary" component={ConsultationSummaryScreen} options={{ title: 'Consultation Summary' }} />
+    <Stack.Screen name="VideoConsultations" component={VideoConsultationsScreen} options={{ title: 'Video Consultations' }} />
     <Stack.Screen name="MedicineSearch" component={MedicineSearchScreen} options={{ title: 'Order Medicines' }} />
     <Stack.Screen name="MedicineDetail" component={MedicineDetailScreen} options={{ title: 'Medicine Details' }} />
     <Stack.Screen name="PrescriptionOrder" component={PrescriptionOrderScreen} options={{ title: 'Prescription Order' }} />

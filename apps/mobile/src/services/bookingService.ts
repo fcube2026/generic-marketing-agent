@@ -24,6 +24,18 @@ export const bookingService = {
     return r.data;
   },
 
+  // Patient: fetch active video consultation bookings
+  getActiveVideoConsultations: async () => {
+    const r = await api.get('/patients/me/video-consultations');
+    return r.data;
+  },
+
+  // Provider: fetch active video consultation bookings
+  getProviderActiveVideoConsultations: async () => {
+    const r = await api.get('/providers/me/video-consultations');
+    return r.data;
+  },
+
   createBooking: async (data: {
     providerId: string;
     serviceCategoryId: string;
