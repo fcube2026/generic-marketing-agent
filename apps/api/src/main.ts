@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -29,21 +29,43 @@ async function bootstrap() {
   );
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // Error handler for body-parser errors (e.g., malformed JSON)
-  // Must come AFTER the body parsers to catch their errors
-  app.use((err: any, req: Request, res: any, next: (err?: any) => void) => {
-    if (err instanceof SyntaxError && 'body' in err) {
-      return res.status(400).json({
-        success: false,
-        statusCode: 400,
-        message: 'Invalid JSON in request body',
-        error: 'Bad Request',
-        timestamp: new Date().toISOString(),
-        path: req.url,
-      });
-    }
-    next(err);
-  });
+  // Error handler for body-parser errors (e.g., malformed JSON, payload too large).
+  // Must come AFTER the body parsers to catch their errors.
+  // All body-parser errors carry an HTTP `status` code; handling them here
+  // ensures the client always receives a well-formed JSON response instead of
+  // an empty connection-close (which happens when Express's default finalhandler
+  // tries to write a response after headers are already partially flushed).
+  app.use(
+    (err: any, req: Request, res: Response, next: (err?: any) => void) => {
+      // Malformed JSON — body-parser sets both `SyntaxError` type and a `body`
+      // property containing the raw input that failed to parse.
+      if (err instanceof SyntaxError && 'body' in err) {
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message: 'Invalid JSON in request body',
+          error: 'Bad Request',
+          timestamp: new Date().toISOString(),
+          path: req.url,
+        });
+      }
+
+      // Other body-parser errors: 413 Payload Too Large, 415 Unsupported Media
+      // Type, etc.  body-parser stamps these with a numeric `status` field.
+      if (typeof err.status === 'number') {
+        return res.status(err.status).json({
+          success: false,
+          statusCode: err.status,
+          message: err.message || 'Request parsing error',
+          error: err.type || 'Error',
+          timestamp: new Date().toISOString(),
+          path: req.url,
+        });
+      }
+
+      next(err);
+    },
+  );
 
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
