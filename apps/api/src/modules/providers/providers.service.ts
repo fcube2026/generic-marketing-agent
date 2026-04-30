@@ -725,44 +725,57 @@ export class ProvidersService {
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),
         ...(mode === 'DOCTOR_PLACE' && { doctorPlaceVisitEnabled: true }),
-        ...(mode === 'VIDEO_CONSULTATION' && {
-          videoConsultationEnabled: true,
-        }),
       },
       include: {
         providerServices: { include: { serviceCategory: true } },
         user: true,
+        bookings: {
+          where: {
+            status: {
+              in: ['ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'],
+            },
+          },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
 
-    // For video consultations, distance is irrelevant — return all enabled providers.
-    if (isVideoMode) {
-      return providers.map((p) => ({ ...p, distance: 0 }));
-    }
+    const results = providers.map((p) => {
+      const isOccupied = p.bookings.length > 0;
+      // Remove bookings from the response object to keep it clean
+      const { bookings: _bookings, ...profile } = p;
 
-    const withDistance = providers
-      .map((provider) => {
-        if (provider.currentLat == null || provider.currentLng == null)
-          return null;
-        const distance = haversineDistance(
-          lat,
-          lng,
-          provider.currentLat,
-          provider.currentLng,
-        );
-        const effectiveServiceRadius =
-          typeof provider.serviceRadius === 'number' &&
-          provider.serviceRadius > 0
-            ? provider.serviceRadius
-            : 10;
+      if (isVideoMode) {
+        return { ...profile, distance: 0, isOccupied };
+      }
 
-        return { ...provider, distance, serviceRadius: effectiveServiceRadius };
-      })
-      .filter(Boolean)
-      .filter((p: any) => p.distance <= p.serviceRadius)
-      .sort((a: any, b: any) => a.distance - b.distance);
+      if (profile.currentLat == null || profile.currentLng == null) return null;
 
-    return withDistance;
+      const distance = haversineDistance(
+        lat,
+        lng,
+        profile.currentLat,
+        profile.currentLng,
+      );
+
+      const effectiveServiceRadius =
+        typeof profile.serviceRadius === 'number' && profile.serviceRadius > 0
+          ? profile.serviceRadius
+          : 10;
+
+      if (distance > effectiveServiceRadius) return null;
+
+      return { ...profile, distance, isOccupied };
+    });
+
+    return results.filter(Boolean).sort((a: any, b: any) => {
+      // Sort by availability first, then distance
+      if (a.isOccupied !== b.isOccupied) {
+        return a.isOccupied ? 1 : -1;
+      }
+      return a.distance - b.distance;
+    });
   }
 
   async uploadKycDocument(userId: string, dto: UploadKycDocumentDto) {
