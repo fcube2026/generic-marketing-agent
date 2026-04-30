@@ -29,6 +29,22 @@ async function bootstrap() {
   );
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
+  // Error handler for body-parser errors (e.g., malformed JSON)
+  // Must come AFTER the body parsers to catch their errors
+  app.use((err: any, req: Request, res: any, next: (err?: any) => void) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+      return res.status(400).json({
+        success: false,
+        statusCode: 400,
+        message: 'Invalid JSON in request body',
+        error: 'Bad Request',
+        timestamp: new Date().toISOString(),
+        path: req.url,
+      });
+    }
+    next(err);
+  });
+
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : ['*'];
