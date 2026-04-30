@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProvidersService } from './providers.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 
 describe('ProvidersService', () => {
   let service: ProvidersService;
@@ -40,12 +41,20 @@ describe('ProvidersService', () => {
     syncBooking: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockPrescriptionStorage = {
+    resolveReadUrl: jest.fn().mockResolvedValue(null),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProvidersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SupabaseSyncService, useValue: mockSupabaseSync },
+        {
+          provide: PrescriptionStorageService,
+          useValue: mockPrescriptionStorage,
+        },
       ],
     }).compile();
 
