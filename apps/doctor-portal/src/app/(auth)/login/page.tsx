@@ -92,6 +92,7 @@ export default function LoginPage() {
             width={168}
             height={68}
             className="h-16 w-auto object-contain"
+            unoptimized
             priority
           />
           <div className="text-left">

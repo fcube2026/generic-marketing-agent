@@ -118,6 +118,7 @@ export default function Sidebar() {
               width={116}
               height={44}
               className="h-8 w-auto object-contain"
+              unoptimized
               priority
             />
           </div>
