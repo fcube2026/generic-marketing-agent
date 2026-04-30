@@ -188,8 +188,8 @@ export default function DashboardPage() {
         </div>
         {USE_SEED && (
           <span className="badge badge-teal gap-1.5 text-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal inline-block animate-pulse" />
-            Seed Data — Testing Mode
+            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-pulse" />
+            Live Data
           </span>
         )}
       </div>

@@ -287,8 +287,8 @@ export default function ConsultationDetailPage() {
             </div>
           )}
           {consultation.summary.followUp && (
-            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-              <p className="text-sm text-blue-800 font-medium">Follow-up: {consultation.summary.followUp}</p>
+            <div className="flex items-center gap-2 p-3 bg-primary-lighter border border-surface-border rounded-lg">
+              <p className="text-sm text-navy font-medium">Follow-up: {consultation.summary.followUp}</p>
             </div>
           )}
         </div>

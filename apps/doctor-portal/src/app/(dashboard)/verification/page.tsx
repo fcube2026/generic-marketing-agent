@@ -470,8 +470,8 @@ export default function VerificationPage() {
                 DigiLocker Document Access
               </h2>
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-blue-800">
+            <div className="bg-primary-lighter border border-surface-border rounded-lg p-4 mb-6">
+              <p className="text-sm text-navy">
                 We would like to securely access your documents from DigiLocker
                 to verify your credentials. This is optional — you may skip this
                 step and we will use only the documents you uploaded.
