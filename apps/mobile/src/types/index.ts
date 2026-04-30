@@ -1,5 +1,5 @@
 export type Role = 'PATIENT' | 'PROVIDER' | 'ADMIN';
-export type BookingMode = 'HOME_VISIT' | 'DOCTOR_PLACE';
+export type BookingMode = 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION';
 export type BookingStatus =
   | 'REQUESTED'
   | 'ACCEPTED'
@@ -38,8 +38,10 @@ export interface ProviderProfile {
   isAvailable: boolean;
   homeVisitEnabled: boolean;
   doctorPlaceVisitEnabled: boolean;
+  videoConsultationEnabled: boolean;
   consultationFeeHomeVisit: number;
   consultationFeeDoctorPlace: number;
+  consultationFeeVideoConsultation: number;
   currentLat?: number;
   currentLng?: number;
   serviceRadius: number;

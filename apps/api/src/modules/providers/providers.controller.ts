@@ -89,12 +89,15 @@ export class ProvidersController {
   @Public()
   @Get('nearby')
   getNearbyProviders(@Query() query: SearchNearbyProvidersDto) {
-    if (query.lat == null || query.lng == null) {
+    if (
+      query.mode !== 'VIDEO_CONSULTATION' &&
+      (query.lat == null || query.lng == null)
+    ) {
       throw new BadRequestException('lat and lng are required');
     }
     return this.providersService.getNearbyProviders(
-      query.lat ?? 0,
-      query.lng ?? 0,
+      query.lat ?? null,
+      query.lng ?? null,
       query.serviceCategory,
       query.mode,
       query.serviceId,

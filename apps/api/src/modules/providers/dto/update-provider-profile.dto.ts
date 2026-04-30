@@ -38,6 +38,15 @@ export class UpdateProviderProfileDto {
   doctorPlaceVisitEnabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  videoConsultationEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Consultation fee must not be negative' })
+  consultationFeeVideoConsultation?: number;
+
+  @IsOptional()
   @IsNumber()
   @Min(1, { message: 'Service radius must be at least 1 km' })
   @Max(100, { message: 'Service radius must not exceed 100 km' })

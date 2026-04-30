@@ -30,6 +30,7 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
   const { categorySlug, serviceId, lat, lng, mode } = route.params;
   const isHomeVisit = mode === 'HOME_VISIT';
   const isClinicVisit = mode === 'DOCTOR_PLACE';
+  const isVideoMode = mode === 'VIDEO_CONSULTATION';
   const [sortBy, setSortBy] = useState<'distance' | 'fee'>('distance');
   const [resolvedLat, setResolvedLat] = useState<number | undefined>(lat ?? undefined);
   const [resolvedLng, setResolvedLng] = useState<number | undefined>(lng ?? undefined);
@@ -90,6 +91,8 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     if (mode) {
       const fee = mode === 'HOME_VISIT'
         ? provider.consultationFeeHomeVisit
+        : mode === 'VIDEO_CONSULTATION'
+        ? provider.consultationFeeVideoConsultation
         : provider.consultationFeeDoctorPlace;
       navigateToConfirm(provider, mode, fee);
       return;
@@ -110,6 +113,13 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
         label: `🏥 Clinic Visit — ${formatCurrency(provider.consultationFeeDoctorPlace)}`,
         mode: 'DOCTOR_PLACE',
         fee: provider.consultationFeeDoctorPlace,
+      });
+    }
+    if (provider.videoConsultationEnabled) {
+      modes.push({
+        label: `📹 Video Consultation — ${formatCurrency(provider.consultationFeeVideoConsultation)}`,
+        mode: 'VIDEO_CONSULTATION',
+        fee: provider.consultationFeeVideoConsultation,
       });
     }
 
@@ -137,12 +147,16 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     ? '🏠 Home Visit Doctors'
     : isClinicVisit
     ? '🏥 Clinic Visit Doctors'
+    : isVideoMode
+    ? '📹 Video Consultation Doctors'
     : 'Nearby Providers';
 
   const emptySubtitle = isHomeVisit
     ? 'No doctors available for home visits in your area.'
     : isClinicVisit
     ? 'No clinics found near your location.'
+    : isVideoMode
+    ? 'No doctors available for video consultations right now.'
     : 'No available providers in your area. Try expanding your search.';
 
   if (!locationReady || isLoading) {

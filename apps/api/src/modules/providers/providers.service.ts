@@ -148,6 +148,15 @@ export class ProvidersService {
         'Clinic visit fee must be greater than 0 when clinic visit is enabled',
       );
     }
+    if (
+      dto.videoConsultationEnabled &&
+      (dto.consultationFeeVideoConsultation === undefined ||
+        dto.consultationFeeVideoConsultation <= 0)
+    ) {
+      throw new BadRequestException(
+        'Video consultation fee must be greater than 0 when video consultation is enabled',
+      );
+    }
   }
 
   private async validateServiceCategoryIds(ids: string[]) {
@@ -636,8 +645,8 @@ export class ProvidersService {
   }
 
   async getNearbyProviders(
-    lat: number,
-    lng: number,
+    lat: number | null,
+    lng: number | null,
     serviceCategory?: string,
     mode?: string,
     serviceId?: string,
@@ -652,13 +661,17 @@ export class ProvidersService {
       (normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
       !!serviceId;
 
+    const isVideoMode = mode === 'VIDEO_CONSULTATION';
+
     const providers = await this.prisma.providerProfile.findMany({
       where: {
         isAvailable: true,
         isActive: true,
         isVerified: true,
-        currentLat: { not: null },
-        currentLng: { not: null },
+        ...(!isVideoMode && {
+          currentLat: { not: null },
+          currentLng: { not: null },
+        }),
         ...(shouldApplyCategoryFilter && {
           OR: [
             ...(serviceId
@@ -697,12 +710,20 @@ export class ProvidersService {
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),
         ...(mode === 'DOCTOR_PLACE' && { doctorPlaceVisitEnabled: true }),
+        ...(mode === 'VIDEO_CONSULTATION' && {
+          videoConsultationEnabled: true,
+        }),
       },
       include: {
         providerServices: { include: { serviceCategory: true } },
         user: true,
       },
     });
+
+    // For video consultations, distance is irrelevant — return all enabled providers.
+    if (isVideoMode) {
+      return providers.map((p) => ({ ...p, distance: 0 }));
+    }
 
     const withDistance = providers
       .map((provider) => {
