@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { USE_SEED, getSeedDashboardStats } from '@/lib/seed-data';
+import { useVideoCall } from '@/lib/useVideoCall';
 
 interface RecentConsultation {
   id: string;
@@ -125,7 +126,7 @@ export default function DashboardPage() {
   const [doctorName, setDoctorName] = useState('Doctor');
   const [profileNotFound, setProfileNotFound] = useState(false);
   const [activeVideoCalls, setActiveVideoCalls] = useState<ActiveVideoConsultation[]>([]);
-  const [videoJoining, setVideoJoining] = useState<string | null>(null);
+  const { joiningId: videoJoining, joinCall } = useVideoCall();
 
   const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
@@ -164,21 +165,9 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   const handleJoinVideoCall = useCallback(async (bookingId: string) => {
-    setVideoJoining(bookingId);
-    try {
-      const { data } = await api.get<{ jitsiUrl: string }>(`/video-sessions/${bookingId}/token`);
-      await api.patch(`/video-sessions/${bookingId}/status`, { status: 'IN_PROGRESS' });
-      window.open(data.jitsiUrl, '_blank', 'noopener,noreferrer');
-      fetchData();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to join video call. Please try again.';
-      alert(msg);
-    } finally {
-      setVideoJoining(null);
-    }
-  }, [fetchData]);
+    await joinCall(bookingId);
+    fetchData();
+  }, [joinCall, fetchData]);
 
   if (loading) {
     return (

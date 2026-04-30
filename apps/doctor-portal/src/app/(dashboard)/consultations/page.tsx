@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { USE_SEED, getSeedConsultationsList } from '@/lib/seed-data';
+import { useVideoCall } from '@/lib/useVideoCall';
 
 interface ConsultationRow {
   id: string;
@@ -45,7 +46,7 @@ export default function ConsultationsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState(searchParams?.get('type') ?? 'all');
   const [query, setQuery] = useState('');
-  const [videoJoining, setVideoJoining] = useState<string | null>(null);
+  const { joiningId: videoJoiningId, joinCall } = useVideoCall();
 
   useEffect(() => {
     if (USE_SEED) {
@@ -64,21 +65,7 @@ export default function ConsultationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleJoinVideoCall = useCallback(async (bookingId: string) => {
-    setVideoJoining(bookingId);
-    try {
-      const { data } = await api.get<{ jitsiUrl: string }>(`/video-sessions/${bookingId}/token`);
-      await api.patch(`/video-sessions/${bookingId}/status`, { status: 'IN_PROGRESS' });
-      window.open(data.jitsiUrl, '_blank', 'noopener,noreferrer');
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to join video call. Please try again.';
-      alert(msg);
-    } finally {
-      setVideoJoining(null);
-    }
-  }, []);
+  const handleJoinVideoCall = joinCall;
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -279,10 +266,10 @@ export default function ConsultationsPage() {
                         {c.type === 'VIDEO_CONSULTATION' && (c.status === 'scheduled' || c.status === 'in_progress') && (
                           <button
                             onClick={() => handleJoinVideoCall(c.id)}
-                            disabled={videoJoining === c.id}
+                            disabled={videoJoiningId === c.id}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-60 transition"
                           >
-                            {videoJoining === c.id ? (
+                            {videoJoiningId === c.id ? (
                               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             ) : (
                               '📹'

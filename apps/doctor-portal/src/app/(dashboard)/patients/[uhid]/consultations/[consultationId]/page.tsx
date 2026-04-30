@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { useVideoCall } from '@/lib/useVideoCall';
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   REQUESTED: { label: 'Requested', cls: 'badge-blue' },
@@ -100,8 +101,8 @@ export default function ConsultationDetailPage() {
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [videoLoading, setVideoLoading] = useState(false);
   const [videoSessionStatus, setVideoSessionStatus] = useState<string | null>(null);
+  const { joiningId: videoJoiningId, joinCall, endCall } = useVideoCall();
 
   const fetchPatient = useCallback(() => {
     if (!uhid) return;
@@ -123,40 +124,17 @@ export default function ConsultationDetailPage() {
   }, [fetchPatient]);
 
   const handleJoinVideoCall = useCallback(async () => {
-    setVideoLoading(true);
-    try {
-      const { data } = await api.get<{ jitsiUrl: string; roomId: string; role: string }>(
-        `/video-sessions/${consultationId}/token`,
-      );
-      await api.patch(`/video-sessions/${consultationId}/status`, { status: 'IN_PROGRESS' });
-      setVideoSessionStatus('IN_PROGRESS');
-      window.open(data.jitsiUrl, '_blank', 'noopener,noreferrer');
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to join video call. Please try again.';
-      alert(msg);
-    } finally {
-      setVideoLoading(false);
-    }
-  }, [consultationId]);
+    const ok = await joinCall(consultationId);
+    if (ok) setVideoSessionStatus('IN_PROGRESS');
+  }, [consultationId, joinCall]);
 
   const handleEndConsultation = useCallback(async () => {
-    if (!confirm('End this video consultation?')) return;
-    setVideoLoading(true);
-    try {
-      await api.patch(`/video-sessions/${consultationId}/status`, { status: 'COMPLETED' });
+    const ok = await endCall(consultationId);
+    if (ok) {
       setVideoSessionStatus('COMPLETED');
       fetchPatient();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to end consultation. Please try again.';
-      alert(msg);
-    } finally {
-      setVideoLoading(false);
     }
-  }, [consultationId, fetchPatient]);
+  }, [consultationId, endCall, fetchPatient]);
 
   if (loading) {
     return (
@@ -303,10 +281,10 @@ export default function ConsultationDetailPage() {
             <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
               <button
                 onClick={handleJoinVideoCall}
-                disabled={videoLoading}
+                disabled={videoJoiningId === consultationId}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition"
               >
-                {videoLoading ? (
+                {videoJoiningId === consultationId ? (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -318,7 +296,7 @@ export default function ConsultationDetailPage() {
               {isLive && (
                 <button
                   onClick={handleEndConsultation}
-                  disabled={videoLoading}
+                  disabled={videoJoiningId === consultationId}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-60 transition"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
