@@ -16,6 +16,9 @@ const BUCKET_ALLOWED_MIME_TYPES = [
   'application/pdf',
 ];
 
+const SUPABASE_SIGNED_PATH_SEGMENT = '/storage/v1/object/sign/';
+const SUPABASE_PUBLIC_PATH_SEGMENT = '/storage/v1/object/public/';
+
 @Injectable()
 export class PrescriptionStorageService implements OnModuleInit {
   private readonly client: SupabaseClient | null;
@@ -150,6 +153,27 @@ export class PrescriptionStorageService implements OnModuleInit {
     return data.signedUrl;
   }
 
+  /**
+   * Convert a stored prescription reference into a fresh browser-safe URL.
+   *
+   * Stored values may be either:
+   * - a stable storage path (preferred for new records), or
+   * - an older signed/public Supabase URL already persisted in the DB.
+   */
+  async resolveReadUrl(storedValue?: string | null): Promise<string | null> {
+    const normalizedValue = storedValue?.trim();
+    if (!normalizedValue) {
+      return null;
+    }
+
+    const filePath = this.extractFilePath(normalizedValue);
+    if (!filePath) {
+      return normalizedValue;
+    }
+
+    return this.getSignedUrl(filePath);
+  }
+
   private getClient(): SupabaseClient {
     if (!this.client || !this.hasValidConfig) {
       throw new Error(
@@ -250,6 +274,38 @@ export class PrescriptionStorageService implements OnModuleInit {
     }
 
     return jwtPayload.role === 'service_role';
+  }
+
+  private extractFilePath(value: string): string | null {
+    if (!value.includes('://')) {
+      return value;
+    }
+
+    try {
+      const parsed = new URL(value);
+      const signedPrefix = `${SUPABASE_SIGNED_PATH_SEGMENT}${this.bucketName}/`;
+      const publicPrefix = `${SUPABASE_PUBLIC_PATH_SEGMENT}${this.bucketName}/`;
+
+      if (parsed.pathname.includes(signedPrefix)) {
+        return decodeURIComponent(
+          parsed.pathname.slice(
+            parsed.pathname.indexOf(signedPrefix) + signedPrefix.length,
+          ),
+        );
+      }
+
+      if (parsed.pathname.includes(publicPrefix)) {
+        return decodeURIComponent(
+          parsed.pathname.slice(
+            parsed.pathname.indexOf(publicPrefix) + publicPrefix.length,
+          ),
+        );
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
   }
 
   private decodeJwtPayload(token: string): Record<string, unknown> | null {

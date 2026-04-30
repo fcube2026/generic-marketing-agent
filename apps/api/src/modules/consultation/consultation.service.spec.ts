@@ -43,6 +43,9 @@ describe('ConsultationService', () => {
     getSignedUrl: jest
       .fn()
       .mockResolvedValue('https://supabase.example.com/consultation-booking-1'),
+    resolveReadUrl: jest
+      .fn()
+      .mockImplementation(async (value: string | null) => value),
   };
 
   beforeEach(async () => {
@@ -237,7 +240,7 @@ describe('ConsultationService', () => {
       const summaryWithPrescriptions = {
         ...mockSummary,
         prescriptions: [
-          { id: 'rx-1', fileUrl: 'https://files/x.pdf', createdAt: new Date() },
+          { id: 'rx-1', fileUrl: 'patient-1/rx-1', createdAt: new Date() },
         ],
       };
       (prisma.consultationSummary.findUnique as jest.Mock).mockResolvedValue(
@@ -246,6 +249,9 @@ describe('ConsultationService', () => {
       (prisma.pharmacyOrder.findFirst as jest.Mock).mockResolvedValue({
         id: 'order-1',
       });
+      mockPrescriptionStorageService.resolveReadUrl.mockResolvedValueOnce(
+        'https://files/x.pdf',
+      );
 
       const result = await service.getSummary('booking-1');
 
@@ -298,6 +304,10 @@ describe('ConsultationService', () => {
         mockSummaries,
       );
       (prisma.consultationSummary.count as jest.Mock).mockResolvedValue(1);
+      mockPrescriptionStorageService.resolveReadUrl.mockReset();
+      mockPrescriptionStorageService.resolveReadUrl.mockImplementation(
+        async (value: string | null) => value,
+      );
 
       const result = await service.getPatientSummaries('user-patient-1', 1, 10);
 
@@ -369,10 +379,11 @@ describe('ConsultationService', () => {
         bookingId: 'booking-9',
         medicinesAdvised: medicines,
         createdAt,
-        prescriptions: [
-          { id: 'rx-1', fileUrl: 'https://files/x.pdf', createdAt },
-        ],
+        prescriptions: [{ id: 'rx-1', fileUrl: 'patient-1/rx-1', createdAt }],
       });
+      mockPrescriptionStorageService.resolveReadUrl.mockResolvedValueOnce(
+        'https://files/x.pdf',
+      );
 
       const result = await service.getLatestForPatient('user-patient-1');
 
@@ -532,7 +543,7 @@ describe('ConsultationService', () => {
         id: 'rx-2',
         consultationSummaryId: 'summary-1',
         details: 'Take after food',
-        fileUrl: 'https://supabase.example.com/consultation-booking-1',
+        fileUrl: 'patient-1/consultation-booking-1',
       });
 
       const result = await service.addPrescriptionWithFile(
@@ -554,7 +565,9 @@ describe('ConsultationService', () => {
         }),
       );
       expect(mockPrescriptionStorageService.uploadFile).toHaveBeenCalled();
-      expect(mockPrescriptionStorageService.getSignedUrl).toHaveBeenCalled();
+      expect(
+        mockPrescriptionStorageService.getSignedUrl,
+      ).not.toHaveBeenCalled();
     });
   });
 });

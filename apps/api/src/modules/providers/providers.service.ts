@@ -6,6 +6,7 @@ import {
 import { DiagnosticStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
@@ -35,6 +36,7 @@ export class ProvidersService {
   constructor(
     private prisma: PrismaService,
     private readonly supabaseSync: SupabaseSyncService,
+    private readonly prescriptionStorage: PrescriptionStorageService,
   ) {}
 
   private async findBestServiceCategory(specialization: string) {
@@ -556,15 +558,8 @@ export class ProvidersService {
     }
 
     const patient = bookings[0].patient;
-    return {
-      id: patient.id,
-      name: patient.name,
-      phone: patient.user.phone,
-      gender: patient.gender,
-      dateOfBirth: patient.dateOfBirth,
-      emergencyContact: patient.emergencyContact,
-      visitCount: bookings.length,
-      consultations: bookings.map((b) => ({
+    const consultations = await Promise.all(
+      bookings.map(async (b) => ({
         id: b.id,
         scheduledAt: b.scheduledAt,
         status: b.status,
@@ -578,10 +573,30 @@ export class ProvidersService {
               observations: b.consultationSummary.observations,
               nextSteps: b.consultationSummary.nextSteps,
               followUp: b.consultationSummary.followUpRecommendation,
-              prescriptions: b.consultationSummary.prescriptions,
+              prescriptions: await Promise.all(
+                b.consultationSummary.prescriptions.map(
+                  async (prescription) => ({
+                    ...prescription,
+                    fileUrl: await this.prescriptionStorage.resolveReadUrl(
+                      prescription.fileUrl,
+                    ),
+                  }),
+                ),
+              ),
             }
           : null,
       })),
+    );
+
+    return {
+      id: patient.id,
+      name: patient.name,
+      phone: patient.user.phone,
+      gender: patient.gender,
+      dateOfBirth: patient.dateOfBirth,
+      emergencyContact: patient.emergencyContact,
+      visitCount: bookings.length,
+      consultations,
     };
   }
 
