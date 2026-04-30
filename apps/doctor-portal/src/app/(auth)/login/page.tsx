@@ -85,13 +85,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-lighter to-primary-light">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-8">
+        <div className="flex items-center justify-center gap-4 mb-8">
           <Image
             src="/curex-logo.png"
             alt="Curex24 logo"
-            width={72}
-            height={72}
-            className="h-14 w-14 object-contain"
+            width={168}
+            height={68}
+            className="h-16 w-auto object-contain"
             priority
           />
           <div className="text-left">
