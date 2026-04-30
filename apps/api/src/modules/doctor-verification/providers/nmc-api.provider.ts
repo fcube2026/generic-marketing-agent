@@ -84,6 +84,8 @@ export class NmcApiProvider {
     this.logger.log(
       `[${this.provider}] Verifying NMC registration: ${req.memberId}`,
     );
+    this.logger.log(`Calling NMC API URL: ${this.apiUrl}`);
+    this.logger.log(`Request payload: ${JSON.stringify(payload)}`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
@@ -105,9 +107,7 @@ export class NmcApiProvider {
 
     const data = (await response.json()) as Record<string, unknown>;
 
-    this.logger.debug(
-      `=== SUREPASS RESPONSE ===\n${JSON.stringify(data, null, 2)}`,
-    );
+    this.logger.log(`Surepass response: ${JSON.stringify(data, null, 2)}`);
 
     if (!response.ok) {
       this.logger.warn(
