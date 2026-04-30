@@ -19,7 +19,6 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 const modeLabel: Record<string, string> = {
   HOME_VISIT:          'Home Visit',
   DOCTOR_PLACE_VISIT:  'Clinic Visit',
-  VIDEO_CONSULTATION:  'Video',
   TELECONSULT:         'Teleconsult',
 };
 
@@ -41,7 +40,16 @@ function getInitials(name: string): string {
   return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }
 
-interface Prescription { id: string; medicineName?: string; dosage?: string; frequency?: string; duration?: string; }
+interface Prescription {
+  id: string;
+  details?: string | null;
+  fileUrl?: string | null;
+  // Legacy / future fields kept optional so older API responses still render.
+  medicineName?: string | null;
+  dosage?: string | null;
+  frequency?: string | null;
+  duration?: string | null;
+}
 interface Consultation {
   id: string;
   scheduledAt: string;
@@ -50,7 +58,6 @@ interface Consultation {
   symptoms: string | null;
   totalFee: number;
   serviceCategory: string;
-  videoSession: { id: string; status: string; roomId: string } | null;
   summary: {
     diagnosis: string | null;
     observations: string | null;
@@ -123,15 +130,23 @@ function ConsultationCard({ consultation }: { consultation: Consultation }) {
             <div className="mt-2">
               <p className="font-medium text-gray-700 mb-1">Prescriptions:</p>
               <div className="space-y-1">
-                {consultation.summary.prescriptions.map((rx, i) => (
-                  <div key={rx.id ?? i} className="flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-1.5">
-                    <span>💊</span>
-                    <span className="text-gray-700 font-medium">{rx.medicineName ?? 'Medicine'}</span>
-                    {rx.dosage && <span className="text-gray-500">· {rx.dosage}</span>}
-                    {rx.frequency && <span className="text-gray-500">· {rx.frequency}</span>}
-                    {rx.duration && <span className="text-gray-500">· {rx.duration}</span>}
-                  </div>
-                ))}
+                {consultation.summary.prescriptions.map((rx, i) => {
+                  const label = rx.medicineName?.trim() || rx.details?.trim() || (rx.fileUrl ? 'Attached prescription' : 'Medicine');
+                  return (
+                    <div key={rx.id ?? i} className="flex items-start gap-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-1.5">
+                      <span className="mt-0.5">💊</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="text-gray-800 font-medium whitespace-pre-wrap">{label}</span>
+                        {rx.dosage && <span className="text-gray-500">· {rx.dosage}</span>}
+                        {rx.frequency && <span className="text-gray-500">· {rx.frequency}</span>}
+                        {rx.duration && <span className="text-gray-500">· {rx.duration}</span>}
+                        {rx.fileUrl && (
+                          <a href={rx.fileUrl} target="_blank" rel="noreferrer" className="text-primary text-xs underline">View file</a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -140,9 +155,6 @@ function ConsultationCard({ consultation }: { consultation: Consultation }) {
 
       <div className="flex items-center justify-between text-xs text-gray-400 border-t border-surface-border pt-2">
         <span>Fee: <span className="font-semibold text-gray-700">₹{consultation.totalFee}</span></span>
-        {consultation.videoSession && (
-          <span className="badge badge-purple text-[10px]">📹 {consultation.videoSession.status}</span>
-        )}
       </div>
     </div>
   );

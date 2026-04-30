@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { ServiceCategoryCard } from '../../components/home/ServiceCategoryCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -44,6 +45,7 @@ const shouldShowRefillBanner = (orders: PharmacyOrder[] | undefined): boolean =>
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useQuery<PatientProfile | null>({
     queryKey: ['patient-profile'],
     queryFn: patientService.getProfile,
@@ -73,6 +75,9 @@ export const HomeScreen: React.FC = () => {
       const res = await api.get('/patients/me/bookings');
       return res.data;
     },
+    refetchInterval: 15000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
 
   const { data: pharmacyOrders } = useQuery<PharmacyOrder[]>({
@@ -87,28 +92,14 @@ export const HomeScreen: React.FC = () => {
     [pharmacyOrders],
   );
 
-  const handleServicePress = (category: ServiceCategory) => {
-    navigation.navigate('SelectService', { category });
-  };
-
-  const activeVideoBookings = (recentBookings || []).filter(
-    (b: Booking) =>
-      b.mode === 'VIDEO_CONSULTATION' &&
-      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
+    }, [queryClient]),
   );
 
-  const handleBookByType = (mode: 'VIDEO_CONSULTATION' | 'HOME_VISIT' | 'DOCTOR_PLACE') => {
-    if (mode === 'VIDEO_CONSULTATION' && activeVideoBookings.length > 0) {
-      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-      return;
-    }
-    // For video, location is not required; for others, we pass 0,0 and let
-    // the user's GPS be used on the ProviderListScreen via getCurrentLocation.
-    navigation.navigate('ProviderList', { mode });
-  };
-
-  const handleVideoConsultationPress = () => {
-    handleBookByType('VIDEO_CONSULTATION');
+  const handleServicePress = (category: ServiceCategory) => {
+    navigation.navigate('SelectService', { category });
   };
 
   if (profileLoading || (canUsePatientApp && isLoading)) {
@@ -172,41 +163,6 @@ export const HomeScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* ── Book by Service Type ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Book a Consultation</Text>
-        <View style={styles.bookingTypeRow}>
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#3B82F6' }]}
-            onPress={() => handleBookByType('VIDEO_CONSULTATION')}
-            accessibilityLabel="Book video call consultation"
-          >
-            <Text style={styles.bookingTypeIcon}>📹</Text>
-            <Text style={styles.bookingTypeLabel}>Video Call</Text>
-            <Text style={styles.bookingTypeDesc}>Consult from anywhere</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#10B981' }]}
-            onPress={() => handleBookByType('HOME_VISIT')}
-            accessibilityLabel="Book home visit"
-          >
-            <Text style={styles.bookingTypeIcon}>🏠</Text>
-            <Text style={styles.bookingTypeLabel}>Home Visit</Text>
-            <Text style={styles.bookingTypeDesc}>Doctor comes to you</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.bookingTypeCard, { borderTopColor: '#8B5CF6' }]}
-            onPress={() => handleBookByType('DOCTOR_PLACE')}
-            accessibilityLabel="Book clinic visit"
-          >
-            <Text style={styles.bookingTypeIcon}>🏥</Text>
-            <Text style={styles.bookingTypeLabel}>Clinic Visit</Text>
-            <Text style={styles.bookingTypeDesc}>Visit a nearby clinic</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Services</Text>
@@ -224,20 +180,6 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
       </View>
-
-      {/* Video Consultation Quick Access */}
-      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultation</Text>
-          <Text style={styles.videoCardSub}>
-            {activeVideoBookings.length > 0
-              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'Consult doctors from the comfort of home'}
-          </Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
 
       {/* Prescription Order Quick Access */}
       <TouchableOpacity
@@ -282,21 +224,14 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Bookings</Text>
           {recentBookings.slice(0, 3).map((booking: any) => {
-            const isVideo = booking.mode === 'VIDEO_CONSULTATION';
             return (
               <TouchableOpacity
                 key={booking.id}
                 style={styles.bookingItem}
-                onPress={() =>
-                  isVideo
-                    ? navigation.navigate('VideoLobby', { bookingId: booking.id })
-                    : navigation.navigate('Tracking', { bookingId: booking.id })
-                }
+                onPress={() => navigation.navigate('Tracking', { bookingId: booking.id })}
               >
                 <View>
-                  <Text style={styles.bookingProvider}>
-                    {isVideo ? '📹 ' : ''}{booking.provider?.name || 'Provider'}
-                  </Text>
+                  <Text style={styles.bookingProvider}>{booking.provider?.name || 'Provider'}</Text>
                   <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
                 </View>
                 <View>
@@ -382,26 +317,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  bookingTypeRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  bookingTypeCard: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    borderTopWidth: 3,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  bookingTypeIcon: { fontSize: 28, marginBottom: 6 },
-  bookingTypeLabel: { fontSize: 13, fontWeight: '700', color: Colors.text, textAlign: 'center' },
-  bookingTypeDesc: { fontSize: 11, color: Colors.textMuted, textAlign: 'center', marginTop: 2 },
   bookingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -27,20 +27,18 @@ type Props = {
 };
 
 export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { categorySlug, lat, lng, mode } = route.params;
-  const isVideoMode = mode === 'VIDEO_CONSULTATION';
+  const { categorySlug, serviceId, lat, lng, mode } = route.params;
   const isHomeVisit = mode === 'HOME_VISIT';
   const isClinicVisit = mode === 'DOCTOR_PLACE';
-  const [sortBy, setSortBy] = useState<'distance' | 'fee'>(isVideoMode ? 'fee' : 'distance');
-  // For video mode, lat/lng are never needed — keep them undefined.
-  const [resolvedLat, setResolvedLat] = useState<number | undefined>(isVideoMode ? undefined : (lat ?? undefined));
-  const [resolvedLng, setResolvedLng] = useState<number | undefined>(isVideoMode ? undefined : (lng ?? undefined));
-  const [locationReady, setLocationReady] = useState<boolean>(isVideoMode || (lat != null && lng != null));
+  const [sortBy, setSortBy] = useState<'distance' | 'fee'>('distance');
+  const [resolvedLat, setResolvedLat] = useState<number | undefined>(lat ?? undefined);
+  const [resolvedLng, setResolvedLng] = useState<number | undefined>(lng ?? undefined);
+  const [locationReady, setLocationReady] = useState<boolean>(lat != null && lng != null);
   const { setSelectedProvider, setSelectedMode } = useBookingStore();
 
-  // For non-video modes, resolve location if not already provided
+  // Resolve location if not already provided
   useEffect(() => {
-    if (!isVideoMode && lat == null) {
+    if (lat == null) {
       getCurrentLocation()
         .then((loc) => {
           const resolved = loc ?? MOCK_LOCATION;
@@ -53,23 +51,23 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
         })
         .finally(() => setLocationReady(true));
     }
-  }, [isVideoMode, lat]);
+  }, [lat]);
 
   const { data: providers, isLoading } = useQuery<ProviderWithDistance[]>({
-    queryKey: ['nearby-providers', categorySlug, resolvedLat, resolvedLng, mode],
+    queryKey: ['nearby-providers', categorySlug, serviceId, resolvedLat, resolvedLng, mode],
     enabled: locationReady,
     queryFn: () =>
       providerService.getNearbyProviders({
-        // Omit lat/lng for video mode — the backend does not require them
-        ...(isVideoMode ? {} : { lat: resolvedLat, lng: resolvedLng }),
+        lat: resolvedLat,
+        lng: resolvedLng,
         serviceCategory: categorySlug,
+        serviceId,
         mode,
       }),
   });
 
   const sortedProviders = [...(providers || [])].sort((a, b) => {
     if (sortBy === 'fee') {
-      if (isVideoMode) return a.consultationFeeVideoConsultation - b.consultationFeeVideoConsultation;
       if (isHomeVisit) return a.consultationFeeHomeVisit - b.consultationFeeHomeVisit;
       return a.consultationFeeDoctorPlace - b.consultationFeeDoctorPlace;
     }
@@ -90,12 +88,9 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     // If a mode was pre-selected (coming from HomeScreen service type tiles),
     // navigate directly without asking the user again.
     if (mode) {
-      const fee =
-        mode === 'VIDEO_CONSULTATION'
-          ? provider.consultationFeeVideoConsultation
-          : mode === 'HOME_VISIT'
-          ? provider.consultationFeeHomeVisit
-          : provider.consultationFeeDoctorPlace;
+      const fee = mode === 'HOME_VISIT'
+        ? provider.consultationFeeHomeVisit
+        : provider.consultationFeeDoctorPlace;
       navigateToConfirm(provider, mode, fee);
       return;
     }
@@ -115,13 +110,6 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
         label: `🏥 Clinic Visit — ${formatCurrency(provider.consultationFeeDoctorPlace)}`,
         mode: 'DOCTOR_PLACE',
         fee: provider.consultationFeeDoctorPlace,
-      });
-    }
-    if (provider.videoConsultationEnabled) {
-      modes.push({
-        label: `📹 Video Consultation — ${formatCurrency(provider.consultationFeeVideoConsultation)}`,
-        mode: 'VIDEO_CONSULTATION',
-        fee: provider.consultationFeeVideoConsultation,
       });
     }
 
@@ -145,24 +133,20 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  const modeLabel = isVideoMode
-    ? '📹 Video Call Doctors'
-    : isHomeVisit
+  const modeLabel = isHomeVisit
     ? '🏠 Home Visit Doctors'
     : isClinicVisit
     ? '🏥 Clinic Visit Doctors'
     : 'Nearby Providers';
 
-  const emptySubtitle = isVideoMode
-    ? 'No doctors available for video consultation right now.'
-    : isHomeVisit
+  const emptySubtitle = isHomeVisit
     ? 'No doctors available for home visits in your area.'
     : isClinicVisit
     ? 'No clinics found near your location.'
     : 'No available providers in your area. Try expanding your search.';
 
   if (!locationReady || isLoading) {
-    return <LoadingSpinner fullScreen message={isVideoMode ? 'Finding available doctors…' : 'Finding providers near you…'} />;
+    return <LoadingSpinner fullScreen message="Finding providers near you…" />;
   }
 
   return (

@@ -4,6 +4,7 @@ import {
   SafeAreaView, RefreshControl, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { bookingService } from '../../services/bookingService';
@@ -24,6 +25,7 @@ type BookingRequest = {
 
 export const IncomingBookingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const queryClient = useQueryClient();
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,6 +54,10 @@ export const IncomingBookingScreen: React.FC = () => {
     try {
       await bookingService.acceptBooking(id);
       setRequests(prev => prev.filter(r => r.id !== id));
+      // Make sure the detail screen and any list views reflect ACCEPTED.
+      queryClient.invalidateQueries({ queryKey: ['booking', id] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
       navigation.navigate('BookingDetail', { bookingId: id });
     } catch {
       Alert.alert('Error', 'Failed to accept booking.');
@@ -66,6 +72,9 @@ export const IncomingBookingScreen: React.FC = () => {
           try {
             await bookingService.declineBooking(id);
             setRequests(prev => prev.filter(r => r.id !== id));
+            queryClient.invalidateQueries({ queryKey: ['booking', id] });
+            queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+            queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
           } catch {
             Alert.alert('Error', 'Failed to decline booking.');
           }

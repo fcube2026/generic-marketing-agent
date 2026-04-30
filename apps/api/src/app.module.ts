@@ -23,9 +23,6 @@ import { DoctorVerificationModule } from './modules/doctor-verification/doctor-v
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
 import { PrescriptionModule } from './modules/prescription/prescription.module';
 import { SmsModule } from './modules/sms/sms.module';
-import { VideoSessionsModule } from './modules/video-sessions/video-sessions.module';
-import { VideoConsultationModule } from './modules/video-consultation/video-consultation.module';
-import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { PushNotificationModule } from './modules/push-notifications/push-notification.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
@@ -37,6 +34,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { PharmacyPartnersModule } from './modules/pharmacy-partners/pharmacy-partners.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
+import { SupabaseSyncModule } from './common/supabase/supabase-sync.module';
 
 @Module({
   controllers: [AppController],
@@ -47,6 +45,7 @@ import { HealthModule } from './common/health/health.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
+    SupabaseSyncModule,
     FeatureFlagsModule,
     QueueModule,
     SmsModule,
@@ -69,9 +68,6 @@ import { HealthModule } from './common/health/health.module';
     DoctorVerificationModule,
     PharmacyModule,
     PrescriptionModule,
-    VideoSessionsModule,
-    VideoConsultationModule,
-    WebhooksModule,
     MarketingModule,
     PatientVerificationModule,
     ClinicalIntakeModule,

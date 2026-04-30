@@ -53,23 +53,6 @@ export const HomeScreen: React.FC = () => {
     .filter((b) => b.status === 'COMPLETED' || b.status === 'CLOSED')
     .reduce((sum, b) => sum + b.totalFee * 0.8, 0);
 
-  const activeVideoBookings = (bookings || []).filter(
-    (b) =>
-      b.mode === 'VIDEO_CONSULTATION' &&
-      ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(b.status),
-  );
-
-  const handleVideoConsultationPress = () => {
-    if (activeVideoBookings.length > 0) {
-      navigation.navigate('VideoLobby', { bookingId: activeVideoBookings[0].id });
-    } else {
-      Alert.alert(
-        'Video Consultations',
-        'You have no active video bookings. Accept a video consultation booking to start a session.',
-      );
-    }
-  };
-
   if (profileLoading) return <LoadingSpinner fullScreen />;
 
   if (!profile) {
@@ -103,6 +86,34 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
+      {/* New Requests Section (Top Priority) */}
+      {pendingBookings.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🔔 New Requests</Text>
+            <Text style={styles.requestCount}>{pendingBookings.length} pending</Text>
+          </View>
+          {pendingBookings.map((booking) => (
+            <TouchableOpacity
+              key={booking.id}
+              style={styles.bookingAlert}
+              onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
+            >
+              <View style={styles.bookingAlertContent}>
+                <Text style={styles.bookingAlertPatient}>
+                  {booking.patient?.name || 'Patient'}
+                </Text>
+                <Text style={styles.bookingAlertService}>{booking.serviceCategory?.name}</Text>
+              </View>
+              <View style={styles.bookingAlertRight}>
+                <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
+                <Text style={styles.bookingAlertArrow}>→</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <Card style={styles.availabilityCard}>
         <Text style={styles.availabilityTitle}>
           {profile.isAvailable ? '🟢 You are Available' : '🔴 You are Unavailable'}
@@ -132,39 +143,6 @@ export const HomeScreen: React.FC = () => {
         </Card>
       </View>
 
-      {/* Video Consultation Quick Access */}
-      <TouchableOpacity style={styles.videoCard} onPress={handleVideoConsultationPress}>
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultations</Text>
-          <Text style={styles.videoCardSub}>
-            {activeVideoBookings.length > 0
-              ? `${activeVideoBookings.length} active session${activeVideoBookings.length > 1 ? 's' : ''}`
-              : 'View your video consultation bookings'}
-          </Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
-
-      {pendingBookings.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔔 New Requests</Text>
-          {pendingBookings.map((booking) => (
-            <TouchableOpacity
-              key={booking.id}
-              style={styles.bookingAlert}
-              onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
-            >
-              <Text style={styles.bookingAlertText}>
-                {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
-                {booking.patient?.name || 'Patient'} — {booking.serviceCategory?.name}
-              </Text>
-              <Text style={styles.bookingAlertFee}>{formatCurrency(booking.totalFee)}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
       {todayBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
@@ -176,7 +154,6 @@ export const HomeScreen: React.FC = () => {
             >
               <View style={styles.bookingItemLeft}>
                 <Text style={styles.bookingPatient}>
-                  {booking.mode === 'VIDEO_CONSULTATION' ? '📹 ' : ''}
                   {booking.patient?.name || 'Patient'}
                 </Text>
                 <Text style={styles.bookingService}>{booking.serviceCategory?.name}</Text>
@@ -205,36 +182,32 @@ const styles = StyleSheet.create({
   statCard: { flex: 1 },
   statValue: { fontSize: 22, fontWeight: '800', color: Colors.text, marginBottom: 4 },
   statLabel: { fontSize: 11, color: Colors.textMuted },
-  section: { padding: 16, paddingTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
-  bookingAlert: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: Colors.warning },
-  bookingAlertText: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  bookingAlertFee: { fontSize: 15, fontWeight: '800', color: Colors.primary },
+  section: { padding: 16, paddingTop: 12 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  requestCount: { fontSize: 12, fontWeight: '600', color: Colors.warning, backgroundColor: '#FFFBEB', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  bookingAlert: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.warning,
+    elevation: 1,
+  },
+  bookingAlertContent: { flex: 1 },
+  bookingAlertPatient: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
+  bookingAlertService: { fontSize: 13, color: Colors.textMuted },
+  bookingAlertRight: { alignItems: 'flex-end', gap: 4 },
+  bookingAlertFee: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  bookingAlertArrow: { fontSize: 16, color: Colors.warning, fontWeight: 'bold' },
   bookingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.white, borderRadius: 10, padding: 14, marginBottom: 8, elevation: 2 },
   bookingItemLeft: {},
   bookingPatient: { fontSize: 15, fontWeight: '600', color: Colors.text },
   bookingService: { fontSize: 13, color: Colors.textMuted },
-  videoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.primary,
-  },
-  videoCardIcon: { fontSize: 28, marginRight: 14 },
-  videoCardContent: { flex: 1 },
-  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
   onboardingPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: Colors.background },
   onboardingIcon: { fontSize: 72, marginBottom: 20 },
   onboardingTitle: { fontSize: 24, fontWeight: '800', color: Colors.text, marginBottom: 8 },

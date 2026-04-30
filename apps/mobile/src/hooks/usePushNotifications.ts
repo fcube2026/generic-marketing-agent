@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import { useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   registerForPushNotifications,
   setupNotificationListeners,
@@ -11,6 +12,34 @@ import {
 } from '../services/notifications/pushNotifications';
 import { getUnreadCount } from '../services/notifications/notificationService';
 
+const BOOKING_NOTIFICATION_TYPES = new Set([
+  'BOOKING_REQUEST',
+  'BOOKING_ACCEPTED',
+  'BOOKING_DECLINED',
+  'BOOKING_CANCELLED',
+  'BOOKING_STATUS_UPDATE',
+  'PROVIDER_ON_THE_WAY',
+  'PROVIDER_ARRIVED',
+  'CONSULTATION_STARTED',
+  'CONSULTATION_COMPLETED',
+  'PAYMENT_SUCCESS',
+  'PAYMENT_REFUNDED',
+]);
+
+function invalidateBookingCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  bookingId?: string,
+) {
+  // Refresh both list views and the specific booking so the patient and
+  // provider see status changes immediately, even when the app was in the
+  // background and the only signal was the push notification.
+  queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
+  queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+  if (bookingId) {
+    queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+  }
+}
+
 /**
  * Hook to manage push notifications throughout the app.
  * Handles registration, listeners, and deep linking from notifications.
@@ -19,14 +48,21 @@ import { getUnreadCount } from '../services/notifications/notificationService';
  */
 export function usePushNotifications(isAuthenticated: boolean) {
   const navigation = useNavigation<any>();
+  const queryClient = useQueryClient();
   const notificationListenerCleanup = useRef<(() => void) | null>(null);
 
   // Handle notification tap - navigate to appropriate screen
   const handleNotificationResponse = useCallback(
     (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as PushNotificationData;
-      
+
       if (!data) return;
+
+      // Whatever the type, refresh booking data before navigating so the
+      // destination screen renders the latest status.
+      if (BOOKING_NOTIFICATION_TYPES.has(data.type)) {
+        invalidateBookingCaches(queryClient, data.bookingId);
+      }
 
       // Navigate based on notification type
       switch (data.type) {
@@ -91,12 +127,18 @@ export function usePushNotifications(isAuthenticated: boolean) {
           navigation.navigate('Notifications');
       }
     },
-    [navigation],
+    [navigation, queryClient],
   );
 
   // Handle notification received in foreground
   const handleNotificationReceived = useCallback(
-    async (_notification: Notifications.Notification) => {
+    async (notification: Notifications.Notification) => {
+      const data = notification.request.content.data as PushNotificationData | undefined;
+      if (data && BOOKING_NOTIFICATION_TYPES.has(data.type)) {
+        // Foreground push: refresh caches so any open list/detail screen
+        // reflects the new status without waiting for the next poll tick.
+        invalidateBookingCaches(queryClient, data.bookingId);
+      }
       // Update badge count when notification received
       try {
         const count = await getUnreadCount();
@@ -105,7 +147,7 @@ export function usePushNotifications(isAuthenticated: boolean) {
         console.error('Failed to update badge count:', error);
       }
     },
-    [],
+    [queryClient],
   );
 
   // Initialize push notifications when authenticated

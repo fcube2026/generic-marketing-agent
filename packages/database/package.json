@@ -10,6 +10,7 @@
     "db:migrate:deploy": "node --max-old-space-size=4096 ../../node_modules/prisma/build/index.js migrate deploy --schema prisma/schema.prisma",
     "db:studio": "node --max-old-space-size=4096 ../../node_modules/prisma/build/index.js studio --schema prisma/schema.prisma",
     "db:seed": "node ../../node_modules/ts-node/dist/bin.js prisma/seed.ts",
+    "db:seed:dev": "node ../../node_modules/ts-node/dist/bin.js prisma/seed-dev.ts",
     "db:seed:staging": "node ../../node_modules/ts-node/dist/bin.js prisma/seed.ts && node ../../node_modules/ts-node/dist/bin.js prisma/seed-staging.ts",
     "db:reset": "echo '⚠️  WARNING: This drops ALL tables! Use only on local dev databases.' && node --max-old-space-size=4096 ../../node_modules/prisma/build/index.js migrate reset --schema prisma/schema.prisma",
     "lint": "node --max-old-space-size=4096 ../../node_modules/prisma/build/index.js validate --schema prisma/schema.prisma"

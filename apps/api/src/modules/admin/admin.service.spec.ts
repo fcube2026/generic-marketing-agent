@@ -59,6 +59,9 @@ describe('AdminService', () => {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    doctorVerificationLog: {
+      updateMany: jest.fn(),
+    },
   };
 
   const mockVerificationService = {
@@ -229,6 +232,9 @@ describe('AdminService', () => {
 
       mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
       mockPrisma.providerLicense.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.doctorVerificationLog.updateMany.mockResolvedValue({
+        count: 1,
+      });
       mockPrisma.providerProfile.update.mockResolvedValue(updated);
       mockPrisma.providerService.count.mockResolvedValue(0);
       mockPrisma.serviceCategory.findFirst.mockResolvedValue({ id: 'cat-1' });

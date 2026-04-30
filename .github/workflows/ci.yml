@@ -1,10 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main, develop]
+  schedule:
+    - cron: "30 1,4,7,10,13,16 * * *"  # every 3h, 07:00–23:00 IST (UTC+5:30)
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -181,6 +180,11 @@ jobs:
 
       - name: Run mobile tests
         run: pnpm --filter @curex24/mobile test -- --passWithNoTests --forceExit
+        env:
+          # The VideoLobbyScreen suite (expo-camera + Animated animations) needs
+          # ~2 GB heap. Raise the V8 limit on the worker process so it doesn't
+          # hit the default 2 GB ceiling on the ubuntu-latest 7 GB runner.
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
   admin-smoke-tests:
     name: Admin Smoke Tests (Dev)

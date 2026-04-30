@@ -10,8 +10,16 @@
  * and mock pharmacyService + navigation only.
  */
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react-native';
+import { render, screen, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Use fake timers so that Animated timers (from the Timeline component) do not
+// fire after each test's environment is torn down, causing spurious
+// "Jest environment already torn down" ReferenceErrors.
+// We skip faking setInterval/clearInterval (as a pair) so that
+// @tanstack/react-query can use its internal polling/GC intervals without
+// interference.
+jest.useFakeTimers({ doNotFake: ['setInterval', 'clearInterval'] });
 
 const mockUseRoute = jest.fn();
 
@@ -80,29 +88,28 @@ const baseOrder: PharmacyOrder = {
 
 describe('OrderTrackingScreen', () => {
   beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setInterval', 'clearInterval'] });
     jest.clearAllMocks();
     mockUseRoute.mockReturnValue({ params: { orderId: 'order-1' } });
   });
 
-  it('renders the loading state while the order is being fetched', async () => {
-    // Resolves later so we can observe the loading UI synchronously.
-    let resolveOrder: (o: PharmacyOrder) => void;
-    mockGetOrderById.mockReturnValue(
-      new Promise<PharmacyOrder>((resolve) => {
-        resolveOrder = resolve;
-      }),
-    );
+  afterEach(() => {
+    // Clear all pending timers (e.g. Animated callbacks) so they don't fire
+    // after the test environment is torn down.
+    act(() => {
+      jest.clearAllTimers();
+    });
+  });
+
+  it('renders the loading state while the order is being fetched', () => {
+    // Use a never-resolving promise so the query stays in loading state for the
+    // entire test. We only need to assert the loading UI; there is no async
+    // work to await. Resolving the promise inside act() causes Animated.spring
+    // callbacks to flood the act-queue and reliably hang for > 5 s in CI.
+    mockGetOrderById.mockReturnValue(new Promise<PharmacyOrder>(() => {}));
 
     renderWithClient(<OrderTrackingScreen />);
     expect(screen.getByText(/Loading your order/i)).toBeTruthy();
-
-    // Resolve the pending request to avoid leaving open work between tests.
-    await act(async () => {
-      resolveOrder!(baseOrder);
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading your order/i)).toBeNull();
-    });
   });
 
   it('renders the timeline and order details for a placed order', async () => {

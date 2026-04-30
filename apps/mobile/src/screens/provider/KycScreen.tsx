@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
-  FlatList,
+  Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +19,6 @@ import {
   NmcVerificationPayload,
   VerificationDocumentsPayload,
 } from '../../services/providerService';
-import { INDIAN_STATE_COUNCILS } from '../../constants/stateCouncils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,9 +26,7 @@ type WizardStep = 1 | 2 | 3;
 type StepStatus = 'pending' | 'processing' | 'done' | 'failed';
 
 interface VerificationProgress {
-  nmc: StepStatus;
-  smc: StepStatus;
-  digilocker: StepStatus;
+  records: StepStatus;
   documents: StepStatus;
   face: StepStatus;
   licenseId?: string;
@@ -40,12 +37,20 @@ interface PipelineStep {
   found: boolean;
 }
 
+interface LicenseStatus {
+  status: string;
+  verifiedAt?: string | null;
+  rejectionReason?: string | null;
+}
+
 interface VerificationLog {
   id: string;
   status: string;
   registrationNumber: string;
   createdAt: string;
+  licenseId?: string | null;
   verificationSource?: string;
+  license?: LicenseStatus | null;
   rawResponse?: {
     issueLabel?: string;
     steps?: PipelineStep[];
@@ -131,16 +136,34 @@ const circleStyles = StyleSheet.create({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const SOURCE_LABELS: Record<string, string> = {
-  NMC_API: 'NMC / Surepass Check',
-  SMC_PORTAL: 'State Medical Council Portal',
+  NMC_API: 'Official Records Check',
+  SMC_PORTAL: 'Official Records Check',
   DIGILOCKER_CONSENT: 'DigiLocker Consent',
-  DOCUMENT_UPLOAD: 'Document Upload (OCR)',
+  DOCUMENT_UPLOAD: 'Document Upload',
   FACE: 'Face Verification',
   PIPELINE: 'Verification Pipeline',
 };
 
 function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source.replace(/_/g, ' ');
+}
+
+// Returns a human-readable status label for a log, considering admin approval
+function logStatusDisplay(log: VerificationLog): { text: string; isApproved: boolean } {
+  if (log.license?.status === 'APPROVED') {
+    return { text: '✅ Approved by Admin', isApproved: true };
+  }
+  if (log.license?.status === 'REJECTED') {
+    const reason = log.license.rejectionReason ? ` — ${log.license.rejectionReason}` : '';
+    return { text: `❌ Rejected by Admin${reason}`, isApproved: false };
+  }
+  if (log.rawResponse?.issueLabel) {
+    if (log.rawResponse.issueLabel === 'Pending Admin Approval') {
+      return { text: '🔒 Awaiting admin review', isApproved: false };
+    }
+    return { text: `⚠️ ${log.rawResponse.issueLabel}`, isApproved: false };
+  }
+  return { text: '', isApproved: false };
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -151,9 +174,7 @@ export const KycScreen: React.FC = () => {
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [fullName, setFullName] = useState('');
   const [regNumber, setRegNumber] = useState('');
-  const [stateCouncil, setStateCouncil] = useState('');
-  const [showCouncilPicker, setShowCouncilPicker] = useState(false);
-  const [councilSearch, setCouncilSearch] = useState('');
+  const [yearOfAdmission, setYearOfAdmission] = useState('');
   const [selectedLog, setSelectedLog] = useState<VerificationLog | null>(null);
   // Show document upload view
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
@@ -162,19 +183,98 @@ export const KycScreen: React.FC = () => {
   // Staged document URIs before submission
   const [pendingAadhaarUri, setPendingAadhaarUri] = useState<string | null>(null);
   const [pendingCertUri, setPendingCertUri] = useState<string | null>(null);
+  // Aadhaar number for API validation
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  // Camera capture confirmation — shown after camera capture, before returning to doc list
+  // base64 is only set for face capture (needed for API submission)
+  const [captureConfirm, setCaptureConfirm] = useState<{
+    uri: string;
+    base64?: string | null;
+    onConfirm: (uri: string, base64?: string | null) => void;
+  } | null>(null);
+  // "resume or start fresh" prompt state
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const progressRestoredRef = useRef(false);
 
   const [progress, setProgress] = useState<VerificationProgress>({
-    nmc: 'pending',
-    smc: 'pending',
-    digilocker: 'pending',
+    records: 'pending',
     documents: 'pending',
     face: 'pending',
   });
+  // true when the NMC API call itself errored (distinct from a genuine not-found result)
+  const [nmcCheckError, setNmcCheckError] = useState(false);
 
   const { data: logs = [], isLoading: logsLoading } = useQuery({
     queryKey: ['verification-logs'],
     queryFn: providerService.getVerificationLogs,
   });
+
+  // ── Restore progress from existing logs (runs once after logs load) ─────────
+
+  useEffect(() => {
+    if (progressRestoredRef.current) return;
+    const logList = logs as VerificationLog[];
+    if (logList.length === 0) return;
+    progressRestoredRef.current = true;
+
+    const pipelineLog = logList.find((l) => l.verificationSource === 'PIPELINE');
+    const docLog = logList.find((l) => l.verificationSource === 'DOCUMENT_UPLOAD');
+    const faceLog = logList.find(
+      (l) => l.verificationSource === 'FACE' && l.status === 'SUCCESS',
+    );
+
+    if (!pipelineLog && !docLog && !faceLog) return;
+
+    setShowResumePrompt(true);
+
+    // Derive the latest licenseId from the most recent log that has one
+    const licenseIdFromLog =
+      pipelineLog?.licenseId ??
+      docLog?.licenseId ??
+      null;
+
+    const restoredProgress: VerificationProgress = {
+      records: pipelineLog
+        ? pipelineLog.license?.status === 'APPROVED' || pipelineLog.status === 'SUCCESS'
+          ? 'done'
+          : 'failed'
+        : 'pending',
+      documents: docLog ? 'done' : 'pending',
+      face: faceLog ? 'done' : 'pending',
+      licenseId: licenseIdFromLog ?? undefined,
+    };
+
+    // Pre-populate name/reg fields from the pipeline log if available
+    if (pipelineLog?.registrationNumber && pipelineLog.registrationNumber !== 'FACE_CHECK') {
+      setRegNumber(pipelineLog.registrationNumber);
+    }
+
+    const _resolve = (resume: boolean) => {
+      setShowResumePrompt(false);
+      if (resume) {
+        setProgress(restoredProgress);
+        setWizardStep(3);
+      }
+    };
+
+    Alert.alert(
+      'Resume Verification',
+      'You have an in-progress KYC verification. Would you like to continue from where you left off, or start fresh?',
+      [
+        {
+          text: 'Start Fresh',
+          style: 'destructive',
+          onPress: () => _resolve(false),
+        },
+        {
+          text: 'Continue',
+          style: 'default',
+          onPress: () => _resolve(true),
+        },
+      ],
+      { cancelable: false },
+    );
+  }, [logs]);
 
   // ── Step 1 → 2 ─────────────────────────────────────────────────────────────
 
@@ -192,21 +292,25 @@ export const KycScreen: React.FC = () => {
     mutationFn: (payload: NmcVerificationPayload) =>
       providerService.submitNmcVerification(payload),
     onMutate: () => {
-      setProgress((p) => ({ ...p, nmc: 'processing', smc: 'pending' }));
+      setProgress((p) => ({ ...p, records: 'processing' }));
     },
     onSuccess: (data: any) => {
-      const nmcStep = (data?.steps ?? []).find((s: PipelineStep) => s.source === 'NMC_API');
-      const smcStep = (data?.steps ?? []).find((s: PipelineStep) => s.source === 'SMC_PORTAL');
+      setNmcCheckError(false);
+      // The cached/already-approved path returns { status: 'APPROVED', cached: true }
+      // with no `steps` property — treat that as "found" so the circle shows green.
+      const isApproved = data?.status === 'APPROVED';
+      const anyFound =
+        isApproved || (data?.steps ?? []).some((s: PipelineStep) => s.found);
       setProgress((p) => ({
         ...p,
-        nmc: nmcStep?.found ? 'done' : 'failed',
-        smc: smcStep?.found ? 'done' : 'failed',
+        records: anyFound ? 'done' : 'failed',
         licenseId: data?.license?.id ?? p.licenseId,
       }));
       queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
     },
     onError: () => {
-      setProgress((p) => ({ ...p, nmc: 'failed', smc: 'failed' }));
+      setNmcCheckError(true);
+      setProgress((p) => ({ ...p, records: 'failed' }));
     },
   });
 
@@ -215,43 +319,23 @@ export const KycScreen: React.FC = () => {
       Alert.alert('Required', 'Please enter your registration number.');
       return;
     }
-    if (!stateCouncil) {
-      Alert.alert('Required', 'Please select your State Medical Council.');
+    const yearVal = yearOfAdmission.trim();
+    const currentYear = new Date().getFullYear();
+    if (!yearVal || !/^\d{4}$/.test(yearVal)) {
+      Alert.alert('Required', 'Please enter a valid 4-digit year of registration.');
+      return;
+    }
+    const yearNum = parseInt(yearVal, 10);
+    if (yearNum < 1950 || yearNum > currentYear) {
+      Alert.alert('Invalid Year', `Year of registration must be between 1950 and ${currentYear}.`);
       return;
     }
     setWizardStep(3);
     nmcMutation.mutate({
       fullName: fullName.trim(),
       nmcRegistrationNumber: regNumber.trim(),
-      stateCouncil,
-      yearOfAdmission: new Date().getFullYear().toString(),
+      yearOfAdmission: yearVal,
     });
-  };
-
-  // ── DigiLocker ─────────────────────────────────────────────────────────────
-
-  const digilockerMutation = useMutation({
-    mutationFn: () => providerService.recordDigilockerConsent(progress.licenseId),
-    onMutate: () => setProgress((p) => ({ ...p, digilocker: 'processing' })),
-    onSuccess: () =>
-      setProgress((p) => ({ ...p, digilocker: 'done', documents: 'done' })),
-    onError: () => setProgress((p) => ({ ...p, digilocker: 'failed' })),
-  });
-
-  const handleDigilockerConsent = () => {
-    Alert.alert(
-      'DigiLocker Consent',
-      'By tapping "I Agree", you authorise Curex24 to fetch your Aadhaar and medical registration documents from DigiLocker for verification.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'I Agree',
-          onPress: () => {
-            digilockerMutation.mutate();
-          },
-        },
-      ],
-    );
   };
 
   // ── Documents ──────────────────────────────────────────────────────────────
@@ -259,46 +343,61 @@ export const KycScreen: React.FC = () => {
   const documentsMutation = useMutation({
     mutationFn: (payload: VerificationDocumentsPayload) =>
       providerService.submitVerificationDocuments(payload),
-    onSuccess: () => setProgress((p) => ({ ...p, documents: 'done' })),
+    onSuccess: () => {
+      setProgress((p) => ({ ...p, documents: 'done' }));
+      setShowDocumentUpload(false);
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
+    },
     onError: () => setProgress((p) => ({ ...p, documents: 'failed' })),
   });
 
-  const pickImage = async (fromCamera: boolean): Promise<string | null> => {
-    if (fromCamera) {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-        allowsEditing: true,
-        aspect: [4, 3],
-      });
-      if (!result.canceled && result.assets[0]) return result.assets[0].uri;
-    } else {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-        allowsEditing: true,
-      });
-      if (!result.canceled && result.assets[0]) return result.assets[0].uri;
+  /** Launch camera with crop editing. After capture, shows the OK confirmation overlay. */
+  const pickFromCamera = async (
+    onConfirm: (uri: string, base64?: string | null) => void,
+    opts?: { aspect?: [number, number]; base64?: boolean; front?: boolean },
+  ) => {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: opts?.aspect ?? [4, 3],
+      base64: opts?.base64 ?? false,
+      cameraType: opts?.front
+        ? ImagePicker.CameraType.front
+        : ImagePicker.CameraType.back,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      const b64 = result.assets[0].base64 ?? null;
+      setCaptureConfirm({ uri, base64: b64, onConfirm });
     }
-    return null;
   };
 
-  const promptImageSource = (title: string, onPick: (uri: string) => void) => {
+  /** Launch gallery picker — gallery has native confirmation, no extra step needed. */
+  const pickFromGallery = async (onPick: (uri: string) => void) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      onPick(result.assets[0].uri);
+    }
+  };
+
+  const promptImageSource = (
+    title: string,
+    onPick: (uri: string, base64?: string | null) => void,
+  ) => {
     Alert.alert(title, 'How would you like to provide this document?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Take Photo',
-        onPress: async () => {
-          const uri = await pickImage(true);
-          if (uri) onPick(uri);
-        },
+        onPress: () => pickFromCamera(onPick),
       },
       {
         text: 'Choose from Gallery',
-        onPress: async () => {
-          const uri = await pickImage(false);
-          if (uri) onPick(uri);
-        },
+        onPress: () => pickFromGallery((uri) => onPick(uri, null)),
       },
     ]);
   };
@@ -330,8 +429,9 @@ export const KycScreen: React.FC = () => {
       aadhaarDocumentUrl: pendingAadhaarUri,
       medicalCertificateUrl: pendingCertUri,
       licenseId: progress.licenseId,
+      aadhaarNumber: aadhaarNumber.trim() || undefined,
     });
-  }, [pendingAadhaarUri, pendingCertUri, progress.licenseId]);
+  }, [pendingAadhaarUri, pendingCertUri, progress.licenseId, aadhaarNumber]);
 
   // ── Face Verification ──────────────────────────────────────────────────────
 
@@ -341,6 +441,7 @@ export const KycScreen: React.FC = () => {
     onSuccess: () => {
       setFaceChecking(false);
       setProgress((p) => ({ ...p, face: 'done' }));
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
     },
     onError: () => {
       setFaceChecking(false);
@@ -364,34 +465,53 @@ export const KycScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Take Selfie',
-          onPress: async () => {
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              quality: 0.7,
-              allowsEditing: true,
-              aspect: [1, 1],
-              cameraType: ImagePicker.CameraType.front,
-              base64: true,
-            });
-            if (!result.canceled && result.assets[0]?.base64) {
-              setFaceChecking(true);
-              setProgress((p) => ({ ...p, face: 'processing' }));
-              faceMutation.mutate(`data:image/jpeg;base64,${result.assets[0].base64}`);
-            }
-          },
+          onPress: () =>
+            pickFromCamera(
+              (_uri, b64) => {
+                if (b64) {
+                  setFaceChecking(true);
+                  setProgress((p) => ({ ...p, face: 'processing' }));
+                  faceMutation.mutate(`data:image/jpeg;base64,${b64}`);
+                }
+              },
+              { aspect: [1, 1], base64: true, front: true },
+            ),
         },
       ],
     );
   }, []);
 
+  // ── Delete Log ─────────────────────────────────────────────────────────────
+
+  const deleteLogMutation = useMutation({
+    mutationFn: (logId: string) => providerService.deleteVerificationLog(logId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to delete log entry. Please try again.');
+    },
+  });
+
+  const handleDeleteLog = (log: VerificationLog) => {
+    Alert.alert(
+      'Delete Log Entry',
+      'Remove this verification attempt from your history? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteLogMutation.mutate(log.id),
+        },
+      ],
+    );
+  };
+
   // ── Derived state ──────────────────────────────────────────────────────────
 
-  const filteredCouncils = INDIAN_STATE_COUNCILS.filter((c) =>
-    c.toLowerCase().includes(councilSearch.toLowerCase()),
-  );
-
   const isAutomatedDone =
-    progress.nmc !== 'pending' && progress.nmc !== 'processing';
+    progress.records !== 'pending' && progress.records !== 'processing';
 
   const allStepsDone =
     progress.documents === 'done' &&
@@ -458,12 +578,13 @@ export const KycScreen: React.FC = () => {
           </View>
         )}
 
-        {/* ════ STEP 2 — Registration + Council ════ */}
+        {/* ════ STEP 2 — Registration Details ════ */}
         {wizardStep === 2 && (
           <View style={styles.stepBox}>
             <Text style={styles.stepTitle}>Registration Details</Text>
             <Text style={styles.stepDesc}>
-              Enter your medical registration number and select your State Medical Council.
+              Enter your medical registration number and year. Your credentials will be
+              verified against official healthcare authority records.
             </Text>
 
             <Text style={styles.label}>
@@ -480,20 +601,19 @@ export const KycScreen: React.FC = () => {
             />
 
             <Text style={styles.label}>
-              State Medical Council <Text style={styles.req}>*</Text>
+              Year of Registration <Text style={styles.req}>*</Text>
             </Text>
-            <TouchableOpacity
-              style={[styles.input, styles.pickerBtn]}
-              onPress={() => {
-                setCouncilSearch('');
-                setShowCouncilPicker(true);
-              }}
-            >
-              <Text style={stateCouncil ? styles.pickerValue : styles.pickerPlaceholder}>
-                {stateCouncil || 'Select your State Medical Council'}
-              </Text>
-              <Text style={styles.chevron}>{'▼'}</Text>
-            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 2015"
+              placeholderTextColor={Colors.textMuted}
+              value={yearOfAdmission}
+              onChangeText={setYearOfAdmission}
+              keyboardType="number-pad"
+              maxLength={4}
+              returnKeyType="done"
+              onSubmitEditing={handleStep2Submit}
+            />
 
             <TouchableOpacity
               style={[
@@ -520,8 +640,7 @@ export const KycScreen: React.FC = () => {
             <View style={styles.circlesRow}>
               {(
                 [
-                  { key: 'nmc' as keyof VerificationProgress, label: 'NMC\nCheck' },
-                  { key: 'smc' as keyof VerificationProgress, label: 'SMC\nPortal' },
+                  { key: 'records' as keyof VerificationProgress, label: 'Official\nRecords' },
                   { key: 'documents' as keyof VerificationProgress, label: 'Documents' },
                   { key: 'face' as keyof VerificationProgress, label: 'Face\nCheck' },
                 ]
@@ -532,7 +651,7 @@ export const KycScreen: React.FC = () => {
                     label={item.label}
                     status={progress[item.key] as StepStatus}
                   />
-                  {index < 3 && <View style={styles.circleLine} />}
+                  {index < 2 && <View style={styles.circleLine} />}
                 </React.Fragment>
               ))}
             </View>
@@ -543,65 +662,43 @@ export const KycScreen: React.FC = () => {
             </View>
 
             {/* Automated check — loading */}
-            {progress.nmc === 'processing' && (
+            {progress.records === 'processing' && (
               <View style={styles.card}>
                 <ActivityIndicator color={Colors.primary} style={{ marginBottom: 10 }} />
                 <Text style={styles.cardTitle}>Checking your registration…</Text>
                 <Text style={styles.cardDesc}>
-                  Verifying with NMC and State Medical Council. This takes a few seconds.
+                  Verifying your registration against official medical authority records.
+                  This takes a few seconds.
                 </Text>
               </View>
             )}
 
-            {/* Automated check — results */}
+            {/* Automated check — result */}
             {isAutomatedDone && (
-              <>
-                <View
-                  style={[
-                    styles.card,
-                    styles.resultCard,
-                    {
-                      borderLeftColor:
-                        progress.nmc === 'done' ? '#22C55E' : '#EF4444',
-                    },
-                  ]}
-                >
-                  <Text style={styles.resultIcon}>
-                    {progress.nmc === 'done' ? '✅' : '❌'}
+              <View
+                style={[
+                  styles.card,
+                  styles.resultCard,
+                  {
+                    borderLeftColor:
+                      progress.records === 'done' ? '#22C55E' : '#EF4444',
+                  },
+                ]}
+              >
+                <Text style={styles.resultIcon}>
+                  {progress.records === 'done' ? '✅' : '⚠️'}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>Official Records Verification</Text>
+                  <Text style={styles.cardDesc}>
+                    {progress.records === 'done'
+                      ? 'Your registration was found in official medical authority records.'
+                      : nmcCheckError
+                        ? 'Verification check encountered an issue. Our admin team will review manually.'
+                        : 'Registration not found in official records. Our admin team will review manually.'}
                   </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>NMC Verification</Text>
-                    <Text style={styles.cardDesc}>
-                      {progress.nmc === 'done'
-                        ? 'Found in National Medical Commission records.'
-                        : 'Not found in NMC records. Our admin team will review manually.'}
-                    </Text>
-                  </View>
                 </View>
-
-                <View
-                  style={[
-                    styles.card,
-                    styles.resultCard,
-                    {
-                      borderLeftColor:
-                        progress.smc === 'done' ? '#22C55E' : '#EF4444',
-                    },
-                  ]}
-                >
-                  <Text style={styles.resultIcon}>
-                    {progress.smc === 'done' ? '✅' : '❌'}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>State Medical Council</Text>
-                    <Text style={styles.cardDesc}>
-                      {progress.smc === 'done'
-                        ? `Verified on ${stateCouncil}.`
-                        : 'Not found on the State Medical Council portal. Admin will review.'}
-                    </Text>
-                  </View>
-                </View>
-              </>
+              </View>
             )}
 
             {/* Document Upload — shown as action card */}
@@ -609,8 +706,7 @@ export const KycScreen: React.FC = () => {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>{'📄 Upload Documents'}</Text>
                 <Text style={styles.cardDesc}>
-                  Upload your MBBS certificate, registration certificate and Aadhaar card
-                  for verification.
+                  Upload your Aadhaar card and medical certificate for verification.
                 </Text>
                 <TouchableOpacity
                   style={[
@@ -682,36 +778,54 @@ export const KycScreen: React.FC = () => {
               ) : (logs as VerificationLog[]).length === 0 ? (
                 <Text style={styles.noLogsText}>No verification attempts yet.</Text>
               ) : (
-                (logs as VerificationLog[]).map((log) => (
-                  <TouchableOpacity
-                    key={log.id}
-                    style={styles.logItem}
-                    onPress={() => setSelectedLog(log)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.logRow}>
-                      <Text style={styles.logSource} numberOfLines={1}>
-                        {sourceLabel(log.verificationSource ?? log.status)}
-                      </Text>
-                      <Text style={styles.logDate}>
-                        {new Date(log.createdAt).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
-                    {log.rawResponse?.issueLabel && (
-                      <Text style={styles.logStatus}>
-                        {log.rawResponse.issueLabel === 'Pending Admin Approval'
-                          ? '🔒 Awaiting admin review'
-                          : `⚠️ ${log.rawResponse.issueLabel}`}
-                      </Text>
-                    )}
-                    <Text style={styles.logHint}>{'Tap to view details →'}</Text>
-                  </TouchableOpacity>
-                ))
+                (logs as VerificationLog[]).map((log) => {
+                  const { text: statusText, isApproved } = logStatusDisplay(log);
+                  return (
+                    <TouchableOpacity
+                      key={log.id}
+                      style={[
+                        styles.logItem,
+                        isApproved && styles.logItemApproved,
+                      ]}
+                      onPress={() => setSelectedLog(log)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.logRow}>
+                        <Text style={styles.logSource} numberOfLines={1}>
+                          {sourceLabel(log.verificationSource ?? log.status)}
+                        </Text>
+                        <View style={styles.logRowRight}>
+                          <Text style={styles.logDate}>
+                            {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.logDeleteBtn}
+                            onPress={() => handleDeleteLog(log)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.logDeleteBtnText}>{'🗑'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
+                      {statusText ? (
+                        <Text
+                          style={[
+                            styles.logStatus,
+                            isApproved && styles.logStatusApproved,
+                          ]}
+                        >
+                          {statusText}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.logHint}>{'Tap to view details →'}</Text>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           </View>
@@ -720,59 +834,33 @@ export const KycScreen: React.FC = () => {
         {/* ════ STEP 3 — Document Upload sub-view ════ */}
         {wizardStep === 3 && showDocumentUpload && (
           <View style={styles.stepBox}>
-            <TouchableOpacity
-              style={styles.backBtnInline}
-              onPress={() => setShowDocumentUpload(false)}
-            >
-              <Text style={styles.backBtnInlineText}>{'← Back'}</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.backBtnInline}
+                onPress={() => setShowDocumentUpload(false)}
+              >
+                <Text style={styles.backBtnInlineText}>{'← Back'}</Text>
+              </TouchableOpacity>
 
-            <Text style={styles.stepTitle}>Upload Documents</Text>
-            <Text style={styles.stepDesc}>
-              Upload your verification documents manually, or fetch them automatically
-              from DigiLocker.
-            </Text>
+              <Text style={styles.stepTitle}>Upload Documents</Text>
+              <Text style={styles.stepDesc}>
+                Provide your Aadhaar card and medical certificate for identity
+                and credential verification.
+              </Text>
 
-            {/* DigiLocker option */}
-            {progress.documents !== 'done' && (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>{'🔐 Fetch from DigiLocker'}</Text>
-                <Text style={styles.cardDesc}>
-                  Allow Curex24 to securely fetch your Aadhaar and medical certificate from
-                  DigiLocker automatically — no manual upload needed.
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    digilockerMutation.isPending && styles.actionBtnDisabled,
-                  ]}
-                  onPress={handleDigilockerConsent}
-                  disabled={digilockerMutation.isPending}
-                >
-                  {digilockerMutation.isPending ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.actionBtnText}>{'🔐  Connect DigiLocker'}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
+                {/* Aadhaar number validation */}
+                <Text style={styles.label}>Aadhaar Number (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="12-digit Aadhaar number"
+                  placeholderTextColor={Colors.textMuted}
+                  value={aadhaarNumber}
+                  onChangeText={(v) => setAadhaarNumber(v.replace(/\D/g, '').slice(0, 12))}
+                  keyboardType="number-pad"
+                  maxLength={12}
+                />
 
-            {/* OR divider */}
-            {progress.documents !== 'done' && (
-              <View style={styles.orDivider}>
-                <View style={styles.orLine} />
-                <Text style={styles.orText}>OR</Text>
-                <View style={styles.orLine} />
-              </View>
-            )}
-
-            {/* Manual upload */}
-            {progress.documents !== 'done' && (
-              <>
-                <Text style={[styles.label, { marginBottom: 12 }]}>Upload Manually</Text>
-
-                {/* Aadhaar picker */}
+                {/* Aadhaar photo picker */}
                 <TouchableOpacity
                   style={[styles.docPickerRow, pendingAadhaarUri && styles.docPickerRowDone]}
                   onPress={handlePickAadhaar}
@@ -806,7 +894,7 @@ export const KycScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Submit for verification */}
+                {/* Submit button — enabled only after both docs captured */}
                 <TouchableOpacity
                   style={[
                     styles.primaryBtn,
@@ -823,82 +911,12 @@ export const KycScreen: React.FC = () => {
                       <Text style={styles.primaryBtnText}>Uploading…</Text>
                     </View>
                   ) : (
-                    <Text style={styles.primaryBtnText}>{'📤  Submit for Verification'}</Text>
+                    <Text style={styles.primaryBtnText}>{'📤  Submit Documents'}</Text>
                   )}
                 </TouchableOpacity>
               </>
-            )}
-
-            {progress.documents === 'done' && (
-              <View style={[styles.card, styles.doneCard, { marginTop: 16 }]}>
-                <Text style={styles.doneCardText}>{'✅  Documents uploaded successfully'}</Text>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { marginTop: 12 }]}
-                  onPress={() => setShowDocumentUpload(false)}
-                >
-                  <Text style={styles.actionBtnText}>Continue to Face Verification</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
-
-        {/* ── Council Picker Modal ── */}
-        <Modal
-          visible={showCouncilPicker}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setShowCouncilPicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select State Medical Council</Text>
-                <TouchableOpacity onPress={() => setShowCouncilPicker(false)}>
-                  <Text style={styles.modalClose}>{'✕'}</Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search council..."
-                placeholderTextColor={Colors.textMuted}
-                value={councilSearch}
-                onChangeText={setCouncilSearch}
-                autoFocus
-              />
-              <FlatList
-                data={filteredCouncils}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.councilItem,
-                      stateCouncil === item && styles.councilItemSelected,
-                    ]}
-                    onPress={() => {
-                      setStateCouncil(item);
-                      setShowCouncilPicker(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.councilItemText,
-                        stateCouncil === item && styles.councilItemTextSelected,
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                    {stateCouncil === item && (
-                      <Text style={styles.checkmark}>{'✓'}</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-                style={{ maxHeight: 400 }}
-                keyboardShouldPersistTaps="handled"
-              />
-            </View>
-          </View>
-        </Modal>
 
         {/* ── Log Detail Modal ── */}
         <Modal
@@ -976,9 +994,20 @@ export const KycScreen: React.FC = () => {
                   {selectedLog.rawResponse?.issueLabel && (
                     <View style={styles.stuckBanner}>
                       <Text style={styles.stuckBannerText}>
-                        {selectedLog.rawResponse.issueLabel === 'Pending Admin Approval'
-                          ? '🔒 All checks done — waiting for admin approval'
-                          : `⚠️ Stuck at: ${selectedLog.rawResponse.issueLabel}`}
+                        {selectedLog.license?.status === 'APPROVED'
+                          ? '✅ Admin has approved this submission'
+                          : selectedLog.license?.status === 'REJECTED'
+                            ? `❌ Admin rejected${selectedLog.license.rejectionReason ? ': ' + selectedLog.license.rejectionReason : ''}`
+                            : selectedLog.rawResponse.issueLabel === 'Pending Admin Approval'
+                              ? '🔒 All checks done — waiting for admin approval'
+                              : `⚠️ Stuck at: ${selectedLog.rawResponse.issueLabel}`}
+                      </Text>
+                    </View>
+                  )}
+                  {!selectedLog.rawResponse?.issueLabel && selectedLog.license?.status === 'APPROVED' && (
+                    <View style={[styles.stuckBanner, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                      <Text style={[styles.stuckBannerText, { color: '#16A34A' }]}>
+                        ✅ Admin has approved this submission
                       </Text>
                     </View>
                   )}
@@ -988,6 +1017,47 @@ export const KycScreen: React.FC = () => {
           )}
         </Modal>
       </ScrollView>
+
+      {/* ── Global captureConfirm overlay (face or document capture) ── */}
+      <Modal
+        visible={!!captureConfirm}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCaptureConfirm(null)}
+      >
+        {captureConfirm && (
+          <View style={styles.captureModalOverlay}>
+            <View style={styles.captureConfirmWrapper}>
+              <Text style={styles.captureConfirmTitle}>Photo Captured</Text>
+              <Text style={styles.captureConfirmSub}>
+                Looks good? Tap OK to use this photo, or Retake to try again.
+              </Text>
+              <Image
+                source={{ uri: captureConfirm.uri }}
+                style={styles.capturePreview}
+                resizeMode="cover"
+              />
+              <View style={styles.captureConfirmActions}>
+                <TouchableOpacity
+                  style={styles.captureRetakeBtn}
+                  onPress={() => setCaptureConfirm(null)}
+                >
+                  <Text style={styles.captureRetakeBtnText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.captureOkBtn}
+                  onPress={() => {
+                    captureConfirm.onConfirm(captureConfirm.uri, captureConfirm.base64);
+                    setCaptureConfirm(null);
+                  }}
+                >
+                  <Text style={styles.captureOkBtnText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 };
@@ -1039,10 +1109,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     marginBottom: 16,
   },
-  pickerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pickerPlaceholder: { color: Colors.textMuted, fontSize: 15, flex: 1 },
-  pickerValue: { color: Colors.text, fontSize: 15, flex: 1 },
-  chevron: { color: Colors.textMuted, fontSize: 12, marginLeft: 8 },
 
   primaryBtn: {
     backgroundColor: Colors.primary,
@@ -1163,16 +1229,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
+  logItemApproved: {
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
   logRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
+  logRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   logSource: { fontSize: 13, fontWeight: '700', color: Colors.text, flex: 1 },
   logDate: { fontSize: 11, color: Colors.textMuted, marginLeft: 8 },
+  logDeleteBtn: { padding: 2 },
+  logDeleteBtnText: { fontSize: 14 },
   logReg: { fontSize: 12, color: Colors.textMuted },
   logStatus: { fontSize: 12, color: '#D97706', marginTop: 4, fontWeight: '600' },
+  logStatusApproved: { color: '#16A34A' },
   logHint: { fontSize: 11, color: Colors.primary, marginTop: 6, fontStyle: 'italic' },
 
   modalOverlay: {
@@ -1196,28 +1275,6 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
   modalClose: { fontSize: 18, color: Colors.textMuted, padding: 4 },
-  searchInput: {
-    margin: 12,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    padding: 10,
-    fontSize: 14,
-    color: Colors.text,
-    backgroundColor: '#F8FAFC',
-  },
-  councilItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  councilItemSelected: { backgroundColor: '#EFF6FF' },
-  councilItemText: { flex: 1, fontSize: 14, color: Colors.text },
-  councilItemTextSelected: { fontWeight: '700', color: Colors.primary },
-  checkmark: { fontSize: 16, color: Colors.primary, fontWeight: '700' },
 
   detailDate: { fontSize: 12, color: Colors.textMuted, marginBottom: 4 },
   detailReg: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 16 },
@@ -1252,19 +1309,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  orDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  orLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
-  orText: {
-    marginHorizontal: 12,
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-
   docPickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1282,4 +1326,70 @@ const styles = StyleSheet.create({
   docPickerTitle: { fontSize: 14, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   docPickerSub: { fontSize: 12, color: Colors.textMuted },
   docPickerChevron: { fontSize: 20, color: Colors.textMuted, marginLeft: 8 },
+
+  // ── Capture confirmation overlay ────────────────────────────────────────────
+  captureModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  captureConfirmWrapper: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  captureConfirmTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 6,
+  },
+  captureConfirmSub: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  capturePreview: {
+    width: '100%',
+    height: 260,
+    borderRadius: 14,
+    marginBottom: 20,
+    backgroundColor: '#F1F5F9',
+  },
+  captureConfirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  captureRetakeBtn: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  captureRetakeBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  captureOkBtn: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+  },
+  captureOkBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.white,
+  },
 });

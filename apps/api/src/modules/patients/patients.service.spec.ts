@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 
 describe('PatientsService', () => {
   let service: PatientsService;
@@ -29,11 +30,18 @@ describe('PatientsService', () => {
     },
   };
 
+  const mockSupabaseSync = {
+    syncPatient: jest.fn().mockResolvedValue(undefined),
+    syncProvider: jest.fn().mockResolvedValue(undefined),
+    syncBooking: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PatientsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: SupabaseSyncService, useValue: mockSupabaseSync },
       ],
     }).compile();
 
@@ -70,7 +78,16 @@ describe('PatientsService', () => {
       expect(result).toEqual(mockProfile);
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: userId },
-        include: { patientProfile: true, addresses: true },
+        select: {
+          id: true,
+          phone: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          patientProfile: true,
+          addresses: true,
+        },
       });
     });
 

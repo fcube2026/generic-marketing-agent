@@ -84,14 +84,22 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ currentIndex, cancelled }) => {
   const fade = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.9)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     fade.setValue(0);
     scale.setValue(0.9);
-    Animated.parallel([
+
+    animationRef.current?.stop();
+    animationRef.current = Animated.parallel([
       Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(scale, { toValue: 1, friction: 6, useNativeDriver: true }),
-    ]).start();
+    ]);
+    animationRef.current.start();
+
+    return () => {
+      animationRef.current?.stop();
+    };
   }, [currentIndex, fade, scale]);
 
   return (

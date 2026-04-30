@@ -65,3 +65,12 @@ test-results/
 .idea
 *.swp
 *.swo
+
+# Dev Artifacts
+body.json
+build-info.json
+build-info-latest.json
+check.js
+seed-fixed.sql
+migration-log.txt
+sync_output.txt

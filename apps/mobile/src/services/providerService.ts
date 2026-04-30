@@ -4,7 +4,7 @@ import { ENDPOINTS } from '../constants/api';
 export interface NmcVerificationPayload {
   fullName: string;
   nmcRegistrationNumber: string;
-  stateCouncil: string;
+  stateCouncil?: string;
   yearOfAdmission: string;
   licenseId?: string;
 }
@@ -18,6 +18,7 @@ export interface VerificationDocumentsPayload {
   aadhaarDocumentUrl: string;
   medicalCertificateUrl: string;
   licenseId?: string;
+  aadhaarNumber?: string;
 }
 
 // Provider management service (used by provider screens)
@@ -79,6 +80,7 @@ export const providerService = {
     return r.data;
   },
 
+
   /** Submit NMC registration for automated multi-step verification. */
   submitNmcVerification: async (data: NmcVerificationPayload) => {
     const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
@@ -109,6 +111,12 @@ export const providerService = {
   /** Fetch all past verification log entries for the current provider. */
   getVerificationLogs: async () => {
     const r = await api.get(ENDPOINTS.VERIFICATION.LOGS);
+    return r.data;
+  },
+
+  /** Delete a specific verification log entry. */
+  deleteVerificationLog: async (logId: string) => {
+    const r = await api.delete(ENDPOINTS.VERIFICATION.DELETE_LOG(logId));
     return r.data;
   },
 
@@ -139,44 +147,12 @@ export const providerService = {
     return r.data;
   },
 
-  /** Submit NMC registration for automated multi-step verification. */
-  submitNmcVerification: async (data: NmcVerificationPayload) => {
-    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_NMC, data);
-    return r.data;
-  },
-
-  /** Submit face verification data (base64 live selfie). */
-  submitFaceVerification: async (data: FaceVerificationPayload) => {
-    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_FACE, data);
-    return r.data;
-  },
-
-  /** Upload Aadhaar + medical certificate document URLs for OCR and admin review. */
-  submitVerificationDocuments: async (data: VerificationDocumentsPayload) => {
-    const r = await api.post(ENDPOINTS.VERIFICATION.SUBMIT_DOCUMENTS, data);
-    return r.data;
-  },
-
-  /** Record the doctor's DigiLocker consent for secure document fetch. */
-  recordDigilockerConsent: async (licenseId?: string) => {
-    const r = await api.post(
-      ENDPOINTS.VERIFICATION.DIGILOCKER_CONSENT,
-      licenseId ? { licenseId } : {},
-    );
-    return r.data;
-  },
-
-  /** Fetch all past verification log entries for the current provider. */
-  getVerificationLogs: async () => {
-    const r = await api.get(ENDPOINTS.VERIFICATION.LOGS);
-    return r.data;
-  },
-
   // Patient-side: discover nearby providers
   getNearbyProviders: async (params: {
     lat?: number;
     lng?: number;
     serviceCategory?: string;
+    serviceId?: string;
     mode?: string;
   }) => {
     const response = await api.get(ENDPOINTS.PROVIDERS.NEARBY, { params });

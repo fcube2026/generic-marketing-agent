@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../constants/colors';
 import { BookingStatusBadge } from '../../components/booking/BookingStatusBadge';
 import { PaymentStatusBadge } from '../../components/booking/PaymentStatusBadge';
@@ -17,10 +18,20 @@ type Nav = NativeStackNavigationProp<PatientStackParamList>;
 
 export const HistoryScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const { data: bookings, isLoading } = useQuery<Booking[]>({
+  const queryClient = useQueryClient();
+  const { data: bookings, isLoading, refetch, isRefetching } = useQuery<Booking[]>({
     queryKey: ['patient-bookings'],
     queryFn: bookingService.getMyBookings,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
+    }, [queryClient]),
+  );
 
   if (isLoading) return <LoadingSpinner fullScreen message="Loading history..." />;
 
@@ -39,22 +50,21 @@ export const HistoryScreen: React.FC = () => {
           data={bookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
+          }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.item}
               onPress={() => {
-                if (item.mode === 'VIDEO_CONSULTATION') {
-                  navigation.navigate('VideoLobby', { bookingId: item.id });
-                } else {
-                  navigation.navigate('Tracking', { bookingId: item.id });
-                }
+                navigation.navigate('Tracking', { bookingId: item.id });
               }}
             >
               <View style={styles.itemHeader}>
                 <Text style={styles.providerName}>{item.provider?.name || 'Provider'}</Text>
                 <BookingStatusBadge status={item.status as BookingStatus} />
               </View>
-              <Text style={styles.service}>{item.serviceCategory?.name}{item.mode === 'VIDEO_CONSULTATION' ? ' 🎥' : ''}</Text>
+              <Text style={styles.service}>{item.serviceCategory?.name}</Text>
               <View style={styles.itemFooter}>
                 <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
                 <PaymentStatusBadge status={item.paymentStatus as PaymentStatus} />

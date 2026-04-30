@@ -3,7 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { DiagnosticStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
+import { PrescriptionStorageService } from '../prescription/prescription-storage.service';
 import { CreateProviderProfileDto } from './dto/create-provider-profile.dto';
 import { UpdateProviderProfileDto } from './dto/update-provider-profile.dto';
 import { UpdateProviderAvailabilityDto } from './dto/update-provider-availability.dto';
@@ -30,7 +33,11 @@ function haversineDistance(
 
 @Injectable()
 export class ProvidersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly supabaseSync: SupabaseSyncService,
+    private readonly prescriptionStorage: PrescriptionStorageService,
+  ) {}
 
   private async findBestServiceCategory(specialization: string) {
     if (!specialization || typeof specialization !== 'string') return null;
@@ -199,13 +206,18 @@ export class ProvidersService {
 
     await this.ensureProviderServiceLink(profile.id, profile.specialization);
 
-    return this.prisma.providerProfile.findUnique({
-      where: { id: profile.id },
-      include: {
-        providerServices: { include: { serviceCategory: true } },
-        user: true,
-      },
-    });
+    return this.prisma.providerProfile
+      .findUnique({
+        where: { id: profile.id },
+        include: {
+          providerServices: { include: { serviceCategory: true } },
+          user: true,
+        },
+      })
+      .then(async (full) => {
+        if (full) await this.supabaseSync.syncProvider(full);
+        return full;
+      });
   }
 
   async getMyProfile(userId: string) {
@@ -262,10 +274,15 @@ export class ProvidersService {
       profileData.specialization ?? profile.specialization ?? '',
     );
 
-    return this.prisma.providerProfile.findUnique({
-      where: { id: profile.id },
-      include: { providerServices: { include: { serviceCategory: true } } },
-    });
+    return this.prisma.providerProfile
+      .findUnique({
+        where: { id: profile.id },
+        include: { providerServices: { include: { serviceCategory: true } } },
+      })
+      .then(async (full) => {
+        if (full) await this.supabaseSync.syncProvider(full);
+        return full;
+      });
   }
 
   async updateAvailability(userId: string, dto: UpdateProviderAvailabilityDto) {
@@ -274,17 +291,22 @@ export class ProvidersService {
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
-    return this.prisma.providerProfile.update({
-      where: { userId },
-      data: {
-        isAvailable: dto.isAvailable,
-        ...(dto.currentLat !== undefined && { currentLat: dto.currentLat }),
-        ...(dto.currentLng !== undefined && { currentLng: dto.currentLng }),
-        ...(dto.serviceRadius !== undefined && {
-          serviceRadius: dto.serviceRadius,
-        }),
-      },
-    });
+    return this.prisma.providerProfile
+      .update({
+        where: { userId },
+        data: {
+          isAvailable: dto.isAvailable,
+          ...(dto.currentLat !== undefined && { currentLat: dto.currentLat }),
+          ...(dto.currentLng !== undefined && { currentLng: dto.currentLng }),
+          ...(dto.serviceRadius !== undefined && {
+            serviceRadius: dto.serviceRadius,
+          }),
+        },
+      })
+      .then(async (updated) => {
+        await this.supabaseSync.syncProvider(updated);
+        return updated;
+      });
   }
 
   async getMyBookings(userId: string) {
@@ -305,6 +327,49 @@ export class ProvidersService {
     });
   }
 
+  private mapBookingStatus(
+    status: string,
+  ): 'scheduled' | 'in_progress' | 'completed' | 'cancelled' {
+    if (['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(status))
+      return 'completed';
+    if (status === 'IN_PROGRESS') return 'in_progress';
+    if (['DECLINED', 'CANCELLED'].includes(status)) return 'cancelled';
+    return 'scheduled';
+  }
+
+  private mapBookingToConsultation(
+    booking: Prisma.BookingGetPayload<{
+      include: {
+        patient: true;
+        consultationSummary: { include: { prescriptions: true } };
+        diagnosticRequests: true;
+      };
+    }>,
+  ) {
+    const dob = booking.patient?.dateOfBirth as Date | null | undefined;
+    const patientAge = dob
+      ? Math.floor(
+          (Date.now() - new Date(dob).getTime()) /
+            (1000 * 60 * 60 * 24 * 365.25),
+        )
+      : undefined;
+    return {
+      id: booking.id,
+      patientName: booking.patient?.name ?? 'Unknown',
+      patientUHID: booking.patient?.id ?? null,
+      patientAge,
+      patientGender: booking.patient?.gender ?? null,
+      scheduledAt: booking.scheduledAt,
+      status: this.mapBookingStatus(booking.status),
+      type: booking.mode,
+      chiefComplaint:
+        booking.consultationSummary?.symptoms ?? booking.symptoms ?? null,
+      diagnosis: booking.consultationSummary?.diagnosis ?? null,
+      prescription: booking.consultationSummary?.prescriptions ?? [],
+      labReports: booking.diagnosticRequests ?? [],
+    };
+  }
+
   async getDashboard(userId: string) {
     const profile = await this.prisma.providerProfile.findUnique({
       where: { userId },
@@ -316,41 +381,84 @@ export class ProvidersService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [todayConsultations, upcoming, completed, earnings] =
-      await Promise.all([
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            scheduledAt: { gte: today, lt: tomorrow },
-          },
-        }),
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            status: { in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED'] },
-            scheduledAt: { gte: today },
-          },
-        }),
-        this.prisma.booking.count({
-          where: {
-            providerId: profile.id,
-            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-          },
-        }),
-        this.prisma.booking.aggregate({
-          where: {
-            providerId: profile.id,
-            status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
-          },
-          _sum: { totalFee: true },
-        }),
-      ]);
+    const [
+      todayConsultations,
+      upcomingConsultations,
+      inProgressConsultations,
+      completedConsultations,
+      earnings,
+      totalPatients,
+      pendingLabReports,
+      recentBookingsRaw,
+    ] = await Promise.all([
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          scheduledAt: { gte: today, lt: tomorrow },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: { in: ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED'] },
+          scheduledAt: { gte: today },
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: 'IN_PROGRESS',
+        },
+      }),
+      this.prisma.booking.count({
+        where: {
+          providerId: profile.id,
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+      }),
+      this.prisma.booking.aggregate({
+        where: {
+          providerId: profile.id,
+          status: { in: ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'] },
+        },
+        _sum: { totalFee: true },
+      }),
+      this.prisma.booking
+        .findMany({
+          where: { providerId: profile.id },
+          select: { patientId: true },
+          distinct: ['patientId'],
+        })
+        .then((rows) => rows.length),
+      this.prisma.diagnosticRequest.count({
+        where: {
+          booking: { providerId: profile.id },
+          status: { notIn: [DiagnosticStatus.RESULTED] },
+        },
+      }),
+      this.prisma.booking.findMany({
+        where: { providerId: profile.id },
+        include: {
+          patient: true,
+          consultationSummary: { include: { prescriptions: true } },
+          diagnosticRequests: true,
+        },
+        orderBy: { scheduledAt: 'desc' },
+        take: 5,
+      }),
+    ]);
 
     return {
       todayConsultations,
-      upcoming,
-      completed,
+      upcomingConsultations,
+      inProgressConsultations,
+      completedConsultations,
       totalEarnings: earnings._sum.totalFee || 0,
+      totalPatients,
+      pendingLabReports,
+      recentConsultations: recentBookingsRaw.map((b) =>
+        this.mapBookingToConsultation(b),
+      ),
     };
   }
 
@@ -360,16 +468,19 @@ export class ProvidersService {
     });
     if (!profile) throw new NotFoundException('Provider profile not found');
 
-    return this.prisma.booking.findMany({
+    const bookings = await this.prisma.booking.findMany({
       where: { providerId: profile.id },
       include: {
-        patient: { include: { user: true } },
-        serviceCategory: true,
-        consultationSummary: true,
-        videoSession: true,
+        patient: true,
+        consultationSummary: { include: { prescriptions: true } },
+        diagnosticRequests: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
+
+    return {
+      consultations: bookings.map((b) => this.mapBookingToConsultation(b)),
+    };
   }
 
   async getPatients(userId: string) {
@@ -393,7 +504,6 @@ export class ProvidersService {
         id: string;
         name: string;
         phone: string;
-        email: string | null;
         gender: string | null;
         dateOfBirth: Date | null;
         visitCount: number;
@@ -410,7 +520,6 @@ export class ProvidersService {
           id: pid,
           name: booking.patient.name,
           phone: booking.patient.user.phone,
-          email: booking.patient.user.email ?? null,
           gender: booking.patient.gender ?? null,
           dateOfBirth: booking.patient.dateOfBirth ?? null,
           visitCount: 1,
@@ -438,7 +547,6 @@ export class ProvidersService {
         patient: { include: { user: true } },
         serviceCategory: true,
         consultationSummary: { include: { prescriptions: true } },
-        videoSession: true,
       },
       orderBy: { scheduledAt: 'desc' },
     });
@@ -450,16 +558,8 @@ export class ProvidersService {
     }
 
     const patient = bookings[0].patient;
-    return {
-      id: patient.id,
-      name: patient.name,
-      phone: patient.user.phone,
-      email: patient.user.email,
-      gender: patient.gender,
-      dateOfBirth: patient.dateOfBirth,
-      emergencyContact: patient.emergencyContact,
-      visitCount: bookings.length,
-      consultations: bookings.map((b) => ({
+    const consultations = await Promise.all(
+      bookings.map(async (b) => ({
         id: b.id,
         scheduledAt: b.scheduledAt,
         status: b.status,
@@ -467,23 +567,36 @@ export class ProvidersService {
         symptoms: b.symptoms,
         totalFee: b.totalFee,
         serviceCategory: b.serviceCategory.name,
-        videoSession: b.videoSession
-          ? {
-              id: b.videoSession.id,
-              status: b.videoSession.status,
-              roomId: b.videoSession.roomId,
-            }
-          : null,
         summary: b.consultationSummary
           ? {
               diagnosis: b.consultationSummary.diagnosis,
               observations: b.consultationSummary.observations,
               nextSteps: b.consultationSummary.nextSteps,
               followUp: b.consultationSummary.followUpRecommendation,
-              prescriptions: b.consultationSummary.prescriptions,
+              prescriptions: await Promise.all(
+                b.consultationSummary.prescriptions.map(
+                  async (prescription) => ({
+                    ...prescription,
+                    fileUrl: await this.prescriptionStorage.resolveReadUrl(
+                      prescription.fileUrl,
+                    ),
+                  }),
+                ),
+              ),
             }
           : null,
       })),
+    );
+
+    return {
+      id: patient.id,
+      name: patient.name,
+      phone: patient.user.phone,
+      gender: patient.gender,
+      dateOfBirth: patient.dateOfBirth,
+      emergencyContact: patient.emergencyContact,
+      visitCount: bookings.length,
+      consultations,
     };
   }
 
@@ -542,6 +655,7 @@ export class ProvidersService {
     lng: number,
     serviceCategory?: string,
     mode?: string,
+    serviceId?: string,
   ) {
     const normalizedCategorySlug = serviceCategory
       ?.trim()
@@ -550,7 +664,8 @@ export class ProvidersService {
       .replace(/^-+|-+$/g, '');
     const categoryLabel = normalizedCategorySlug?.replace(/-/g, ' ');
     const shouldApplyCategoryFilter =
-      normalizedCategorySlug && normalizedCategorySlug !== 'doctor';
+      (normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
+      !!serviceId;
 
     const providers = await this.prisma.providerProfile.findMany({
       where: {
@@ -561,25 +676,38 @@ export class ProvidersService {
         currentLng: { not: null },
         ...(shouldApplyCategoryFilter && {
           OR: [
-            {
-              providerServices: {
-                some: {
-                  serviceCategory: { slug: normalizedCategorySlug },
-                },
-              },
-            },
-            {
-              specialization: {
-                contains: normalizedCategorySlug,
-                mode: 'insensitive',
-              },
-            },
-            {
-              specialization: {
-                contains: categoryLabel,
-                mode: 'insensitive',
-              },
-            },
+            ...(serviceId
+              ? [
+                  {
+                    providerServices: {
+                      some: { serviceCategory: { id: serviceId } },
+                    },
+                  },
+                ]
+              : []),
+            ...(normalizedCategorySlug && normalizedCategorySlug !== 'doctor'
+              ? [
+                  {
+                    providerServices: {
+                      some: {
+                        serviceCategory: { slug: normalizedCategorySlug },
+                      },
+                    },
+                  },
+                  {
+                    specialization: {
+                      contains: normalizedCategorySlug,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    specialization: {
+                      contains: categoryLabel,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                ]
+              : []),
           ],
         }),
         ...(mode === 'HOME_VISIT' && { homeVisitEnabled: true }),

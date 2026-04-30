@@ -1,6 +1,6 @@
 // apps/mobile/app.config.ts
-// Dynamic Expo configuration supporting development, staging, and production variants.
-// Environment is determined by APP_ENV or EAS build profile.
+// Standard Expo configuration for the Curex24 Mobile App.
+// Reverted to stable JS-only state (Mock video flow enabled).
 
 const IS_STAGING = process.env.APP_ENV === 'staging';
 const IS_PRODUCTION = process.env.APP_ENV === 'production';
@@ -38,13 +38,10 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     supportsTablet: true,
     bundleIdentifier: getBundleId(),
     infoPlist: {
+      NSCameraUsageDescription: 'Allow Curex24 to access your camera for document upload.',
+      NSPhotoLibraryUsageDescription: 'Allow Curex24 to access your photos for document upload.',
+      NSPhotoLibraryAddUsageDescription: 'Allow Curex24 to save photos to your library.',
       UIBackgroundModes: ['remote-notification'],
-      NSCameraUsageDescription:
-        'Camera access is required for face verification and document capture during KYC.',
-      NSPhotoLibraryUsageDescription:
-        'Photo library access is required to upload verification documents (Aadhaar and medical certificate).',
-      NSPhotoLibraryAddUsageDescription:
-        'Photo library write access is required to save captured document images.',
     },
   },
   android: {
@@ -60,14 +57,11 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
       'android.permission.WRITE_EXTERNAL_STORAGE',
       'android.permission.READ_MEDIA_IMAGES',
     ],
-  },
-  web: {
-    favicon: './assets/icon.png',
+    useNextNotificationsApi: true,
   },
   extra: {
     appEnv: process.env.APP_ENV || 'development',
-    apiUrl:
-      process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
     eas: {
@@ -75,22 +69,13 @@ export default ({ config }: { config: Record<string, unknown> }) => ({
     },
   },
   plugins: [
-    './plugins/withStaticEntryFile',
+    'expo-splash-screen',
     [
       'expo-image-picker',
       {
         photosPermission: 'Allow Curex24 to access your photos for document upload.',
-        cameraPermission: 'Allow Curex24 to use the camera for face verification and document capture.',
       },
     ],
-    [
-      'expo-notifications',
-      {
-        icon: './assets/icon.png',
-        color: '#0D9488',
-        sounds: [],
-        mode: 'production',
-      },
-    ],
+    'expo-notifications',
   ],
 });

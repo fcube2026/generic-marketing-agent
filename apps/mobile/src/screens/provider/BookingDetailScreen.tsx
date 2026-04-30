@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Alert, Linking,
+  SafeAreaView, Alert, Linking, RefreshControl,
 } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
@@ -26,31 +27,38 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_ORDER_HOME = ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'];
-const STATUS_ORDER_VIDEO = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'];
 
 export const BookingDetailScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
+  const queryClient = useQueryClient();
   const { bookingId } = route.params;
-  const [booking, setBooking] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  const {
+    data: booking,
+    isLoading: loading,
+    refetch,
+    isRefetching,
+  } = useQuery<any>({
+    queryKey: ['booking', bookingId],
+    queryFn: () => bookingService.getBookingById(bookingId),
+    refetchInterval: 10000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
+  });
 
   // Push provider location at intervals for active home-visit bookings
   useProviderLocationTracking(bookingId, booking?.status);
-
-  useEffect(() => {
-    bookingService.getBookingById(bookingId).then(data => {
-      setBooking(data);
-      setLoading(false);
-    });
-  }, [bookingId]);
 
   const updateStatus = async (newStatus: string) => {
     setUpdating(true);
     try {
       await bookingService.updateStatus(bookingId, newStatus);
-      setBooking((prev: any) => ({ ...prev, status: newStatus }));
+      // Refresh both this booking and any list views (provider + patient).
+      await queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
       if (newStatus === 'IN_PROGRESS') {
         navigation.navigate('ConsultationForm', { bookingId });
       }
@@ -71,16 +79,17 @@ export const BookingDetailScreen: React.FC = () => {
     }
   };
 
-  const openMaps = (address: string) => {
-    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
-    Linking.openURL(url);
+  const invalidateAll = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+    queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
   };
 
   const handleAccept = async () => {
     setUpdating(true);
     try {
       await bookingService.acceptBooking(bookingId);
-      setBooking((prev: any) => ({ ...prev, status: 'ACCEPTED' }));
+      await invalidateAll();
     } catch {
       Alert.alert('Error', 'Failed to accept booking.');
     } finally {
@@ -89,7 +98,7 @@ export const BookingDetailScreen: React.FC = () => {
   };
 
   const handleDecline = () => {
-    Alert.alert('Decline Booking', 'Are you sure you want to decline this booking?', [
+    Alert.alert('Decline Booking', 'Are you sure you want to decline this request?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Decline',
@@ -98,7 +107,8 @@ export const BookingDetailScreen: React.FC = () => {
           setUpdating(true);
           try {
             await bookingService.declineBooking(bookingId);
-            setBooking((prev: any) => ({ ...prev, status: 'DECLINED' }));
+            await invalidateAll();
+            navigation.goBack();
           } catch {
             Alert.alert('Error', 'Failed to decline booking.');
           } finally {
@@ -109,6 +119,11 @@ export const BookingDetailScreen: React.FC = () => {
     ]);
   };
 
+  const openMaps = (address: string) => {
+    const url = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+    Linking.openURL(url);
+  };
+
   if (loading) {
     return <View style={styles.center}><Text style={styles.loadingText}>Loading booking…</Text></View>;
   }
@@ -117,17 +132,14 @@ export const BookingDetailScreen: React.FC = () => {
     return <View style={styles.center}><Text style={styles.loadingText}>Booking not found.</Text></View>;
   }
 
-  const isVideo = booking?.mode === 'VIDEO_CONSULTATION';
-  const STATUS_ORDER = isVideo ? STATUS_ORDER_VIDEO : STATUS_ORDER_HOME;
+  const STATUS_ORDER = STATUS_ORDER_HOME;
   const currentStep = STATUS_ORDER.indexOf(booking.status);
 
-  const getNextAction = () => {
-    if (isVideo) {
-      switch (booking.status) {
-        case 'ACCEPTED': return { label: '🎥 Go to Video Session', nav: 'VideoLobby' as const };
-        default: return null;
-      }
-    }
+  const getNextAction = (): { 
+    label: string; 
+    next?: string; 
+    nav?: 'ConsultationForm' | 'SafetyChecklist' | 'VisitOtp';
+  } | null => {
     switch (booking.status) {
       case 'ACCEPTED': return { label: '🚗 Start Journey', next: 'ON_THE_WAY' };
       case 'ON_THE_WAY': return { label: '📍 Mark Arrived', next: 'ARRIVED' };
@@ -141,7 +153,12 @@ export const BookingDetailScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
+        }
+      >
         {/* Status */}
         <View style={styles.statusCard}>
           <Text style={styles.statusLabel}>Status</Text>
@@ -168,9 +185,13 @@ export const BookingDetailScreen: React.FC = () => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Patient</Text>
           <Text style={styles.infoText}>Name: {booking.patient?.name || 'Patient'}</Text>
-          <Text style={styles.infoText}>Phone: {booking.patient?.phone ? `+91 ****${booking.patient.phone.slice(-4)}` : '—'}</Text>
+          <Text style={styles.infoText}>
+            Phone: {booking.patient?.phone && typeof booking.patient.phone === 'string' 
+              ? `+91 ****${booking.patient.phone.slice(-4)}` 
+              : '—'}
+          </Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
-          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '🎥 Video Consultation' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
         </View>
 
@@ -210,33 +231,34 @@ export const BookingDetailScreen: React.FC = () => {
           <Text style={styles.payStatus}>Payment: {booking.paymentStatus}</Text>
         </View>
 
+        {/* Action Button */}
         {booking.status === 'REQUESTED' && (
-          <View style={styles.rowActions}>
+          <View style={styles.requestActions}>
             <TouchableOpacity
-              style={[styles.secondaryBtn, updating && { opacity: 0.7 }]}
+              style={[styles.declineBtn, updating && { opacity: 0.7 }]}
               onPress={handleDecline}
               disabled={updating}
             >
-              <Text style={styles.secondaryBtnText}>Decline</Text>
+              <Text style={styles.declineBtnText}>Decline</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, { flex: 1, marginTop: 0 }, updating && { opacity: 0.7 }]}
+              style={[styles.acceptBtn, updating && { opacity: 0.7 }]}
               onPress={handleAccept}
               disabled={updating}
             >
-              <Text style={styles.actionBtnText}>Accept Booking</Text>
+              <Text style={styles.acceptBtnText}>{updating ? 'Working…' : 'Accept'}</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Action Button */}
         {nextAction && (
           <TouchableOpacity
             style={[styles.actionBtn, updating && { opacity: 0.7 }]}
             onPress={() => {
-              if ('nav' in nextAction) {
+              if (nextAction.nav) {
+                // @ts-ignore - Narrowed types are safe but TS can be picky with navigation.navigate
                 navigation.navigate(nextAction.nav, { bookingId });
-              } else {
+              } else if (nextAction.next) {
                 updateStatus(nextAction.next);
               }
             }}
@@ -276,14 +298,9 @@ const styles = StyleSheet.create({
   payStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 4 },
   actionBtn: { backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8 },
   actionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  rowActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  secondaryBtn: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
+  requestActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  acceptBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center' },
+  acceptBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  declineBtn: { flex: 1, backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.error, borderRadius: 14, padding: 18, alignItems: 'center' },
+  declineBtnText: { color: Colors.error, fontSize: 16, fontWeight: '700' },
 });

@@ -106,9 +106,13 @@ export class ConsultationService {
 
     if (!summary) throw new NotFoundException('Consultation summary not found');
     const latestPrescription = summary.prescriptions[0];
+    const prescriptionUrl =
+      await this.prescriptionStorageService.resolveReadUrl(
+        latestPrescription?.fileUrl ?? null,
+      );
     return {
       ...summary,
-      prescriptionUrl: latestPrescription?.fileUrl ?? null,
+      prescriptionUrl,
       hasOrder: !!pharmacyOrder,
       orderId: pharmacyOrder?.id ?? null,
     };
@@ -150,7 +154,21 @@ export class ConsultationService {
       this.prisma.consultationSummary.count({ where }),
     ]);
 
-    return { data: summaries, total, page, limit };
+    const summariesWithFreshUrls = await Promise.all(
+      summaries.map(async (summary) => ({
+        ...summary,
+        prescriptions: await Promise.all(
+          summary.prescriptions.map(async (prescription) => ({
+            ...prescription,
+            fileUrl: await this.prescriptionStorageService.resolveReadUrl(
+              prescription.fileUrl,
+            ),
+          })),
+        ),
+      })),
+    );
+
+    return { data: summariesWithFreshUrls, total, page, limit };
   }
 
   /**
@@ -196,12 +214,16 @@ export class ConsultationService {
     const medicines = Array.isArray(summary.medicinesAdvised)
       ? summary.medicinesAdvised
       : [];
+    const prescriptionUrl =
+      await this.prescriptionStorageService.resolveReadUrl(
+        latestPrescription?.fileUrl ?? null,
+      );
 
     return {
       consultationId: summary.id,
       createdAt: summary.createdAt,
       medicines,
-      prescriptionUrl: latestPrescription?.fileUrl ?? null,
+      prescriptionUrl,
     };
   }
 
@@ -320,12 +342,10 @@ export class ConsultationService {
       file.buffer,
       file.mimetype,
     );
-    const fileUrl =
-      await this.prescriptionStorageService.getSignedUrl(filePath);
 
     return this.addPrescription(bookingId, userId, {
       details,
-      fileUrl,
+      fileUrl: filePath,
     });
   }
 }

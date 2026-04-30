@@ -31,6 +31,7 @@ const mockPrisma = {
   },
   auditLog: {
     create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+    findMany: jest.fn().mockResolvedValue([]),
   },
   $transaction: jest.fn(),
   user: {
@@ -65,6 +66,7 @@ describe('PrescriptionService', () => {
     );
     jest.clearAllMocks();
     mockPrisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
+    mockPrisma.auditLog.findMany.mockResolvedValue([]);
     mockPrisma.user.findMany.mockResolvedValue([
       {
         id: 'admin-1',

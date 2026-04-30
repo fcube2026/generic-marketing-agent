@@ -57,6 +57,7 @@ jest.mock('expo-image-picker', () => ({
 // Avoid pulling design-token dependent button styling overhead if any –
 // the real Button component is fine but its loading state is harmless.
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import api from '../../../services/api';
 import { pharmacyService } from '../../../services/pharmacyService';
 import * as ImagePicker from 'expo-image-picker';
@@ -79,6 +80,17 @@ const resetStore = () => {
   });
 };
 
+const renderScreen = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <PrescriptionOrderScreen />
+    </QueryClientProvider>,
+  );
+};
+
 describe('PrescriptionOrderScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -91,7 +103,7 @@ describe('PrescriptionOrderScreen', () => {
   });
 
   it('renders the prescription source options when no prescription is set', () => {
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
     expect(screen.getByText('📋 Prescription')).toBeTruthy();
     expect(screen.getByText('Use Recent Prescription')).toBeTruthy();
     expect(screen.getByText('Upload Prescription')).toBeTruthy();
@@ -100,7 +112,7 @@ describe('PrescriptionOrderScreen', () => {
   });
 
   it('shows the empty-medicines message before any prescription is added', () => {
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
     expect(
       screen.getByText(
         /No medicines found\. Search and add medicines from your prescription below\./i,
@@ -112,7 +124,7 @@ describe('PrescriptionOrderScreen', () => {
     mockUseRoute.mockReturnValue({
       params: { prescriptionUrl: 'https://example.com/rx.jpg' },
     });
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
     // The store auto-attaches the incoming param via useEffect
     await waitFor(() => {
       expect(usePharmacyOrderStore.getState().prescriptionUrl).toBe(
@@ -138,7 +150,7 @@ describe('PrescriptionOrderScreen', () => {
       },
     });
 
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
 
     await act(async () => {
       fireEvent.press(screen.getByText('Camera'));
@@ -173,7 +185,7 @@ describe('PrescriptionOrderScreen', () => {
     err.response = { data: { message: 'File too large' } };
     mockApiPost.mockRejectedValue(err);
 
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
 
     await act(async () => {
       fireEvent.press(screen.getByText('Gallery'));
@@ -193,7 +205,7 @@ describe('PrescriptionOrderScreen', () => {
       granted: false,
     });
 
-    render(<PrescriptionOrderScreen />);
+    renderScreen();
     await act(async () => {
       fireEvent.press(screen.getByText('Camera'));
     });

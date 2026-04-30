@@ -5,11 +5,11 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
 import { BookingStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
-import { VideoConsultationReminderService } from '../video-consultation/video-consultation-reminder.service';
 import { PatientVerificationService } from '../patient-verification/patient-verification.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -33,9 +33,9 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
-    private videoReminderService: VideoConsultationReminderService,
     private patientVerificationService: PatientVerificationService,
     private config: ConfigService,
+    private readonly supabaseSync: SupabaseSyncService,
   ) {}
 
   private formatScheduledTime(date: Date): string {
@@ -101,14 +101,6 @@ export class BookingsService {
         'This provider does not offer clinic visits.',
       );
     }
-    if (
-      dto.mode === 'VIDEO_CONSULTATION' &&
-      !provider.videoConsultationEnabled
-    ) {
-      throw new BadRequestException(
-        'This provider does not offer video consultations.',
-      );
-    }
 
     // Validate address is provided for home visits
     if (dto.mode === 'HOME_VISIT' && !dto.addressId) {
@@ -160,9 +152,7 @@ export class BookingsService {
     const fee =
       dto.mode === 'HOME_VISIT'
         ? provider.consultationFeeHomeVisit
-        : dto.mode === 'VIDEO_CONSULTATION'
-          ? provider.consultationFeeVideoConsultation
-          : provider.consultationFeeDoctorPlace;
+        : provider.consultationFeeDoctorPlace;
 
     const booking = await this.prisma.booking.create({
       data: {
@@ -200,13 +190,14 @@ export class BookingsService {
       },
     });
 
+    // Mirror to Supabase (best-effort). Sync FK-side rows first so the
+    // booking row's source mappings have a counterpart.
+    await this.supabaseSync.syncPatient(patientProfile);
+    await this.supabaseSync.syncProvider(provider);
+    await this.supabaseSync.syncBooking(booking);
+
     // Notify provider of new booking request with push and SMS
-    const modeText =
-      dto.mode === 'HOME_VISIT'
-        ? 'home visit'
-        : dto.mode === 'VIDEO_CONSULTATION'
-          ? 'video consultation'
-          : 'clinic visit';
+    const modeText = dto.mode === 'HOME_VISIT' ? 'home visit' : 'clinic visit';
     await this.notificationsService.sendNotification(
       {
         userId: provider.userId,
@@ -302,6 +293,8 @@ export class BookingsService {
       data: { status: dto.status },
     });
 
+    await this.supabaseSync.syncBooking(updated);
+
     await this.prisma.bookingStatusHistory.create({
       data: {
         bookingId,
@@ -392,7 +385,22 @@ export class BookingsService {
     return updated;
   }
 
+  private async assertBookingProvider(bookingId: string, userId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { provider: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.provider?.userId !== userId) {
+      throw new ForbiddenException(
+        'Only the assigned provider can perform this action',
+      );
+    }
+  }
+
   async acceptBooking(bookingId: string, userId: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.ACCEPTED,
     });
@@ -422,24 +430,14 @@ export class BookingsService {
           },
         },
       );
-
-      // Schedule pre-session reminders for video consultations
-      if (booking.mode === 'VIDEO_CONSULTATION') {
-        await this.videoReminderService.scheduleReminders(
-          bookingId,
-          booking.scheduledAt,
-          booking.patient.userId,
-          booking.provider.userId,
-          booking.provider.name,
-          booking.patient.name,
-        );
-      }
     }
 
     return updated;
   }
 
   async declineBooking(bookingId: string, userId: string, reason?: string) {
+    await this.assertBookingProvider(bookingId, userId);
+
     const updated = await this.updateBookingStatus(bookingId, userId, {
       status: BookingStatus.DECLINED,
     });
@@ -544,10 +542,6 @@ export class BookingsService {
             },
           );
         }
-      }
-      // Cancel scheduled video consultation reminders if applicable
-      if (booking.mode === 'VIDEO_CONSULTATION') {
-        await this.videoReminderService.cancelReminders(bookingId);
       }
     }
 

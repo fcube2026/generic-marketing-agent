@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import api from '@/lib/api';
 
 const navGroups = [
   {
@@ -37,15 +39,6 @@ const navGroups = [
         icon: (
           <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-        ),
-      },
-      {
-        href: '/video-consultations',
-        label: 'Video Calls',
-        icon: (
-          <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.854v6.292a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         ),
       },
@@ -87,6 +80,27 @@ const navGroups = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [doctorName, setDoctorName] = useState('Doctor');
+  const [specialization, setSpecialization] = useState('');
+  const doctorInitials = useMemo(() => {
+    return doctorName
+      .replace(/^Dr\.?\s*/i, '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0].toUpperCase())
+      .join('') || 'DR';
+  }, [doctorName]);
+
+  useEffect(() => {
+    api
+      .get('/providers/me')
+      .then((res) => {
+        if (res.data?.name) setDoctorName(res.data.name);
+        if (res.data?.specialization) setSpecialization(res.data.specialization);
+      })
+      .catch(() => {/* silently ignore — sidebar is non-critical */});
+  }, []);
 
   return (
     <aside
@@ -152,11 +166,11 @@ export default function Sidebar() {
       <div className="px-4 py-4 border-t border-surface-border">
         <div className="flex items-center gap-3 px-2">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs shrink-0">
-            AM
+            {doctorInitials}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-navy truncate">Dr. Arjun Mehta</p>
-            <p className="text-[10px] text-gray-400">Internal Medicine</p>
+            <p className="text-xs font-semibold text-navy truncate">{doctorName}</p>
+            <p className="text-[10px] text-gray-400">{specialization || 'Doctor'}</p>
           </div>
           <div className="w-2 h-2 rounded-full bg-teal shrink-0" title="Online" />
         </div>
