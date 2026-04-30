@@ -230,7 +230,7 @@ export class AdminService {
       where: {
         providerId,
         verificationSource: 'PIPELINE',
-        status: { in: ['NOT_FOUND', 'MANUAL_REVIEW'] },
+        status: { in: ['NOT_FOUND', 'MANUAL_REVIEW'] as const },
       },
       data: { status: 'SUCCESS' },
     });

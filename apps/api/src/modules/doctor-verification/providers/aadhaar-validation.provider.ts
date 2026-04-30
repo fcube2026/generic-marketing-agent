@@ -103,16 +103,16 @@ export class AadhaarValidationProvider {
       payload.is_valid === true ||
       payload.valid === true;
 
-    // Extract customer details when present
-    const customerName =
-      (payload.full_name as string) ?? (payload.name as string) ?? undefined;
-    const customerDob =
-      (payload.dob as string) ?? (payload.date_of_birth as string) ?? undefined;
-    const customerGender = (payload.gender as string) ?? undefined;
+    // Extract customer details when present — use String() to safely coerce
+    // any non-null primitive from the API response, undefined otherwise.
+    const toStr = (v: unknown): string | undefined =>
+      v != null && typeof v !== 'object' ? String(v) : undefined;
+
+    const customerName = toStr(payload.full_name) ?? toStr(payload.name);
+    const customerDob = toStr(payload.dob) ?? toStr(payload.date_of_birth);
+    const customerGender = toStr(payload.gender);
     const customerAddress =
-      (payload.address as string) ??
-      (payload.split_address as string) ??
-      undefined;
+      toStr(payload.address) ?? toStr(payload.split_address);
 
     return {
       valid,

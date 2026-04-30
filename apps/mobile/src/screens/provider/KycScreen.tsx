@@ -48,6 +48,7 @@ interface VerificationLog {
   status: string;
   registrationNumber: string;
   createdAt: string;
+  licenseId?: string | null;
   verificationSource?: string;
   license?: LicenseStatus | null;
   rawResponse?: {
@@ -228,8 +229,8 @@ export const KycScreen: React.FC = () => {
 
     // Derive the latest licenseId from the most recent log that has one
     const licenseIdFromLog =
-      (pipelineLog as any)?.licenseId ??
-      (docLog as any)?.licenseId ??
+      pipelineLog?.licenseId ??
+      docLog?.licenseId ??
       null;
 
     const restoredProgress: VerificationProgress = {
