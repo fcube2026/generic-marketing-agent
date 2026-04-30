@@ -576,6 +576,7 @@ describe('ProvidersService', () => {
         },
       ],
       user: { id: 'user-1', phone: '+919876543210' },
+      bookings: [],
       ...overrides,
     });
 
