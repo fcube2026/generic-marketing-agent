@@ -158,7 +158,7 @@ export default function ConsultationDetailPage({
           <h2 className="section-title">Vitals at Visit</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             {[
-              { label: 'Blood Pressure', value: consultation.vitals.bp, unit: 'mmHg', warn: parseInt(consultation.vitals.bp.split('/')[0]) > 140 },
+              { label: 'Blood Pressure', value: consultation.vitals.bp, unit: 'mmHg', warn: parseInt(consultation.vitals.bp.split('/')[0], 10) > 140 },
               { label: 'Temperature', value: `${consultation.vitals.tempF}°F`, unit: '', warn: consultation.vitals.tempF > 99 },
               { label: 'SpO₂', value: `${consultation.vitals.spo2Percent}%`, unit: 'Oxygen', warn: consultation.vitals.spo2Percent < 95 },
               { label: 'Pulse', value: consultation.vitals.pulsePerMin, unit: '/min', warn: consultation.vitals.pulsePerMin > 100 },
