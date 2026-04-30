@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,21 @@ import {
   Linking,
   ScrollView,
   TouchableOpacity,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { videoConsultationService, VideoToken } from '../../services/videoConsultationService';
+import { bookingService } from '../../services/bookingService';
+import { Booking } from '../../types';
+import { formatDateTime } from '../../utils/format';
+import { API_BASE_URL } from '../../constants/api';
 import type { PatientStackParamList } from '../../navigation/PatientNavigator';
 import type { ProviderStackParamList } from '../../navigation/ProviderNavigator';
 
@@ -23,9 +31,33 @@ type RouteV = RouteProp<ProviderStackParamList, 'VideoLobby'>;
 type NavP = NativeStackNavigationProp<PatientStackParamList>;
 type NavV = NativeStackNavigationProp<ProviderStackParamList>;
 
+/** Default video consultation duration displayed in the lobby. */
+const DEFAULT_DURATION_MINUTES = 15;
+
+/** Timeout (ms) for the network connectivity probe. */
+const NETWORK_CHECK_TIMEOUT_MS = 4000;
+
+/** Checks network by attempting a lightweight request to the API base URL. */
+async function checkNetworkConnectivity(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NETWORK_CHECK_TIMEOUT_MS);
+    await fetch(`${API_BASE_URL}/health`, {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return true;
+  } catch {
+    // Any error (network, abort, or non-OK status) is treated as disconnected
+    return false;
+  }
+}
+
 export const VideoLobbyScreen: React.FC = () => {
   const route = useRoute<RouteP | RouteV>();
   const navigation = useNavigation<NavP | NavV>();
+  const queryClient = useQueryClient();
   const { bookingId } = route.params as { bookingId: string };
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -34,7 +66,38 @@ export const VideoLobbyScreen: React.FC = () => {
   const [token, setToken] = useState<VideoToken | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<boolean | null>(null);
+
+  const appState = useRef(AppState.currentState);
+
+  // Fetch booking info for session details
+  const { data: booking } = useQuery<Booking>({
+    queryKey: ['booking', bookingId],
+    queryFn: () => bookingService.getBooking(bookingId),
+    refetchInterval: 10000,
+    staleTime: 0,
+  });
+
+  // Re-run network check and refetch booking when app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        runNetworkCheck();
+        queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [bookingId, queryClient]);
+
+  // Refresh booking list when screen receives focus
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+    }, [bookingId, queryClient]),
+  );
 
   useEffect(() => {
     const fetchToken = async () => {
@@ -51,7 +114,14 @@ export const VideoLobbyScreen: React.FC = () => {
       }
     };
     fetchToken();
+    runNetworkCheck();
   }, [bookingId]);
+
+  const runNetworkCheck = async () => {
+    setNetworkStatus(null); // Reset to "checking"
+    const connected = await checkNetworkConnectivity();
+    setNetworkStatus(connected);
+  };
 
   const handleRequestPermissions = async () => {
     if (!cameraPermission?.granted) await requestCameraPermission();
@@ -84,6 +154,17 @@ export const VideoLobbyScreen: React.FC = () => {
       if (!supported) {
         throw new Error('Cannot open video call URL');
       }
+
+      // Mark session and booking as IN_PROGRESS
+      try {
+        await videoConsultationService.startSession(bookingId);
+      } catch (err) {
+        if (__DEV__) console.warn('[VideoLobby] startSession failed:', err);
+      }
+
+      // Refresh booking status after starting session
+      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+
       await Linking.openURL(token.jitsiUrl);
     } catch {
       Alert.alert(
@@ -95,8 +176,72 @@ export const VideoLobbyScreen: React.FC = () => {
     }
   };
 
+  const handleEndConsultation = async () => {
+    Alert.alert(
+      'End Consultation',
+      'Are you sure you want to end this consultation?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'End',
+          style: 'destructive',
+          onPress: async () => {
+            setEnding(true);
+            try {
+              // Mark session and booking as COMPLETED
+              try {
+                await videoConsultationService.endSession(bookingId);
+              } catch (err) {
+                if (__DEV__) console.warn('[VideoLobby] endSession failed:', err);
+              }
+
+              // Refresh caches
+              queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+              queryClient.invalidateQueries({ queryKey: ['patient-video-consultations'] });
+              queryClient.invalidateQueries({ queryKey: ['provider-video-consultations'] });
+
+              if (token?.role === 'provider') {
+                (navigation as NativeStackNavigationProp<ProviderStackParamList>).navigate(
+                  'ConsultationForm',
+                  { bookingId },
+                );
+              } else {
+                (navigation as NativeStackNavigationProp<PatientStackParamList>).navigate(
+                  'ConsultationSummary',
+                  { bookingId },
+                );
+              }
+            } finally {
+              setEnding(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const permissionsGranted =
     cameraPermission?.granted && micPermission?.granted;
+
+  const isInProgress = booking?.status === 'IN_PROGRESS';
+
+  // Disable join if network is down or not yet checked
+  const joinDisabled =
+    loading ||
+    !!error ||
+    !token ||
+    networkStatus === false ||
+    !permissionsGranted;
+
+  // Participant name to display
+  const participantName =
+    token?.role === 'provider'
+      ? booking?.patient?.name || 'Patient'
+      : booking?.provider?.name || 'Doctor';
+
+  if (loading) {
+    return <LoadingSpinner fullScreen message="Preparing video room…" />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -111,30 +256,87 @@ export const VideoLobbyScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* Permission Status */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Device Check</Text>
+      {/* Session Info */}
+      {token && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Session Info</Text>
 
-        <View style={styles.permRow}>
-          <Text style={styles.permIcon}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Session ID</Text>
+            <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
+              {token.roomId}
+            </Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>
+              {token.role === 'provider' ? 'Patient' : 'Doctor'}
+            </Text>
+            <Text style={styles.infoValue}>{participantName}</Text>
+          </View>
+
+          {booking?.scheduledAt && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Scheduled At</Text>
+              <Text style={styles.infoValue}>{formatDateTime(booking.scheduledAt)}</Text>
+            </View>
+          )}
+
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Text style={styles.infoLabel}>Duration</Text>
+            <Text style={styles.infoValue}>{DEFAULT_DURATION_MINUTES} minutes</Text>
+          </View>
+        </View>
+      )}
+
+      {/* System Checks */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>System Checks</Text>
+
+        {/* Network */}
+        <View style={styles.checkRow}>
+          <Text style={styles.checkIcon}>
+            {networkStatus === null ? '⏳' : networkStatus ? '✅' : '❌'}
+          </Text>
+          <View style={styles.checkInfo}>
+            <Text style={styles.checkLabel}>📶 Network</Text>
+            <Text style={[styles.checkStatus, networkStatus === false && styles.checkStatusFail]}>
+              {networkStatus === null
+                ? 'Checking…'
+                : networkStatus
+                ? 'Connected'
+                : 'Not connected'}
+            </Text>
+          </View>
+          {networkStatus === false && (
+            <TouchableOpacity style={styles.retryBtn} onPress={runNetworkCheck}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Camera */}
+        <View style={styles.checkRow}>
+          <Text style={styles.checkIcon}>
             {cameraPermission?.granted ? '✅' : '⚠️'}
           </Text>
-          <View style={styles.permInfo}>
-            <Text style={styles.permLabel}>Camera</Text>
-            <Text style={styles.permStatus}>
-              {cameraPermission?.granted ? 'Granted' : 'Not granted'}
+          <View style={styles.checkInfo}>
+            <Text style={styles.checkLabel}>📷 Camera</Text>
+            <Text style={[styles.checkStatus, !cameraPermission?.granted && styles.checkStatusWarn]}>
+              {cameraPermission?.granted ? 'Enabled' : 'Not granted'}
             </Text>
           </View>
         </View>
 
-        <View style={styles.permRow}>
-          <Text style={styles.permIcon}>
+        {/* Microphone */}
+        <View style={[styles.checkRow, styles.checkRowLast]}>
+          <Text style={styles.checkIcon}>
             {micPermission?.granted ? '✅' : '⚠️'}
           </Text>
-          <View style={styles.permInfo}>
-            <Text style={styles.permLabel}>Microphone</Text>
-            <Text style={styles.permStatus}>
-              {micPermission?.granted ? 'Granted' : 'Not granted'}
+          <View style={styles.checkInfo}>
+            <Text style={styles.checkLabel}>🎤 Microphone</Text>
+            <Text style={[styles.checkStatus, !micPermission?.granted && styles.checkStatusWarn]}>
+              {micPermission?.granted ? 'Enabled' : 'Not granted'}
             </Text>
           </View>
         </View>
@@ -144,18 +346,18 @@ export const VideoLobbyScreen: React.FC = () => {
             style={styles.permBtn}
             onPress={handleRequestPermissions}
           >
-            <Text style={styles.permBtnText}>Grant Permissions</Text>
+            <Text style={styles.permBtnText}>Grant Camera & Microphone Access</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Info Card */}
+      {/* How It Works */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>How It Works</Text>
-        <Text style={styles.infoItem}>📱 Tapping "Join Call" opens the video call in your browser</Text>
+        <Text style={styles.infoItem}>📱 Tapping "Start / Join Call" opens the video call in your browser</Text>
         <Text style={styles.infoItem}>🔊 Make sure your volume is turned up</Text>
         <Text style={styles.infoItem}>🌐 A stable internet connection is recommended</Text>
-        <Text style={styles.infoItem}>🔙 Return to this app after the call ends</Text>
+        <Text style={styles.infoItem}>🔙 Return to this app after the call ends, then tap "End Consultation"</Text>
       </View>
 
       {/* Error */}
@@ -165,12 +367,11 @@ export const VideoLobbyScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Room info (debug / reference) */}
-      {token && (
-        <View style={styles.roomCard}>
-          <Text style={styles.roomLabel}>Room ID</Text>
-          <Text style={styles.roomId} numberOfLines={1} ellipsizeMode="middle">
-            {token.roomId}
+      {/* Network failure notice */}
+      {networkStatus === false && (
+        <View style={styles.warnCard}>
+          <Text style={styles.warnText}>
+            ⚠️ No internet connection detected. Please check your network before joining.
           </Text>
         </View>
       )}
@@ -178,17 +379,27 @@ export const VideoLobbyScreen: React.FC = () => {
       {/* Join Button */}
       <Button
         title={
-          loading
-            ? 'Preparing room…'
-            : joining
+          joining
             ? 'Opening call…'
-            : '📹 Join Video Call'
+            : '📹 Start / Join Call'
         }
         onPress={handleJoin}
-        loading={loading || joining}
-        disabled={loading || !!error || !token}
+        loading={joining}
+        disabled={joinDisabled}
         style={styles.joinBtn}
       />
+
+      {/* End Consultation Button — visible once the call has been started */}
+      {isInProgress && (
+        <Button
+          title={ending ? 'Ending…' : '🛑 End Consultation'}
+          onPress={handleEndConsultation}
+          loading={ending}
+          disabled={ending}
+          variant="danger"
+          style={styles.endBtn}
+        />
+      )}
 
       <Button
         title="Go Back"
@@ -232,17 +443,40 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 12,
   },
-  permRow: {
+  // Session info rows
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  infoRowLast: { borderBottomWidth: 0 },
+  infoLabel: { fontSize: 13, color: Colors.textMuted, flex: 1 },
+  infoValue: { fontSize: 13, fontWeight: '600', color: Colors.text, flex: 2, textAlign: 'right' },
+  // System check rows
+  checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  permIcon: { fontSize: 22, marginRight: 12 },
-  permInfo: { flex: 1 },
-  permLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  permStatus: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  checkRowLast: { borderBottomWidth: 0 },
+  checkIcon: { fontSize: 22, marginRight: 12 },
+  checkInfo: { flex: 1 },
+  checkLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  checkStatus: { fontSize: 13, color: Colors.success, marginTop: 2 },
+  checkStatusFail: { color: Colors.error },
+  checkStatusWarn: { color: Colors.warning },
+  retryBtn: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  retryBtnText: { color: Colors.primary, fontWeight: '700', fontSize: 12 },
   permBtn: {
     marginTop: 12,
     backgroundColor: Colors.primaryLight,
@@ -259,16 +493,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorText: { fontSize: 14, color: Colors.error, textAlign: 'center' },
-  roomCard: {
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 12,
+  warnCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 10,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#FDE68A',
   },
-  roomLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, marginBottom: 4, textTransform: 'uppercase' },
-  roomId: { fontSize: 13, color: Colors.text, fontFamily: 'monospace' },
+  warnText: { fontSize: 14, color: '#92400E', textAlign: 'center' },
   joinBtn: { marginTop: 4 },
+  endBtn: { marginTop: 12 },
   backBtn: { marginTop: 12 },
 });
+

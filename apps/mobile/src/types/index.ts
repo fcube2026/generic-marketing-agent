@@ -82,6 +82,7 @@ export interface Booking {
   paymentStatus: PaymentStatus;
   createdAt: string;
   provider?: ProviderProfile;
+  patient?: { id?: string; name?: string; phone?: string };
   serviceCategory?: ServiceCategory;
   address?: Address;
   /** URL of the prescription issued during this consultation (mock field) */
