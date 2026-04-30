@@ -19,7 +19,8 @@
       "bundleIdentifier": "com.curex24.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "Curex24 needs camera access for video consultations.",
-        "NSMicrophoneUsageDescription": "Curex24 needs microphone access for audio during video consultations."
+        "NSMicrophoneUsageDescription": "Curex24 needs microphone access for audio during video consultations.",
+        "NSLocationWhenInUseUsageDescription": "Curex24 needs your location to track your provider's arrival for home-visit bookings."
       }
     },
     "android": {
@@ -34,7 +35,9 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_CONNECT"
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
