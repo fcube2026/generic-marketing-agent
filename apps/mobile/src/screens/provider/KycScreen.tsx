@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,12 +37,20 @@ interface PipelineStep {
   found: boolean;
 }
 
+interface LicenseStatus {
+  status: string;
+  verifiedAt?: string | null;
+  rejectionReason?: string | null;
+}
+
 interface VerificationLog {
   id: string;
   status: string;
   registrationNumber: string;
   createdAt: string;
+  licenseId?: string | null;
   verificationSource?: string;
+  license?: LicenseStatus | null;
   rawResponse?: {
     issueLabel?: string;
     steps?: PipelineStep[];
@@ -140,6 +148,24 @@ function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source.replace(/_/g, ' ');
 }
 
+// Returns a human-readable status label for a log, considering admin approval
+function logStatusDisplay(log: VerificationLog): { text: string; isApproved: boolean } {
+  if (log.license?.status === 'APPROVED') {
+    return { text: '✅ Approved by Admin', isApproved: true };
+  }
+  if (log.license?.status === 'REJECTED') {
+    const reason = log.license.rejectionReason ? ` — ${log.license.rejectionReason}` : '';
+    return { text: `❌ Rejected by Admin${reason}`, isApproved: false };
+  }
+  if (log.rawResponse?.issueLabel) {
+    if (log.rawResponse.issueLabel === 'Pending Admin Approval') {
+      return { text: '🔒 Awaiting admin review', isApproved: false };
+    }
+    return { text: `⚠️ ${log.rawResponse.issueLabel}`, isApproved: false };
+  }
+  return { text: '', isApproved: false };
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export const KycScreen: React.FC = () => {
@@ -160,10 +186,15 @@ export const KycScreen: React.FC = () => {
   // Aadhaar number for API validation
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   // Camera capture confirmation — shown after camera capture, before returning to doc list
+  // base64 is only set for face capture (needed for API submission)
   const [captureConfirm, setCaptureConfirm] = useState<{
     uri: string;
-    onConfirm: (uri: string) => void;
+    base64?: string | null;
+    onConfirm: (uri: string, base64?: string | null) => void;
   } | null>(null);
+  // "resume or start fresh" prompt state
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const progressRestoredRef = useRef(false);
 
   const [progress, setProgress] = useState<VerificationProgress>({
     records: 'pending',
@@ -177,6 +208,73 @@ export const KycScreen: React.FC = () => {
     queryKey: ['verification-logs'],
     queryFn: providerService.getVerificationLogs,
   });
+
+  // ── Restore progress from existing logs (runs once after logs load) ─────────
+
+  useEffect(() => {
+    if (progressRestoredRef.current) return;
+    const logList = logs as VerificationLog[];
+    if (logList.length === 0) return;
+    progressRestoredRef.current = true;
+
+    const pipelineLog = logList.find((l) => l.verificationSource === 'PIPELINE');
+    const docLog = logList.find((l) => l.verificationSource === 'DOCUMENT_UPLOAD');
+    const faceLog = logList.find(
+      (l) => l.verificationSource === 'FACE' && l.status === 'SUCCESS',
+    );
+
+    if (!pipelineLog && !docLog && !faceLog) return;
+
+    setShowResumePrompt(true);
+
+    // Derive the latest licenseId from the most recent log that has one
+    const licenseIdFromLog =
+      pipelineLog?.licenseId ??
+      docLog?.licenseId ??
+      null;
+
+    const restoredProgress: VerificationProgress = {
+      records: pipelineLog
+        ? pipelineLog.license?.status === 'APPROVED' || pipelineLog.status === 'SUCCESS'
+          ? 'done'
+          : 'failed'
+        : 'pending',
+      documents: docLog ? 'done' : 'pending',
+      face: faceLog ? 'done' : 'pending',
+      licenseId: licenseIdFromLog ?? undefined,
+    };
+
+    // Pre-populate name/reg fields from the pipeline log if available
+    if (pipelineLog?.registrationNumber && pipelineLog.registrationNumber !== 'FACE_CHECK') {
+      setRegNumber(pipelineLog.registrationNumber);
+    }
+
+    const _resolve = (resume: boolean) => {
+      setShowResumePrompt(false);
+      if (resume) {
+        setProgress(restoredProgress);
+        setWizardStep(3);
+      }
+    };
+
+    Alert.alert(
+      'Resume Verification',
+      'You have an in-progress KYC verification. Would you like to continue from where you left off, or start fresh?',
+      [
+        {
+          text: 'Start Fresh',
+          style: 'destructive',
+          onPress: () => _resolve(false),
+        },
+        {
+          text: 'Continue',
+          style: 'default',
+          onPress: () => _resolve(true),
+        },
+      ],
+      { cancelable: false },
+    );
+  }, [logs]);
 
   // ── Step 1 → 2 ─────────────────────────────────────────────────────────────
 
@@ -248,21 +346,30 @@ export const KycScreen: React.FC = () => {
     onSuccess: () => {
       setProgress((p) => ({ ...p, documents: 'done' }));
       setShowDocumentUpload(false);
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
     },
     onError: () => setProgress((p) => ({ ...p, documents: 'failed' })),
   });
 
   /** Launch camera with crop editing. After capture, shows the OK confirmation overlay. */
-  const pickFromCamera = async (onConfirm: (uri: string) => void) => {
+  const pickFromCamera = async (
+    onConfirm: (uri: string, base64?: string | null) => void,
+    opts?: { aspect?: [number, number]; base64?: boolean; front?: boolean },
+  ) => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: opts?.aspect ?? [4, 3],
+      base64: opts?.base64 ?? false,
+      cameraType: opts?.front
+        ? ImagePicker.CameraType.front
+        : ImagePicker.CameraType.back,
     });
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
-      setCaptureConfirm({ uri, onConfirm });
+      const b64 = result.assets[0].base64 ?? null;
+      setCaptureConfirm({ uri, base64: b64, onConfirm });
     }
   };
 
@@ -278,7 +385,10 @@ export const KycScreen: React.FC = () => {
     }
   };
 
-  const promptImageSource = (title: string, onPick: (uri: string) => void) => {
+  const promptImageSource = (
+    title: string,
+    onPick: (uri: string, base64?: string | null) => void,
+  ) => {
     Alert.alert(title, 'How would you like to provide this document?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -287,7 +397,7 @@ export const KycScreen: React.FC = () => {
       },
       {
         text: 'Choose from Gallery',
-        onPress: () => pickFromGallery(onPick),
+        onPress: () => pickFromGallery((uri) => onPick(uri, null)),
       },
     ]);
   };
@@ -331,6 +441,7 @@ export const KycScreen: React.FC = () => {
     onSuccess: () => {
       setFaceChecking(false);
       setProgress((p) => ({ ...p, face: 'done' }));
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
     },
     onError: () => {
       setFaceChecking(false);
@@ -354,25 +465,48 @@ export const KycScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Take Selfie',
-          onPress: async () => {
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              quality: 0.7,
-              allowsEditing: true,
-              aspect: [1, 1],
-              cameraType: ImagePicker.CameraType.front,
-              base64: true,
-            });
-            if (!result.canceled && result.assets[0]?.base64) {
-              setFaceChecking(true);
-              setProgress((p) => ({ ...p, face: 'processing' }));
-              faceMutation.mutate(`data:image/jpeg;base64,${result.assets[0].base64}`);
-            }
-          },
+          onPress: () =>
+            pickFromCamera(
+              (_uri, b64) => {
+                if (b64) {
+                  setFaceChecking(true);
+                  setProgress((p) => ({ ...p, face: 'processing' }));
+                  faceMutation.mutate(`data:image/jpeg;base64,${b64}`);
+                }
+              },
+              { aspect: [1, 1], base64: true, front: true },
+            ),
         },
       ],
     );
   }, []);
+
+  // ── Delete Log ─────────────────────────────────────────────────────────────
+
+  const deleteLogMutation = useMutation({
+    mutationFn: (logId: string) => providerService.deleteVerificationLog(logId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['verification-logs'] });
+    },
+    onError: () => {
+      Alert.alert('Error', 'Failed to delete log entry. Please try again.');
+    },
+  });
+
+  const handleDeleteLog = (log: VerificationLog) => {
+    Alert.alert(
+      'Delete Log Entry',
+      'Remove this verification attempt from your history? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteLogMutation.mutate(log.id),
+        },
+      ],
+    );
+  };
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
@@ -644,36 +778,54 @@ export const KycScreen: React.FC = () => {
               ) : (logs as VerificationLog[]).length === 0 ? (
                 <Text style={styles.noLogsText}>No verification attempts yet.</Text>
               ) : (
-                (logs as VerificationLog[]).map((log) => (
-                  <TouchableOpacity
-                    key={log.id}
-                    style={styles.logItem}
-                    onPress={() => setSelectedLog(log)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.logRow}>
-                      <Text style={styles.logSource} numberOfLines={1}>
-                        {sourceLabel(log.verificationSource ?? log.status)}
-                      </Text>
-                      <Text style={styles.logDate}>
-                        {new Date(log.createdAt).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
-                    {log.rawResponse?.issueLabel && (
-                      <Text style={styles.logStatus}>
-                        {log.rawResponse.issueLabel === 'Pending Admin Approval'
-                          ? '🔒 Awaiting admin review'
-                          : `⚠️ ${log.rawResponse.issueLabel}`}
-                      </Text>
-                    )}
-                    <Text style={styles.logHint}>{'Tap to view details →'}</Text>
-                  </TouchableOpacity>
-                ))
+                (logs as VerificationLog[]).map((log) => {
+                  const { text: statusText, isApproved } = logStatusDisplay(log);
+                  return (
+                    <TouchableOpacity
+                      key={log.id}
+                      style={[
+                        styles.logItem,
+                        isApproved && styles.logItemApproved,
+                      ]}
+                      onPress={() => setSelectedLog(log)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.logRow}>
+                        <Text style={styles.logSource} numberOfLines={1}>
+                          {sourceLabel(log.verificationSource ?? log.status)}
+                        </Text>
+                        <View style={styles.logRowRight}>
+                          <Text style={styles.logDate}>
+                            {new Date(log.createdAt).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.logDeleteBtn}
+                            onPress={() => handleDeleteLog(log)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.logDeleteBtnText}>{'🗑'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <Text style={styles.logReg}>Reg: {log.registrationNumber}</Text>
+                      {statusText ? (
+                        <Text
+                          style={[
+                            styles.logStatus,
+                            isApproved && styles.logStatusApproved,
+                          ]}
+                        >
+                          {statusText}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.logHint}>{'Tap to view details →'}</Text>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           </View>
@@ -682,50 +834,19 @@ export const KycScreen: React.FC = () => {
         {/* ════ STEP 3 — Document Upload sub-view ════ */}
         {wizardStep === 3 && showDocumentUpload && (
           <View style={styles.stepBox}>
-            {/* Capture confirmation overlay — shown after camera capture */}
-            {captureConfirm ? (
-              <View style={styles.captureConfirmWrapper}>
-                <Text style={styles.captureConfirmTitle}>Photo Captured</Text>
-                <Text style={styles.captureConfirmSub}>
-                  Looks good? Tap OK to use this photo, or Retake to try again.
-                </Text>
-                <Image
-                  source={{ uri: captureConfirm.uri }}
-                  style={styles.capturePreview}
-                  resizeMode="cover"
-                />
-                <View style={styles.captureConfirmActions}>
-                  <TouchableOpacity
-                    style={styles.captureRetakeBtn}
-                    onPress={() => setCaptureConfirm(null)}
-                  >
-                    <Text style={styles.captureRetakeBtnText}>Retake</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.captureOkBtn}
-                    onPress={() => {
-                      captureConfirm.onConfirm(captureConfirm.uri);
-                      setCaptureConfirm(null);
-                    }}
-                  >
-                    <Text style={styles.captureOkBtnText}>OK</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.backBtnInline}
-                  onPress={() => setShowDocumentUpload(false)}
-                >
-                  <Text style={styles.backBtnInlineText}>{'← Back'}</Text>
-                </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.backBtnInline}
+                onPress={() => setShowDocumentUpload(false)}
+              >
+                <Text style={styles.backBtnInlineText}>{'← Back'}</Text>
+              </TouchableOpacity>
 
-                <Text style={styles.stepTitle}>Upload Documents</Text>
-                <Text style={styles.stepDesc}>
-                  Provide your Aadhaar card and medical certificate for identity
-                  and credential verification.
-                </Text>
+              <Text style={styles.stepTitle}>Upload Documents</Text>
+              <Text style={styles.stepDesc}>
+                Provide your Aadhaar card and medical certificate for identity
+                and credential verification.
+              </Text>
 
                 {/* Aadhaar number validation */}
                 <Text style={styles.label}>Aadhaar Number (optional)</Text>
@@ -794,7 +915,6 @@ export const KycScreen: React.FC = () => {
                   )}
                 </TouchableOpacity>
               </>
-            )}
           </View>
         )}
 
@@ -874,9 +994,20 @@ export const KycScreen: React.FC = () => {
                   {selectedLog.rawResponse?.issueLabel && (
                     <View style={styles.stuckBanner}>
                       <Text style={styles.stuckBannerText}>
-                        {selectedLog.rawResponse.issueLabel === 'Pending Admin Approval'
-                          ? '🔒 All checks done — waiting for admin approval'
-                          : `⚠️ Stuck at: ${selectedLog.rawResponse.issueLabel}`}
+                        {selectedLog.license?.status === 'APPROVED'
+                          ? '✅ Admin has approved this submission'
+                          : selectedLog.license?.status === 'REJECTED'
+                            ? `❌ Admin rejected${selectedLog.license.rejectionReason ? ': ' + selectedLog.license.rejectionReason : ''}`
+                            : selectedLog.rawResponse.issueLabel === 'Pending Admin Approval'
+                              ? '🔒 All checks done — waiting for admin approval'
+                              : `⚠️ Stuck at: ${selectedLog.rawResponse.issueLabel}`}
+                      </Text>
+                    </View>
+                  )}
+                  {!selectedLog.rawResponse?.issueLabel && selectedLog.license?.status === 'APPROVED' && (
+                    <View style={[styles.stuckBanner, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+                      <Text style={[styles.stuckBannerText, { color: '#16A34A' }]}>
+                        ✅ Admin has approved this submission
                       </Text>
                     </View>
                   )}
@@ -886,6 +1017,47 @@ export const KycScreen: React.FC = () => {
           )}
         </Modal>
       </ScrollView>
+
+      {/* ── Global captureConfirm overlay (face or document capture) ── */}
+      <Modal
+        visible={!!captureConfirm}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCaptureConfirm(null)}
+      >
+        {captureConfirm && (
+          <View style={styles.captureModalOverlay}>
+            <View style={styles.captureConfirmWrapper}>
+              <Text style={styles.captureConfirmTitle}>Photo Captured</Text>
+              <Text style={styles.captureConfirmSub}>
+                Looks good? Tap OK to use this photo, or Retake to try again.
+              </Text>
+              <Image
+                source={{ uri: captureConfirm.uri }}
+                style={styles.capturePreview}
+                resizeMode="cover"
+              />
+              <View style={styles.captureConfirmActions}>
+                <TouchableOpacity
+                  style={styles.captureRetakeBtn}
+                  onPress={() => setCaptureConfirm(null)}
+                >
+                  <Text style={styles.captureRetakeBtnText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.captureOkBtn}
+                  onPress={() => {
+                    captureConfirm.onConfirm(captureConfirm.uri, captureConfirm.base64);
+                    setCaptureConfirm(null);
+                  }}
+                >
+                  <Text style={styles.captureOkBtnText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 };
@@ -1057,16 +1229,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
+  logItemApproved: {
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    backgroundColor: '#F0FDF4',
+  },
   logRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
+  logRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   logSource: { fontSize: 13, fontWeight: '700', color: Colors.text, flex: 1 },
   logDate: { fontSize: 11, color: Colors.textMuted, marginLeft: 8 },
+  logDeleteBtn: { padding: 2 },
+  logDeleteBtnText: { fontSize: 14 },
   logReg: { fontSize: 12, color: Colors.textMuted },
   logStatus: { fontSize: 12, color: '#D97706', marginTop: 4, fontWeight: '600' },
+  logStatusApproved: { color: '#16A34A' },
   logHint: { fontSize: 11, color: Colors.primary, marginTop: 6, fontStyle: 'italic' },
 
   modalOverlay: {
@@ -1143,9 +1328,19 @@ const styles = StyleSheet.create({
   docPickerChevron: { fontSize: 20, color: Colors.textMuted, marginLeft: 8 },
 
   // ── Capture confirmation overlay ────────────────────────────────────────────
-  captureConfirmWrapper: {
+  captureModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 16,
+    padding: 20,
+  },
+  captureConfirmWrapper: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
   },
   captureConfirmTitle: {
     fontSize: 20,

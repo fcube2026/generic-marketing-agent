@@ -7,9 +7,11 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
-import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
-import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
+import {
+  AadhaarValidationProvider,
+  AadhaarValidationResult,
+} from './providers/aadhaar-validation.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
 import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
@@ -26,7 +28,6 @@ const MAX_AUTO_ATTEMPTS = 3;
 
 /** Source tags stored in ProviderLicense.verificationSource. */
 const SOURCE_NMC_API = 'NMC_API';
-const SOURCE_SMC_PORTAL = 'SMC_PORTAL';
 const SOURCE_FACE = 'FACE';
 
 export type VerificationLogStatus =
@@ -60,15 +61,14 @@ export class DoctorVerificationService {
   constructor(
     private prisma: PrismaService,
     private nmcProvider: NmcApiProvider,
-    private smcProvider: SmcScraperProvider,
     private faceProvider: FaceVerificationProvider,
     private aadhaarProvider: AadhaarValidationProvider,
     private notificationsService: NotificationsService,
   ) {}
 
   /**
-   * Doctor submits their NMC registration details for automated verification.
-   * Runs a multi-step pipeline: NMC API -> SMC portal -> confidence scoring.
+   * Doctor submits their registration details for automated verification.
+   * Runs a Surepass official-records check followed by confidence scoring.
    * Idempotent: if already approved and within re-verification window, returns cached result.
    */
   async submitForVerification(userId: string, dto: SubmitNmcVerificationDto) {
@@ -183,6 +183,15 @@ export class DoctorVerificationService {
       },
     });
 
+    // Persist the live face data for future home-visit identity verification.
+    // Stored as a data-URL (base64) or a cloud storage URL depending on the client.
+    if (dto.liveFaceData) {
+      await this.prisma.providerProfile.update({
+        where: { id: profile.id },
+        data: { kycFaceStoragePath: dto.liveFaceData },
+      });
+    }
+
     return {
       match: faceResult.match,
       similarityScore: faceResult.similarityScore,
@@ -245,7 +254,7 @@ export class DoctorVerificationService {
     }
 
     // Validate Aadhaar number if provided
-    let aadhaarValidation: { valid: boolean } | null = null;
+    let aadhaarValidation: AadhaarValidationResult | null = null;
     if (dto.aadhaarNumber) {
       try {
         aadhaarValidation = await this.aadhaarProvider.validate(
@@ -284,6 +293,10 @@ export class DoctorVerificationService {
       licenseId: license.id,
       documentsReceived: true,
       aadhaarValid: aadhaarValidation?.valid ?? null,
+      aadhaarCustomerName: aadhaarValidation?.customerName ?? null,
+      aadhaarCustomerDob: aadhaarValidation?.customerDob ?? null,
+      aadhaarCustomerGender: aadhaarValidation?.customerGender ?? null,
+      aadhaarCustomerAddress: aadhaarValidation?.customerAddress ?? null,
       message: 'Documents uploaded successfully. Proceed to face verification.',
     };
   }
@@ -419,6 +432,8 @@ export class DoctorVerificationService {
 
   /**
    * Returns all verification logs for a provider by their userId (audit trail).
+   * Each log includes the associated license's current status so the client can
+   * show admin approval/rejection for that specific attempt.
    */
   async getVerificationLogs(userId: string) {
     const profile = await this.prisma.providerProfile.findUnique({
@@ -429,7 +444,35 @@ export class DoctorVerificationService {
     return this.prisma.doctorVerificationLog.findMany({
       where: { providerId: profile.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        license: {
+          select: {
+            status: true,
+            verifiedAt: true,
+            rejectionReason: true,
+          },
+        },
+      },
     });
+  }
+
+  /**
+   * Deletes a single verification log entry belonging to the authenticated provider.
+   * Doctors may clean up stale/unwanted attempts from their log history.
+   */
+  async deleteVerificationLog(userId: string, logId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const log = await this.prisma.doctorVerificationLog.findFirst({
+      where: { id: logId, providerId: profile.id },
+    });
+    if (!log) throw new NotFoundException('Verification log not found');
+
+    await this.prisma.doctorVerificationLog.delete({ where: { id: logId } });
+    return { deleted: true };
   }
 
   /**
@@ -462,10 +505,9 @@ export class DoctorVerificationService {
   // ---- Internal helpers -------------------------------------------------------
 
   /**
-   * Runs the multi-step verification pipeline:
-   * 1. NMC API (Surepass / Decentro / IDfy)
-   * 2. SMC portal scraper
-   * Then computes confidence score and issue code.
+   * Runs the Surepass official-records verification:
+   * Queries the Surepass API to confirm the doctor is in official records,
+   * then computes confidence score and issue code.
    */
   private async runVerificationPipeline(
     providerId: string,
@@ -565,72 +607,16 @@ export class DoctorVerificationService {
       this.logger.warn(`NMC API error: ${String(err)}`);
     }
 
-    // Step 2: SMC Portal
-    let smcFound = false;
-    let smcNameMatch = false;
-
-    try {
-      const smcResult = await this.smcProvider.verify({
-        registrationNumber: nmcRegistrationNumber,
-        fullName: dto.fullName ?? '',
-        stateCouncil: resolvedStateCouncil,
-      });
-      smcFound = smcResult.found;
-
-      if (smcFound && dto.fullName && smcResult.name) {
-        smcNameMatch = this.namesMatch(dto.fullName, smcResult.name);
-      } else if (smcFound) {
-        smcNameMatch = true;
-      }
-
-      const smcScore =
-        smcFound && smcNameMatch
-          ? CONFIDENCE_WEIGHTS.SMC_PORTAL
-          : smcFound
-            ? Math.floor(CONFIDENCE_WEIGHTS.SMC_PORTAL * 0.7)
-            : 0;
-
-      steps.push({
-        source: SOURCE_SMC_PORTAL,
-        found: smcFound,
-        score: smcScore,
-        details: {
-          name: smcResult.name,
-          registrationNumber: smcResult.registrationNumber,
-          status: smcResult.status,
-          councilName: smcResult.councilName,
-          screenshotUrl: smcResult.screenshotUrl,
-          nameMatch: smcNameMatch,
-        },
-      });
-
-      this.logger.log(
-        `SMC check: ${smcFound ? 'FOUND' : 'NOT_FOUND'} — ${nmcRegistrationNumber} / ${resolvedStateCouncil}`,
-      );
-    } catch (err) {
-      steps.push({
-        source: SOURCE_SMC_PORTAL,
-        found: false,
-        score: 0,
-        details: {},
-        error: String(err),
-      });
-      this.logger.warn(`SMC portal error: ${String(err)}`);
-    }
-
     // Confidence Score
     const confidenceScore = steps.reduce((sum, s) => sum + s.score, 0);
 
     // Issue Code Determination
     const dataMismatch =
-      (steps.some((s) => s.source === SOURCE_NMC_API && s.found) &&
-        !nmcNameMatch) ||
-      (steps.some((s) => s.source === SOURCE_SMC_PORTAL && s.found) &&
-        !smcNameMatch);
+      steps.some((s) => s.source === SOURCE_NMC_API && s.found) &&
+      !nmcNameMatch;
 
     const issueCode = this.computeIssueCode({
       nmcFound,
-      smcFound,
       confidenceScore,
       dataMismatch,
     });
@@ -683,7 +669,7 @@ export class DoctorVerificationService {
     const errorCode =
       issueCode === ISSUE_CODES.DATA_MISMATCH
         ? 'DATA_MISMATCH'
-        : issueCode === ISSUE_CODES.NOT_FOUND_NEEDS_SMC_EMAIL
+        : issueCode === ISSUE_CODES.NOT_FOUND_IN_OFFICIAL_RECORDS
           ? 'DOCTOR_NOT_FOUND'
           : null;
 
@@ -721,21 +707,19 @@ export class DoctorVerificationService {
   }
 
   /**
-   * Compute the issue code based on pipeline results.
-   * The pipeline never auto-approves; both FULLY_VERIFIED and VERIFIED_VIA_DOCUMENTS
-   * are replaced with PENDING_ADMIN_APPROVAL so every submission requires admin review.
+   * Compute the issue code based on the Surepass official-records check result.
+   * The pipeline never auto-approves — every submission requires admin review.
    */
   private computeIssueCode(opts: {
     nmcFound: boolean;
-    smcFound: boolean;
     confidenceScore: number;
     dataMismatch: boolean;
   }): IssueCode {
-    const { nmcFound, smcFound, dataMismatch } = opts;
+    const { nmcFound, dataMismatch } = opts;
 
     if (dataMismatch) return ISSUE_CODES.DATA_MISMATCH;
-    if (!nmcFound && !smcFound) return ISSUE_CODES.NOT_FOUND_NEEDS_SMC_EMAIL;
-    // At least one source confirmed the registration → route to admin approval
+    if (!nmcFound) return ISSUE_CODES.NOT_FOUND_IN_OFFICIAL_RECORDS;
+    // Registration confirmed in official records → route to admin approval
     return ISSUE_CODES.PENDING_ADMIN_APPROVAL;
   }
 

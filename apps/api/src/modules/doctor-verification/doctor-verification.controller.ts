@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
@@ -10,8 +10,8 @@ export class DoctorVerificationController {
   constructor(private verificationService: DoctorVerificationService) {}
 
   /**
-   * Doctor submits NMC registration details for automated multi-step verification.
-   * Runs: NMC API -> SMC portal -> confidence scoring -> issue code assignment.
+   * Doctor submits registration details for Surepass official-records verification.
+   * Runs: Surepass official-records check -> confidence scoring -> issue code assignment.
    * Always routes to admin approval; never auto-approves.
    * POST /providers/me/verification/nmc
    */
@@ -69,5 +69,14 @@ export class DoctorVerificationController {
   @Get('logs')
   getMyVerificationLogs(@CurrentUser() user: any) {
     return this.verificationService.getVerificationLogs(user.id);
+  }
+
+  /**
+   * Doctor deletes a specific verification log entry from their history.
+   * DELETE /providers/me/verification/logs/:id
+   */
+  @Delete('logs/:id')
+  deleteVerificationLog(@CurrentUser() user: any, @Param('id') logId: string) {
+    return this.verificationService.deleteVerificationLog(user.id, logId);
   }
 }

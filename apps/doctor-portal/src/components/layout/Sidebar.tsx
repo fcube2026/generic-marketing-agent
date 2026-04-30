@@ -138,11 +138,11 @@ export default function Sidebar() {
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
                       isActive
-                        ? 'bg-primary-lighter text-primary border border-primary/20'
+                        ? 'bg-primary text-white border border-primary shadow-sm'
                         : 'text-navy-muted hover:bg-gray-50 hover:text-navy'
                     }`}
                   >
-                    <span className={isActive ? 'text-primary' : 'text-gray-400 group-hover:text-navy-muted'}>
+                    <span className={isActive ? 'text-white' : 'text-gray-400 group-hover:text-navy-muted'}>
                       {item.icon}
                     </span>
                     <span className="flex-1">{item.label}</span>
@@ -152,7 +152,7 @@ export default function Sidebar() {
                       </span>
                     )}
                     {isActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
                     )}
                   </Link>
                 );
@@ -165,7 +165,7 @@ export default function Sidebar() {
       {/* Bottom — doctor badge */}
       <div className="px-4 py-4 border-t border-surface-border">
         <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-primary-lighter flex items-center justify-center text-primary font-bold text-xs shrink-0">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs shrink-0">
             {doctorInitials}
           </div>
           <div className="min-w-0">

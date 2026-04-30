@@ -100,9 +100,9 @@ export default function ConsultationsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total', value: counts.total, cls: 'text-navy', icon: '📋' },
-          { label: 'Scheduled', value: counts.scheduled, cls: 'text-blue-600', icon: '📅' },
+          { label: 'Scheduled', value: counts.scheduled, cls: 'text-primary', icon: '📅' },
           { label: 'In Progress', value: counts.in_progress, cls: 'text-amber-600', icon: '⏳' },
-          { label: 'Completed', value: counts.completed, cls: 'text-green-600', icon: '✅' },
+          { label: 'Completed', value: counts.completed, cls: 'text-primary', icon: '✅' },
         ].map((s) => (
           <div key={s.label} className="stat-card">
             <span className="text-lg">{s.icon}</span>

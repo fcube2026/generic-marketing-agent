@@ -105,6 +105,10 @@ export class NmcApiProvider {
 
     const data = (await response.json()) as Record<string, unknown>;
 
+    this.logger.debug(
+      `=== SUREPASS RESPONSE ===\n${JSON.stringify(data, null, 2)}`,
+    );
+
     if (!response.ok) {
       this.logger.warn(
         `[${this.provider}] Verification API error ${response.status}: ${JSON.stringify(data)}`,
@@ -121,16 +125,12 @@ export class NmcApiProvider {
   private buildPayload(req: NmcVerificationRequest): Record<string, unknown> {
     switch (this.provider) {
       case 'surepass':
-        // Surepass doctor-verification API uses id_number for the NMC registration
-        // number. consent must be the string "Y". state_council and
-        // year_of_admission are optional — Surepass resolves them internally.
+        // Surepass doctor-verification API (/api/v1/doctor/doctor-verification)
+        // expects registration_number and registration_year as payload keys.
         return {
-          reference_id: `curex24-${Date.now()}`,
-          consent: 'Y',
-          id_number: req.memberId,
-          ...(req.stateCouncil ? { state_council: req.stateCouncil } : {}),
+          registration_number: req.memberId,
           ...(req.yearOfAdmission
-            ? { year_of_admission: req.yearOfAdmission }
+            ? { registration_year: req.yearOfAdmission }
             : {}),
         };
       case 'decentro':

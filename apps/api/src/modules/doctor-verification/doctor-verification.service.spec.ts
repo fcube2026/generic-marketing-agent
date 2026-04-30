@@ -3,7 +3,6 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DoctorVerificationService } from './doctor-verification.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
-import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
 import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -27,6 +26,9 @@ describe('DoctorVerificationService', () => {
     doctorVerificationLog: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
+      delete: jest.fn(),
+      updateMany: jest.fn(),
     },
     notification: {
       create: jest.fn(),
@@ -38,10 +40,6 @@ describe('DoctorVerificationService', () => {
 
   const mockNmcProvider = {
     verify: jest.fn(),
-  };
-
-  const mockSmcProvider = {
-    verify: jest.fn().mockResolvedValue({ found: false }),
   };
 
   const mockFaceProvider = {
@@ -82,7 +80,6 @@ describe('DoctorVerificationService', () => {
         DoctorVerificationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NmcApiProvider, useValue: mockNmcProvider },
-        { provide: SmcScraperProvider, useValue: mockSmcProvider },
         { provide: FaceVerificationProvider, useValue: mockFaceProvider },
         { provide: AadhaarValidationProvider, useValue: mockAadhaarProvider },
         { provide: NotificationsService, useValue: mockNotificationsService },
@@ -269,12 +266,11 @@ describe('DoctorVerificationService', () => {
       mockPrisma.providerLicense.findUnique.mockResolvedValue(mockLicense);
 
       mockNmcProvider.verify.mockRejectedValue(new Error('API timeout'));
-      mockSmcProvider.verify.mockResolvedValue({ found: false });
       mockPrisma.doctorVerificationLog.create.mockResolvedValue({});
 
       const result = await service.submitForVerification('user-1', dto);
 
-      // Pipeline gracefully degrades: NMC API error → SMC not found → NOT_FOUND status
+      // Pipeline gracefully degrades: Surepass API error → NOT_FOUND status
       expect(result.status).toBe('NOT_FOUND');
       expect(mockPrisma.doctorVerificationLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -381,13 +377,18 @@ describe('DoctorVerificationService', () => {
   // ─── getVerificationLogs ────────────────────────────────────────────────────
 
   describe('getVerificationLogs', () => {
-    it('should return logs for a provider by userId', async () => {
+    it('should return logs with license status for a provider by userId', async () => {
       const logs = [
         {
           id: 'log-1',
           providerId: 'provider-1',
           registrationNumber: 'MH-12345',
-          status: 'SUCCESS',
+          status: 'NOT_FOUND',
+          license: {
+            status: 'APPROVED',
+            verifiedAt: new Date().toISOString(),
+            rejectionReason: null,
+          },
         },
       ];
       mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
@@ -399,6 +400,15 @@ describe('DoctorVerificationService', () => {
       expect(mockPrisma.doctorVerificationLog.findMany).toHaveBeenCalledWith({
         where: { providerId: 'provider-1' },
         orderBy: { createdAt: 'desc' },
+        include: {
+          license: {
+            select: {
+              status: true,
+              verifiedAt: true,
+              rejectionReason: true,
+            },
+          },
+        },
       });
     });
 
@@ -408,6 +418,47 @@ describe('DoctorVerificationService', () => {
       await expect(service.getVerificationLogs('unknown-user')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  // ─── deleteVerificationLog ──────────────────────────────────────────────────
+
+  describe('deleteVerificationLog', () => {
+    const mockLog = {
+      id: 'log-1',
+      providerId: 'provider-1',
+      registrationNumber: 'MH-12345',
+      status: 'NOT_FOUND',
+    };
+
+    it('should delete a log belonging to the provider', async () => {
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
+      mockPrisma.doctorVerificationLog.findFirst.mockResolvedValue(mockLog);
+      mockPrisma.doctorVerificationLog.delete.mockResolvedValue(mockLog);
+
+      const result = await service.deleteVerificationLog('user-1', 'log-1');
+
+      expect(result).toEqual({ deleted: true });
+      expect(mockPrisma.doctorVerificationLog.delete).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+      });
+    });
+
+    it('should throw NotFoundException if log not found for this provider', async () => {
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(mockProfile);
+      mockPrisma.doctorVerificationLog.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteVerificationLog('user-1', 'nonexistent-log'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if provider profile not found', async () => {
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.deleteVerificationLog('unknown-user', 'log-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

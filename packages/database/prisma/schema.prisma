@@ -80,22 +80,32 @@ model ProviderProfile {
   userId                           String   @unique
   name                             String
   bio                              String?
-  specialization                   String
+  specialization                   String   // optional: keep only for display
+
   contactInfo                      String   @default("")
   clinicAddress                    String   @default("")
   licenseNumber                    String?
+
   isVerified                       Boolean  @default(false)
   isActive                         Boolean  @default(true)
+
   homeVisitEnabled                 Boolean  @default(false)
   doctorPlaceVisitEnabled          Boolean  @default(false)
-  videoConsultationEnabled         Boolean  @default(false)
+  // videoConsultationEnabled      Boolean  @default(true)  // ❌ remove or keep true
+
   serviceRadius                    Float    @default(10)
+
   consultationFeeHomeVisit         Float    @default(0)
   consultationFeeDoctorPlace       Float    @default(0)
   consultationFeeVideoConsultation Float    @default(0)
+
   currentLat                       Float?
   currentLng                       Float?
+
   isAvailable                      Boolean  @default(false)
+
+  kycFaceStoragePath               String?
+
   createdAt                        DateTime @default(now())
   updatedAt                        DateTime @updatedAt
 
@@ -108,6 +118,7 @@ model ProviderProfile {
   payouts           Payout[]
   verificationLogs  DoctorVerificationLog[]
 
+  @@index([isAvailable])
   @@map("provider_profiles")
 }
 

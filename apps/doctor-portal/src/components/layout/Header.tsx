@@ -37,9 +37,9 @@ export default function Header() {
       <div className="flex items-center gap-2 text-sm text-gray-500">
         <span className="font-semibold text-navy">Doctor Portal</span>
         <span className="text-gray-300">|</span>
-        <span className="inline-flex items-center gap-1.5 text-xs bg-teal-light text-teal-dark font-semibold px-2.5 py-1 rounded-full">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal inline-block" />
-          Seed Mode — Testing
+        <span className="inline-flex items-center gap-1.5 text-xs bg-primary text-white font-semibold px-2.5 py-1 rounded-full border border-primary">
+          <span className="w-1.5 h-1.5 rounded-full bg-white inline-block" />
+          Live Data
         </span>
       </div>
 
@@ -67,7 +67,7 @@ export default function Header() {
 
         {/* Avatar + logout */}
         <div className="flex items-center gap-2 pl-3 border-l border-surface-border">
-          <div className="w-7 h-7 rounded-full bg-primary-lighter text-primary text-xs font-bold flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center">
             {initials}
           </div>
           <button
