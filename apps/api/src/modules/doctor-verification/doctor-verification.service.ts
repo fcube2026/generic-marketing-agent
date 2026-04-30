@@ -678,7 +678,11 @@ export class DoctorVerificationService {
         providerId,
         licenseId,
         registrationNumber: nmcRegistrationNumber,
-        stateCouncil,
+        // DoctorVerificationLog.stateCouncil is non-null in the schema, but the
+        // KYC flow no longer collects a state council from the doctor — fall
+        // back to 'N/A' (matches the DOCUMENT_UPLOAD / DIGILOCKER_CONSENT log
+        // sites above) to avoid a PrismaClientValidationError on insert.
+        stateCouncil: stateCouncil ?? 'N/A',
         verificationSource: 'PIPELINE',
         status: overallStatus,
         rawRequest: {
