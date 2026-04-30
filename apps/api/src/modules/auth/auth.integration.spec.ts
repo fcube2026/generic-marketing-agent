@@ -166,5 +166,43 @@ describe('Auth Endpoints (Integration)', () => {
         .send({})
         .expect(400);
     });
+
+    it('should handle malformed JSON gracefully', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/admin-login')
+        .set('Content-Type', 'application/json')
+        .send('{"email": invalid json}')
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toBe('Invalid JSON in request body');
+      expect(res.body.error).toBe('Bad Request');
+    });
+  });
+
+  describe('POST /api/v1/auth/login', () => {
+    it('should login with valid credentials', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ email: 'admin@curex24.com', password: 'admin123' })
+        .expect(201);
+
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user).toBeDefined();
+      expect(res.body.user.role).toBe('ADMIN');
+    });
+
+    it('should handle malformed JSON without closing connection', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .set('Content-Type', 'application/json')
+        .send(
+          '{\\\"email\\\": \\\"admin@curex24.com\\\", \\\"password\\\": \\\"admin123\\\"}',
+        )
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toBe('Invalid JSON in request body');
+    });
   });
 });
