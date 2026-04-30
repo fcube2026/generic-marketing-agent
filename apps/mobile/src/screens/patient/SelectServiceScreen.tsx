@@ -49,7 +49,7 @@ const DATE_SLOTS = GENERATE_DATE_SLOTS();
 
 export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
   const { category } = route.params;
-  const [mode, setMode] = useState<'HOME_VISIT' | 'DOCTOR_PLACE' | null>(null);
+  const [mode, setMode] = useState<'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION' | null>(null);
   const [symptoms, setSymptoms] = useState('');
   const [timing, setTiming] = useState<'now' | 'later'>('now');
   
@@ -92,18 +92,26 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
         storeSetScheduledAt(null);
       }
 
-      // Home Visit / Clinic require the patient's location for distance sorting.
-      const location = await getCurrentLocation();
-      const resolvedLocation = location ?? MOCK_LOCATION;
-
-      navigation.navigate('ProviderList', {
-        categoryId: category.id,
-        serviceId: category.id,
-        categorySlug: category.slug,
-        mode,
-        lat: resolvedLocation.lat,
-        lng: resolvedLocation.lng,
-      });
+      // Video consultations don't require location; Home/Clinic do.
+      if (mode === 'VIDEO_CONSULTATION') {
+        navigation.navigate('ProviderList', {
+          categoryId: category.id,
+          serviceId: category.id,
+          categorySlug: category.slug,
+          mode,
+        });
+      } else {
+        const location = await getCurrentLocation();
+        const resolvedLocation = location ?? MOCK_LOCATION;
+        navigation.navigate('ProviderList', {
+          categoryId: category.id,
+          serviceId: category.id,
+          categorySlug: category.slug,
+          mode,
+          lat: resolvedLocation.lat,
+          lng: resolvedLocation.lng,
+        });
+      }
     } catch {
       Alert.alert('Error', 'Failed to get your location. Please try again.');
     } finally {
@@ -153,6 +161,14 @@ export const SelectServiceScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             <Text style={styles.modeIcon}>🏥</Text>
             <Text style={[styles.modeLabel, mode === 'DOCTOR_PLACE' && styles.modeLabelActive]}>Clinic</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'VIDEO_CONSULTATION' && styles.modeBtnActive]}
+            onPress={() => setMode('VIDEO_CONSULTATION')}
+          >
+            <Text style={styles.modeIcon}>📹</Text>
+            <Text style={[styles.modeLabel, mode === 'VIDEO_CONSULTATION' && styles.modeLabelActive]}>Video</Text>
           </TouchableOpacity>
         </View>
       </View>

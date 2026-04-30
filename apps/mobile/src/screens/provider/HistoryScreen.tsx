@@ -85,7 +85,7 @@ export const HistoryScreen: React.FC = () => {
           <View style={styles.metaItem}>
             <Text style={styles.metaLabel}>Mode</Text>
             <Text style={styles.metaValue}>
-              {item.mode === 'HOME_VISIT' ? '🏠 Home' : '🏥 Clinic'}
+              {item.mode === 'HOME_VISIT' ? '🏠 Home' : item.mode === 'VIDEO_CONSULTATION' ? '📹 Video' : '🏥 Clinic'}
             </Text>
           </View>
           <View style={styles.metaItem}>

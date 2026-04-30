@@ -19,6 +19,7 @@ export const OnboardingScreen: React.FC = () => {
     name: '', bio: '', specialization: '', contactInfo: '',
     homeVisitEnabled: false, consultationFeeHomeVisit: '',
     doctorPlaceVisitEnabled: false, consultationFeeDoctorPlace: '',
+    videoConsultationEnabled: false, consultationFeeVideoConsultation: '',
     serviceRadius: '10',
   });
 
@@ -35,6 +36,8 @@ export const OnboardingScreen: React.FC = () => {
         consultationFeeHomeVisit: parseFloat(form.consultationFeeHomeVisit) || 0,
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
         consultationFeeDoctorPlace: parseFloat(form.consultationFeeDoctorPlace) || 0,
+        videoConsultationEnabled: form.videoConsultationEnabled,
+        consultationFeeVideoConsultation: parseFloat(form.consultationFeeVideoConsultation) || 0,
         serviceRadius: parseFloat(form.serviceRadius) || 10,
       });
       queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
@@ -82,6 +85,12 @@ export const OnboardingScreen: React.FC = () => {
           {form.doctorPlaceVisitEnabled && (
             <Input label="Clinic Fee (₹)" value={form.consultationFeeDoctorPlace} onChangeText={(t) => update('consultationFeeDoctorPlace', t)} keyboardType="numeric" placeholder="300" />
           )}
+          <View style={[styles.toggleRow, { marginTop: 16 }]}>
+            <Toggle value={form.videoConsultationEnabled} onToggle={() => update('videoConsultationEnabled', !form.videoConsultationEnabled)} label="📹 Video Consultation" />
+          </View>
+          {form.videoConsultationEnabled && (
+            <Input label="Video Consultation Fee (₹)" value={form.consultationFeeVideoConsultation} onChangeText={(t) => update('consultationFeeVideoConsultation', t)} keyboardType="numeric" placeholder="400" />
+          )}
           <Input label="Service Radius (km)" value={form.serviceRadius} onChangeText={(t) => update('serviceRadius', t)} keyboardType="numeric" placeholder="10" />
           <View style={styles.btnRow}>
             <Button title="← Back" onPress={() => setStep(1)} variant="outline" style={{ flex: 1 }} />
@@ -97,6 +106,7 @@ export const OnboardingScreen: React.FC = () => {
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Specialization</Text><Text style={styles.reviewValue}>{form.specialization}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Home Visit</Text><Text style={styles.reviewValue}>{form.homeVisitEnabled ? `Yes — ₹${form.consultationFeeHomeVisit}` : 'No'}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Clinic Visit</Text><Text style={styles.reviewValue}>{form.doctorPlaceVisitEnabled ? `Yes — ₹${form.consultationFeeDoctorPlace}` : 'No'}</Text></View>
+          <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Video Consult</Text><Text style={styles.reviewValue}>{form.videoConsultationEnabled ? `Yes — ₹${form.consultationFeeVideoConsultation}` : 'No'}</Text></View>
           <View style={styles.reviewItem}><Text style={styles.reviewLabel}>Service Radius</Text><Text style={styles.reviewValue}>{form.serviceRadius} km</Text></View>
           <View style={styles.btnRow}>
             <Button title="← Back" onPress={() => setStep(2)} variant="outline" style={{ flex: 1 }} />

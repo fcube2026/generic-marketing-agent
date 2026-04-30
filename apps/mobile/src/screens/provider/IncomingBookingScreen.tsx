@@ -87,8 +87,8 @@ export const IncomingBookingScreen: React.FC = () => {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.patientName}>{item.patientName}</Text>
-        <View style={[styles.modeBadge, item.mode === 'HOME_VISIT' ? styles.homeVisit : styles.clinicVisit]}>
-          <Text style={styles.modeText}>{item.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+        <View style={[styles.modeBadge, item.mode === 'HOME_VISIT' ? styles.homeVisit : item.mode === 'VIDEO_CONSULTATION' ? styles.videoVisit : styles.clinicVisit]}>
+          <Text style={styles.modeText}>{item.mode === 'HOME_VISIT' ? '🏠 Home Visit' : item.mode === 'VIDEO_CONSULTATION' ? '📹 Video' : '🏥 Clinic Visit'}</Text>
         </View>
       </View>
       <Text style={styles.serviceType}>{item.serviceType}</Text>
@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
   modeBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   homeVisit: { backgroundColor: Colors.primaryLight },
   clinicVisit: { backgroundColor: '#DBEAFE' },
+  videoVisit: { backgroundColor: '#EDE9FE' },
   modeText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
   serviceType: { fontSize: 13, color: Colors.secondary, fontWeight: '600', marginBottom: 4 },
   symptoms: { fontSize: 13, color: Colors.textMuted, marginBottom: 10 },
