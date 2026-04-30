@@ -5,27 +5,27 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#22C55E',
-          light: '#DCFCE7',
-          lighter: '#F0FDF4',
-          dark: '#16A34A',
+          DEFAULT: '#3CB371',
+          light: '#D4F1E0',
+          lighter: '#EBF9F4',
+          dark: '#2D8659',
           foreground: '#ffffff',
         },
         teal: {
-          DEFAULT: '#22C55E',
-          light: '#DCFCE7',
-          dark: '#14532D',
+          DEFAULT: '#3CB371',
+          light: '#D4F1E0',
+          dark: '#1F5C3F',
         },
         navy: {
-          DEFAULT: '#14532D',
-          light: '#166534',
-          muted: '#15803D',
+          DEFAULT: '#1F5C3F',
+          light: '#2D8659',
+          muted: '#3CB371',
         },
         medical: {
           red: '#dc2626',
           amber: '#d97706',
-          green: '#16A34A',
-          blue: '#22C55E',
+          green: '#2D8659',
+          blue: '#3CB371',
           purple: '#7c3aed',
         },
         surface: {
