@@ -52,7 +52,7 @@ export const VideoConsultationsScreen: React.FC = () => {
       {!bookings || bookings.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📹</Text>
-          <Text style={styles.emptyTitle}>No active bookings currently available</Text>
+          <Text style={styles.emptyTitle}>No active video consultations</Text>
           <Text style={styles.emptySubtitle}>
             Active video consultation requests will appear here
           </Text>
@@ -91,7 +91,7 @@ export const VideoConsultationsScreen: React.FC = () => {
                   style={styles.joinBtn}
                   onPress={() => navigation.navigate('VideoLobby', { bookingId: item.id })}
                 >
-                  <Text style={styles.joinBtnText}>📹 Join Video Call</Text>
+                  <Text style={styles.joinBtnText}>📹 Join Consultation</Text>
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
