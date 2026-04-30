@@ -15,6 +15,14 @@ interface RecentConsultation {
   diagnosis?: string | null;
 }
 
+interface ActiveVideoConsultation {
+  id: string;
+  patient: { id: string; name: string };
+  scheduledAt: string;
+  status: string;
+  serviceCategory?: { name: string } | null;
+}
+
 interface DashboardStats {
   totalPatients: number;
   todayConsultations: number;
@@ -107,6 +115,7 @@ const consultationStatusCls: Record<string, string> = {
 const quickActions = [
   { href: '/patients', label: 'Patient Records', desc: 'Search & manage patients by UHID', icon: '👥', color: 'border-teal/30 hover:border-teal bg-teal-light/20' },
   { href: '/consultations', label: 'Consultations', desc: 'View and manage all consultations', icon: '📋', color: 'border-primary/30 hover:border-primary bg-primary-lighter/30' },
+  { href: '/consultations?type=VIDEO_CONSULTATION', label: 'Video Consultations', desc: 'View and join video consultations', icon: '📹', color: 'border-purple-300 hover:border-purple-500 bg-purple-50' },
   { href: '/earnings', label: 'Earnings', desc: 'Track your revenue and payouts', icon: '💰', color: 'border-amber-300 hover:border-amber-500 bg-amber-50' },
 ];
 
@@ -115,6 +124,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [doctorName, setDoctorName] = useState('Doctor');
   const [profileNotFound, setProfileNotFound] = useState(false);
+  const [activeVideoCalls, setActiveVideoCalls] = useState<ActiveVideoConsultation[]>([]);
+  const [videoJoining, setVideoJoining] = useState<string | null>(null);
 
   const recentConsultations: RecentConsultation[] = stats?.recentConsultations ?? [];
 
@@ -127,12 +138,14 @@ export default function DashboardPage() {
     Promise.all([
       api.get('/providers/me/dashboard'),
       api.get('/providers/me'),
+      api.get('/providers/me/video-consultations'),
     ])
-      .then(([dashRes, profileRes]) => {
+      .then(([dashRes, profileRes, videoRes]) => {
         setStats(dashRes.data);
         if (profileRes.data?.name) {
           setDoctorName(profileRes.data.name);
         }
+        setActiveVideoCalls(Array.isArray(videoRes.data) ? videoRes.data : []);
       })
       .catch((err) => {
         if (err?.response?.status === 404) {
@@ -148,6 +161,23 @@ export default function DashboardPage() {
     fetchData();
     const interval = setInterval(fetchData, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const handleJoinVideoCall = useCallback(async (bookingId: string) => {
+    setVideoJoining(bookingId);
+    try {
+      const { data } = await api.get<{ jitsiUrl: string }>(`/video-sessions/${bookingId}/token`);
+      await api.patch(`/video-sessions/${bookingId}/status`, { status: 'IN_PROGRESS' });
+      window.open(data.jitsiUrl, '_blank', 'noopener,noreferrer');
+      fetchData();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to join video call. Please try again.';
+      alert(msg);
+    } finally {
+      setVideoJoining(null);
+    }
   }, [fetchData]);
 
   if (loading) {
@@ -210,6 +240,59 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Active Video Consultations */}
+      {activeVideoCalls.length > 0 && (
+        <div className="card border-2 border-purple-200 bg-purple-50/50 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📹</span>
+              <h2 className="section-title mb-0 text-purple-800">Active Video Consultations</h2>
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            </div>
+            <Link href="/consultations?type=VIDEO_CONSULTATION" className="text-xs font-semibold text-purple-600 hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {activeVideoCalls.map((vc) => {
+              const initials = (vc.patient.name || '??').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              const isActive = vc.status === 'IN_PROGRESS';
+              return (
+                <div key={vc.id} className="flex items-center gap-3 bg-white rounded-xl border border-purple-100 p-3">
+                  <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
+                    {initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-navy truncate">{vc.patient.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {vc.serviceCategory?.name || 'Video Consultation'} ·{' '}
+                      {new Date(vc.scheduledAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <span className={`badge text-[10px] shrink-0 ${isActive ? 'badge-amber' : 'badge-blue'}`}>
+                    {isActive ? 'In Progress' : 'Scheduled'}
+                  </span>
+                  <button
+                    onClick={() => handleJoinVideoCall(vc.id)}
+                    disabled={videoJoining === vc.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-60 transition shrink-0"
+                  >
+                    {videoJoining === vc.id ? (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                    {isActive ? 'Rejoin' : 'Join Call'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Consultations */}
