@@ -202,11 +202,11 @@ export default function ConsultationDetailPage({
             </div>
           )}
           {consultation.followUpDate && (
-            <div className="mt-3 flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-              <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mt-3 flex items-center gap-2 p-3 bg-primary-lighter border border-surface-border rounded-lg">
+              <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-sm text-blue-800 font-medium">
+              <p className="text-sm text-navy font-medium">
                 Follow-up scheduled: {new Date(consultation.followUpDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
               </p>
             </div>

@@ -65,7 +65,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-lighter to-primary-light">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-primary">Curex24</h1>
@@ -74,7 +74,7 @@ export default function LoginPage() {
 
         <form
           onSubmit={step === 'phone' ? handleSendOtp : handleVerifyOtp}
-          className="bg-white rounded-2xl shadow-lg p-8 space-y-5"
+          className="bg-white rounded-2xl shadow-card p-8 space-y-5 border border-surface-border"
           data-testid="login-form"
         >
           <h2 className="text-xl font-bold text-gray-800">

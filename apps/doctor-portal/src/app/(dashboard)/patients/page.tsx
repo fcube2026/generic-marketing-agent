@@ -118,7 +118,7 @@ export default function PatientsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Patients', value: stats.total, color: 'text-primary', icon: '👥' },
-          { label: 'Male', value: stats.male, color: 'text-blue-600', icon: '♂️' },
+          { label: 'Male', value: stats.male, color: 'text-primary', icon: '♂️' },
           { label: 'Female', value: stats.female, color: 'text-purple-600', icon: '♀️' },
           { label: 'Total Visits', value: stats.totalVisits, color: 'text-amber-600', icon: '🩺' },
         ].map((s) => (
