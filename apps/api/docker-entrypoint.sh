@@ -32,7 +32,12 @@ done
 #   failed entry blocks every later migration — including the patient KYC ML
 #   columns migration (20260424110000_add_patient_kyc_ml_aadhaar_fields),
 #   which is what causes the patient Identity Verification screen to 500.
-ROLLED_BACK_MIGRATIONS="20260424100100_add_pharmacy_order_payment_flow"
+# - 20260430000000_add_provider_kyc_face_storage: original SQL used bare
+#   ADD COLUMN without IF NOT EXISTS. On envs where the column already existed
+#   (e.g. from a manual apply or partial run), this left the migration in a
+#   failed state, blocking all later migrations and causing a 500 on the
+#   doctor face-verification step. Fixed to ADD COLUMN IF NOT EXISTS.
+ROLLED_BACK_MIGRATIONS="20260424100100_add_pharmacy_order_payment_flow 20260430000000_add_provider_kyc_face_storage"
 
 for ROLLED_BACK_MIGRATION in $ROLLED_BACK_MIGRATIONS; do
   DATABASE_URL="$DIRECT_URL" timeout 30 "$PRISMA_BIN" migrate resolve --rolled-back "$ROLLED_BACK_MIGRATION" \
