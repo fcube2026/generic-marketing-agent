@@ -27,6 +27,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_ORDER_HOME = ['REQUESTED', 'ACCEPTED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'];
+const STATUS_ORDER_VIDEO = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'];
 
 export const BookingDetailScreen: React.FC = () => {
   const route = useRoute<Route>();
@@ -85,6 +86,8 @@ export const BookingDetailScreen: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
   };
 
+  const isVideoConsultation = booking?.mode === 'VIDEO_CONSULTATION';
+
   const handleAccept = async () => {
     setUpdating(true);
     try {
@@ -132,14 +135,20 @@ export const BookingDetailScreen: React.FC = () => {
     return <View style={styles.center}><Text style={styles.loadingText}>Booking not found.</Text></View>;
   }
 
-  const STATUS_ORDER = STATUS_ORDER_HOME;
+  const STATUS_ORDER = isVideoConsultation ? STATUS_ORDER_VIDEO : STATUS_ORDER_HOME;
   const currentStep = STATUS_ORDER.indexOf(booking.status);
-
   const getNextAction = (): { 
     label: string; 
     next?: string; 
-    nav?: 'ConsultationForm' | 'SafetyChecklist' | 'VisitOtp';
+    nav?: 'ConsultationForm' | 'SafetyChecklist' | 'VisitOtp' | 'VideoLobby';
   } | null => {
+    if (isVideoConsultation) {
+      switch (booking.status) {
+        case 'ACCEPTED': return { label: '📹 Join Video Call', nav: 'VideoLobby' };
+        case 'IN_PROGRESS': return { label: '✅ Complete & Write Summary', next: 'COMPLETED' };
+        default: return null;
+      }
+    }
     switch (booking.status) {
       case 'ACCEPTED': return { label: '🚗 Start Journey', next: 'ON_THE_WAY' };
       case 'ON_THE_WAY': return { label: '📍 Mark Arrived', next: 'ARRIVED' };
@@ -191,7 +200,7 @@ export const BookingDetailScreen: React.FC = () => {
               : '—'}
           </Text>
           <Text style={styles.infoText}>Service: {booking.serviceCategory?.name || '—'}</Text>
-          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</Text>
+          <Text style={styles.infoText}>Mode: {booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '📹 Video Consultation' : '🏥 Clinic Visit'}</Text>
           {booking.symptoms && <Text style={styles.infoText}>Symptoms: {booking.symptoms}</Text>}
         </View>
 

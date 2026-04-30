@@ -32,6 +32,7 @@ import { ConsentModule } from './modules/consent/consent.module';
 import { VisitOtpModule } from './modules/visit-otp/visit-otp.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { PharmacyPartnersModule } from './modules/pharmacy-partners/pharmacy-partners.module';
+import { VideoConsultationModule } from './modules/video-consultation/video-consultation.module';
 import { BootstrapService } from './common/bootstrap.service';
 import { HealthModule } from './common/health/health.module';
 import { SupabaseSyncModule } from './common/supabase/supabase-sync.module';
@@ -75,6 +76,7 @@ import { SupabaseSyncModule } from './common/supabase/supabase-sync.module';
     VisitOtpModule,
     SubscriptionsModule,
     PharmacyPartnersModule,
+    VideoConsultationModule,
   ],
   providers: [BootstrapService],
 })

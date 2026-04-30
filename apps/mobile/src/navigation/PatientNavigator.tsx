@@ -32,6 +32,7 @@ import { PharmacyOrdersScreen } from '../screens/pharmacy/PharmacyOrdersScreen';
 import { PharmacyOrderDetailScreen } from '../screens/pharmacy/PharmacyOrderDetailScreen';
 import { OrderTrackingScreen } from '../screens/pharmacy/OrderTrackingScreen';
 import { NotificationSettingsScreen } from '../screens/common/NotificationSettingsScreen';
+import { VideoLobbyScreen } from '../screens/common/VideoLobbyScreen';
 import { Colors } from '../constants/colors';
 import { ServiceCategory, MedicineResult } from '../types';
 
@@ -47,9 +48,9 @@ export type PatientStackParamList = {
   PatientKycGuardian: undefined;
   PatientKycReview: undefined;
   SelectService: { category: ServiceCategory };
-  ProviderList: { categoryId?: string; categorySlug?: string; serviceId?: string; lat?: number; lng?: number; mode?: 'HOME_VISIT' | 'DOCTOR_PLACE' };
+  ProviderList: { categoryId?: string; categorySlug?: string; serviceId?: string; lat?: number; lng?: number; mode?: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION' };
   Recommendation: { categorySlug: string; lat: number; lng: number };
-  BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE'; fee: number };
+  BookingConfirm: { providerId: string; mode: 'HOME_VISIT' | 'DOCTOR_PLACE' | 'VIDEO_CONSULTATION'; fee: number };
   ClinicalIntake: { bookingId: string };
   Consent: { bookingId: string };
   VerificationStatus: { bookingId: string };
@@ -66,6 +67,7 @@ export type PatientStackParamList = {
   PharmacyOrderDetail: { orderId: string };
   OrderTracking: { orderId: string };
   NotificationSettings: undefined;
+  VideoLobby: { bookingId: string };
 };
 
 const Stack = createNativeStackNavigator<PatientStackParamList>();
@@ -124,5 +126,6 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PharmacyOrderDetail" component={PharmacyOrderDetailScreen} options={{ title: 'Order Details' }} />
     <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ title: 'Track Order' }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
+    <Stack.Screen name="VideoLobby" component={VideoLobbyScreen} options={{ title: 'Video Consultation' }} />
   </Stack.Navigator>
 );
