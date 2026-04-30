@@ -769,13 +769,18 @@ export class ProvidersService {
       return { ...profile, distance, isOccupied };
     });
 
-    return results.filter(Boolean).sort((a: any, b: any) => {
-      // Sort by availability first, then distance
-      if (a.isOccupied !== b.isOccupied) {
-        return a.isOccupied ? 1 : -1;
-      }
-      return a.distance - b.distance;
-    });
+    return results
+      .filter(
+        (provider): provider is NonNullable<typeof provider> =>
+          provider !== null,
+      )
+      .sort((a, b) => {
+        // Sort by availability first, then distance
+        if (a.isOccupied !== b.isOccupied) {
+          return a.isOccupied ? 1 : -1;
+        }
+        return a.distance - b.distance;
+      });
   }
 
   async uploadKycDocument(userId: string, dto: UploadKycDocumentDto) {
