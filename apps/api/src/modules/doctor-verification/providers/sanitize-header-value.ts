@@ -14,7 +14,7 @@
 export function sanitizeHeaderValue(
   value: string | undefined,
 ): string | undefined {
-  if (value === undefined || value === null) return value;
+  if (value === undefined || value === null) return undefined;
   // Remove any character with code <= 0x1F (control chars incl. CR/LF/TAB)
   // or 0x7F (DEL), then trim surrounding whitespace.
   // eslint-disable-next-line no-control-regex
