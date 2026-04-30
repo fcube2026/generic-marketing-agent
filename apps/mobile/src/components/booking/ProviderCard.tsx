@@ -11,8 +11,12 @@ interface ProviderCardProps {
 }
 
 export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }) => (
-  <TouchableOpacity onPress={() => onSelect(provider)} activeOpacity={0.9}>
-    <Card style={styles.card}>
+  <TouchableOpacity 
+    onPress={() => !provider.isOccupied && onSelect(provider)} 
+    activeOpacity={provider.isOccupied ? 1 : 0.9}
+    disabled={provider.isOccupied}
+  >
+    <Card style={[styles.card, provider.isOccupied && styles.cardOccupied]}>
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{provider.name.charAt(0)}</Text>
@@ -29,6 +33,16 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }
             {provider.doctorPlaceVisitEnabled && (
               <View style={[styles.badge, styles.badgeSecondary]}>
                 <Text style={styles.badgeText}>Clinic</Text>
+              </View>
+            )}
+            {provider.videoConsultationEnabled && (
+              <View style={[styles.badge, styles.badgeVideo]}>
+                <Text style={styles.badgeText}>Video</Text>
+              </View>
+            )}
+            {provider.isOccupied && (
+              <View style={[styles.badge, styles.badgeOccupied]}>
+                <Text style={styles.badgeTextOccupied}>Currently occupied in another booking</Text>
               </View>
             )}
           </View>
@@ -74,7 +88,11 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   badgePrimary: { backgroundColor: Colors.primaryLight },
   badgeSecondary: { backgroundColor: '#DBEAFE' },
+  badgeVideo: { backgroundColor: '#F0F9FF' },
+  badgeOccupied: { backgroundColor: Colors.error + '1A' }, // 10% opacity error red
   badgeText: { fontSize: 11, fontWeight: '600', color: Colors.primary },
+  badgeTextOccupied: { fontSize: 11, fontWeight: '600', color: Colors.error },
+  cardOccupied: { opacity: 0.7 },
   footer: {
     flexDirection: 'row',
     borderTopWidth: 1,

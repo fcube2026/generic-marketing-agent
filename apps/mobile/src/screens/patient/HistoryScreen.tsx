@@ -65,6 +65,15 @@ export const HistoryScreen: React.FC = () => {
                 <BookingStatusBadge status={item.status as BookingStatus} />
               </View>
               <Text style={styles.service}>{item.serviceCategory?.name}</Text>
+              <View style={styles.modeContainer}>
+                <Text style={styles.modeText}>
+                  {item.mode === 'VIDEO_CONSULTATION'
+                    ? '📹 Video Consultation'
+                    : item.mode === 'HOME_VISIT'
+                    ? '🏠 Home Visit'
+                    : '🏥 Clinic Visit'}
+                </Text>
+              </View>
               <View style={styles.itemFooter}>
                 <Text style={styles.date}>{formatDateTime(item.scheduledAt)}</Text>
                 <PaymentStatusBadge status={item.paymentStatus as PaymentStatus} />
@@ -104,7 +113,16 @@ const styles = StyleSheet.create({
   },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   providerName: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  service: { fontSize: 13, color: Colors.textMuted, marginBottom: 10 },
+  service: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
+  modeContainer: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  modeText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
   itemFooter: { flexDirection: 'row', justifyContent: 'space-between' },
   date: { fontSize: 12, color: Colors.textMuted },
   fee: { fontSize: 14, fontWeight: '700', color: Colors.primary },

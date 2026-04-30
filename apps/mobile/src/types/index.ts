@@ -45,6 +45,7 @@ export interface ProviderProfile {
   currentLat?: number;
   currentLng?: number;
   serviceRadius: number;
+  isOccupied?: boolean;
 }
 
 export interface ServiceCategory {
@@ -90,6 +91,7 @@ export interface Booking {
 }
 export interface ProviderWithDistance extends ProviderProfile {
   distance: number;
+  isOccupied?: boolean;
 }
 
 export interface RecommendationOption {
