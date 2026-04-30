@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { useVideoCall } from '@/lib/useVideoCall';
+import { getInitials } from '@/lib/utils';
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   REQUESTED: { label: 'Requested', cls: 'badge-blue' },
@@ -80,14 +82,8 @@ function calcAge(dob: string | null): number | null {
   return Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
+
+const VIDEO_STATUSES = new Set(['REQUESTED', 'ACCEPTED', 'IN_PROGRESS']);
 
 export default function ConsultationDetailPage() {
   const params = useParams();
@@ -98,8 +94,10 @@ export default function ConsultationDetailPage() {
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [videoSessionStatus, setVideoSessionStatus] = useState<string | null>(null);
+  const { joiningId: videoJoiningId, joinCall, endCall } = useVideoCall();
 
-  useEffect(() => {
+  const fetchPatient = useCallback(() => {
     if (!uhid) return;
     api
       .get(`/providers/me/patients/${uhid}`)
@@ -113,6 +111,23 @@ export default function ConsultationDetailPage() {
       })
       .finally(() => setLoading(false));
   }, [uhid]);
+
+  useEffect(() => {
+    fetchPatient();
+  }, [fetchPatient]);
+
+  const handleJoinVideoCall = useCallback(async () => {
+    const ok = await joinCall(consultationId);
+    if (ok) setVideoSessionStatus('IN_PROGRESS');
+  }, [consultationId, joinCall]);
+
+  const handleEndConsultation = useCallback(async () => {
+    const ok = await endCall(consultationId);
+    if (ok) {
+      setVideoSessionStatus('COMPLETED');
+      fetchPatient();
+    }
+  }, [consultationId, endCall, fetchPatient]);
 
   if (loading) {
     return (
@@ -157,6 +172,11 @@ export default function ConsultationDetailPage() {
   const age = calcAge(patient.dateOfBirth);
   const initials = getInitials(patient.name);
   const prescriptions = consultation.summary?.prescriptions ?? [];
+
+  const isVideoConsultation = consultation.mode === 'VIDEO_CONSULTATION';
+  const effectiveVideoStatus = videoSessionStatus ?? consultation.videoSession?.status ?? null;
+  const canJoin = isVideoConsultation && VIDEO_STATUSES.has(consultation.status) && effectiveVideoStatus !== 'COMPLETED';
+  const isLive = canJoin && (effectiveVideoStatus === 'IN_PROGRESS' || consultation.status === 'IN_PROGRESS');
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -231,6 +251,57 @@ export default function ConsultationDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* Video Call Panel */}
+      {isVideoConsultation && canJoin && (
+        <div className={`card p-5 border-2 ${isLive ? 'border-green-400 bg-green-50' : 'border-primary/30 bg-primary-lighter/20'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${isLive ? 'bg-green-100' : 'bg-primary-lighter'}`}>
+                📹
+              </div>
+              <div>
+                <p className={`text-sm font-bold ${isLive ? 'text-green-800' : 'text-navy'}`}>
+                  {isLive ? 'Video Consultation In Progress' : 'Video Consultation Ready'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {isLive
+                    ? 'The call is active. Rejoin or end the session.'
+                    : 'Click "Join Call" to start the video consultation with this patient.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
+              <button
+                onClick={handleJoinVideoCall}
+                disabled={videoJoiningId === consultationId}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark disabled:opacity-60 transition"
+              >
+                {videoJoiningId === consultationId ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                )}
+                {isLive ? 'Rejoin Call' : 'Join Call'}
+              </button>
+              {isLive && (
+                <button
+                  onClick={handleEndConsultation}
+                  disabled={videoJoiningId === consultationId}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-60 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
+                  </svg>
+                  End Consultation
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vitals */}
       {consultation.vitals && (

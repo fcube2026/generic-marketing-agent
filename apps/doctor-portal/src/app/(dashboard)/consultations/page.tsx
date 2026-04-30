@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { USE_SEED, getSeedConsultationsList } from '@/lib/seed-data';
+import { useVideoCall } from '@/lib/useVideoCall';
 
 interface ConsultationRow {
   id: string;
@@ -30,16 +32,21 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 };
 
 const typeLabel: Record<string, string> = {
-  in_person:   'In-Person',
-  teleconsult: 'Teleconsult',
+  in_person:          'In-Person',
+  teleconsult:        'Teleconsult',
+  HOME_VISIT:         'Home Visit',
+  DOCTOR_PLACE_VISIT: 'Clinic Visit',
+  VIDEO_CONSULTATION: 'Video Call',
 };
 
 export default function ConsultationsPage() {
+  const searchParams = useSearchParams();
   const [consultations, setConsultations] = useState<ConsultationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterType, setFilterType] = useState('all');
+  const [filterType, setFilterType] = useState(searchParams?.get('type') ?? 'all');
   const [query, setQuery] = useState('');
+  const { joiningId: videoJoiningId, joinCall } = useVideoCall();
 
   useEffect(() => {
     if (USE_SEED) {
@@ -57,6 +64,8 @@ export default function ConsultationsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleJoinVideoCall = joinCall;
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -146,6 +155,9 @@ export default function ConsultationsPage() {
             <option value="all">All Types</option>
             <option value="in_person">In-Person</option>
             <option value="teleconsult">Teleconsult</option>
+            <option value="VIDEO_CONSULTATION">Video Call</option>
+            <option value="HOME_VISIT">Home Visit</option>
+            <option value="DOCTOR_PLACE_VISIT">Clinic Visit</option>
           </select>
         </div>
       </div>
@@ -251,6 +263,20 @@ export default function ConsultationsPage() {
                     {/* Action */}
                     <td className="text-right">
                       <div className="flex items-center gap-2 justify-end">
+                        {c.type === 'VIDEO_CONSULTATION' && (c.status === 'scheduled' || c.status === 'in_progress') && (
+                          <button
+                            onClick={() => handleJoinVideoCall(c.id)}
+                            disabled={videoJoiningId === c.id}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-60 transition"
+                          >
+                            {videoJoiningId === c.id ? (
+                              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              '📹'
+                            )}
+                            {c.status === 'in_progress' ? 'Rejoin' : 'Join'}
+                          </button>
+                        )}
                         {c.patientUHID && (
                           <Link
                             href={`/patients/${c.patientUHID}/consultations/${c.id}`}
