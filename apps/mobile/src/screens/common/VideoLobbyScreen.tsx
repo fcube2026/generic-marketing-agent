@@ -69,7 +69,6 @@ export const VideoLobbyScreen: React.FC = () => {
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [networkStatus, setNetworkStatus] = useState<boolean | null>(null);
-  const [hasJoinedCall, setHasJoinedCall] = useState(false);
 
   const appState = useRef(AppState.currentState);
 
@@ -159,11 +158,10 @@ export const VideoLobbyScreen: React.FC = () => {
       // Mark session and booking as IN_PROGRESS
       try {
         await videoConsultationService.startSession(bookingId);
-      } catch {
-        // Best-effort — don't block the call if status update fails
+      } catch (err) {
+        if (__DEV__) console.warn('[VideoLobby] startSession failed:', err);
       }
 
-      setHasJoinedCall(true);
       // Refresh booking status after starting session
       queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
 
@@ -193,8 +191,8 @@ export const VideoLobbyScreen: React.FC = () => {
               // Mark session and booking as COMPLETED
               try {
                 await videoConsultationService.endSession(bookingId);
-              } catch {
-                // Best-effort
+              } catch (err) {
+                if (__DEV__) console.warn('[VideoLobby] endSession failed:', err);
               }
 
               // Refresh caches
@@ -225,8 +223,7 @@ export const VideoLobbyScreen: React.FC = () => {
   const permissionsGranted =
     cameraPermission?.granted && micPermission?.granted;
 
-  const isInProgress =
-    booking?.status === 'IN_PROGRESS' || hasJoinedCall;
+  const isInProgress = booking?.status === 'IN_PROGRESS';
 
   // Disable join if network is down or not yet checked
   const joinDisabled =
@@ -239,7 +236,7 @@ export const VideoLobbyScreen: React.FC = () => {
   // Participant name to display
   const participantName =
     token?.role === 'provider'
-      ? (booking as any)?.patient?.name || 'Patient'
+      ? booking?.patient?.name || 'Patient'
       : booking?.provider?.name || 'Doctor';
 
   if (loading) {

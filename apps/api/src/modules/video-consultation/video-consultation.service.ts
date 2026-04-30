@@ -107,8 +107,9 @@ export class VideoConsultationService {
     const now = new Date();
     let duration: number | undefined;
     if (status === 'COMPLETED' && session.startedAt) {
-      duration = Math.round(
-        (now.getTime() - session.startedAt.getTime()) / 1000,
+      duration = Math.max(
+        0,
+        Math.round((now.getTime() - session.startedAt.getTime()) / 1000),
       );
     }
 
@@ -116,8 +117,8 @@ export class VideoConsultationService {
       where: { bookingId },
       data: {
         status,
-        startedAt: status === 'IN_PROGRESS' ? now : undefined,
-        endedAt: status === 'COMPLETED' ? now : undefined,
+        ...(status === 'IN_PROGRESS' && { startedAt: now }),
+        ...(status === 'COMPLETED' && { endedAt: now }),
         duration: duration ?? undefined,
       },
     });
