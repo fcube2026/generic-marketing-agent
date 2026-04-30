@@ -144,7 +144,7 @@ export const BookingDetailScreen: React.FC = () => {
   } | null => {
     if (isVideoConsultation) {
       switch (booking.status) {
-        case 'ACCEPTED': return { label: '📹 Join Video Call', nav: 'VideoLobby' };
+        case 'ACCEPTED': return { label: '📹 Join Consultation', nav: 'VideoLobby' };
         case 'IN_PROGRESS': return { label: '✅ Complete & Write Summary', next: 'COMPLETED' };
         default: return null;
       }

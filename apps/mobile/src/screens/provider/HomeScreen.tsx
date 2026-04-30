@@ -11,7 +11,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { providerService } from '../../services/providerService';
 import { bookingService } from '../../services/bookingService';
 import { ProviderStackParamList } from '../../navigation/ProviderNavigator';
-import { formatCurrency } from '../../utils/format';
+import { formatCurrency, formatDateTime } from '../../utils/format';
 import { getCurrentLocation } from '../../utils/location';
 import { Booking, BookingStatus } from '../../types';
 
@@ -30,6 +30,13 @@ export const HomeScreen: React.FC = () => {
     queryKey: ['provider-bookings'],
     queryFn: bookingService.getProviderBookings,
     refetchInterval: 15000,
+  });
+
+  const { data: videoBookings } = useQuery<Booking[]>({
+    queryKey: ['provider-video-consultations'],
+    queryFn: bookingService.getProviderActiveVideoConsultations,
+    refetchInterval: 15000,
+    staleTime: 0,
   });
 
   const availabilityMutation = useMutation({
@@ -52,6 +59,13 @@ export const HomeScreen: React.FC = () => {
   const todayEarnings = todayBookings
     .filter((b) => b.status === 'COMPLETED' || b.status === 'CLOSED')
     .reduce((sum, b) => sum + b.totalFee * 0.8, 0);
+
+  const activeVideoBookings = (videoBookings || []).filter(
+    (b) => b.status === 'ACCEPTED' || b.status === 'IN_PROGRESS',
+  );
+  const upcomingVideoBookings = (videoBookings || []).filter(
+    (b) => b.status === 'REQUESTED',
+  );
 
   if (profileLoading) return <LoadingSpinner fullScreen />;
 
@@ -143,6 +157,68 @@ export const HomeScreen: React.FC = () => {
         </Card>
       </View>
 
+      {/* Video Consultations Quick Action Section */}
+      <View style={styles.videoSection}>
+        <View style={styles.videoSectionHeader}>
+          <View style={styles.videoSectionTitleRow}>
+            <Text style={styles.videoSectionIcon}>📹</Text>
+            <Text style={styles.videoSectionTitle}>Video Consultations</Text>
+            {activeVideoBookings.length > 0 && (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>{activeVideoBookings.length} active</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.viewAllBtn}
+            onPress={() => navigation.navigate('VideoConsultations')}
+          >
+            <Text style={styles.viewAllBtnText}>View All →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {videoBookings === undefined ? (
+          <Text style={styles.videoLoadingText}>Loading…</Text>
+        ) : activeVideoBookings.length === 0 && upcomingVideoBookings.length === 0 ? (
+          <View style={styles.videoEmpty}>
+            <Text style={styles.videoEmptyText}>No active video consultations</Text>
+          </View>
+        ) : (
+          <>
+            {activeVideoBookings.map((booking) => (
+              <View key={booking.id} style={styles.videoItem}>
+                <View style={styles.videoItemLeft}>
+                  <Text style={styles.videoItemPatient}>{booking.patient?.name || 'Patient'}</Text>
+                  <Text style={styles.videoItemTime}>{formatDateTime(booking.scheduledAt)}</Text>
+                </View>
+                <View style={styles.videoItemRight}>
+                  <BookingStatusBadge status={booking.status as BookingStatus} />
+                  <TouchableOpacity
+                    style={styles.joinBtn}
+                    onPress={() => navigation.navigate('VideoLobby', { bookingId: booking.id })}
+                  >
+                    <Text style={styles.joinBtnText}>Join</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            {upcomingVideoBookings.slice(0, 2).map((booking) => (
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.videoItem}
+                onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
+              >
+                <View style={styles.videoItemLeft}>
+                  <Text style={styles.videoItemPatient}>{booking.patient?.name || 'Patient'}</Text>
+                  <Text style={styles.videoItemTime}>{formatDateTime(booking.scheduledAt)}</Text>
+                </View>
+                <BookingStatusBadge status={booking.status as BookingStatus} />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+      </View>
+
       {todayBookings.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📅 Today's Schedule</Text>
@@ -163,19 +239,6 @@ export const HomeScreen: React.FC = () => {
           ))}
         </View>
       )}
-
-      {/* Video Consultations Quick Access */}
-      <TouchableOpacity
-        style={styles.videoCard}
-        onPress={() => navigation.navigate('VideoConsultations')}
-      >
-        <Text style={styles.videoCardIcon}>📹</Text>
-        <View style={styles.videoCardContent}>
-          <Text style={styles.videoCardTitle}>Video Consultations</Text>
-          <Text style={styles.videoCardSub}>View active video consultation bookings</Text>
-        </View>
-        <Text style={styles.videoCardArrow}>→</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -227,15 +290,13 @@ const styles = StyleSheet.create({
   onboardingSub: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 22 },
   onboardingBtn: { backgroundColor: Colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12 },
   onboardingBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
-  videoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 14,
+  // Video Consultation Section
+  videoSection: {
+    backgroundColor: Colors.white,
+    borderRadius: 14,
     marginHorizontal: 16,
-    marginTop: 8,
     marginBottom: 16,
+    padding: 14,
     elevation: 2,
     shadowColor: '#000',
     shadowOpacity: 0.06,
@@ -244,9 +305,55 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#2563EB',
   },
-  videoCardIcon: { fontSize: 28, marginRight: 14 },
-  videoCardContent: { flex: 1 },
-  videoCardTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  videoCardSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  videoCardArrow: { fontSize: 18, color: Colors.textMuted },
+  videoSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  videoSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  videoSectionIcon: { fontSize: 20 },
+  videoSectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  activeBadge: {
+    backgroundColor: '#DCFCE7',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  activeBadgeText: { fontSize: 11, fontWeight: '700', color: '#16A34A' },
+  viewAllBtn: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  viewAllBtnText: { fontSize: 12, fontWeight: '700', color: '#2563EB' },
+  videoEmpty: { paddingVertical: 12, alignItems: 'center' },
+  videoEmptyText: { fontSize: 13, color: Colors.textMuted },
+  videoLoadingText: { fontSize: 13, color: Colors.textMuted, paddingVertical: 8, textAlign: 'center' },
+  videoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  videoItemLeft: { flex: 1 },
+  videoItemPatient: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  videoItemTime: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  videoItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  joinBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  joinBtnText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
 });
