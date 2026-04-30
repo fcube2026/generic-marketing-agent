@@ -35,11 +35,9 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }
                 <Text style={styles.badgeText}>Clinic</Text>
               </View>
             )}
-            {provider.videoConsultationEnabled && (
-              <View style={[styles.badge, styles.badgeVideo]}>
+            <View style={[styles.badge, styles.badgeVideo]}>
                 <Text style={styles.badgeText}>Video</Text>
               </View>
-            )}
             {provider.isOccupied && (
               <View style={[styles.badge, styles.badgeOccupied]}>
                 <Text style={styles.badgeTextOccupied}>Currently occupied in another booking</Text>

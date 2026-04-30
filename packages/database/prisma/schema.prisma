@@ -76,38 +76,38 @@ model PatientProfile {
 }
 
 model ProviderProfile {
-  id                               String   @id @default(cuid())
-  userId                           String   @unique
-  name                             String
-  bio                              String?
-  specialization                   String   // optional: keep only for display
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  name           String
+  bio            String?
+  specialization String // optional: keep only for display
 
-  contactInfo                      String   @default("")
-  clinicAddress                    String   @default("")
-  licenseNumber                    String?
+  contactInfo   String  @default("")
+  clinicAddress String  @default("")
+  licenseNumber String?
 
-  isVerified                       Boolean  @default(false)
-  isActive                         Boolean  @default(true)
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
 
-  homeVisitEnabled                 Boolean  @default(false)
-  doctorPlaceVisitEnabled          Boolean  @default(false)
-  // videoConsultationEnabled      Boolean  @default(true)  // ❌ remove or keep true
+  homeVisitEnabled         Boolean @default(false)
+  doctorPlaceVisitEnabled  Boolean @default(false)
+  videoConsultationEnabled Boolean @default(true)
 
-  serviceRadius                    Float    @default(10)
+  serviceRadius Float @default(10)
 
-  consultationFeeHomeVisit         Float    @default(0)
-  consultationFeeDoctorPlace       Float    @default(0)
-  consultationFeeVideoConsultation Float    @default(0)
+  consultationFeeHomeVisit         Float @default(0)
+  consultationFeeDoctorPlace       Float @default(0)
+  consultationFeeVideoConsultation Float @default(0)
 
-  currentLat                       Float?
-  currentLng                       Float?
+  currentLat Float?
+  currentLng Float?
 
-  isAvailable                      Boolean  @default(false)
+  isAvailable Boolean @default(false)
 
-  kycFaceStoragePath               String?
+  kycFaceStoragePath String?
 
-  createdAt                        DateTime @default(now())
-  updatedAt                        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   licenses          ProviderLicense[]
