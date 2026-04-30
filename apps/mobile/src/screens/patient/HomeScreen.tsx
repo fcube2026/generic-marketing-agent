@@ -184,7 +184,15 @@ export const HomeScreen: React.FC = () => {
       {/* Video Consultation Quick Access */}
       <TouchableOpacity
         style={[styles.videoCard, styles.videoCardHighlight]}
-        onPress={() => navigation.navigate('SelectService', { category: { id: 'video', name: 'Video Consultation', slug: 'video-consultation', description: 'Consult a doctor online from anywhere' } as any })}
+        onPress={() => {
+          const videoCategory: ServiceCategory = {
+            id: 'video-consultation',
+            name: 'Video Consultation',
+            slug: 'video-consultation',
+            description: 'Consult a doctor online from anywhere',
+          };
+          navigation.navigate('SelectService', { category: videoCategory });
+        }}
       >
         <Text style={styles.videoCardIcon}>📹</Text>
         <View style={styles.videoCardContent}>
