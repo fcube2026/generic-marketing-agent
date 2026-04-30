@@ -37,7 +37,7 @@ const SESSION_STATUS_COLOR: Record<string, string> = {
   CREATED: 'bg-primary-light text-navy border border-surface-border',
   WAITING: 'bg-yellow-100 text-yellow-700',
   IN_PROGRESS: 'bg-red-100 text-red-700',
-  COMPLETED: 'bg-green-100 text-green-700',
+  COMPLETED: 'bg-primary text-white border border-primary',
   FAILED: 'bg-red-100 text-red-700',
   EXPIRED: 'bg-gray-100 text-gray-500',
 };
@@ -266,7 +266,7 @@ export default function VideoConsultationDetailPage() {
           <button
             onClick={handleEnd}
             disabled={actionLoading}
-            className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition disabled:opacity-60"
+            className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary-dark transition disabled:opacity-60"
           >
             {actionLoading ? 'Ending…' : '✅ End Consultation'}
           </button>

@@ -37,8 +37,8 @@ export default function ProfilePage() {
   }
 
   const statusColor: Record<string, string> = {
-    APPROVED: 'bg-green-100 text-green-700',
-    verified: 'bg-green-100 text-green-700',
+    APPROVED: 'bg-primary text-white',
+    verified: 'bg-primary text-white',
     PENDING: 'bg-yellow-100 text-yellow-700',
     pending: 'bg-yellow-100 text-yellow-700',
     PENDING_ADMIN_APPROVAL: 'bg-yellow-100 text-yellow-700',

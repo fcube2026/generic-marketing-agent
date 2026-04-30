@@ -46,17 +46,17 @@
   .badge {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  .badge-blue   { @apply badge bg-primary-light text-navy border border-surface-border; }
-  .badge-green  { @apply badge bg-green-50 text-green-700; }
+    .badge-blue   { @apply badge bg-primary text-white border border-primary; }
+    .badge-green  { @apply badge bg-primary text-white border border-primary; }
   .badge-amber  { @apply badge bg-amber-50 text-amber-700; }
   .badge-red    { @apply badge bg-red-50 text-red-700; }
   .badge-purple { @apply badge bg-purple-50 text-purple-700; }
   .badge-gray   { @apply badge bg-gray-100 text-gray-600; }
-  .badge-teal   { @apply badge bg-primary-light text-navy border border-surface-border; }
+    .badge-teal   { @apply badge bg-primary text-white border border-primary; }
 
   /* UHID chip */
   .uhid-chip {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-lighter text-primary rounded-md text-xs font-mono font-semibold border border-primary/20;
+      @apply inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-primary rounded-md text-xs font-mono font-semibold border border-primary/30;
   }
 
   /* Table */
@@ -86,7 +86,7 @@
   }
 
   /* Param status colours */
-  .param-normal   { @apply text-green-700 bg-green-50; }
+  .param-normal   { @apply text-primary bg-white border border-primary/30; }
   .param-high     { @apply text-red-700 bg-red-50; }
   .param-low      { @apply text-amber-700 bg-amber-50; }
   .param-critical { @apply text-red-800 bg-red-100 font-bold; }

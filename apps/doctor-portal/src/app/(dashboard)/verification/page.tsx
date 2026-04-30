@@ -60,7 +60,7 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
               n < current
-                ? 'bg-green-500 text-white'
+                ? 'bg-primary text-white'
                 : n === current
                   ? 'bg-primary text-white'
                   : 'bg-gray-200 text-gray-500'
@@ -70,7 +70,7 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
           </div>
           {n < total && (
             <div
-              className={`h-0.5 w-8 ${n < current ? 'bg-green-500' : 'bg-gray-200'}`}
+              className={`h-0.5 w-8 ${n < current ? 'bg-primary' : 'bg-gray-200'}`}
             />
           )}
         </div>
@@ -382,7 +382,7 @@ export default function VerificationPage() {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary transition"
                 >
                   {form.aadhaarFile ? (
-                    <p className="text-sm text-green-600 font-medium">
+                    <p className="text-sm text-primary font-medium">
                       ✓ {form.aadhaarFile.name}
                     </p>
                   ) : (
@@ -412,7 +412,7 @@ export default function VerificationPage() {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary transition"
                 >
                   {form.medicalCertFile ? (
-                    <p className="text-sm text-green-600 font-medium">
+                    <p className="text-sm text-primary font-medium">
                       ✓ {form.medicalCertFile.name}
                     </p>
                   ) : (
@@ -470,8 +470,8 @@ export default function VerificationPage() {
                 DigiLocker Document Access
               </h2>
             </div>
-            <div className="bg-primary-lighter border border-surface-border rounded-lg p-4 mb-6">
-              <p className="text-sm text-navy">
+            <div className="bg-white border border-primary/30 rounded-lg p-4 mb-6">
+              <p className="text-sm text-primary-dark">
                 We would like to securely access your documents from DigiLocker
                 to verify your credentials. This is optional — you may skip this
                 step and we will use only the documents you uploaded.
@@ -513,7 +513,7 @@ export default function VerificationPage() {
                 >
                   <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
                     {s.status === 'done' && (
-                      <span className="text-green-500 text-xl font-bold">✓</span>
+                      <span className="text-primary text-xl font-bold">✓</span>
                     )}
                     {s.status === 'running' && (
                       <span className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent inline-block" />
@@ -525,7 +525,7 @@ export default function VerificationPage() {
                   <span
                     className={`text-sm font-medium ${
                       s.status === 'done'
-                        ? 'text-green-700'
+                        ? 'text-primary-dark'
                         : s.status === 'running'
                           ? 'text-primary'
                           : 'text-gray-400'

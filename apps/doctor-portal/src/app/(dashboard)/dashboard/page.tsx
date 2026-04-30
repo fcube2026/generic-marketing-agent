@@ -26,7 +26,7 @@ const statCards = (stats: DashboardStats) => [
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
-    color: 'text-primary bg-primary-lighter',
+    color: 'text-white bg-primary',
     href: '/consultations',
   },
   {
@@ -37,7 +37,7 @@ const statCards = (stats: DashboardStats) => [
         <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
-    color: 'text-teal bg-teal-light',
+    color: 'text-white bg-primary',
     href: '/patients',
   },
   {
@@ -70,7 +70,7 @@ const statCards = (stats: DashboardStats) => [
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
-    color: 'text-green-700 bg-green-50',
+    color: 'text-white bg-primary',
     href: '/consultations',
   },
   {
@@ -95,7 +95,7 @@ const consultationStatusCls: Record<string, string> = {
 
 const quickActions = [
   { href: '/patients', label: 'Patient Records', desc: 'Search & manage patients by UHID', icon: '👥', color: 'border-teal/30 hover:border-teal bg-teal-light/20' },
-  { href: '/consultations', label: 'Consultations', desc: 'View and manage all consultations', icon: '📋', color: 'border-primary/30 hover:border-primary bg-primary-lighter/30' },
+  { href: '/consultations', label: 'Consultations', desc: 'View and manage all consultations', icon: '📋', color: 'border-primary hover:border-primary-dark bg-white hover:bg-primary/5' },
   { href: '/video-consultations', label: 'Video Calls', desc: 'Join or schedule video consultations', icon: '🎥', color: 'border-purple-300 hover:border-purple-500 bg-purple-50' },
   { href: '/earnings', label: 'Earnings', desc: 'Track your revenue and payouts', icon: '💰', color: 'border-amber-300 hover:border-amber-500 bg-amber-50' },
 ];
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                   className="flex items-start gap-3 py-3 hover:bg-surface-muted -mx-2 px-2 rounded-lg transition group"
                 >
                   {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-primary-lighter text-primary font-bold text-xs flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shrink-0">
                     {(c.patientName || '').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
