@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
@@ -48,7 +48,7 @@ export default function ConsultationsPage() {
   const [query, setQuery] = useState('');
   const { joiningId: videoJoiningId, joinCall } = useVideoCall();
 
-  useEffect(() => {
+  const fetchConsultations = useCallback(() => {
     if (USE_SEED) {
       setConsultations(getSeedConsultationsList() as ConsultationRow[]);
       setLoading(false);
@@ -65,7 +65,14 @@ export default function ConsultationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleJoinVideoCall = joinCall;
+  useEffect(() => {
+    fetchConsultations();
+  }, [fetchConsultations]);
+
+  const handleJoinVideoCall = useCallback(async (bookingId: string) => {
+    await joinCall(bookingId);
+    fetchConsultations();
+  }, [joinCall, fetchConsultations]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();

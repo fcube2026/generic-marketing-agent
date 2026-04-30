@@ -123,11 +123,19 @@ export class VideoConsultationService {
       },
     });
 
-    // Mirror status to booking when session starts
+    // Mirror status to booking
     if (status === 'IN_PROGRESS' && booking.status === 'ACCEPTED') {
       await this.prisma.booking.update({
         where: { id: bookingId },
         data: { status: 'IN_PROGRESS' },
+      });
+    } else if (
+      status === 'COMPLETED' &&
+      ['ACCEPTED', 'IN_PROGRESS'].includes(booking.status)
+    ) {
+      await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'COMPLETED' },
       });
     }
 
