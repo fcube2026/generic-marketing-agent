@@ -90,9 +90,8 @@ export class NmcApiProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
-    let response: Response;
     try {
-      response = await fetch(this.apiUrl, {
+      const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -101,24 +100,61 @@ export class NmcApiProvider {
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
+
+      // Read body as text first so a non-JSON error page (e.g. an HTML 401/404
+      // page from the API gateway) does not throw a SyntaxError before we get
+      // a chance to inspect response.status.
+      const bodyText = await response.text();
+      const truncatedBody =
+        bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
+
+      if (!response.ok) {
+        this.logger.warn(
+          `[${this.provider}] Verification API error ${response.status}: ${truncatedBody}`,
+        );
+        throw new Error(
+          `NMC API (${this.provider}) returned HTTP ${response.status}`,
+        );
+      }
+
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(bodyText) as Record<string, unknown>;
+      } catch {
+        this.logger.warn(
+          `[${this.provider}] Verification API returned non-JSON success body: ${truncatedBody}`,
+        );
+        throw new Error(
+          `NMC API (${this.provider}) returned non-JSON success body`,
+        );
+      }
+
+      this.logger.log(
+        `[${this.provider}] response: ${JSON.stringify(data, null, 2)}`,
+      );
+
+      return this.normalizeResponse(data, req);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Preserve the structured errors we threw above (HTTP status / non-JSON
+      // body) so tests and callers can rely on those exact messages.
+      if (
+        message.startsWith(`NMC API (${this.provider}) returned`) ||
+        message.startsWith(`NMC API (${this.provider}) timed out`) ||
+        message.startsWith(`NMC API (${this.provider}) request failed`)
+      ) {
+        throw err;
+      }
+      const isAbort =
+        (err instanceof Error && err.name === 'AbortError') ||
+        /aborted/i.test(message);
+      if (isAbort) {
+        throw new Error(`NMC API (${this.provider}) timed out after 30s`);
+      }
+      throw new Error(`NMC API (${this.provider}) request failed: ${message}`);
     } finally {
       clearTimeout(timeoutId);
     }
-
-    const data = (await response.json()) as Record<string, unknown>;
-
-    this.logger.log(`Surepass response: ${JSON.stringify(data, null, 2)}`);
-
-    if (!response.ok) {
-      this.logger.warn(
-        `[${this.provider}] Verification API error ${response.status}: ${JSON.stringify(data)}`,
-      );
-      throw new Error(
-        `NMC API (${this.provider}) returned HTTP ${response.status}`,
-      );
-    }
-
-    return this.normalizeResponse(data, req);
   }
 
   /** Build the request payload in the format expected by each provider. */
