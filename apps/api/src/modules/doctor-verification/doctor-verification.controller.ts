@@ -10,8 +10,8 @@ export class DoctorVerificationController {
   constructor(private verificationService: DoctorVerificationService) {}
 
   /**
-   * Doctor submits NMC registration details for automated multi-step verification.
-   * Runs: NMC API -> SMC portal -> confidence scoring -> issue code assignment.
+   * Doctor submits registration details for Surepass official-records verification.
+   * Runs: Surepass official-records check -> confidence scoring -> issue code assignment.
    * Always routes to admin approval; never auto-approves.
    * POST /providers/me/verification/nmc
    */
