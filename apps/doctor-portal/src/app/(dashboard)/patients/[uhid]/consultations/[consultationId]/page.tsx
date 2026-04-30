@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useVideoCall } from '@/lib/useVideoCall';
+import { getInitials } from '@/lib/utils';
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
   REQUESTED: { label: 'Requested', cls: 'badge-blue' },
@@ -81,14 +82,6 @@ function calcAge(dob: string | null): number | null {
   return Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
 
 const VIDEO_STATUSES = new Set(['REQUESTED', 'ACCEPTED', 'IN_PROGRESS']);
 

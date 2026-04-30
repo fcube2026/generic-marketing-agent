@@ -5,6 +5,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { USE_SEED, getSeedDashboardStats } from '@/lib/seed-data';
 import { useVideoCall } from '@/lib/useVideoCall';
+import { getInitials } from '@/lib/utils';
 
 interface RecentConsultation {
   id: string;
@@ -245,7 +246,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-3">
             {activeVideoCalls.map((vc) => {
-              const initials = (vc.patient.name || '??').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+              const initials = getInitials(vc.patient.name);
               const isActive = vc.status === 'IN_PROGRESS';
               return (
                 <div key={vc.id} className="flex items-center gap-3 bg-white rounded-xl border border-purple-100 p-3">
