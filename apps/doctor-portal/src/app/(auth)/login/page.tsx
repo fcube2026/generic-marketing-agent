@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -84,9 +85,19 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-lighter to-primary-light">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-primary">Curex24</h1>
-          <p className="text-gray-500 mt-1">Doctor Portal</p>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <Image
+            src="/curex-logo.png"
+            alt="Curex24 logo"
+            width={72}
+            height={72}
+            className="h-14 w-14 object-contain"
+            priority
+          />
+          <div className="text-left">
+            <h1 className="text-3xl font-extrabold text-primary leading-none">Curex24</h1>
+            <p className="text-gray-500 mt-1">Doctor Portal</p>
+          </div>
         </div>
 
         <form
