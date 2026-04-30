@@ -218,6 +218,53 @@ export default function ConsultationDetailPage() {
         </div>
       </div>
 
+      {/* Vitals */}
+      {consultation.vitals && (
+        <div className="card p-5">
+          <h2 className="section-title">Vitals at Visit</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            {[
+              { label: 'Blood Pressure', value: consultation.vitals.bp, unit: 'mmHg', warn: parseInt(consultation.vitals.bp.split('/')[0], 10) > 140 },
+              { label: 'Temperature', value: `${consultation.vitals.tempF}°F`, unit: '', warn: consultation.vitals.tempF > 99 },
+              { label: 'SpO₂', value: `${consultation.vitals.spo2Percent}%`, unit: 'Oxygen', warn: consultation.vitals.spo2Percent < 95 },
+              { label: 'Pulse', value: consultation.vitals.pulsePerMin, unit: '/min', warn: consultation.vitals.pulsePerMin > 100 },
+              { label: 'Resp. Rate', value: consultation.vitals.rr, unit: '/min', warn: consultation.vitals.rr > 20 },
+              { label: 'Weight', value: `${consultation.vitals.weightKg} kg`, unit: '' },
+              { label: 'Height', value: `${consultation.vitals.heightCm} cm`, unit: '' },
+              { label: 'BMI', value: consultation.vitals.bmi, unit: 'kg/m²', warn: consultation.vitals.bmi > 30 },
+            ].map((v) => (
+              <div
+                key={v.label}
+                className={`flex flex-col items-center gap-0.5 p-3 rounded-xl border text-center ${
+                  v.warn ? 'border-amber-200 bg-amber-50' : 'border-surface-border bg-surface-muted'
+                }`}
+              >
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">{v.label}</span>
+                <span className={`text-base font-bold ${v.warn ? 'text-amber-700' : 'text-navy'}`}>{v.value}</span>
+                {v.unit && <span className="text-[9px] text-gray-400">{v.unit}</span>}
+                {v.warn && <span className="text-[9px] font-bold text-amber-600 mt-0.5">⚠ Review</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Clinical Notes */}
+      {consultation.clinicalNotes && (
+        <div className="card p-5">
+          <h2 className="section-title">Clinical Notes</h2>
+          <div className="bg-surface-muted rounded-xl border border-surface-border p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-mono">
+            {consultation.clinicalNotes}
+          </div>
+          {consultation.referral && (
+            <div className="mt-3 flex items-start gap-2 p-3 bg-purple-50 border border-purple-100 rounded-lg">
+              <svg className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-purple-700 mb-0.5">Referral Issued</p>
+                <p className="text-sm text-purple-800">{consultation.referral}</p>
+              </div>
       {consultation.summary && (
         <div className="card p-5 space-y-3">
           <h2 className="section-title">Clinical Summary</h2>

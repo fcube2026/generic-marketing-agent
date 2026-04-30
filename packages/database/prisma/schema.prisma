@@ -94,6 +94,7 @@ model ProviderProfile {
   currentLat                 Float?
   currentLng                 Float?
   isAvailable                Boolean  @default(false)
+  kycFaceStoragePath         String?
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 

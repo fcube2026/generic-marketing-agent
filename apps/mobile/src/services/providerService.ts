@@ -114,6 +114,12 @@ export const providerService = {
     return r.data;
   },
 
+  /** Delete a specific verification log entry. */
+  deleteVerificationLog: async (logId: string) => {
+    const r = await api.delete(ENDPOINTS.VERIFICATION.DELETE_LOG(logId));
+    return r.data;
+  },
+
   /**
    * Upload a prescription file and/or text details under a booking.
    * Requires the consultation summary to already exist.

@@ -117,12 +117,17 @@ describe('OrderTrackingScreen', () => {
     await act(async () => {
       resolveOrder!(baseOrder);
     });
-    // React Query v5 schedules state-update notifications via setTimeout(0).
-    // With fake timers active those callbacks are never fired automatically, so
-    // we must flush them (and any Animated frame timers) inside act so that
-    // React commits the loaded state before the waitFor assertion runs.
-    act(() => {
-      jest.runAllTimers();
+    // React Query v5 schedules its state-update notification via setTimeout(0).
+    // We use runOnlyPendingTimers (not runAllTimers) so that only the timers
+    // already in the queue at this point are fired — specifically RQ's
+    // setTimeout(0) — without recursively firing Animated rAF callbacks that
+    // the newly-rendered Timeline component will schedule. Those rAF callbacks
+    // are themselves setTimeout(0) in Jest (RN mocks requestAnimationFrame as
+    // setTimeout(_, 0)), and running them with runAllTimers causes the spring
+    // animation's fake-clock to stall at t=0 → infinite frame loop → 100k-timer
+    // abort inside act() → 5 s Jest test timeout.
+    await act(async () => {
+      jest.runOnlyPendingTimers();
     });
     await waitFor(() => {
       expect(screen.queryByText(/Loading your order/i)).toBeNull();
