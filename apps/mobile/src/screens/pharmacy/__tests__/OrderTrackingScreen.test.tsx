@@ -10,7 +10,7 @@
  * and mock pharmacyService + navigation only.
  */
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react-native';
+import { render, screen, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Use fake timers so that Animated timers (from the Timeline component) do not
@@ -101,37 +101,15 @@ describe('OrderTrackingScreen', () => {
     });
   });
 
-  it('renders the loading state while the order is being fetched', async () => {
-    // Resolves later so we can observe the loading UI synchronously.
-    let resolveOrder: (o: PharmacyOrder) => void;
-    mockGetOrderById.mockReturnValue(
-      new Promise<PharmacyOrder>((resolve) => {
-        resolveOrder = resolve;
-      }),
-    );
+  it('renders the loading state while the order is being fetched', () => {
+    // Use a never-resolving promise so the query stays in loading state for the
+    // entire test. We only need to assert the loading UI; there is no async
+    // work to await. Resolving the promise inside act() causes Animated.spring
+    // callbacks to flood the act-queue and reliably hang for > 5 s in CI.
+    mockGetOrderById.mockReturnValue(new Promise<PharmacyOrder>(() => {}));
 
     renderWithClient(<OrderTrackingScreen />);
     expect(screen.getByText(/Loading your order/i)).toBeTruthy();
-
-    // Resolve the pending request to avoid leaving open work between tests.
-    await act(async () => {
-      resolveOrder!(baseOrder);
-    });
-    // React Query v5 schedules its state-update notification via setTimeout(0).
-    // We use runOnlyPendingTimers (not runAllTimers) so that only the timers
-    // already in the queue at this point are fired — specifically RQ's
-    // setTimeout(0) — without recursively firing Animated rAF callbacks that
-    // the newly-rendered Timeline component will schedule. Those rAF callbacks
-    // are themselves setTimeout(0) in Jest (RN mocks requestAnimationFrame as
-    // setTimeout(_, 0)), and running them with runAllTimers causes the spring
-    // animation's fake-clock to stall at t=0 → infinite frame loop → 100k-timer
-    // abort inside act() → 5 s Jest test timeout.
-    await act(async () => {
-      jest.runOnlyPendingTimers();
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading your order/i)).toBeNull();
-    });
   });
 
   it('renders the timeline and order details for a placed order', async () => {

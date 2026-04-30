@@ -32,6 +32,17 @@ interface Prescription {
   createdAt?: string;
 }
 
+interface Vitals {
+  bp: string;
+  tempF: number;
+  spo2Percent: number;
+  pulsePerMin: number;
+  rr: number;
+  weightKg: number;
+  heightCm: number;
+  bmi: number;
+}
+
 interface Consultation {
   id: string;
   scheduledAt: string;
@@ -40,6 +51,9 @@ interface Consultation {
   symptoms: string | null;
   totalFee: number;
   serviceCategory: string;
+  vitals: Vitals | null;
+  clinicalNotes: string | null;
+  referral: string | null;
   videoSession: { id: string; status: string; roomId: string } | null;
   summary: {
     diagnosis: string | null;
@@ -265,6 +279,11 @@ export default function ConsultationDetailPage() {
                 <p className="text-xs font-semibold text-purple-700 mb-0.5">Referral Issued</p>
                 <p className="text-sm text-purple-800">{consultation.referral}</p>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {consultation.summary && (
         <div className="card p-5 space-y-3">
           <h2 className="section-title">Clinical Summary</h2>
