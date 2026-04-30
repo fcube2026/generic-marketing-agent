@@ -9,7 +9,10 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { NmcApiProvider } from './providers/nmc-api.provider';
 import { SmcScraperProvider } from './providers/smc-scraper.provider';
 import { FaceVerificationProvider } from './providers/face-verification.provider';
-import { AadhaarValidationProvider } from './providers/aadhaar-validation.provider';
+import {
+  AadhaarValidationProvider,
+  AadhaarValidationResult,
+} from './providers/aadhaar-validation.provider';
 import { SubmitNmcVerificationDto } from './dto/submit-nmc-verification.dto';
 import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
 import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
@@ -183,6 +186,15 @@ export class DoctorVerificationService {
       },
     });
 
+    // Persist the live face data for future home-visit identity verification.
+    // Stored as a data-URL (base64) or a cloud storage URL depending on the client.
+    if (dto.liveFaceData) {
+      await this.prisma.providerProfile.update({
+        where: { id: profile.id },
+        data: { kycFaceStoragePath: dto.liveFaceData },
+      });
+    }
+
     return {
       match: faceResult.match,
       similarityScore: faceResult.similarityScore,
@@ -245,7 +257,7 @@ export class DoctorVerificationService {
     }
 
     // Validate Aadhaar number if provided
-    let aadhaarValidation: { valid: boolean } | null = null;
+    let aadhaarValidation: AadhaarValidationResult | null = null;
     if (dto.aadhaarNumber) {
       try {
         aadhaarValidation = await this.aadhaarProvider.validate(
@@ -284,6 +296,10 @@ export class DoctorVerificationService {
       licenseId: license.id,
       documentsReceived: true,
       aadhaarValid: aadhaarValidation?.valid ?? null,
+      aadhaarCustomerName: aadhaarValidation?.customerName ?? null,
+      aadhaarCustomerDob: aadhaarValidation?.customerDob ?? null,
+      aadhaarCustomerGender: aadhaarValidation?.customerGender ?? null,
+      aadhaarCustomerAddress: aadhaarValidation?.customerAddress ?? null,
       message: 'Documents uploaded successfully. Proceed to face verification.',
     };
   }
@@ -419,6 +435,8 @@ export class DoctorVerificationService {
 
   /**
    * Returns all verification logs for a provider by their userId (audit trail).
+   * Each log includes the associated license's current status so the client can
+   * show admin approval/rejection for that specific attempt.
    */
   async getVerificationLogs(userId: string) {
     const profile = await this.prisma.providerProfile.findUnique({
@@ -429,7 +447,35 @@ export class DoctorVerificationService {
     return this.prisma.doctorVerificationLog.findMany({
       where: { providerId: profile.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        license: {
+          select: {
+            status: true,
+            verifiedAt: true,
+            rejectionReason: true,
+          },
+        },
+      },
     });
+  }
+
+  /**
+   * Deletes a single verification log entry belonging to the authenticated provider.
+   * Doctors may clean up stale/unwanted attempts from their log history.
+   */
+  async deleteVerificationLog(userId: string, logId: string) {
+    const profile = await this.prisma.providerProfile.findUnique({
+      where: { userId },
+    });
+    if (!profile) throw new NotFoundException('Provider profile not found');
+
+    const log = await this.prisma.doctorVerificationLog.findFirst({
+      where: { id: logId, providerId: profile.id },
+    });
+    if (!log) throw new NotFoundException('Verification log not found');
+
+    await this.prisma.doctorVerificationLog.delete({ where: { id: logId } });
+    return { deleted: true };
   }
 
   /**

@@ -224,6 +224,17 @@ export class AdminService {
       data: { verifiedAt: new Date(), status: 'APPROVED' },
     });
 
+    // Mark outstanding PIPELINE verification logs as SUCCESS so the doctor sees
+    // "Approved by Admin" on that specific attempt in their log history.
+    await this.prisma.doctorVerificationLog.updateMany({
+      where: {
+        providerId,
+        verificationSource: 'PIPELINE',
+        status: { in: ['NOT_FOUND', 'MANUAL_REVIEW'] },
+      },
+      data: { status: 'SUCCESS' },
+    });
+
     const updated = await this.prisma.providerProfile.update({
       where: { id: providerId },
       data: { isVerified: true, isActive: true },

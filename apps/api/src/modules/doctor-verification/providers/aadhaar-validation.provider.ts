@@ -4,6 +4,11 @@ import { ConfigService } from '@nestjs/config';
 export interface AadhaarValidationResult {
   valid: boolean;
   aadhaarNumber?: string;
+  /** Customer details returned by the external Aadhaar API (Surepass etc.) */
+  customerName?: string;
+  customerDob?: string;
+  customerGender?: string;
+  customerAddress?: string;
   rawResponse?: Record<string, unknown>;
 }
 
@@ -98,6 +103,25 @@ export class AadhaarValidationProvider {
       payload.is_valid === true ||
       payload.valid === true;
 
-    return { valid, aadhaarNumber, rawResponse: data };
+    // Extract customer details when present
+    const customerName =
+      (payload.full_name as string) ?? (payload.name as string) ?? undefined;
+    const customerDob =
+      (payload.dob as string) ?? (payload.date_of_birth as string) ?? undefined;
+    const customerGender = (payload.gender as string) ?? undefined;
+    const customerAddress =
+      (payload.address as string) ??
+      (payload.split_address as string) ??
+      undefined;
+
+    return {
+      valid,
+      aadhaarNumber,
+      customerName,
+      customerDob,
+      customerGender,
+      customerAddress,
+      rawResponse: data,
+    };
   }
 }

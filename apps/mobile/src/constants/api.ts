@@ -27,6 +27,7 @@ export const ENDPOINTS = {
     SUBMIT_DOCUMENTS: '/providers/me/verification/documents',
     DIGILOCKER_CONSENT: '/providers/me/verification/digilocker-consent',
     LOGS: '/providers/me/verification/logs',
+    DELETE_LOG: (logId: string) => `/providers/me/verification/logs/${logId}`,
   },
   PATIENT_VERIFICATION: {
     INITIATE: '/verification/initiate',
