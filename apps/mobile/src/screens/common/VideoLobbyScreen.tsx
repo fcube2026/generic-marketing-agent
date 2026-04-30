@@ -43,7 +43,8 @@ export const VideoLobbyScreen: React.FC = () => {
         setToken(data);
       } catch (e: any) {
         setError(
-          e?.response?.data?.message ?? 'Failed to load video session. Please try again.',
+          e?.response?.data?.message ??
+          'Unable to prepare your video room. Make sure the booking has been accepted by the provider before joining.',
         );
       } finally {
         setLoading(false);
@@ -85,7 +86,10 @@ export const VideoLobbyScreen: React.FC = () => {
       }
       await Linking.openURL(token.jitsiUrl);
     } catch {
-      Alert.alert('Error', 'Could not open video call. Please try again.');
+      Alert.alert(
+        'Could Not Open Call',
+        'Unable to launch the video call. Please ensure a browser app is installed and try again.',
+      );
     } finally {
       setJoining(false);
     }
