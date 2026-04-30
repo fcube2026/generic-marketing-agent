@@ -34,7 +34,7 @@ const SESSION_STATUS_LABEL: Record<string, string> = {
 };
 
 const SESSION_STATUS_COLOR: Record<string, string> = {
-  CREATED: 'bg-blue-100 text-blue-700',
+  CREATED: 'bg-primary-light text-navy border border-surface-border',
   WAITING: 'bg-yellow-100 text-yellow-700',
   IN_PROGRESS: 'bg-red-100 text-red-700',
   COMPLETED: 'bg-green-100 text-green-700',
@@ -176,7 +176,7 @@ export default function VideoConsultationDetailPage() {
           <div className="flex justify-between">
             <dt className="text-sm text-gray-500">Booking Status</dt>
             <dd>
-              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-primary-light text-navy border border-surface-border">
                 {booking?.status?.replace('_', ' ') || '—'}
               </span>
             </dd>
