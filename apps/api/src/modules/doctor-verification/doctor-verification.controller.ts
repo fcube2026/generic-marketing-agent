@@ -5,7 +5,7 @@ import { SubmitFaceVerificationDto } from './dto/submit-face-verification.dto';
 import { SubmitVerificationDocumentsDto } from './dto/submit-verification-documents.dto';
 import { CurrentUser } from '../auth/decorators/roles.decorator';
 
-@Controller('providers/me/verification')
+@Controller('doctor-verification')
 export class DoctorVerificationController {
   constructor(private verificationService: DoctorVerificationService) {}
 
@@ -13,9 +13,9 @@ export class DoctorVerificationController {
    * Doctor submits registration details for Surepass official-records verification.
    * Runs: Surepass official-records check -> confidence scoring -> issue code assignment.
    * Always routes to admin approval; never auto-approves.
-   * POST /providers/me/verification/nmc
+   * POST /doctor-verification/verify
    */
-  @Post('nmc')
+  @Post('verify')
   submitForVerification(
     @CurrentUser() user: any,
     @Body() dto: SubmitNmcVerificationDto,
@@ -25,7 +25,7 @@ export class DoctorVerificationController {
 
   /**
    * Doctor uploads Aadhaar card and medical certificate documents.
-   * POST /providers/me/verification/documents
+   * POST /doctor-verification/documents
    */
   @Post('documents')
   submitVerificationDocuments(
@@ -37,7 +37,7 @@ export class DoctorVerificationController {
 
   /**
    * Records the doctor's consent to fetch documents from DigiLocker.
-   * POST /providers/me/verification/digilocker-consent
+   * POST /doctor-verification/digilocker-consent
    */
   @Post('digilocker-consent')
   recordDigilockerConsent(
@@ -52,7 +52,7 @@ export class DoctorVerificationController {
 
   /**
    * Doctor submits a live face capture for face verification.
-   * POST /providers/me/verification/face
+   * POST /doctor-verification/face
    */
   @Post('face')
   submitFaceVerification(
@@ -64,7 +64,7 @@ export class DoctorVerificationController {
 
   /**
    * Doctor polls their verification history and current pipeline status.
-   * GET /providers/me/verification/logs
+   * GET /doctor-verification/logs
    */
   @Get('logs')
   getMyVerificationLogs(@CurrentUser() user: any) {
@@ -73,7 +73,7 @@ export class DoctorVerificationController {
 
   /**
    * Doctor deletes a specific verification log entry from their history.
-   * DELETE /providers/me/verification/logs/:id
+   * DELETE /doctor-verification/logs/:id
    */
   @Delete('logs/:id')
   deleteVerificationLog(@CurrentUser() user: any, @Param('id') logId: string) {

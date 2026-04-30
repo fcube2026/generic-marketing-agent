@@ -22,12 +22,12 @@ export const ENDPOINTS = {
     NEARBY: '/providers/nearby',
   },
   VERIFICATION: {
-    SUBMIT_NMC: '/providers/me/verification/nmc',
-    SUBMIT_FACE: '/providers/me/verification/face',
-    SUBMIT_DOCUMENTS: '/providers/me/verification/documents',
-    DIGILOCKER_CONSENT: '/providers/me/verification/digilocker-consent',
-    LOGS: '/providers/me/verification/logs',
-    DELETE_LOG: (logId: string) => `/providers/me/verification/logs/${logId}`,
+    SUBMIT_NMC: '/doctor-verification/verify',
+    SUBMIT_FACE: '/doctor-verification/face',
+    SUBMIT_DOCUMENTS: '/doctor-verification/documents',
+    DIGILOCKER_CONSENT: '/doctor-verification/digilocker-consent',
+    LOGS: '/doctor-verification/logs',
+    DELETE_LOG: (logId: string) => `/doctor-verification/logs/${logId}`,
   },
   PATIENT_VERIFICATION: {
     INITIATE: '/verification/initiate',
