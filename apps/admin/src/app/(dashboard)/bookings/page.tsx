@@ -126,7 +126,11 @@ export default function BookingsPage() {
                     <td className="px-5 py-3 text-sm text-gray-600">{booking.provider?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm text-gray-600">{booking.serviceCategory?.name || '—'}</td>
                     <td className="px-5 py-3 text-sm">
-                      {booking.mode === 'HOME_VISIT' ? '🏠 Home' : '🏥 Clinic'}
+                      {booking.mode === 'HOME_VISIT'
+                        ? '🏠 Home'
+                        : booking.mode === 'VIDEO_CONSULTATION'
+                        ? '📹 Video'
+                        : '🏥 Clinic'}
                     </td>
                     <td className="px-5 py-3"><StatusBadge status={booking.status} /></td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{booking.totalFee}</td>

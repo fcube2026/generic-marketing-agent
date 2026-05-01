@@ -33,6 +33,12 @@ interface BookingDetail {
   payment?: { amount: number; status: string; transactionId: string | null; paidAt: string | null };
 }
 
+const BOOKING_MODE_LABEL: Record<string, string> = {
+  HOME_VISIT: '🏠 Home Visit',
+  VIDEO_CONSULTATION: '📹 Video Consultation',
+  DOCTOR_PLACE: '🏥 Clinic Visit',
+};
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -89,7 +95,7 @@ export default function BookingDetailPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Mode</span>
-              <span>{booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</span>
+              <span>{BOOKING_MODE_LABEL[booking.mode] ?? '🏥 Clinic Visit'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Service</span>

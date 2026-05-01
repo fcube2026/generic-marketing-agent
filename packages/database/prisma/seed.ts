@@ -43,6 +43,11 @@ const serviceCategories = [
     slug: 'ent',
     description: 'Ear, nose, and throat specialist care',
   },
+  {
+    name: 'Others',
+    slug: 'others',
+    description: 'Other specializations not covered by the main service categories',
+  },
 ];
 
 const pharmacyPartners = [

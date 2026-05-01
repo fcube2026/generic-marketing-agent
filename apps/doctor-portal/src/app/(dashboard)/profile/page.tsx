@@ -112,7 +112,7 @@ export default function ProfilePage() {
         payload.consultationFeeHomeVisit = Number(feeHome);
       }
       // Always send video fee; default to 500 when left blank
-      payload.consultationFeeVideoConsultation = feeVideo ? Number(feeVideo) : 500;
+      payload.consultationFeeVideoConsultation = feeVideo !== '' ? Number(feeVideo) : 500;
 
       await api.put('/providers/me', payload);
       const refreshed = await api.get('/providers/me');
