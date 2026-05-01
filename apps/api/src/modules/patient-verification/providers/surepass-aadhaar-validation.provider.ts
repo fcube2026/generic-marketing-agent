@@ -113,7 +113,7 @@ export class SurepassAadhaarValidationProvider {
         const delayMs =
           SurepassAadhaarValidationProvider.RETRY_DELAYS_MS[attempt - 1];
         this.logger.warn(
-          `[surepass-aadhaar-validation] Retrying after ${delayMs}ms (attempt ${attempt + 1})`,
+          `[surepass-aadhaar-validation] Retrying after ${delayMs}ms (attempt ${attempt + 1} of ${SurepassAadhaarValidationProvider.RETRY_DELAYS_MS.length + 1})`,
         );
         await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
       }
@@ -136,7 +136,7 @@ export class SurepassAadhaarValidationProvider {
         clearTimeout(timeoutId);
         const isAbort = err instanceof Error && err.name === 'AbortError';
         this.logger.error(
-          `[surepass-aadhaar-validation] Network error calling Surepass (attempt=${attempt + 1}, timeout=${isAbort}): ${String(err)}`,
+          `[surepass-aadhaar-validation] Network error calling Surepass (attempt=${attempt + 1} of ${SurepassAadhaarValidationProvider.RETRY_DELAYS_MS.length + 1}, timeout=${isAbort}): ${String(err)}`,
         );
         lastError = new ServiceUnavailableException(
           'Aadhaar validation service is temporarily unavailable. Please try again later.',
@@ -151,7 +151,7 @@ export class SurepassAadhaarValidationProvider {
 
       if (!response.ok) {
         this.logger.warn(
-          `[surepass-aadhaar-validation] API error ${response.status} (attempt=${attempt + 1}): ${truncated}`,
+          `[surepass-aadhaar-validation] API error ${response.status} (attempt=${attempt + 1} of ${SurepassAadhaarValidationProvider.RETRY_DELAYS_MS.length + 1}): ${truncated}`,
         );
         // 422 means the Aadhaar number itself failed validation (not found in
         // UIDAI records, invalid checksum, etc.) — treat as invalid aadhaar.
