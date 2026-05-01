@@ -334,14 +334,7 @@ export class BookingsService {
       data: { status: dto.status },
     });
 
-    // Fire-and-forget: do not block on Supabase sync; a slow or unavailable
-    // Supabase instance must never delay the status-update response to the client.
-    void this.supabaseSync.syncBooking(updated).catch((err) => {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[bookings] supabase sync failed for booking=${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
+    await this.supabaseSync.syncBooking(updated);
 
     await this.prisma.bookingStatusHistory.create({
       data: {
@@ -453,42 +446,32 @@ export class BookingsService {
       status: BookingStatus.ACCEPTED,
     });
 
-    // Fire-and-forget: notify patient that booking was accepted. Awaiting slow
-    // downstream providers (SMS/Push) here previously caused the Accept button
-    // to stay in "Updating…" state for 2-5 seconds.
-    void this.prisma.booking
-      .findUnique({
-        where: { id: bookingId },
-        include: { patient: true, provider: true },
-      })
-      .then((booking) => {
-        if (!booking) return;
-        return this.notificationsService.sendNotification(
-          {
-            userId: booking.patient.userId,
-            title: 'Booking Accepted',
-            message: `Your booking has been accepted by Dr. ${booking.provider.name}.`,
-            type: 'BOOKING_ACCEPTED',
-            metadata: { bookingId },
+    // Notify patient that booking was accepted
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (booking) {
+      await this.notificationsService.sendNotification(
+        {
+          userId: booking.patient.userId,
+          title: 'Booking Accepted',
+          message: `Your booking has been accepted by Dr. ${booking.provider.name}.`,
+          type: 'BOOKING_ACCEPTED',
+          metadata: { bookingId },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: 'BOOKING_ACCEPTED',
+          smsParams: {
+            providerName: booking.provider.name,
+            scheduledTime: this.formatScheduledTime(booking.scheduledAt),
           },
-          {
-            inApp: true,
-            push: true,
-            sms: true,
-            smsTemplate: 'BOOKING_ACCEPTED',
-            smsParams: {
-              providerName: booking.provider.name,
-              scheduledTime: this.formatScheduledTime(booking.scheduledAt),
-            },
-          },
-        );
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error(
-          `[bookings] accept notification failed for booking=${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+        },
+      );
+    }
 
     return updated;
   }
@@ -500,41 +483,33 @@ export class BookingsService {
       status: BookingStatus.DECLINED,
     });
 
-    // Fire-and-forget: notify patient that booking was declined.
-    void this.prisma.booking
-      .findUnique({
-        where: { id: bookingId },
-        include: { patient: true, provider: true },
-      })
-      .then((booking) => {
-        if (!booking) return;
-        return this.notificationsService.sendNotification(
-          {
-            userId: booking.patient.userId,
-            title: 'Booking Declined',
-            message: reason
-              ? `Your booking was declined by Dr. ${booking.provider.name}. Reason: ${reason}`
-              : `Your booking was declined by Dr. ${booking.provider.name}.`,
-            type: 'BOOKING_DECLINED',
-            metadata: { bookingId, reason },
+    // Notify patient that booking was declined
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true },
+    });
+    if (booking) {
+      await this.notificationsService.sendNotification(
+        {
+          userId: booking.patient.userId,
+          title: 'Booking Declined',
+          message: reason
+            ? `Your booking was declined by Dr. ${booking.provider.name}. Reason: ${reason}`
+            : `Your booking was declined by Dr. ${booking.provider.name}.`,
+          type: 'BOOKING_DECLINED',
+          metadata: { bookingId, reason },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: 'BOOKING_DECLINED',
+          smsParams: {
+            reason: reason || '',
           },
-          {
-            inApp: true,
-            push: true,
-            sms: true,
-            smsTemplate: 'BOOKING_DECLINED',
-            smsParams: {
-              reason: reason || '',
-            },
-          },
-        );
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error(
-          `[bookings] decline notification failed for booking=${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+        },
+      );
+    }
 
     return updated;
   }
@@ -544,84 +519,72 @@ export class BookingsService {
       status: BookingStatus.CANCELLED,
     });
 
-    // Fire-and-forget: notify the other party about cancellation and handle
-    // refunds. Awaiting slow downstream providers (SMS/Push) previously added
-    // 2-5 seconds to the cancel response time.
-    void this.prisma.booking
-      .findUnique({
-        where: { id: bookingId },
-        include: { patient: true, provider: true, payment: true },
-      })
-      .then(async (booking) => {
-        if (!booking) return;
-        const isPatientCancelling = booking.patient.userId === userId;
-        const notifyUserId = isPatientCancelling
-          ? booking.provider.userId
-          : booking.patient.userId;
-        const cancelledBy = isPatientCancelling
-          ? 'the patient'
-          : 'the provider';
+    // Notify the other party about cancellation
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { patient: true, provider: true, payment: true },
+    });
+    if (booking) {
+      const isPatientCancelling = booking.patient.userId === userId;
+      const notifyUserId = isPatientCancelling
+        ? booking.provider.userId
+        : booking.patient.userId;
+      const cancelledBy = isPatientCancelling ? 'the patient' : 'the provider';
 
-        await this.notificationsService.sendNotification(
-          {
-            userId: notifyUserId,
-            title: 'Booking Cancelled',
-            message: `A booking has been cancelled by ${cancelledBy}.`,
-            type: 'BOOKING_CANCELLED',
-            metadata: { bookingId },
+      await this.notificationsService.sendNotification(
+        {
+          userId: notifyUserId,
+          title: 'Booking Cancelled',
+          message: `A booking has been cancelled by ${cancelledBy}.`,
+          type: 'BOOKING_CANCELLED',
+          metadata: { bookingId },
+        },
+        {
+          inApp: true,
+          push: true,
+          sms: true,
+          smsTemplate: isPatientCancelling
+            ? 'BOOKING_CANCELLED_BY_PATIENT'
+            : 'BOOKING_DECLINED',
+          smsParams: {
+            patientName: booking.patient.name,
+            scheduledTime: this.formatScheduledTime(booking.scheduledAt),
           },
-          {
-            inApp: true,
-            push: true,
-            sms: true,
-            smsTemplate: isPatientCancelling
-              ? 'BOOKING_CANCELLED_BY_PATIENT'
-              : 'BOOKING_DECLINED',
-            smsParams: {
-              patientName: booking.patient.name,
-              scheduledTime: this.formatScheduledTime(booking.scheduledAt),
+        },
+      );
+
+      // Trigger mock refund if payment was completed
+      if (booking.payment && booking.payment.status === 'PAID') {
+        await this.prisma.payment.update({
+          where: { id: booking.payment.id },
+          data: { status: 'REFUNDED' },
+        });
+        await this.prisma.booking.update({
+          where: { id: bookingId },
+          data: { paymentStatus: 'REFUNDED' },
+        });
+
+        // Notify patient about refund
+        if (!isPatientCancelling) {
+          await this.notificationsService.sendNotification(
+            {
+              userId: booking.patient.userId,
+              title: 'Refund Processed',
+              message: `A refund of ₹${booking.totalFee} has been processed for your cancelled booking.`,
+              type: 'PAYMENT_REFUNDED',
+              metadata: { bookingId, amount: booking.totalFee },
             },
-          },
-        );
-
-        // Trigger mock refund if payment was completed
-        if (booking.payment && booking.payment.status === 'PAID') {
-          await this.prisma.payment.update({
-            where: { id: booking.payment.id },
-            data: { status: 'REFUNDED' },
-          });
-          await this.prisma.booking.update({
-            where: { id: bookingId },
-            data: { paymentStatus: 'REFUNDED' },
-          });
-
-          // Notify patient about refund
-          if (!isPatientCancelling) {
-            await this.notificationsService.sendNotification(
-              {
-                userId: booking.patient.userId,
-                title: 'Refund Processed',
-                message: `A refund of ₹${booking.totalFee} has been processed for your cancelled booking.`,
-                type: 'PAYMENT_REFUNDED',
-                metadata: { bookingId, amount: booking.totalFee },
-              },
-              {
-                inApp: true,
-                push: true,
-                sms: true,
-                smsTemplate: 'REFUND_PROCESSED',
-                smsParams: { amount: String(booking.totalFee) },
-              },
-            );
-          }
+            {
+              inApp: true,
+              push: true,
+              sms: true,
+              smsTemplate: 'REFUND_PROCESSED',
+              smsParams: { amount: String(booking.totalFee) },
+            },
+          );
         }
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error(
-          `[bookings] cancel notification/refund failed for booking=${bookingId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
+      }
+    }
 
     return updated;
   }

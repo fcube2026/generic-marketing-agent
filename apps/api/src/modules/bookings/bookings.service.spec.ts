@@ -664,9 +664,6 @@ describe('BookingsService', () => {
       });
 
       await service.cancelBooking('booking-1', 'patient-user-1');
-      // Flush all pending microtasks from the fire-and-forget promise chain
-      // (notification await → payment update await are two levels deep).
-      await new Promise<void>((resolve) => setImmediate(resolve));
 
       expect(mockPrisma.payment.update).toHaveBeenCalledWith({
         where: { id: 'payment-1' },
