@@ -56,24 +56,12 @@ export const BookingDetailScreen: React.FC = () => {
     setUpdating(true);
     try {
       await bookingService.updateStatus(bookingId, newStatus);
-      // Optimistically update local cache so the UI reflects the new status
-      // immediately without waiting for the background refetch to complete.
-      queryClient.setQueryData(['booking', bookingId], (old: any) =>
-        old ? { ...old, status: newStatus } : old,
-      );
-      // Invalidate in background so list views and polling stay in sync.
-      queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
+      // Refresh both this booking and any list views (provider + patient).
+      await queryClient.invalidateQueries({ queryKey: ['booking', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['provider-bookings'] });
       queryClient.invalidateQueries({ queryKey: ['patient-bookings'] });
       if (newStatus === 'IN_PROGRESS') {
-        navigation.navigate('ConsultationForm', {
-          bookingId,
-          patientName: booking?.patient?.name,
-          patientId: booking?.patient?.uniquePatientId ||
-            (booking?.patient?.id
-              ? `PT-${String(booking.patient.id).slice(-8).toUpperCase()}`
-              : undefined),
-        });
+        navigation.navigate('ConsultationForm', { bookingId });
       }
     } catch (err: any) {
       const apiMessage =

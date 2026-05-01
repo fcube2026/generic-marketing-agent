@@ -122,7 +122,7 @@ const MedicineAutocompleteInput: React.FC<{
 export const ConsultationFormScreen: React.FC = () => {
   const route = useRoute<Route>();
   const navigation = useNavigation<Nav>();
-  const { bookingId, patientName: routePatientName, patientId: routePatientId } = route.params;
+  const { bookingId } = route.params;
   const [booking, setBooking] = useState<any>(null);
 
   const [symptoms, setSymptoms] = useState('');
@@ -167,14 +167,12 @@ export const ConsultationFormScreen: React.FC = () => {
     };
   }, [bookingId]);
 
-  // Use params passed from BookingDetailScreen for immediate display; fall back
-  // to data from the background fetch once it completes.
-  const patientName = booking?.patient?.name || routePatientName || 'Patient';
+  const patientName = booking?.patient?.name || 'Patient';
   const uniquePatientId =
     booking?.patient?.uniquePatientId ||
     (booking?.patient?.id
       ? `PT-${String(booking.patient.id).slice(-8).toUpperCase()}`
-      : routePatientId || '—');
+      : '—');
 
   const addMedicine = () =>
     setMedicines(prev => [...prev, { name: '', dosage: '', frequency: '', duration: '' }]);
