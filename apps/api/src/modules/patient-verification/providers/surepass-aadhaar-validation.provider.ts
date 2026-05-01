@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export interface SurepassAadhaarValidationResult {
@@ -106,6 +110,14 @@ export class SurepassAadhaarValidationProvider {
         body: JSON.stringify({ id_number: aadhaarNumber }),
         signal: controller.signal,
       });
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      this.logger.error(
+        `[surepass-aadhaar-validation] Network error calling Surepass (timeout=${isAbort}): ${String(err)}`,
+      );
+      throw new ServiceUnavailableException(
+        'Aadhaar validation service is temporarily unavailable. Please try again later.',
+      );
     } finally {
       clearTimeout(timeoutId);
     }
@@ -118,10 +130,19 @@ export class SurepassAadhaarValidationProvider {
       this.logger.warn(
         `[surepass-aadhaar-validation] API error ${response.status}: ${truncated}`,
       );
-      return {
-        valid: false,
-        rawResponse: { httpStatus: response.status, body: truncated },
-      };
+      // 422 means the Aadhaar number itself failed validation (not found in
+      // UIDAI records, invalid checksum, etc.) — treat as invalid aadhaar.
+      // Any other non-200 status (401, 403, 429, 5xx) is a service/auth
+      // error and should not be surfaced as "the Aadhaar number is wrong".
+      if (response.status === 422) {
+        return {
+          valid: false,
+          rawResponse: { httpStatus: response.status, body: truncated },
+        };
+      }
+      throw new ServiceUnavailableException(
+        'Aadhaar validation service is temporarily unavailable. Please try again later.',
+      );
     }
 
     let raw: Record<string, unknown>;
@@ -131,7 +152,9 @@ export class SurepassAadhaarValidationProvider {
       this.logger.warn(
         `[surepass-aadhaar-validation] API returned non-JSON body: ${truncated}`,
       );
-      return { valid: false, rawResponse: { body: truncated } };
+      throw new ServiceUnavailableException(
+        'Aadhaar validation service returned an unexpected response. Please try again later.',
+      );
     }
 
     return this.parseResponse(raw);
@@ -147,6 +170,18 @@ export class SurepassAadhaarValidationProvider {
       success === true ||
       (raw['message_code'] as string | undefined) === 'success';
 
+    // A status_code >= 500 in the body means a Surepass server-side fault even
+    // when the HTTP response is 200. Surface it as a service error so the user
+    // gets a "try again later" message rather than "invalid Aadhaar".
+    if (!valid && statusCode !== undefined && statusCode >= 500) {
+      this.logger.error(
+        `[surepass-aadhaar-validation] Surepass server error in body: status_code=${statusCode}`,
+      );
+      throw new ServiceUnavailableException(
+        'Aadhaar validation service is temporarily unavailable. Please try again later.',
+      );
+    }
+
     const data = (raw['data'] ?? {}) as Record<string, unknown>;
 
     const toStr = (v: unknown): string | undefined =>
@@ -157,9 +192,16 @@ export class SurepassAadhaarValidationProvider {
     const ageRange = toStr(data['age_range']);
     const state = toStr(data['state']);
     const gender = toStr(data['gender']);
-    const lastDigits = toStr(data['last_digits']);
     const isMobile =
       typeof data['is_mobile'] === 'boolean' ? data['is_mobile'] : undefined;
+
+    // Extract the last 4 digits of the Aadhaar from the masked `aadhaar_number`
+    // field (e.g. "XXXXXXXX2132") rather than `last_digits` which is the last 3
+    // digits of the mobile number registered with UIDAI.
+    const maskedAadhaar = toStr(data['aadhaar_number']);
+    const lastDigits = maskedAadhaar
+      ? maskedAadhaar.replace(/\s/g, '').slice(-4)
+      : undefined;
 
     this.logger.log(
       `[surepass-aadhaar-validation] Parsed: valid=${valid}, state=${state ?? '—'}, gender=${gender ?? '—'}, last4=${lastDigits ?? '—'}`,
