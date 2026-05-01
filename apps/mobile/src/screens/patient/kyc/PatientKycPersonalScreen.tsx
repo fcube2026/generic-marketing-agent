@@ -31,16 +31,57 @@ export const PatientKycPersonalScreen: React.FC<Props> = ({ navigation }) => {
   // Step 1). Every field stays editable — the draft is only a hint.
   const ocrDraft = usePatientKycDraft((s) => s.ocr);
   const [fullName, setFullName] = useState(ocrDraft?.fullName ?? '');
-  const [dob, setDob] = useState(ocrDraft?.dob ?? ''); // YYYY-MM-DD
+  const [dob, setDob] = useState(ocrDraft?.dob ?? ''); // free-form, normalised on submit
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'OTHER' | null>(
     ocrDraft?.gender ?? null,
   );
+
+  /**
+   * Accept a few common DOB formats and normalise to ISO `YYYY-MM-DD`:
+   *   - `YYYY-MM-DD`
+   *   - `DD/MM/YYYY` or `DD-MM-YYYY` (Aadhaar print format)
+   *   - `D/M/YYYY` (single-digit day/month)
+   * Returns `null` if the value can't be parsed into a real calendar date.
+   */
+  const normaliseDob = (raw: string): string | null => {
+    const v = raw.trim();
+    if (!v) return null;
+    let y: number, m: number, d: number;
+    let match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v);
+    if (match) {
+      y = Number(match[1]);
+      m = Number(match[2]);
+      d = Number(match[3]);
+    } else {
+      match = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(v);
+      if (!match) return null;
+      d = Number(match[1]);
+      m = Number(match[2]);
+      y = Number(match[3]);
+    }
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (
+      dt.getUTCFullYear() !== y ||
+      dt.getUTCMonth() !== m - 1 ||
+      dt.getUTCDate() !== d
+    ) {
+      return null;
+    }
+    // Reject future DOBs.
+    if (dt.getTime() > Date.now()) return null;
+    const mm = String(m).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
+  const normalisedDob = normaliseDob(dob);
 
   const mutation = useMutation({
     mutationFn: () =>
       verificationService.selfSubmitPersonalDetails({
         fullName: fullName.trim(),
-        dateOfBirth: dob,
+        dateOfBirth: normalisedDob ?? '',
         gender: gender as 'MALE' | 'FEMALE' | 'OTHER',
       }),
     onSuccess: (data) => {
@@ -57,9 +98,7 @@ export const PatientKycPersonalScreen: React.FC<Props> = ({ navigation }) => {
   });
 
   const isValid =
-    fullName.trim().length >= 2 &&
-    /^\d{4}-\d{2}-\d{2}$/.test(dob) &&
-    !!gender;
+    fullName.trim().length >= 2 && !!normalisedDob && !!gender;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -78,12 +117,17 @@ export const PatientKycPersonalScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       <Input
-        label="Date of Birth (YYYY-MM-DD)"
-        placeholder="e.g. 1995-08-12"
+        label="Date of Birth"
+        placeholder="DD/MM/YYYY (e.g. 12/08/1995)"
         value={dob}
         onChangeText={setDob}
         keyboardType="numbers-and-punctuation"
       />
+      {dob.trim().length > 0 && !normalisedDob && (
+        <Text style={styles.helper}>
+          Please enter a valid date as DD/MM/YYYY (or YYYY-MM-DD).
+        </Text>
+      )}
 
       <Text style={styles.label}>Gender</Text>
       <View style={styles.genderRow}>
@@ -138,4 +182,5 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 14, fontWeight: '600', color: Colors.textMuted },
   pillTextActive: { color: Colors.primary },
   footer: { marginTop: 16 },
+  helper: { fontSize: 12, color: Colors.error, marginTop: -8, marginBottom: 12 },
 });

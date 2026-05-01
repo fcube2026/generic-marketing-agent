@@ -106,7 +106,7 @@ export const PatientNavigator: React.FC = () => (
     <Stack.Screen name="PatientKycPersonal" component={PatientKycPersonalScreen} options={{ title: 'Your Details' }} />
     <Stack.Screen name="PatientKycAddress" component={PatientKycAddressScreen} options={{ title: 'Your Address' }} />
     <Stack.Screen name="PatientKycIdUpload" component={PatientKycIdUploadScreen} options={{ title: 'Upload Aadhaar (legacy)' }} />
-    <Stack.Screen name="PatientKycAadhaarUpload" component={PatientKycAadhaarScreen} options={{ title: 'Upload Aadhaar' }} />
+    <Stack.Screen name="PatientKycAadhaarUpload" component={PatientKycAadhaarScreen} options={{ title: 'Validate Aadhaar' }} />
     <Stack.Screen name="PatientKycFaceCapture" component={PatientKycFaceCaptureScreen} options={{ title: 'Face Verification' }} />
     <Stack.Screen name="PatientKycGuardian" component={PatientKycGuardianScreen} options={{ title: 'Guardian Details' }} />
     <Stack.Screen name="PatientKycReview" component={PatientKycReviewScreen} options={{ title: 'Review & Submit' }} />
