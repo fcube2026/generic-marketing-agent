@@ -88,7 +88,7 @@ export class VideoConsultationService {
           id: session.id,
           bookingId: session.bookingId,
           roomId: session.roomId,
-          sessionToken: session.sessionToken ?? sessionToken,
+          sessionToken: session.sessionToken,
           creatorUserId: userId,
           status: session.status,
           duration: session.duration ?? DEFAULT_PLANNED_DURATION_SECONDS,
@@ -102,6 +102,9 @@ export class VideoConsultationService {
     return {
       jitsiUrl,
       roomId: session.roomId,
+      // sessionToken is always set for sessions created by this service.
+      // For legacy sessions that pre-date this field it falls back to an
+      // empty string so callers don't need to handle null/undefined.
       sessionToken: session.sessionToken ?? '',
       role,
     };
