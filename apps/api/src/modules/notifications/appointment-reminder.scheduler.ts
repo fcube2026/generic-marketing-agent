@@ -228,10 +228,10 @@ export class AppointmentReminderScheduler {
     // Window bounds (in ms)
     const FIVE_MIN_LOW = now.getTime() + 4 * 60 * 1000; // 4 min from now
     const FIVE_MIN_HIGH = now.getTime() + 6 * 60 * 1000; // 6 min from now
-    const ONE_MIN_LOW = now.getTime() + 0 * 60 * 1000; // now
+    const ONE_MIN_LOW = now.getTime(); // now
     const ONE_MIN_HIGH = now.getTime() + 2 * 60 * 1000; // 2 min from now
     const START_LOW = now.getTime() - 1 * 60 * 1000; // 1 min ago
-    const START_HIGH = now.getTime() + 0 * 60 * 1000; // now
+    const START_HIGH = now.getTime(); // now
 
     // Fetch bookings in the widest window (4-6 min) and narrow ones (0-2 min, -1-0 min)
     const bookings = await this.prisma.booking.findMany({

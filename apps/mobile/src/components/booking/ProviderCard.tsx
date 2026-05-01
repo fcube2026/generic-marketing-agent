@@ -20,7 +20,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect, 
 
   const feeLabel = isVideoMode ? 'Fee (Video)' : 'Fee (Home)';
   const feeValue = isVideoMode
-    ? (provider.consultationFeeVideoConsultation || DEFAULT_VIDEO_FEE)
+    ? provider.consultationFeeVideoConsultation || DEFAULT_VIDEO_FEE
     : provider.consultationFeeHomeVisit;
 
   return (
