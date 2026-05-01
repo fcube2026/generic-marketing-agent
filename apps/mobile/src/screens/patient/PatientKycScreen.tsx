@@ -25,7 +25,7 @@ type Props = {
 const STEP_LABELS: Record<SelfServeStep, string> = {
   PERSONAL_DETAILS: 'Personal Details',
   ADDRESS: 'Residential Address',
-  ID_UPLOAD: 'Upload Aadhaar',
+  ID_UPLOAD: 'Validate Aadhaar',
   FACE_CAPTURE: 'Face Verification',
   GUARDIAN: 'Guardian Details',
   REVIEW: 'Review & Submit',
@@ -163,8 +163,8 @@ export const PatientKycScreen: React.FC<Props> = ({ navigation }) => {
     data.status === 'CONFIRMED' || data.status === 'EMERGENCY_OVERRIDE';
   const isFlagged = data.status === 'FLAGGED';
   const allSteps: SelfServeStep[] = data.isMinor
-    ? ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'GUARDIAN', 'REVIEW']
-    : ['PERSONAL_DETAILS', 'ADDRESS', 'ID_UPLOAD', 'FACE_CAPTURE', 'REVIEW'];
+    ? ['ID_UPLOAD', 'PERSONAL_DETAILS', 'ADDRESS', 'FACE_CAPTURE', 'GUARDIAN', 'REVIEW']
+    : ['ID_UPLOAD', 'PERSONAL_DETAILS', 'ADDRESS', 'FACE_CAPTURE', 'REVIEW'];
   const completed = new Set(data.completedSteps);
   const nextStep = data.nextStep;
 
