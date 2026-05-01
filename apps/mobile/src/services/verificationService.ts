@@ -159,6 +159,46 @@ export const verificationService = {
   // Python sidecar. The mobile UI uses these instead of the older
   // signed-URL flow when the Aadhaar-first wizard runs.
 
+  /**
+   * Multipart upload of an eAadhaar PDF; validates via Surepass and returns
+   * extracted personal details for pre-filling the wizard screens.
+   */
+  selfProcessEaadhaar: async (
+    fileUri: string,
+    mimeType: string = 'application/pdf',
+    password?: string,
+  ): Promise<{
+    fullName: string | null;
+    dob: string | null;
+    gender: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    pincode: string | null;
+    aadhaarLast4: string | null;
+    isMinor: boolean;
+  }> => {
+    const form = new FormData();
+    form.append(
+      'file',
+      {
+        uri: fileUri,
+        name: 'eaadhaar.pdf',
+        type: mimeType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
+    );
+    if (password) {
+      form.append('password', password);
+    }
+    const r = await api.post('/verification/self/eaadhaar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data,
+      timeout: 60000,
+    });
+    return r.data;
+  },
+
   /** Multipart upload of the Aadhaar image; returns extracted fields. */
   selfProcessAadhaar: async (
     fileUri: string,

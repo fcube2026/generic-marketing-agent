@@ -16,6 +16,9 @@ export interface AadhaarOcrDraft {
   dob: string | null; // ISO YYYY-MM-DD
   gender: 'MALE' | 'FEMALE' | 'OTHER' | null;
   address: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
   aadhaarLast4: string | null;
 }
 

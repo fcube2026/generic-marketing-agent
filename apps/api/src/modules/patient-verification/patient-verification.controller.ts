@@ -163,6 +163,47 @@ export class PatientVerificationController {
   // endpoints above stay registered so older mobile builds keep working.
   // ──────────────────────────────────────────
 
+  @Post('verification/self/eaadhaar')
+  @Roles('PATIENT')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      // eAadhaar PDFs are typically <2 MB; cap at 10 MB to be safe.
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({
+    summary:
+      'Upload an eAadhaar PDF; validates via Surepass and returns extracted fields',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        password: {
+          type: 'string',
+          description: 'Optional eAadhaar PDF password',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  selfEaadhaarUpload(
+    @CurrentUser() user: any,
+    @UploadedFile()
+    file:
+      | { buffer: Buffer; mimetype: string; originalname?: string }
+      | undefined,
+    @Body('password') password?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('eAadhaar PDF file is required');
+    }
+    return this.service.selfProcessEaadhaar(user.id, file, password);
+  }
+
   @Post('verification/self/aadhaar')
   @Roles('PATIENT')
   @UseInterceptors(

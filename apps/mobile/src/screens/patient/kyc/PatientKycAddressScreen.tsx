@@ -35,9 +35,9 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation, route }) 
   // field stays editable, the draft is only a hint.
   const ocrDraft = usePatientKycDraft((s) => s.ocr);
   const [addressLine, setAddressLine] = useState(ocrDraft?.address ?? '');
-  const [city, setCity] = useState('');
-  const [stateName, setStateName] = useState('');
-  const [pincode, setPincode] = useState('');
+  const [city, setCity] = useState(ocrDraft?.city ?? '');
+  const [stateName, setStateName] = useState(ocrDraft?.state ?? '');
+  const [pincode, setPincode] = useState(ocrDraft?.pincode ?? '');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [formatted, setFormatted] = useState<string | null>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
