@@ -16,6 +16,13 @@ import { ConfigService } from '@nestjs/config';
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const CONSULTATION_DURATION_MS = 15 * 60 * 1000; // default slot = 15 minutes
 
+// Statuses that represent an active/in-progress patient booking for conflict detection.
+const PATIENT_ACTIVE_STATUSES = [
+  'REQUESTED',
+  'ACCEPTED',
+  'IN_PROGRESS',
+] as const;
+
 const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   REQUESTED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
   ACCEPTED: ['ON_THE_WAY', 'CANCELLED'],
@@ -155,14 +162,14 @@ export class BookingsService {
     // Assuming each consultation is CONSULTATION_DURATION_MS long:
     //   overlap exists when: existingStart < newEnd  AND  existingEnd > newStart
     //   => existingStart < (scheduledAt + DURATION)
-    //   => existingStart > (scheduledAt - DURATION)   (existingEnd > scheduledAt)
+    //   => existingStart >= (scheduledAt - DURATION)   (existingEnd > scheduledAt)
     const newBookingEnd = new Date(
       scheduledAt.getTime() + CONSULTATION_DURATION_MS,
     );
     const patientConflict = await this.prisma.booking.findFirst({
       where: {
         patientId: patientProfile.id,
-        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: [...PATIENT_ACTIVE_STATUSES] },
         scheduledAt: {
           gte: new Date(scheduledAt.getTime() - CONSULTATION_DURATION_MS),
           lt: newBookingEnd,
