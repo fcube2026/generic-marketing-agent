@@ -1010,6 +1010,8 @@ export class PatientVerificationService {
           : 'SUREPASS_MOCK',
         ocrMatchPassed: true,
         ocrConfidenceScore: 1.0,
+        // surepassEaadhaarRaw is a general-purpose Surepass audit field reused
+        // for both eAadhaar PDF and Aadhaar number validation raw responses.
         surepassEaadhaarRaw: result.rawResponse
           ? (result.rawResponse as Prisma.InputJsonValue)
           : null,
