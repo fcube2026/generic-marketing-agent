@@ -754,9 +754,13 @@ export class ProvidersService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     const categoryLabel = normalizedCategorySlug?.replace(/-/g, ' ');
+    // 'others' is a patient-facing catch-all bucket — never filter by category
+    // so that doctors with any custom/unlisted specialization are returned.
+    const isOthersCatchAll = normalizedCategorySlug === 'others';
     const shouldApplyCategoryFilter =
-      (normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
-      !!serviceId;
+      !isOthersCatchAll &&
+      ((normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
+        !!serviceId);
 
     const isVideoMode = mode === 'VIDEO_CONSULTATION';
 
