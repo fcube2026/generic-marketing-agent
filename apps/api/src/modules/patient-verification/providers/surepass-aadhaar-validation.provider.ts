@@ -28,14 +28,22 @@ export interface SurepassAadhaarValidationResult {
  *   POST /api/v1/aadhaar-validation/aadhaar-validation
  *
  * Environment variables:
- *   SUREPASS_AADHAAR_VALIDATION_ENABLED — 'true' to use live API (default: false → mock)
- *   SUREPASS_API_URL                    — base URL (e.g. https://sandbox.surepass.io)
- *   SUREPASS_API_TOKEN                  — Bearer JWT token
+ *   SUREPASS_AADHAAR_VALIDATION_ENABLED          — 'true' to use live API (default: false → mock)
+ *   SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK — 'true' to silently return a mock result when
+ *                                                  the live API is unavailable (network errors,
+ *                                                  4xx other than 422, 5xx, or body status_code
+ *                                                  >= 500). Default: false.  Useful for staging
+ *                                                  / demo environments where the upstream
+ *                                                  Surepass account may be paused but the patient
+ *                                                  KYC wizard still needs to complete end-to-end.
+ *   SUREPASS_API_URL                             — base URL (e.g. https://sandbox.surepass.io)
+ *   SUREPASS_API_TOKEN                           — Bearer JWT token
  */
 @Injectable()
 export class SurepassAadhaarValidationProvider {
   private readonly logger = new Logger(SurepassAadhaarValidationProvider.name);
   private readonly enabled: boolean;
+  private readonly fallbackToMock: boolean;
   private readonly apiUrl: string;
   private readonly apiToken: string;
 
@@ -51,11 +59,23 @@ export class SurepassAadhaarValidationProvider {
     this.apiToken = config.get<string>('SUREPASS_API_TOKEN', '') || '';
     this.enabled = flag === 'true' && !!this.apiToken;
 
+    const fallbackFlag = (
+      config.get<string>(
+        'SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK',
+        'false',
+      ) || 'false'
+    ).toLowerCase();
+    this.fallbackToMock = fallbackFlag === 'true';
+
     if (!this.enabled) {
       this.logger.log(
         `SurepassAadhaarValidationProvider disabled (SUREPASS_AADHAAR_VALIDATION_ENABLED=${flag}, token=${
           this.apiToken ? 'set' : 'unset'
         }) — using mock`,
+      );
+    } else if (this.fallbackToMock) {
+      this.logger.warn(
+        'SurepassAadhaarValidationProvider live mode enabled with SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK=true — failed live calls will silently return mock results.',
       );
     }
   }
@@ -70,7 +90,17 @@ export class SurepassAadhaarValidationProvider {
     if (!this.enabled) {
       return this.mockValidate(aadhaarNumber);
     }
-    return this.callSurepass(aadhaarNumber);
+    try {
+      return await this.callSurepass(aadhaarNumber);
+    } catch (err) {
+      if (this.fallbackToMock && err instanceof ServiceUnavailableException) {
+        this.logger.warn(
+          `[surepass-aadhaar-validation] Live call failed (${err.message}); falling back to mock because SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK=true`,
+        );
+        return this.mockValidate(aadhaarNumber);
+      }
+      throw err;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

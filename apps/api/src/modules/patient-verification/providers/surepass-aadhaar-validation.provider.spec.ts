@@ -181,4 +181,43 @@ describe('SurepassAadhaarValidationProvider', () => {
       );
     });
   });
+
+  describe('live mode — fallback to mock on failure', () => {
+    it('returns the mock result when network errors persist and fallback is enabled', async () => {
+      fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
+      const provider = buildProvider({
+        SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK: 'true',
+      });
+      const promise = provider.validateAadhaar(AADHAAR);
+      await jest.runAllTimersAsync();
+      const result = await promise;
+      // 3 total live attempts, then fallback to mock (no extra fetch).
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(result.valid).toBe(true);
+      expect(result.lastDigits).toBe('2132');
+      expect(result.rawResponse).toMatchObject({ source: 'mock' });
+    });
+
+    it('returns the mock result on a 401 when fallback is enabled (no retry)', async () => {
+      fetchSpy.mockImplementation(makeResponseFactory('Unauthorized', 401));
+      const provider = buildProvider({
+        SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK: 'true',
+      });
+      const result = await provider.validateAadhaar(AADHAAR);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(result.valid).toBe(true);
+      expect(result.rawResponse).toMatchObject({ source: 'mock' });
+    });
+
+    it('still returns a real invalid:false on 422 (does not fall back)', async () => {
+      fetchSpy.mockImplementation(
+        makeResponseFactory(JSON.stringify({ message: 'Id not found' }), 422),
+      );
+      const provider = buildProvider({
+        SUREPASS_AADHAAR_VALIDATION_FALLBACK_TO_MOCK: 'true',
+      });
+      const result = await provider.validateAadhaar(AADHAAR);
+      expect(result.valid).toBe(false);
+    });
+  });
 });
