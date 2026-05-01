@@ -118,7 +118,10 @@ export class SurepassAadhaarValidationProvider {
       this.logger.warn(
         `[surepass-aadhaar-validation] API error ${response.status}: ${truncated}`,
       );
-      return { valid: false };
+      return {
+        valid: false,
+        rawResponse: { httpStatus: response.status, body: truncated },
+      };
     }
 
     let raw: Record<string, unknown>;
@@ -128,7 +131,7 @@ export class SurepassAadhaarValidationProvider {
       this.logger.warn(
         `[surepass-aadhaar-validation] API returned non-JSON body: ${truncated}`,
       );
-      return { valid: false };
+      return { valid: false, rawResponse: { body: truncated } };
     }
 
     return this.parseResponse(raw);
