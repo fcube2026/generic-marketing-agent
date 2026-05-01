@@ -12,6 +12,7 @@ import { SmsService } from '../sms/sms.service';
 import { ConfigService } from '@nestjs/config';
 import { KycMlClient, KycMlError, mapKycMlErrorStatus } from './kyc-ml.client';
 import { SurepassEaadhaarProvider } from './providers/surepass-eaadhaar.provider';
+import { SurepassAadhaarValidationProvider } from './providers/surepass-aadhaar-validation.provider';
 import {
   PatientVerificationStatus,
   ManualReviewReason,
@@ -73,6 +74,7 @@ export class PatientVerificationService {
     private readonly config: ConfigService,
     private readonly kycMl: KycMlClient,
     private readonly surepassEaadhaar: SurepassEaadhaarProvider,
+    private readonly surepassAadhaarValidation: SurepassAadhaarValidationProvider,
   ) {
     this.supabaseUrl = this.config.get<string>('SUPABASE_URL', '');
     this.supabaseKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
@@ -958,6 +960,103 @@ export class PatientVerificationService {
       pincode: result.zip ?? null,
       aadhaarLast4: result.aadhaarLast4 ?? null,
       isMinor,
+    };
+  }
+
+  /**
+   * Validate an Aadhaar number via Surepass and store the result.
+   *
+   * This is lighter-weight than the eAadhaar PDF upload: only the last-4
+   * digits, gender, state, age-range and mobile-linked flag are returned.
+   * The full Aadhaar number is never stored.
+   */
+  async selfValidateAadhaarNumber(userId: string, aadhaarNumber: string) {
+    const verification = await this.getOrCreateForUser(userId);
+
+    const result =
+      await this.surepassAadhaarValidation.validateAadhaar(aadhaarNumber);
+
+    if (!result.valid) {
+      await this.writeAuditLog(
+        verification.id,
+        'SUREPASS_AADHAAR_VALIDATION_INVALID',
+        userId,
+        { rawStatus: result.rawResponse?.['status_code'] },
+      );
+      throw new BadRequestException(
+        'The Aadhaar number could not be validated. Please check the number and try again.',
+      );
+    }
+
+    const normalizeGender = (g?: string): string | null => {
+      if (!g) return null;
+      const u = g.toUpperCase();
+      if (u === 'M' || u === 'MALE') return 'MALE';
+      if (u === 'F' || u === 'FEMALE') return 'FEMALE';
+      return 'OTHER';
+    };
+
+    const now = new Date();
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        gender: normalizeGender(result.gender) ?? verification.gender ?? null,
+        state: result.state ?? verification.state ?? null,
+        aadhaarLast4: result.lastDigits ?? null,
+        idType: 'AADHAAR_VALIDATION',
+        idVerificationSource: this.surepassAadhaarValidation.isEnabled()
+          ? 'SUREPASS'
+          : 'SUREPASS_MOCK',
+        ocrMatchPassed: true,
+        ocrConfidenceScore: 1.0,
+        surepassEaadhaarRaw: result.rawResponse
+          ? (result.rawResponse as Prisma.InputJsonValue)
+          : null,
+        eAadhaarValidatedAt: now,
+        status: PatientVerificationStatus.PROFILE_COMPLETE,
+      },
+    });
+
+    await this.prisma.patientIdDocument.create({
+      data: {
+        verificationId: verification.id,
+        documentType: 'AADHAAR_VALIDATION',
+        storagePath: '',
+        extractedIdNumber: result.lastDigits
+          ? `XXXX XXXX XXXX ${result.lastDigits}`
+          : null,
+        ocrRawResult: {
+          source: this.surepassAadhaarValidation.isEnabled()
+            ? 'surepass'
+            : 'surepass-mock',
+          aadhaar_last4: result.lastDigits,
+          age_range: result.ageRange,
+          state: result.state,
+          validated_at: now.toISOString(),
+        },
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SUREPASS_AADHAAR_VALIDATED',
+      userId,
+      {
+        has_last4: !!result.lastDigits,
+        has_state: !!result.state,
+        has_gender: !!result.gender,
+        mock: !this.surepassAadhaarValidation.isEnabled(),
+      },
+    );
+
+    return {
+      gender: normalizeGender(result.gender),
+      state: result.state ?? null,
+      aadhaarLast4: result.lastDigits ?? null,
+      ageRange: result.ageRange ?? null,
+      isMobile: result.isMobile ?? null,
+      isMinor: verification.isMinor,
     };
   }
 

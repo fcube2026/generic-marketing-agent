@@ -4,6 +4,7 @@ import { PatientVerificationController } from './patient-verification.controller
 import { RiskEngineService } from './risk-engine.service';
 import { KycMlClient } from './kyc-ml.client';
 import { SurepassEaadhaarProvider } from './providers/surepass-eaadhaar.provider';
+import { SurepassAadhaarValidationProvider } from './providers/surepass-aadhaar-validation.provider';
 import { SmsModule } from '../sms/sms.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { SmsModule } from '../sms/sms.module';
     RiskEngineService,
     KycMlClient,
     SurepassEaadhaarProvider,
+    SurepassAadhaarValidationProvider,
   ],
   controllers: [PatientVerificationController],
   exports: [PatientVerificationService],
