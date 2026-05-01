@@ -734,13 +734,22 @@ export class ProvidersService {
       where: {
         providerId: profile.id,
         mode: 'VIDEO_CONSULTATION',
-        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: {
+          in: [
+            'REQUESTED',
+            'ACCEPTED',
+            'IN_PROGRESS',
+            'COMPLETED',
+            'SUMMARY_SUBMITTED',
+            'CLOSED',
+          ],
+        },
       },
       include: {
         patient: true,
         serviceCategory: true,
       },
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { scheduledAt: 'desc' },
     });
   }
 

@@ -193,14 +193,23 @@ export class PatientsService {
       where: {
         patientId: patientProfile.id,
         mode: 'VIDEO_CONSULTATION',
-        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: {
+          in: [
+            'REQUESTED',
+            'ACCEPTED',
+            'IN_PROGRESS',
+            'COMPLETED',
+            'SUMMARY_SUBMITTED',
+            'CLOSED',
+          ],
+        },
       },
       include: {
         provider: true,
         serviceCategory: true,
         payment: true,
       },
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { scheduledAt: 'desc' },
     });
   }
 }

@@ -54,6 +54,9 @@ async function checkNetworkConnectivity(): Promise<boolean> {
   }
 }
 
+/** Debounce delay (ms) before committing a new network status value. */
+const NETWORK_DEBOUNCE_MS = 1500;
+
 export const VideoLobbyScreen: React.FC = () => {
   const route = useRoute<RouteP | RouteV>();
   const navigation = useNavigation<NavP | NavV>();
@@ -73,6 +76,10 @@ export const VideoLobbyScreen: React.FC = () => {
   const [cameraOff, setCameraOff] = useState(false);
 
   const appState = useRef(AppState.currentState);
+  // Ref to hold the debounce timer for network status updates
+  const networkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guard against state updates after the component has unmounted
+  const isMountedRef = useRef(true);
 
   // Fetch booking info for session details
   const { data: booking } = useQuery<Booking>({
@@ -81,6 +88,29 @@ export const VideoLobbyScreen: React.FC = () => {
     refetchInterval: 10000,
     staleTime: 0,
   });
+
+  const runNetworkCheck = useCallback(async () => {
+    // Keep status as "checking" while the probe is in flight
+    setNetworkStatus(null);
+    const connected = await checkNetworkConnectivity();
+    // Debounce the status update: only commit if no newer check arrives
+    // within NETWORK_DEBOUNCE_MS to prevent rapid flickering. Skip if
+    // the component has already unmounted.
+    if (networkDebounceRef.current) clearTimeout(networkDebounceRef.current);
+    networkDebounceRef.current = setTimeout(() => {
+      networkDebounceRef.current = null;
+      if (isMountedRef.current) setNetworkStatus(connected);
+    }, NETWORK_DEBOUNCE_MS);
+  }, []);
+
+  // Clear any pending debounce timer on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (networkDebounceRef.current) clearTimeout(networkDebounceRef.current);
+    };
+  }, []);
 
   // Re-run network check and refetch booking when app returns to foreground
   useEffect(() => {
@@ -92,7 +122,7 @@ export const VideoLobbyScreen: React.FC = () => {
       appState.current = nextState;
     });
     return () => sub.remove();
-  }, [bookingId, queryClient]);
+  }, [bookingId, queryClient, runNetworkCheck]);
 
   // Refresh booking list when screen receives focus
   useFocusEffect(
@@ -117,13 +147,7 @@ export const VideoLobbyScreen: React.FC = () => {
     };
     fetchToken();
     runNetworkCheck();
-  }, [bookingId]);
-
-  const runNetworkCheck = async () => {
-    setNetworkStatus(null); // Reset to "checking"
-    const connected = await checkNetworkConnectivity();
-    setNetworkStatus(connected);
-  };
+  }, [bookingId, runNetworkCheck]);
 
   const handleRequestPermissions = async () => {
     if (!cameraPermission?.granted) await requestCameraPermission();

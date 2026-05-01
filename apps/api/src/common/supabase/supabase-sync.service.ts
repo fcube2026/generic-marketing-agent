@@ -179,6 +179,7 @@ export class SupabaseSyncService {
     bookingId: string;
     roomId: string;
     sessionToken?: string | null;
+    videoSessionLink?: string | null;
     creatorUserId?: string | null;
     status: string;
     duration?: number | null;
@@ -191,6 +192,7 @@ export class SupabaseSyncService {
       booking_source_id: session.bookingId,
       room_id: session.roomId,
       session_token: session.sessionToken ?? null,
+      video_session_link: session.videoSessionLink ?? null,
       creator_user_id: session.creatorUserId ?? null,
       status: session.status,
       duration: session.duration ?? null,
