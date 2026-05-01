@@ -31,7 +31,7 @@ export class VideoConsultationService {
    * Returns (creating if necessary) the Jitsi room details for a booking.
    * Both patient and provider call this to get the join URL.
    *
-   * Returns { jitsiUrl, roomId, sessionToken, role }
+   * Returns { jitsiUrl, roomId, sessionToken, videoSessionLink, role }
    */
   async generateToken(
     userId: string,
@@ -40,6 +40,7 @@ export class VideoConsultationService {
     jitsiUrl: string;
     roomId: string;
     sessionToken: string;
+    videoSessionLink: string;
     role: 'patient' | 'provider';
   }> {
     const booking = await this.prisma.booking.findUnique({
@@ -71,11 +72,15 @@ export class VideoConsultationService {
     if (!session) {
       const roomId = `curex-${crypto.randomBytes(16).toString('hex')}`;
       const sessionToken = generateSessionToken();
+      // The videoSessionLink uses the sessionToken as the Jitsi room name so
+      // the link is human-readable and sessionToken doubles as the room ID.
+      const videoSessionLink = `https://meet.jit.si/${sessionToken}`;
       session = await this.prisma.videoSession.create({
         data: {
           bookingId,
           roomId,
           sessionToken,
+          videoSessionLink,
           creatorUserId: userId,
           duration: DEFAULT_PLANNED_DURATION_SECONDS,
           status: 'CREATED',
@@ -89,6 +94,7 @@ export class VideoConsultationService {
           bookingId: session.bookingId,
           roomId: session.roomId,
           sessionToken: session.sessionToken,
+          videoSessionLink: session.videoSessionLink,
           creatorUserId: userId,
           status: session.status,
           duration: session.duration ?? DEFAULT_PLANNED_DURATION_SECONDS,
@@ -98,14 +104,19 @@ export class VideoConsultationService {
         .catch(() => undefined);
     }
 
-    const jitsiUrl = `https://meet.jit.si/${session.roomId}`;
+    // Use stored videoSessionLink when available; fall back to roomId-based URL
+    // for sessions created before this field was added.
+    const videoSessionLink =
+      session.videoSessionLink ??
+      `https://meet.jit.si/${session.sessionToken ?? session.roomId}`;
     return {
-      jitsiUrl,
+      jitsiUrl: videoSessionLink,
       roomId: session.roomId,
       // sessionToken is always set for sessions created by this service.
       // For legacy sessions that pre-date this field it falls back to an
       // empty string so callers don't need to handle null/undefined.
       sessionToken: session.sessionToken ?? '',
+      videoSessionLink,
       role,
     };
   }
@@ -189,6 +200,7 @@ export class VideoConsultationService {
         bookingId: updated.bookingId,
         roomId: updated.roomId,
         sessionToken: updated.sessionToken ?? undefined,
+        videoSessionLink: updated.videoSessionLink ?? undefined,
         creatorUserId: updated.creatorUserId ?? undefined,
         status: updated.status,
         duration: updated.duration ?? undefined,

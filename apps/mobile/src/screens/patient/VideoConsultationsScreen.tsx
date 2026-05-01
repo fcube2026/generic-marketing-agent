@@ -47,47 +47,15 @@ export const VideoConsultationsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>📹 Video Consultations</Text>
-        <TouchableOpacity
-          style={styles.newBtn}
-          onPress={() =>
-            navigation.navigate('SelectService', {
-              category: {
-                id: 'video-consultation',
-                name: 'Video Consultation',
-                slug: 'video-consultation',
-                description: 'Consult a doctor online from anywhere',
-              },
-            })
-          }
-        >
-          <Text style={styles.newBtnText}>+ New</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.header}>📹 Video Consultations</Text>
 
       {!bookings || bookings.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📹</Text>
-          <Text style={styles.emptyTitle}>No active bookings currently available</Text>
+          <Text style={styles.emptyTitle}>No consultations available</Text>
           <Text style={styles.emptySubtitle}>
-            Book a video consultation to connect with a doctor online
+            Your video consultations will appear here
           </Text>
-          <TouchableOpacity
-            style={styles.bookBtn}
-            onPress={() =>
-              navigation.navigate('SelectService', {
-                category: {
-                  id: 'video-consultation',
-                  name: 'Video Consultation',
-                  slug: 'video-consultation',
-                  description: 'Consult a doctor online from anywhere',
-                },
-              })
-            }
-          >
-            <Text style={styles.bookBtnText}>Book Now</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -136,25 +104,17 @@ export const VideoConsultationsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+  header: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.text,
+    padding: 20,
     paddingTop: 60,
     paddingBottom: 16,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  header: { fontSize: 22, fontWeight: '800', color: Colors.text },
-  newBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  newBtnText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
   list: { padding: 16 },
   item: {
     backgroundColor: Colors.white,
@@ -216,14 +176,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textMuted,
     textAlign: 'center',
-    marginBottom: 24,
     lineHeight: 20,
   },
-  bookBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-  },
-  bookBtnText: { color: Colors.white, fontWeight: '700', fontSize: 16 },
 });

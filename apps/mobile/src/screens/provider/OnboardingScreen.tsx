@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
@@ -34,6 +34,7 @@ export const OnboardingScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [specializationPickerVisible, setSpecializationPickerVisible] = useState(false);
   const [form, setForm] = useState({
     name: '', bio: '', specialization: '', otherSpecialization: '', contactInfo: '',
@@ -43,10 +44,52 @@ export const OnboardingScreen: React.FC = () => {
     serviceRadius: '10',
   });
 
+  // Load existing profile for prefill (edit mode)
+  const { data: profile } = useQuery({
+    queryKey: ['provider-profile'],
+    queryFn: providerService.getProfile,
+    retry: false,
+  });
+
+  // Prefill form once profile data is available
+  useEffect(() => {
+    if (profile && !initialized) {
+      const knownSpec = SPECIALIZATIONS.includes(profile.specialization ?? '')
+        ? profile.specialization ?? ''
+        : profile.specialization ? 'Others' : '';
+      const otherSpec = !SPECIALIZATIONS.includes(profile.specialization ?? '') && profile.specialization
+        ? profile.specialization
+        : '';
+      setForm({
+        name: profile.name ?? '',
+        bio: profile.bio ?? '',
+        specialization: knownSpec,
+        otherSpecialization: otherSpec,
+        contactInfo: profile.contactInfo ?? user?.phone ?? '',
+        homeVisitEnabled: profile.homeVisitEnabled ?? false,
+        consultationFeeHomeVisit: profile.consultationFeeHomeVisit
+          ? String(profile.consultationFeeHomeVisit)
+          : '',
+        doctorPlaceVisitEnabled: profile.doctorPlaceVisitEnabled ?? false,
+        consultationFeeDoctorPlace: profile.consultationFeeDoctorPlace
+          ? String(profile.consultationFeeDoctorPlace)
+          : '',
+        videoConsultationEnabled: profile.videoConsultationEnabled ?? true,
+        consultationFeeVideoConsultation: profile.consultationFeeVideoConsultation
+          ? String(profile.consultationFeeVideoConsultation)
+          : '500',
+        serviceRadius: profile.serviceRadius ? String(profile.serviceRadius) : '10',
+      });
+      setInitialized(true);
+    }
+  }, [profile, initialized, user?.phone]);
+
   const update = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
 
   const effectiveSpecialization =
     form.specialization === 'Others' ? form.otherSpecialization : form.specialization;
+
+  const isEditMode = !!profile;
 
   const handleSubmit = async () => {
     if (!form.name || !effectiveSpecialization) { Alert.alert('Required', 'Name and specialization are required'); return; }
@@ -64,11 +107,14 @@ export const OnboardingScreen: React.FC = () => {
         serviceRadius: parseFloat(form.serviceRadius) || 10,
       });
       queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
-      Alert.alert('Success', 'Profile created! You can now receive bookings after verification.', [
+      const successMsg = isEditMode
+        ? 'Profile updated successfully.'
+        : 'Profile created! You can now receive bookings after verification.';
+      Alert.alert('Success', successMsg, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.error || 'Failed to create profile');
+      Alert.alert('Error', e?.response?.data?.error || 'Failed to save profile');
     } finally { setLoading(false); }
   };
 
@@ -84,7 +130,7 @@ export const OnboardingScreen: React.FC = () => {
 
       {step === 1 && (
         <View style={styles.stepContent}>
-          <Text style={styles.stepTitle}>Personal Information</Text>
+          <Text style={styles.stepTitle}>{isEditMode ? 'Edit Profile' : 'Personal Information'}</Text>
           <Input label="Full Name *" value={form.name} onChangeText={(t) => update('name', t)} placeholder="Dr. John Smith" />
           <Text style={styles.fieldLabel}>Specialization *</Text>
           <TouchableOpacity

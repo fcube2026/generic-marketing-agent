@@ -47,14 +47,14 @@ export const VideoConsultationsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>📹 Active Video Consultations</Text>
+      <Text style={styles.header}>📹 Video Consultations</Text>
 
       {!bookings || bookings.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📹</Text>
-          <Text style={styles.emptyTitle}>No active video consultations</Text>
+          <Text style={styles.emptyTitle}>No consultations available</Text>
           <Text style={styles.emptySubtitle}>
-            Active video consultation requests will appear here
+            Video consultation requests will appear here
           </Text>
         </View>
       ) : (
