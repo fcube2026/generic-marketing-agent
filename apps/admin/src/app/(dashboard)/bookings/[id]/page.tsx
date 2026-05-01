@@ -89,7 +89,7 @@ export default function BookingDetailPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Mode</span>
-              <span>{booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : '🏥 Clinic Visit'}</span>
+              <span>{booking.mode === 'HOME_VISIT' ? '🏠 Home Visit' : booking.mode === 'VIDEO_CONSULTATION' ? '📹 Video Consultation' : '🏥 Clinic Visit'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Service</span>

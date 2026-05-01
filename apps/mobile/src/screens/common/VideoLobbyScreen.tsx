@@ -10,7 +10,7 @@ import {
   AppState,
   AppStateStatus,
 } from 'react-native';
-import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -69,6 +69,8 @@ export const VideoLobbyScreen: React.FC = () => {
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [networkStatus, setNetworkStatus] = useState<boolean | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
 
   const appState = useRef(AppState.currentState);
 
@@ -289,6 +291,52 @@ export const VideoLobbyScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Camera Preview */}
+      {permissionsGranted && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Camera Preview</Text>
+          <View style={styles.previewContainer}>
+            {!cameraOff ? (
+              <CameraView
+                style={styles.cameraPreview}
+                facing="front"
+                mute={micMuted}
+              />
+            ) : (
+              <View style={[styles.cameraPreview, styles.cameraOffPlaceholder]}>
+                <Text style={styles.cameraOffIcon}>📷</Text>
+                <Text style={styles.cameraOffText}>Camera Off</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Mic / Camera Toggles */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              style={[styles.controlBtn, micMuted && styles.controlBtnActive]}
+              onPress={() => setMicMuted((prev) => !prev)}
+              accessibilityLabel={micMuted ? 'Unmute microphone' : 'Mute microphone'}
+            >
+              <Text style={styles.controlBtnIcon}>{micMuted ? '🔇' : '🎤'}</Text>
+              <Text style={[styles.controlBtnLabel, micMuted && styles.controlBtnLabelActive]}>
+                {micMuted ? 'Unmute' : 'Mute'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.controlBtn, cameraOff && styles.controlBtnActive]}
+              onPress={() => setCameraOff((prev) => !prev)}
+              accessibilityLabel={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+            >
+              <Text style={styles.controlBtnIcon}>{cameraOff ? '🚫' : '🎥'}</Text>
+              <Text style={[styles.controlBtnLabel, cameraOff && styles.controlBtnLabelActive]}>
+                {cameraOff ? 'Camera Off' : 'Camera On'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* System Checks */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>System Checks</Text>
@@ -505,5 +553,45 @@ const styles = StyleSheet.create({
   joinBtn: { marginTop: 4 },
   endBtn: { marginTop: 12 },
   backBtn: { marginTop: 12 },
+  // Camera preview
+  previewContainer: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#000',
+  },
+  cameraPreview: {
+    width: '100%',
+    height: 200,
+  },
+  cameraOffPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  cameraOffIcon: { fontSize: 36, marginBottom: 6 },
+  cameraOffText: { color: '#aaa', fontSize: 14 },
+  // Control buttons
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  controlBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  controlBtnActive: {
+    borderColor: Colors.error,
+    backgroundColor: '#FEF2F2',
+  },
+  controlBtnIcon: { fontSize: 22, marginBottom: 4 },
+  controlBtnLabel: { fontSize: 12, fontWeight: '600', color: Colors.text },
+  controlBtnLabelActive: { color: Colors.error },
 });
 

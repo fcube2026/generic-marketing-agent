@@ -106,7 +106,7 @@ describe('ProvidersService', () => {
       expect(mockPrisma.providerProfile.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           name: dto.name,
-          specialization: dto.specialization,
+          specialization: 'General Medicine',
           contactInfo: dto.contactInfo,
           bio: dto.bio,
           userId,

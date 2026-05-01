@@ -14,49 +14,53 @@ import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
 
 const GENERIC_SERVICE_SLUGS = ['doctor', 'general-medicine'];
 
-// Maps common free-text variations to a canonical specialization name.
+// Maps common free-text variations to a canonical service category name.
+// Values must match the `name` field of a ServiceCategory row so that
+// findBestServiceCategory() can resolve them via a direct name/slug lookup.
+// Specializations that do not have a matching service category will fall
+// through to the "Others" catch-all bucket (never to General Medicine).
 const SPECIALIZATION_MAP: Record<string, string> = {
-  cardio: 'Cardiologist',
-  cardiology: 'Cardiologist',
-  cardiologist: 'Cardiologist',
-  derma: 'Dermatologist',
-  dermatology: 'Dermatologist',
-  dermatologist: 'Dermatologist',
-  gynae: 'Gynecologist',
-  gynaecology: 'Gynecologist',
-  gynecology: 'Gynecologist',
-  gynecologist: 'Gynecologist',
-  gynaecologist: 'Gynecologist',
-  'general physician': 'General Physician',
-  'general medicine': 'General Physician',
-  gp: 'General Physician',
-  mbbs: 'General Physician',
-  ortho: 'Orthopedic',
-  orthopedics: 'Orthopedic',
-  orthopaedics: 'Orthopedic',
-  orthopedic: 'Orthopedic',
-  orthopaedic: 'Orthopedic',
-  paediatrics: 'Pediatrician',
-  pediatrics: 'Pediatrician',
-  paediatrician: 'Pediatrician',
-  pediatrician: 'Pediatrician',
-  neuro: 'Neurologist',
-  neurology: 'Neurologist',
-  neurologist: 'Neurologist',
-  psychiatry: 'Psychiatrist',
-  psychiatrist: 'Psychiatrist',
-  ophthalmology: 'Ophthalmologist',
-  ophthalmologist: 'Ophthalmologist',
-  ent: 'ENT Specialist',
-  'ent specialist': 'ENT Specialist',
-  dentistry: 'Dentist',
-  dentist: 'Dentist',
-  radiology: 'Radiologist',
-  radiologist: 'Radiologist',
-  oncology: 'Oncologist',
-  oncologist: 'Oncologist',
-  urology: 'Urologist',
-  urologist: 'Urologist',
+  cardio: 'Cardiology',
+  cardiology: 'Cardiology',
+  cardiologist: 'Cardiology',
+  derma: 'Dermatology',
+  dermatology: 'Dermatology',
+  dermatologist: 'Dermatology',
+  gynae: 'Gynecology',
+  gynaecology: 'Gynecology',
+  gynecology: 'Gynecology',
+  gynecologist: 'Gynecology',
+  gynaecologist: 'Gynecology',
+  'general physician': 'General Medicine',
+  'general medicine': 'General Medicine',
+  gp: 'General Medicine',
+  mbbs: 'General Medicine',
+  ortho: 'Orthopedics',
+  orthopedics: 'Orthopedics',
+  orthopaedics: 'Orthopedics',
+  orthopedic: 'Orthopedics',
+  orthopaedic: 'Orthopedics',
+  paediatrics: 'Pediatrics',
+  pediatrics: 'Pediatrics',
+  paediatrician: 'Pediatrics',
+  pediatrician: 'Pediatrics',
+  neuro: 'Neurology',
+  neurology: 'Neurology',
+  neurologist: 'Neurology',
+  psychiatry: 'Psychiatry',
+  psychiatrist: 'Psychiatry',
+  ophthalmology: 'Ophthalmology',
+  ophthalmologist: 'Ophthalmology',
+  ent: 'ENT',
+  'ent specialist': 'ENT',
+  dentistry: 'Dentistry',
+  dentist: 'Dentistry',
+  radiology: 'Radiology',
+  radiologist: 'Radiology',
+  oncology: 'Oncology',
+  oncologist: 'Oncology',
+  urology: 'Urology',
+  urologist: 'Urology',
 };
 
 function normalizeSpecialization(value: string): string {
@@ -164,13 +168,12 @@ export class ProvidersService {
     });
     if (existingCount > 0) return;
 
-    const fallbackCategory =
-      (await this.prisma.serviceCategory.findFirst({
-        where: { slug: 'doctor' },
-      })) ||
-      (await this.prisma.serviceCategory.findFirst({
-        where: { slug: 'general-medicine' },
-      }));
+    // When no matching service category exists, fall back to the "Others"
+    // catch-all bucket. Never default to General Medicine for unrecognised
+    // specializations — that causes incorrect service labels in search/admin.
+    const fallbackCategory = await this.prisma.serviceCategory.findFirst({
+      where: { slug: 'others' },
+    });
 
     if (!fallbackCategory) return;
 
