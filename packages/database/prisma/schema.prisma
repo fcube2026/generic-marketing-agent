@@ -1212,6 +1212,10 @@ model PatientVerification {
   aadhaarLast4           String?
   aadhaarFaceStoragePath String?
   identityVerifiedAt     DateTime?
+  // Surepass eAadhaar validation — raw API response stored for audit; validated
+  // timestamp set when Surepass confirms authenticity of the uploaded PDF.
+  surepassEaadhaarRaw    Json?
+  eAadhaarValidatedAt    DateTime?
   submittedAt            DateTime?
   autoApprovedAt         DateTime?
   emergencyOverride      Boolean                   @default(false)

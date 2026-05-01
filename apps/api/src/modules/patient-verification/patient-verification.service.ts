@@ -11,6 +11,7 @@ import { RiskEngineService } from './risk-engine.service';
 import { SmsService } from '../sms/sms.service';
 import { ConfigService } from '@nestjs/config';
 import { KycMlClient, KycMlError, mapKycMlErrorStatus } from './kyc-ml.client';
+import { SurepassEaadhaarProvider } from './providers/surepass-eaadhaar.provider';
 import {
   PatientVerificationStatus,
   ManualReviewReason,
@@ -71,6 +72,7 @@ export class PatientVerificationService {
     private readonly smsService: SmsService,
     private readonly config: ConfigService,
     private readonly kycMl: KycMlClient,
+    private readonly surepassEaadhaar: SurepassEaadhaarProvider,
   ) {
     this.supabaseUrl = this.config.get<string>('SUPABASE_URL', '');
     this.supabaseKey = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
@@ -789,6 +791,151 @@ export class PatientVerificationService {
       address: extraction.address,
       aadhaarLast4: extraction.aadhaar_last4,
       faceStored: extraction.face_stored,
+      isMinor,
+    };
+  }
+
+  /**
+   * Upload an eAadhaar PDF to Surepass for validation + field extraction.
+   *
+   * This is the preferred Aadhaar verification path when
+   * `SUREPASS_EAADHAAR_ENABLED=true`. The extracted personal details
+   * (name, DOB, gender, address, pincode, state) are persisted onto the
+   * PatientVerification row so the next wizard screens can be pre-filled.
+   * The full Surepass response is stored as `surepassEaadhaarRaw` for audit.
+   *
+   * When the live Surepass service is not configured (dev / CI) the provider
+   * falls back to a deterministic mock so the wizard flow remains testable.
+   */
+  async selfProcessEaadhaar(
+    userId: string,
+    file: { buffer: Buffer; mimetype: string; originalname?: string },
+    password?: string,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('No eAadhaar PDF was uploaded.');
+    }
+    if (
+      file.mimetype !== 'application/pdf' &&
+      !file.mimetype.startsWith('application/')
+    ) {
+      throw new BadRequestException(
+        'Please upload the eAadhaar as a PDF file.',
+      );
+    }
+
+    const verification = await this.getOrCreateForUser(userId);
+
+    const result = await this.surepassEaadhaar.processEaadhaar(
+      file.buffer,
+      password?.trim() || undefined,
+    );
+
+    if (!result.valid) {
+      await this.writeAuditLog(
+        verification.id,
+        'SUREPASS_EAADHAAR_INVALID',
+        userId,
+        { rawStatus: result.rawResponse?.['status_code'] },
+      );
+      throw new BadRequestException(
+        'The uploaded eAadhaar could not be validated. Please ensure you are uploading a valid eAadhaar PDF and that the password (if any) is correct.',
+      );
+    }
+
+    // Convert Surepass DOB (DD-MM-YYYY or DD/MM/YYYY) to ISO YYYY-MM-DD
+    let dobIso: string | null = null;
+    if (result.dob) {
+      const [d, m, y] = result.dob.split(/[-/]/);
+      if (d && m && y) {
+        dobIso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+    }
+
+    const dobDate = dobIso ? new Date(dobIso) : null;
+    const isMinor = dobDate
+      ? this.computeIsMinor(dobDate)
+      : verification.isMinor;
+
+    // Map Surepass gender ('M' / 'F' / 'MALE' / 'FEMALE' etc.) to enum value
+    const normalizeGender = (g?: string): string | null => {
+      if (!g) return null;
+      const u = g.toUpperCase();
+      if (u === 'M' || u === 'MALE') return 'MALE';
+      if (u === 'F' || u === 'FEMALE') return 'FEMALE';
+      return 'OTHER';
+    };
+
+    const now = new Date();
+
+    await this.prisma.patientVerification.update({
+      where: { id: verification.id },
+      data: {
+        fullName: result.name ?? verification.fullName ?? null,
+        dateOfBirth: dobDate ?? verification.dateOfBirth ?? null,
+        gender: normalizeGender(result.gender) ?? verification.gender ?? null,
+        addressLine: result.address ?? verification.addressLine ?? null,
+        city: result.district ?? verification.city ?? null,
+        state: result.state ?? verification.state ?? null,
+        pincode: result.zip ?? verification.pincode ?? null,
+        aadhaarLast4: result.aadhaarLast4 ?? null,
+        idType: 'EAADHAAR',
+        idVerificationSource: this.surepassEaadhaar.isEnabled()
+          ? 'SUREPASS'
+          : 'SUREPASS_MOCK',
+        ocrMatchPassed: true,
+        ocrConfidenceScore: 1.0,
+        isMinor,
+        surepassEaadhaarRaw: result.rawResponse
+          ? (result.rawResponse as Prisma.InputJsonValue)
+          : null,
+        eAadhaarValidatedAt: now,
+        status: PatientVerificationStatus.PROFILE_COMPLETE,
+      },
+    });
+
+    // Create associated PatientIdDocument record for admin review
+    await this.prisma.patientIdDocument.create({
+      data: {
+        verificationId: verification.id,
+        documentType: 'EAADHAAR',
+        storagePath: '',
+        extractedName: result.name,
+        extractedDob: dobIso,
+        extractedIdNumber: result.aadhaarLast4
+          ? `XXXX XXXX ${result.aadhaarLast4}`
+          : null,
+        ocrRawResult: {
+          source: this.surepassEaadhaar.isEnabled()
+            ? 'surepass'
+            : 'surepass-mock',
+          aadhaar_last4: result.aadhaarLast4,
+          validated_at: now.toISOString(),
+        },
+      },
+    });
+
+    await this.writeAuditLog(
+      verification.id,
+      'SUREPASS_EAADHAAR_VALIDATED',
+      userId,
+      {
+        has_name: !!result.name,
+        has_dob: !!result.dob,
+        has_address: !!result.address,
+        mock: !this.surepassEaadhaar.isEnabled(),
+      },
+    );
+
+    return {
+      fullName: result.name ?? null,
+      dob: dobIso,
+      gender: normalizeGender(result.gender),
+      address: result.address ?? null,
+      city: result.district ?? null,
+      state: result.state ?? null,
+      pincode: result.zip ?? null,
+      aadhaarLast4: result.aadhaarLast4 ?? null,
       isMinor,
     };
   }

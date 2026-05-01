@@ -16,29 +16,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-// ── expo-image-picker ─────────────────────────────────────────────────────────
-const mockLaunchCameraAsync = jest.fn();
-jest.mock('expo-image-picker', () => ({
+// ── expo-document-picker ──────────────────────────────────────────────────────
+const mockGetDocumentAsync = jest.fn();
+jest.mock('expo-document-picker', () => ({
   __esModule: true,
-  requestCameraPermissionsAsync: jest.fn(() =>
-    Promise.resolve({ status: 'granted' }),
-  ),
-  requestMediaLibraryPermissionsAsync: jest.fn(() =>
-    Promise.resolve({ status: 'granted' }),
-  ),
-  launchCameraAsync: (...args: unknown[]) => mockLaunchCameraAsync(...args),
-  launchImageLibraryAsync: jest.fn(() =>
-    Promise.resolve({ canceled: true }),
-  ),
-  MediaTypeOptions: { Images: 'Images' },
+  getDocumentAsync: (...args: unknown[]) => mockGetDocumentAsync(...args),
 }));
 
 // ── verificationService ──────────────────────────────────────────────────────
-const mockSelfProcessAadhaar = jest.fn();
+const mockSelfProcessEaadhaar = jest.fn();
 jest.mock('../../../../services/verificationService', () => ({
   verificationService: {
-    selfProcessAadhaar: (...args: unknown[]) =>
-      mockSelfProcessAadhaar(...args),
+    selfProcessEaadhaar: (...args: unknown[]) =>
+      mockSelfProcessEaadhaar(...args),
   },
 }));
 
@@ -68,9 +58,15 @@ describe('PatientKycAadhaarScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     usePatientKycDraft.getState().reset();
-    mockLaunchCameraAsync.mockResolvedValue({
+    mockGetDocumentAsync.mockResolvedValue({
       canceled: false,
-      assets: [{ uri: 'file:///tmp/aadhaar.jpg', mimeType: 'image/jpeg' }],
+      assets: [
+        {
+          uri: 'file:///tmp/eaadhaar.pdf',
+          name: 'eaadhaar.pdf',
+          mimeType: 'application/pdf',
+        },
+      ],
     });
   });
 
@@ -81,57 +77,63 @@ describe('PatientKycAadhaarScreen', () => {
       </QueryClientProvider>,
     );
 
-  it('renders the step header and CTAs', () => {
+  it('renders the step header and PDF picker CTA', () => {
     renderScreen();
     expect(screen.getByText('Step 1 of 5')).toBeOnTheScreen();
-    expect(screen.getByText('Upload Your Aadhaar')).toBeOnTheScreen();
-    expect(screen.getByText('Use camera')).toBeOnTheScreen();
-    expect(screen.getByText('Pick from gallery')).toBeOnTheScreen();
+    expect(screen.getByText('Upload eAadhaar')).toBeOnTheScreen();
+    expect(screen.getByText('Select eAadhaar PDF')).toBeOnTheScreen();
   });
 
-  it('uploads, stores OCR draft, shows masked Aadhaar last-4', async () => {
-    mockSelfProcessAadhaar.mockResolvedValue({
+  it('validates eAadhaar, stores OCR draft with city/state/pincode, shows masked last-4', async () => {
+    mockSelfProcessEaadhaar.mockResolvedValue({
       fullName: 'Ramesh Kumar',
       dob: '1990-05-12',
       gender: 'MALE',
-      address: '42 MG Road',
+      address: '42 MG Road, Mock Colony',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pincode: '110001',
       aadhaarLast4: '9012',
-      faceStored: true,
       isMinor: false,
     });
 
     renderScreen();
-    fireEvent.press(screen.getByText('Use camera'));
-    await waitFor(() => expect(mockLaunchCameraAsync).toHaveBeenCalled());
+    fireEvent.press(screen.getByText('Select eAadhaar PDF'));
+    await waitFor(() => expect(mockGetDocumentAsync).toHaveBeenCalled());
 
-    // After picking, the "Process Aadhaar" CTA appears.
-    const processBtn = await screen.findByText('Process Aadhaar');
-    fireEvent.press(processBtn);
+    // After picking, the "Validate eAadhaar" CTA appears
+    const validateBtn = await screen.findByText('Validate eAadhaar');
+    fireEvent.press(validateBtn);
 
     await waitFor(() =>
-      expect(mockSelfProcessAadhaar).toHaveBeenCalledWith(
-        'file:///tmp/aadhaar.jpg',
-        'image/jpeg',
+      expect(mockSelfProcessEaadhaar).toHaveBeenCalledWith(
+        'file:///tmp/eaadhaar.pdf',
+        'application/pdf',
+        undefined,
       ),
     );
 
-    // The masked last-4 must be shown — never the full number.
+    // Masked last-4 must be shown — never the full number
     await waitFor(() =>
       expect(screen.getByText(/XXXX XXXX 9012/)).toBeOnTheScreen(),
     );
     expect(screen.queryByText(/1234 5678 9012/)).toBeNull();
 
-    // OCR draft must be hydrated for the next screens.
+    // OCR draft must include city, state, pincode for pre-filling address screen
     expect(usePatientKycDraft.getState().ocr).toEqual({
       fullName: 'Ramesh Kumar',
       dob: '1990-05-12',
       gender: 'MALE',
-      address: '42 MG Road',
+      address: '42 MG Road, Mock Colony',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pincode: '110001',
       aadhaarLast4: '9012',
     });
 
-    // Continue button navigates to the Personal Details screen.
+    // Continue button navigates to Personal Details
     fireEvent.press(screen.getByText('Continue'));
     expect(navigate).toHaveBeenCalledWith('PatientKycPersonal');
   });
 });
+
