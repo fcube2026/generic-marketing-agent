@@ -981,7 +981,11 @@ export class PatientVerificationService {
         verification.id,
         'SUREPASS_AADHAAR_VALIDATION_INVALID',
         userId,
-        { rawStatus: result.rawResponse?.['status_code'] },
+        {
+          rawStatus:
+            result.rawResponse?.['status_code'] ??
+            result.rawResponse?.['httpStatus'],
+        },
       );
       throw new BadRequestException(
         'The Aadhaar number could not be validated. Please check the number and try again.',
