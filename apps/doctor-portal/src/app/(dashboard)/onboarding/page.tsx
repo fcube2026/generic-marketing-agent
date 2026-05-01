@@ -13,8 +13,10 @@ interface OnboardingForm {
   clinicAddress: string;
   consultationFeeDoctorPlace: string;
   consultationFeeHomeVisit: string;
+  consultationFeeVideoConsultation: string;
   doctorPlaceVisitEnabled: boolean;
   homeVisitEnabled: boolean;
+  videoConsultationEnabled: boolean;
 }
 
 const initialForm: OnboardingForm = {
@@ -26,8 +28,10 @@ const initialForm: OnboardingForm = {
   clinicAddress: '',
   consultationFeeDoctorPlace: '',
   consultationFeeHomeVisit: '',
+  consultationFeeVideoConsultation: '',
   doctorPlaceVisitEnabled: true,
   homeVisitEnabled: false,
+  videoConsultationEnabled: true,
 };
 
 export default function OnboardingPage() {
@@ -80,6 +84,7 @@ export default function OnboardingPage() {
         contactInfo: form.contactInfo.trim(),
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
         homeVisitEnabled: form.homeVisitEnabled,
+        videoConsultationEnabled: form.videoConsultationEnabled,
       };
       if (form.bio.trim()) payload.bio = form.bio.trim();
       if (form.clinicAddress.trim()) payload.clinicAddress = form.clinicAddress.trim();
@@ -90,6 +95,10 @@ export default function OnboardingPage() {
       if (form.homeVisitEnabled && form.consultationFeeHomeVisit) {
         payload.consultationFeeHomeVisit = Number(form.consultationFeeHomeVisit);
       }
+      // Video consultation fee: always include; default to 500 if not set
+      payload.consultationFeeVideoConsultation = form.consultationFeeVideoConsultation
+        ? Number(form.consultationFeeVideoConsultation)
+        : 500;
 
       await api.post('/providers/onboard', payload);
       router.push('/dashboard');
@@ -221,6 +230,14 @@ export default function OnboardingPage() {
               fee={form.consultationFeeHomeVisit}
               onFee={(v) => update('consultationFeeHomeVisit', v)}
             />
+            <ModeBlock
+              label="📹 Video consultation"
+              enabled={form.videoConsultationEnabled}
+              onToggle={(v) => update('videoConsultationEnabled', v)}
+              fee={form.consultationFeeVideoConsultation}
+              onFee={(v) => update('consultationFeeVideoConsultation', v)}
+              feePlaceholder="500"
+            />
           </div>
         </div>
 
@@ -282,12 +299,14 @@ function ModeBlock({
   onToggle,
   fee,
   onFee,
+  feePlaceholder = '500',
 }: {
   label: string;
   enabled: boolean;
   onToggle: (v: boolean) => void;
   fee: string;
   onFee: (v: string) => void;
+  feePlaceholder?: string;
 }) {
   return (
     <div className="border border-gray-200 rounded-lg p-3">
@@ -309,7 +328,7 @@ function ModeBlock({
             value={fee}
             onChange={(e) => onFee(e.target.value)}
             className="input"
-            placeholder="500"
+            placeholder={feePlaceholder}
           />
         </div>
       )}

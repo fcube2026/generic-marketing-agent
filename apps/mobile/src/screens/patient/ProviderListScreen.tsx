@@ -229,7 +229,7 @@ export const ProviderListScreen: React.FC<Props> = ({ navigation, route }) => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <ProviderCard provider={item} onSelect={handleSelectProvider} />
+            <ProviderCard provider={item} onSelect={handleSelectProvider} mode={mode} />
           )}
         />
       )}
