@@ -14,6 +14,7 @@ import { PatientVerificationService } from '../patient-verification/patient-veri
 import { ConfigService } from '@nestjs/config';
 
 const BOOKING_CONFLICT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const CONSULTATION_DURATION_MS = 15 * 60 * 1000; // default slot = 15 minutes
 
 const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   REQUESTED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
@@ -146,6 +147,32 @@ export class BookingsService {
     if (conflictingBooking) {
       throw new BadRequestException(
         'Provider has a conflicting booking at the requested time. Please choose a different time.',
+      );
+    }
+
+    // Check for patient-side scheduling conflicts: block if the patient already
+    // has an active booking whose time window overlaps with the new booking.
+    // Assuming each consultation is CONSULTATION_DURATION_MS long:
+    //   overlap exists when: existingStart < newEnd  AND  existingEnd > newStart
+    //   => existingStart < (scheduledAt + DURATION)
+    //   => existingStart > (scheduledAt - DURATION)   (existingEnd > scheduledAt)
+    const newBookingEnd = new Date(
+      scheduledAt.getTime() + CONSULTATION_DURATION_MS,
+    );
+    const patientConflict = await this.prisma.booking.findFirst({
+      where: {
+        patientId: patientProfile.id,
+        status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] },
+        scheduledAt: {
+          gte: new Date(scheduledAt.getTime() - CONSULTATION_DURATION_MS),
+          lt: newBookingEnd,
+        },
+      },
+    });
+
+    if (patientConflict) {
+      throw new BadRequestException(
+        'You already have a consultation at this time. Please choose a different time.',
       );
     }
 
