@@ -1,73 +1,103 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors } from '../../constants/colors';
-import { ProviderWithDistance } from '../../types';
+import { BookingMode, ProviderWithDistance } from '../../types';
 import { formatCurrency, formatDistance } from '../../utils/format';
 import { Card } from '../common/Card';
+
+/** Default fee shown when the provider has not set a video consultation fee. */
+const DEFAULT_VIDEO_FEE = 500;
 
 interface ProviderCardProps {
   provider: ProviderWithDistance;
   onSelect: (provider: ProviderWithDistance) => void;
+  /** Pre-selected booking mode — affects which fee is shown in the card footer. */
+  mode?: BookingMode;
 }
 
-export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect }) => (
-  <TouchableOpacity 
-    onPress={() => !provider.isOccupied && onSelect(provider)} 
-    activeOpacity={provider.isOccupied ? 1 : 0.9}
-    disabled={provider.isOccupied}
-  >
-    <Card style={[styles.card, provider.isOccupied && styles.cardOccupied]}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{provider.name.charAt(0)}</Text>
-        </View>
-        <View style={styles.info}>
-          <Text style={styles.name}>{provider.name}</Text>
-          <Text style={styles.specialization}>{provider.specialization}</Text>
-          <View style={styles.badges}>
-            {provider.homeVisitEnabled && (
-              <View style={[styles.badge, styles.badgePrimary]}>
-                <Text style={styles.badgeText}>Home Visit</Text>
-              </View>
-            )}
-            {provider.doctorPlaceVisitEnabled && (
-              <View style={[styles.badge, styles.badgeSecondary]}>
-                <Text style={styles.badgeText}>Clinic</Text>
-              </View>
-            )}
-            <View style={[styles.badge, styles.badgeVideo]}>
+export const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onSelect, mode }) => {
+  const isVideoMode = mode === 'VIDEO_CONSULTATION';
+
+  const feeLabel = isVideoMode ? 'Fee (Video)' : 'Fee (Home)';
+  const feeValue = isVideoMode
+    ? provider.consultationFeeVideoConsultation || DEFAULT_VIDEO_FEE
+    : provider.consultationFeeHomeVisit;
+
+  return (
+    <TouchableOpacity
+      onPress={() => !provider.isOccupied && onSelect(provider)}
+      activeOpacity={provider.isOccupied ? 1 : 0.9}
+      disabled={provider.isOccupied}
+    >
+      <Card style={[styles.card, provider.isOccupied && styles.cardOccupied]}>
+        {/* Currently Occupied banner — displayed at the very top of the card */}
+        {provider.isOccupied && (
+          <View style={styles.occupiedBanner}>
+            <Text style={styles.occupiedBannerText}>🔴 Currently Occupied</Text>
+          </View>
+        )}
+
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{provider.name.charAt(0)}</Text>
+          </View>
+          <View style={styles.info}>
+            <Text style={styles.name}>{provider.name}</Text>
+            <Text style={styles.specialization}>{provider.specialization}</Text>
+            <View style={styles.badges}>
+              {provider.homeVisitEnabled && (
+                <View style={[styles.badge, styles.badgePrimary]}>
+                  <Text style={styles.badgeText}>Home Visit</Text>
+                </View>
+              )}
+              {provider.doctorPlaceVisitEnabled && (
+                <View style={[styles.badge, styles.badgeSecondary]}>
+                  <Text style={styles.badgeText}>Clinic</Text>
+                </View>
+              )}
+              <View style={[styles.badge, styles.badgeVideo]}>
                 <Text style={styles.badgeText}>Video</Text>
               </View>
-            {provider.isOccupied && (
-              <View style={[styles.badge, styles.badgeOccupied]}>
-                <Text style={styles.badgeTextOccupied}>Currently occupied in another booking</Text>
-              </View>
-            )}
+            </View>
           </View>
         </View>
-      </View>
-      <View style={styles.footer}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{formatDistance(provider.distance)}</Text>
+        <View style={styles.footer}>
+          {!isVideoMode && (
+            <>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>Distance</Text>
+                <Text style={styles.statValue}>{formatDistance(provider.distance)}</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statLabel}>ETA</Text>
+                <Text style={styles.statValue}>{Math.round(provider.distance * 3)} min</Text>
+              </View>
+            </>
+          )}
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>{feeLabel}</Text>
+            <Text style={[styles.statValue, styles.fee]}>
+              {formatCurrency(feeValue)}
+            </Text>
+          </View>
         </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>ETA</Text>
-          <Text style={styles.statValue}>{Math.round(provider.distance * 3)} min</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Fee (Home)</Text>
-          <Text style={[styles.statValue, styles.fee]}>
-            {formatCurrency(provider.consultationFeeHomeVisit)}
-          </Text>
-        </View>
-      </View>
-    </Card>
-  </TouchableOpacity>
-);
+      </Card>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   card: { marginBottom: 12 },
+  cardOccupied: { opacity: 0.7 },
+  occupiedBanner: {
+    backgroundColor: Colors.error + '1A',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  occupiedBannerText: { fontSize: 13, fontWeight: '700', color: Colors.error },
   header: { flexDirection: 'row', marginBottom: 12 },
   avatar: {
     width: 52,
@@ -82,15 +112,12 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
   specialization: { fontSize: 13, color: Colors.textMuted, marginBottom: 6 },
-  badges: { flexDirection: 'row', gap: 6 },
+  badges: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   badgePrimary: { backgroundColor: Colors.primaryLight },
   badgeSecondary: { backgroundColor: '#DBEAFE' },
   badgeVideo: { backgroundColor: '#F0F9FF' },
-  badgeOccupied: { backgroundColor: Colors.error + '1A' }, // 10% opacity error red
   badgeText: { fontSize: 11, fontWeight: '600', color: Colors.primary },
-  badgeTextOccupied: { fontSize: 11, fontWeight: '600', color: Colors.error },
-  cardOccupied: { opacity: 0.7 },
   footer: {
     flexDirection: 'row',
     borderTopWidth: 1,

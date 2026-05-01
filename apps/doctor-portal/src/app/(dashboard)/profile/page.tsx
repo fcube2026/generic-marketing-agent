@@ -14,8 +14,10 @@ interface ProviderProfile {
   clinicAddress?: string | null;
   consultationFeeDoctorPlace?: number | null;
   consultationFeeHomeVisit?: number | null;
+  consultationFeeVideoConsultation?: number | null;
   doctorPlaceVisitEnabled?: boolean;
   homeVisitEnabled?: boolean;
+  videoConsultationEnabled?: boolean;
   verificationStatus: string;
   user?: { phone?: string | null; email?: string | null };
 }
@@ -56,8 +58,10 @@ export default function ProfilePage() {
   const [clinicAddress, setClinicAddress] = useState('');
   const [feeClinic, setFeeClinic] = useState('');
   const [feeHome, setFeeHome] = useState('');
+  const [feeVideo, setFeeVideo] = useState('');
   const [doctorPlaceVisitEnabled, setDoctorPlaceVisitEnabled] = useState(true);
   const [homeVisitEnabled, setHomeVisitEnabled] = useState(false);
+  const [videoConsultationEnabled, setVideoConsultationEnabled] = useState(true);
 
   const populate = (p: ProviderProfile) => {
     setProfile(p);
@@ -68,8 +72,10 @@ export default function ProfilePage() {
     setClinicAddress(p.clinicAddress ?? '');
     setFeeClinic(p.consultationFeeDoctorPlace != null ? String(p.consultationFeeDoctorPlace) : '');
     setFeeHome(p.consultationFeeHomeVisit != null ? String(p.consultationFeeHomeVisit) : '');
+    setFeeVideo(p.consultationFeeVideoConsultation != null ? String(p.consultationFeeVideoConsultation) : '');
     setDoctorPlaceVisitEnabled(p.doctorPlaceVisitEnabled ?? true);
     setHomeVisitEnabled(p.homeVisitEnabled ?? false);
+    setVideoConsultationEnabled(p.videoConsultationEnabled ?? true);
   };
 
   useEffect(() => {
@@ -97,6 +103,7 @@ export default function ProfilePage() {
         clinicAddress: clinicAddress.trim(),
         doctorPlaceVisitEnabled,
         homeVisitEnabled,
+        videoConsultationEnabled,
       };
       if (doctorPlaceVisitEnabled && feeClinic) {
         payload.consultationFeeDoctorPlace = Number(feeClinic);
@@ -104,6 +111,8 @@ export default function ProfilePage() {
       if (homeVisitEnabled && feeHome) {
         payload.consultationFeeHomeVisit = Number(feeHome);
       }
+      // Always send video fee; default to 500 when left blank
+      payload.consultationFeeVideoConsultation = feeVideo ? Number(feeVideo) : 500;
 
       await api.put('/providers/me', payload);
       const refreshed = await api.get('/providers/me');
@@ -231,6 +240,14 @@ export default function ProfilePage() {
               fee={feeHome}
               onFee={setFeeHome}
             />
+            <ModeBlock
+              label="📹 Video consultation"
+              enabled={videoConsultationEnabled}
+              onToggle={setVideoConsultationEnabled}
+              fee={feeVideo}
+              onFee={setFeeVideo}
+              feePlaceholder="500"
+            />
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -280,6 +297,14 @@ export default function ProfilePage() {
                   : 'Disabled'
               }
             />
+            <Row
+              label="Video consultation fee"
+              value={
+                profile?.videoConsultationEnabled !== false
+                  ? `₹${profile?.consultationFeeVideoConsultation ?? 500}`
+                  : 'Disabled'
+              }
+            />
             <div>
               <p className="text-sm font-medium text-gray-500">Verification Status</p>
               <span
@@ -323,12 +348,14 @@ function ModeBlock({
   onToggle,
   fee,
   onFee,
+  feePlaceholder = '0',
 }: {
   label: string;
   enabled: boolean;
   onToggle: (v: boolean) => void;
   fee: string;
   onFee: (v: string) => void;
+  feePlaceholder?: string;
 }) {
   return (
     <div className="border border-gray-200 rounded-lg p-3">
@@ -350,6 +377,7 @@ function ModeBlock({
             value={fee}
             onChange={(e) => onFee(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            placeholder={feePlaceholder}
           />
         </div>
       )}

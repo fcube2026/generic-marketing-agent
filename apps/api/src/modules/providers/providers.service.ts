@@ -187,9 +187,21 @@ export class ProvidersService {
       data: { role: 'PROVIDER' },
     });
 
+    // Apply safe defaults so every new provider is enabled for video consultation
+    // and has a sensible fee even when the client omits these fields.
+    const enrichedProfile = {
+      ...profileData,
+      videoConsultationEnabled: profileData.videoConsultationEnabled ?? true,
+      consultationFeeVideoConsultation:
+        profileData.consultationFeeVideoConsultation != null &&
+        profileData.consultationFeeVideoConsultation > 0
+          ? profileData.consultationFeeVideoConsultation
+          : 500,
+    };
+
     const profile = await this.prisma.providerProfile.create({
       data: {
-        ...profileData,
+        ...enrichedProfile,
         userId,
       },
     });
