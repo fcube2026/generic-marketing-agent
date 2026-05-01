@@ -48,8 +48,8 @@ export class SurepassEaadhaarProvider {
       config.get<string>('SUREPASS_EAADHAAR_ENABLED', 'false') || 'false'
     ).toLowerCase();
     this.apiUrl = (
-      config.get<string>('SUREPASS_API_URL', 'https://kyc-api.surepass.io') ||
-      'https://kyc-api.surepass.io'
+      config.get<string>('SUREPASS_API_URL', 'https://sandbox.surepass.io') ||
+      'https://sandbox.surepass.io'
     ).replace(/\/+$/, '');
     this.apiToken = config.get<string>('SUREPASS_API_TOKEN', '') || '';
     this.enabled = flag === 'true' && !!this.apiToken;
