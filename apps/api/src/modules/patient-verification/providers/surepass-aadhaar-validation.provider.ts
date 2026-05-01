@@ -91,73 +91,113 @@ export class SurepassAadhaarValidationProvider {
     };
   }
 
+  /**
+   * Retry delays in milliseconds for transient failures (network errors or
+   * HTTP 5xx responses).  Two retries → three total attempts.
+   */
+  private static readonly RETRY_DELAYS_MS = [500, 1500] as const;
+
   private async callSurepass(
     aadhaarNumber: string,
   ): Promise<SurepassAadhaarValidationResult> {
     const endpoint = `${this.apiUrl}/api/v1/aadhaar-validation/aadhaar-validation`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    let lastError: ServiceUnavailableException | undefined;
 
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiToken}`,
-        },
-        body: JSON.stringify({ id_number: aadhaarNumber }),
-        signal: controller.signal,
-      });
-    } catch (err) {
-      const isAbort = err instanceof Error && err.name === 'AbortError';
-      this.logger.error(
-        `[surepass-aadhaar-validation] Network error calling Surepass (timeout=${isAbort}): ${String(err)}`,
-      );
-      throw new ServiceUnavailableException(
-        'Aadhaar validation service is temporarily unavailable. Please try again later.',
-      );
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    const bodyText = await response.text();
-    const truncated =
-      bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
-
-    if (!response.ok) {
-      this.logger.warn(
-        `[surepass-aadhaar-validation] API error ${response.status}: ${truncated}`,
-      );
-      // 422 means the Aadhaar number itself failed validation (not found in
-      // UIDAI records, invalid checksum, etc.) — treat as invalid aadhaar.
-      // Any other non-200 status (401, 403, 429, 5xx) is a service/auth
-      // error and should not be surfaced as "the Aadhaar number is wrong".
-      if (response.status === 422) {
-        return {
-          valid: false,
-          rawResponse: { httpStatus: response.status, body: truncated },
-        };
+    for (
+      let attempt = 0;
+      attempt <= SurepassAadhaarValidationProvider.RETRY_DELAYS_MS.length;
+      attempt++
+    ) {
+      if (attempt > 0) {
+        const delayMs =
+          SurepassAadhaarValidationProvider.RETRY_DELAYS_MS[attempt - 1];
+        this.logger.warn(
+          `[surepass-aadhaar-validation] Retrying after ${delayMs}ms (attempt ${attempt + 1})`,
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
       }
-      throw new ServiceUnavailableException(
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiToken}`,
+          },
+          body: JSON.stringify({ id_number: aadhaarNumber }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        this.logger.error(
+          `[surepass-aadhaar-validation] Network error calling Surepass (attempt=${attempt + 1}, timeout=${isAbort}): ${String(err)}`,
+        );
+        lastError = new ServiceUnavailableException(
+          'Aadhaar validation service is temporarily unavailable. Please try again later.',
+        );
+        continue;
+      }
+      clearTimeout(timeoutId);
+
+      const bodyText = await response.text();
+      const truncated =
+        bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
+
+      if (!response.ok) {
+        this.logger.warn(
+          `[surepass-aadhaar-validation] API error ${response.status} (attempt=${attempt + 1}): ${truncated}`,
+        );
+        // 422 means the Aadhaar number itself failed validation (not found in
+        // UIDAI records, invalid checksum, etc.) — treat as invalid aadhaar.
+        // Any other non-200 status (401, 403, 429, 5xx) is a service/auth
+        // error and should not be surfaced as "the Aadhaar number is wrong".
+        if (response.status === 422) {
+          return {
+            valid: false,
+            rawResponse: { httpStatus: response.status, body: truncated },
+          };
+        }
+        // 4xx errors (other than 422) are deterministic; do not retry.
+        if (response.status >= 400 && response.status < 500) {
+          throw new ServiceUnavailableException(
+            'Aadhaar validation service is temporarily unavailable. Please try again later.',
+          );
+        }
+        // 5xx — transient; record and retry.
+        lastError = new ServiceUnavailableException(
+          'Aadhaar validation service is temporarily unavailable. Please try again later.',
+        );
+        continue;
+      }
+
+      let raw: Record<string, unknown>;
+      try {
+        raw = JSON.parse(bodyText) as Record<string, unknown>;
+      } catch {
+        this.logger.warn(
+          `[surepass-aadhaar-validation] API returned non-JSON body: ${truncated}`,
+        );
+        throw new ServiceUnavailableException(
+          'Aadhaar validation service returned an unexpected response. Please try again later.',
+        );
+      }
+
+      return this.parseResponse(raw);
+    }
+
+    // All attempts exhausted — propagate the last recorded error.
+    throw (
+      lastError ??
+      new ServiceUnavailableException(
         'Aadhaar validation service is temporarily unavailable. Please try again later.',
-      );
-    }
-
-    let raw: Record<string, unknown>;
-    try {
-      raw = JSON.parse(bodyText) as Record<string, unknown>;
-    } catch {
-      this.logger.warn(
-        `[surepass-aadhaar-validation] API returned non-JSON body: ${truncated}`,
-      );
-      throw new ServiceUnavailableException(
-        'Aadhaar validation service returned an unexpected response. Please try again later.',
-      );
-    }
-
-    return this.parseResponse(raw);
+      )
+    );
   }
 
   private parseResponse(
