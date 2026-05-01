@@ -52,12 +52,19 @@ export const HomeScreen: React.FC = () => {
     onError: () => Alert.alert('Error', 'Failed to update availability'),
   });
 
+  const ACTIVE_STATUSES: BookingStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'];
   const pendingBookings = (bookings || []).filter((b) => b.status === 'REQUESTED');
   const todayBookings = (bookings || []).filter(
-    (b) => new Date(b.scheduledAt).toDateString() === new Date().toDateString()
+    (b) =>
+      new Date(b.scheduledAt).toDateString() === new Date().toDateString() &&
+      (ACTIVE_STATUSES as string[]).includes(b.status),
   );
-  const todayEarnings = todayBookings
-    .filter((b) => b.status === 'COMPLETED' || b.status === 'CLOSED')
+  const todayEarnings = (bookings || [])
+    .filter(
+      (b) =>
+        new Date(b.scheduledAt).toDateString() === new Date().toDateString() &&
+        (b.status === 'COMPLETED' || b.status === 'CLOSED'),
+    )
     .reduce((sum, b) => sum + b.totalFee * 0.8, 0);
 
   const activeVideoBookings = (videoBookings || []).filter(

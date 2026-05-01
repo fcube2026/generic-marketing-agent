@@ -36,9 +36,7 @@ export const ProfileScreen: React.FC = () => {
     queryFn: bookingService.getProviderBookings,
   });
 
-  const completedCount = bookings.filter((b) =>
-    ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(b.status)
-  ).length;
+  const completedCount = bookings.filter((b) => b.status === 'COMPLETED').length;
 
   const totalEarned = bookings
     .filter((b) => ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(b.status))

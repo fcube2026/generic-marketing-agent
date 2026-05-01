@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Switch, TextInput,
   TouchableOpacity, Alert, SafeAreaView,
 } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '../../constants/colors';
 import { providerService } from '../../services/providerService';
 import { getCurrentLocation } from '../../utils/location';
@@ -12,16 +13,37 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 type DaySchedule = { enabled: boolean; start: string; end: string };
 
 export const AvailabilityScreen: React.FC = () => {
+  const queryClient = useQueryClient();
   const [isAvailable, setIsAvailable] = useState(false);
   const [homeVisit, setHomeVisit] = useState(false);
   const [homeVisitFee, setHomeVisitFee] = useState('');
   const [doctorPlace, setDoctorPlace] = useState(false);
   const [doctorPlaceFee, setDoctorPlaceFee] = useState('');
+  const [videoConsultation, setVideoConsultation] = useState(false);
+  const [videoConsultationFee, setVideoConsultationFee] = useState('');
   const [serviceRadius, setServiceRadius] = useState(10);
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<Record<string, DaySchedule>>(
     Object.fromEntries(DAYS.map(d => [d, { enabled: false, start: '09:00', end: '18:00' }]))
   );
+
+  const { data: profile } = useQuery({
+    queryKey: ['provider-profile'],
+    queryFn: providerService.getProfile,
+  });
+
+  // Populate state from saved profile so toggles persist across sessions
+  useEffect(() => {
+    if (!profile) return;
+    setIsAvailable(profile.isAvailable ?? false);
+    setHomeVisit(profile.homeVisitEnabled ?? false);
+    setHomeVisitFee(profile.consultationFeeHomeVisit ? String(profile.consultationFeeHomeVisit) : '');
+    setDoctorPlace(profile.doctorPlaceVisitEnabled ?? false);
+    setDoctorPlaceFee(profile.consultationFeeDoctorPlace ? String(profile.consultationFeeDoctorPlace) : '');
+    setVideoConsultation(profile.videoConsultationEnabled ?? false);
+    setVideoConsultationFee(profile.consultationFeeVideoConsultation ? String(profile.consultationFeeVideoConsultation) : '');
+    setServiceRadius(profile.serviceRadius ?? 10);
+  }, [profile]);
 
   const updateDay = (day: string, field: keyof DaySchedule, value: boolean | string) => {
     setSchedule(prev => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
@@ -35,6 +57,8 @@ export const AvailabilityScreen: React.FC = () => {
         consultationFeeHomeVisit: parseFloat(homeVisitFee) || 0,
         doctorPlaceVisitEnabled: doctorPlace,
         consultationFeeDoctorPlace: parseFloat(doctorPlaceFee) || 0,
+        videoConsultationEnabled: videoConsultation,
+        consultationFeeVideoConsultation: parseFloat(videoConsultationFee) || 0,
         serviceRadius,
       });
 
@@ -45,6 +69,7 @@ export const AvailabilityScreen: React.FC = () => {
         location?.lng,
       );
 
+      queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
       Alert.alert('Saved', 'Availability settings updated.');
     } catch {
       Alert.alert('Error', 'Failed to save settings.');
@@ -108,6 +133,28 @@ export const AvailabilityScreen: React.FC = () => {
                 onChangeText={setDoctorPlaceFee}
                 keyboardType="numeric"
                 placeholder="e.g. 300"
+              />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.modeRow}>
+            <View>
+              <Text style={styles.modeLabel}>📹 Video Consultation</Text>
+              <Text style={styles.modeNote}>Remote video call</Text>
+            </View>
+            <Switch value={videoConsultation} onValueChange={setVideoConsultation} trackColor={{ true: Colors.primary }} />
+          </View>
+          {videoConsultation && (
+            <View style={styles.feeRow}>
+              <Text style={styles.feeLabel}>Consultation Fee (₹)</Text>
+              <TextInput
+                style={styles.feeInput}
+                value={videoConsultationFee}
+                onChangeText={setVideoConsultationFee}
+                keyboardType="numeric"
+                placeholder="e.g. 500"
               />
             </View>
           )}
