@@ -61,8 +61,8 @@ const SPECIALIZATION_MAP: Record<string, string> = {
 
 function normalizeSpecialization(value: string): string {
   if (!value || typeof value !== 'string') return '';
-  const key = value.trim().toLowerCase();
-  return SPECIALIZATION_MAP[key] ?? value.trim();
+  const trimmed = value.trim();
+  return SPECIALIZATION_MAP[trimmed.toLowerCase()] ?? trimmed;
 }
 
 function haversineDistance(

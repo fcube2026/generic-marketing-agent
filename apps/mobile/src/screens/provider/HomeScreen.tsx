@@ -57,7 +57,7 @@ export const HomeScreen: React.FC = () => {
   const todayBookings = (bookings || []).filter(
     (b) =>
       new Date(b.scheduledAt).toDateString() === new Date().toDateString() &&
-      (ACTIVE_STATUSES as string[]).includes(b.status),
+      ACTIVE_STATUSES.includes(b.status as BookingStatus),
   );
   const todayEarnings = (bookings || [])
     .filter(
