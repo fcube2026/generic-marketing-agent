@@ -40,6 +40,7 @@ import { SelfIdUploadDto } from './dto/self-id-upload.dto';
 import { SelfIdConfirmDto } from './dto/self-id-confirm.dto';
 import { SelfFaceCaptureDto } from './dto/self-face-capture.dto';
 import { SelfGuardianDto } from './dto/self-guardian.dto';
+import { SelfAadhaarValidateDto } from './dto/self-aadhaar-validate.dto';
 
 @ApiTags('Patient Verification')
 @ApiBearerAuth()
@@ -162,6 +163,19 @@ export class PatientVerificationController {
   // when the Python `apps/kyc-ml` sidecar is deployed. The legacy JSON
   // endpoints above stay registered so older mobile builds keep working.
   // ──────────────────────────────────────────
+
+  @Post('verification/self/aadhaar-validate')
+  @Roles('PATIENT')
+  @ApiOperation({
+    summary:
+      'Validate an Aadhaar number via Surepass; returns gender, state, age range and last-4 digits for auto-fill',
+  })
+  selfAadhaarValidate(
+    @CurrentUser() user: any,
+    @Body() dto: SelfAadhaarValidateDto,
+  ) {
+    return this.service.selfValidateAadhaarNumber(user.id, dto.aadhaarNumber);
+  }
 
   @Post('verification/self/eaadhaar')
   @Roles('PATIENT')

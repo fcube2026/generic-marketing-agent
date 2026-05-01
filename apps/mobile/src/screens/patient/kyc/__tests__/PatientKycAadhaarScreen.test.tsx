@@ -16,19 +16,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-// ── expo-document-picker ──────────────────────────────────────────────────────
-const mockGetDocumentAsync = jest.fn();
-jest.mock('expo-document-picker', () => ({
-  __esModule: true,
-  getDocumentAsync: (...args: unknown[]) => mockGetDocumentAsync(...args),
-}));
-
 // ── verificationService ──────────────────────────────────────────────────────
-const mockSelfProcessEaadhaar = jest.fn();
+const mockSelfValidateAadhaarNumber = jest.fn();
 jest.mock('../../../../services/verificationService', () => ({
   verificationService: {
-    selfProcessEaadhaar: (...args: unknown[]) =>
-      mockSelfProcessEaadhaar(...args),
+    selfValidateAadhaarNumber: (...args: unknown[]) =>
+      mockSelfValidateAadhaarNumber(...args),
   },
 }));
 
@@ -58,16 +51,6 @@ describe('PatientKycAadhaarScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     usePatientKycDraft.getState().reset();
-    mockGetDocumentAsync.mockResolvedValue({
-      canceled: false,
-      assets: [
-        {
-          uri: 'file:///tmp/eaadhaar.pdf',
-          name: 'eaadhaar.pdf',
-          mimeType: 'application/pdf',
-        },
-      ],
-    });
   });
 
   const renderScreen = () =>
@@ -77,63 +60,75 @@ describe('PatientKycAadhaarScreen', () => {
       </QueryClientProvider>,
     );
 
-  it('renders the step header and PDF picker CTA', () => {
+  it('renders the step header and Aadhaar number input', () => {
     renderScreen();
     expect(screen.getByText('Step 1 of 5')).toBeOnTheScreen();
-    expect(screen.getByText('Upload eAadhaar')).toBeOnTheScreen();
-    expect(screen.getByText('Select eAadhaar PDF')).toBeOnTheScreen();
+    expect(screen.getByText('Aadhaar Verification')).toBeOnTheScreen();
+    expect(screen.getByPlaceholderText('Enter 12-digit Aadhaar number')).toBeOnTheScreen();
   });
 
-  it('validates eAadhaar, stores OCR draft with city/state/pincode, shows masked last-4', async () => {
-    mockSelfProcessEaadhaar.mockResolvedValue({
-      fullName: 'Ramesh Kumar',
-      dob: '1990-05-12',
+  it('validates Aadhaar number, stores OCR draft with gender/state, shows masked last-4', async () => {
+    mockSelfValidateAadhaarNumber.mockResolvedValue({
       gender: 'MALE',
-      address: '42 MG Road, Mock Colony',
-      city: 'New Delhi',
-      state: 'Delhi',
-      pincode: '110001',
-      aadhaarLast4: '9012',
+      state: 'Gujarat',
+      aadhaarLast4: '1298',
+      ageRange: '20-30',
+      isMobile: true,
       isMinor: false,
     });
 
     renderScreen();
-    fireEvent.press(screen.getByText('Select eAadhaar PDF'));
-    await waitFor(() => expect(mockGetDocumentAsync).toHaveBeenCalled());
 
-    // After picking, the "Validate eAadhaar" CTA appears
-    const validateBtn = await screen.findByText('Validate eAadhaar');
+    // Type a valid 12-digit Aadhaar number
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Enter 12-digit Aadhaar number'),
+      '917646971298',
+    );
+
+    const validateBtn = screen.getByText('Validate Aadhaar');
     fireEvent.press(validateBtn);
 
     await waitFor(() =>
-      expect(mockSelfProcessEaadhaar).toHaveBeenCalledWith(
-        'file:///tmp/eaadhaar.pdf',
-        'application/pdf',
-        undefined,
-      ),
+      expect(mockSelfValidateAadhaarNumber).toHaveBeenCalledWith('917646971298'),
     );
 
     // Masked last-4 must be shown — never the full number
     await waitFor(() =>
-      expect(screen.getByText(/XXXX XXXX 9012/)).toBeOnTheScreen(),
+      expect(screen.getByText(/XXXX XXXX XXXX 1298/)).toBeOnTheScreen(),
     );
-    expect(screen.queryByText(/1234 5678 9012/)).toBeNull();
+    expect(screen.queryByText(/917646971298/)).toBeNull();
 
-    // OCR draft must include city, state, pincode for pre-filling address screen
+    // OCR draft must include gender and state for pre-filling subsequent screens
     expect(usePatientKycDraft.getState().ocr).toEqual({
-      fullName: 'Ramesh Kumar',
-      dob: '1990-05-12',
+      fullName: null,
+      dob: null,
       gender: 'MALE',
-      address: '42 MG Road, Mock Colony',
-      city: 'New Delhi',
-      state: 'Delhi',
-      pincode: '110001',
-      aadhaarLast4: '9012',
+      address: null,
+      city: null,
+      state: 'Gujarat',
+      pincode: null,
+      aadhaarLast4: '1298',
     });
+
+    // Result card shows state and age range
+    expect(screen.getByText('Gujarat')).toBeOnTheScreen();
+    expect(screen.getByText('20-30 years')).toBeOnTheScreen();
 
     // Continue button navigates to Personal Details
     fireEvent.press(screen.getByText('Continue'));
     expect(navigate).toHaveBeenCalledWith('PatientKycPersonal');
+  });
+
+  it('disables Validate button when fewer than 12 digits are entered', () => {
+    renderScreen();
+    fireEvent.changeText(
+      screen.getByPlaceholderText('Enter 12-digit Aadhaar number'),
+      '12345',
+    );
+    const btn = screen.getByText('Validate Aadhaar');
+    // Button should be disabled (not trigger mutation)
+    fireEvent.press(btn);
+    expect(mockSelfValidateAadhaarNumber).not.toHaveBeenCalled();
   });
 });
 

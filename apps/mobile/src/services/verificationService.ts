@@ -160,6 +160,26 @@ export const verificationService = {
   // signed-URL flow when the Aadhaar-first wizard runs.
 
   /**
+   * Validate an Aadhaar number via Surepass. Returns gender, state,
+   * age range and last-4 digits for auto-filling the KYC wizard.
+   */
+  selfValidateAadhaarNumber: async (
+    aadhaarNumber: string,
+  ): Promise<{
+    gender: string | null;
+    state: string | null;
+    aadhaarLast4: string | null;
+    ageRange: string | null;
+    isMobile: boolean | null;
+    isMinor: boolean;
+  }> => {
+    const r = await api.post('/verification/self/aadhaar-validate', {
+      aadhaarNumber,
+    });
+    return r.data;
+  },
+
+  /**
    * Multipart upload of an eAadhaar PDF; validates via Surepass and returns
    * extracted personal details for pre-filling the wizard screens.
    */
