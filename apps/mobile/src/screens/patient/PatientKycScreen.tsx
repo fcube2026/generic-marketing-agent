@@ -34,7 +34,6 @@ const STEP_LABELS: Record<SelfServeStep, string> = {
 type KycRoute =
   | 'PatientKycPersonal'
   | 'PatientKycAddress'
-  | 'PatientKycIdUpload'
   | 'PatientKycAadhaarUpload'
   | 'PatientKycFaceCapture'
   | 'PatientKycGuardian'
@@ -43,10 +42,8 @@ type KycRoute =
 const STEP_TO_ROUTE: Record<SelfServeStep, KycRoute> = {
   PERSONAL_DETAILS: 'PatientKycPersonal',
   ADDRESS: 'PatientKycAddress',
-  // ID_UPLOAD now points at the new Aadhaar OCR screen. The legacy
-  // PatientKycIdUpload screen remains registered as a fallback that the new
-  // screen can navigate to via "Use manual entry" when the kyc-ml service
-  // is not available in the current environment.
+  // ID_UPLOAD is satisfied by the Surepass Aadhaar number validation done
+  // on the PatientKycAadhaarUpload screen — no PDF/image upload step.
   ID_UPLOAD: 'PatientKycAadhaarUpload',
   FACE_CAPTURE: 'PatientKycFaceCapture',
   GUARDIAN: 'PatientKycGuardian',

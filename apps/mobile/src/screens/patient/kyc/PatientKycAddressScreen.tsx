@@ -155,7 +155,10 @@ export const PatientKycAddressScreen: React.FC<Props> = ({ navigation, route }) 
       if (result.mode === 'KYC') {
         qc.setQueryData(['patient-kyc-status'], result.kycStatus);
         qc.invalidateQueries({ queryKey: ['patient-kyc-status'] });
-        navigation.navigate('PatientKycIdUpload');
+        // Aadhaar validation is completed in Step 1 (PatientKycAadhaarUpload)
+        // so the legacy "Upload Aadhaar" image step is skipped — go directly
+        // to face verification.
+        navigation.navigate('PatientKycFaceCapture');
         return;
       }
 
