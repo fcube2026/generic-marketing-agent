@@ -253,6 +253,77 @@ describe('BookingsService', () => {
       );
     });
 
+    it('should throw with patient-facing message when patient already has an overlapping booking', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue({
+        id: 'address-1',
+        userId,
+      });
+      // Provider conflict check returns null (no provider conflict),
+      // patient conflict check returns an existing booking.
+      mockPrisma.booking.findFirst
+        .mockResolvedValueOnce(null) // provider conflict → none
+        .mockResolvedValueOnce({
+          id: 'existing-pt-booking',
+          status: 'REQUESTED',
+        }); // patient conflict
+
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        'You already have a consultation at this time. Please choose a different time.',
+      );
+    });
+
+    it('patient conflict error must not say "Provider"', async () => {
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue({
+        id: 'address-1',
+        userId,
+      });
+      mockPrisma.booking.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'existing-pt-booking',
+          status: 'IN_PROGRESS',
+        });
+
+      await expect(service.createBooking(userId, dto)).rejects.toThrow(
+        expect.objectContaining({
+          message: expect.not.stringContaining('Provider'),
+        }),
+      );
+    });
+
+    it('should pass patient conflict check when existing booking is in terminal status (COMPLETED)', async () => {
+      const booking = {
+        id: 'booking-1',
+        ...dto,
+        patientId: patient.id,
+        totalFee: 500,
+        status: 'REQUESTED',
+        provider,
+        serviceCategory: { id: 'cat-1', name: 'General' },
+        address: null,
+      };
+
+      mockPrisma.patientProfile.findUnique.mockResolvedValue(patient);
+      mockPrisma.providerProfile.findUnique.mockResolvedValue(provider);
+      mockPrisma.address.findFirst.mockResolvedValue({
+        id: 'address-1',
+        userId,
+      });
+      // Both conflict checks return null (COMPLETED bookings not in the filter)
+      mockPrisma.booking.findFirst.mockResolvedValue(null);
+      mockPrisma.booking.create.mockResolvedValue(booking);
+      mockPrisma.bookingStatusHistory.create.mockResolvedValue({});
+      mockPrisma.payment.create.mockResolvedValue({});
+      mockNotifications.sendNotification.mockResolvedValue({});
+
+      const result = await service.createBooking(userId, dto);
+      expect(result).toEqual(booking);
+    });
+
     it('should allow clinic visit without addressId', async () => {
       const clinicDto = {
         ...dto,

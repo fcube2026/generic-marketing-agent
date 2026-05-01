@@ -36,9 +36,11 @@ export const ProfileScreen: React.FC = () => {
     queryFn: bookingService.getProviderBookings,
   });
 
-  const completedCount = bookings.filter((b) =>
-    ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(b.status)
-  ).length;
+  // "Consultations" count badge shows only fully-COMPLETED sessions (doctor
+  // pressed "End Consultation"). Bookings still in SUMMARY_SUBMITTED or CLOSED
+  // are also financially settled, so they count toward totalEarned but must not
+  // inflate the consultations badge before the doctor has formally finished.
+  const completedCount = bookings.filter((b) => b.status === 'COMPLETED').length;
 
   const totalEarned = bookings
     .filter((b) => ['COMPLETED', 'SUMMARY_SUBMITTED', 'CLOSED'].includes(b.status))

@@ -659,6 +659,59 @@ describe('ProvidersService', () => {
       );
     });
 
+    it('should not apply category filter for "others" catch-all (shows all available doctors)', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(patientLat, patientLng, 'others');
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({ OR: expect.anything() }),
+        }),
+      );
+    });
+
+    it('should not apply category filter for "others" + serviceId (still catch-all)', async () => {
+      mockPrisma.providerProfile.findMany.mockResolvedValue([]);
+
+      await service.getNearbyProviders(
+        patientLat,
+        patientLng,
+        'others',
+        undefined,
+        'service-id-123',
+      );
+
+      expect(mockPrisma.providerProfile.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.not.objectContaining({ OR: expect.anything() }),
+        }),
+      );
+    });
+
+    it('should return all available providers when "others" + VIDEO_CONSULTATION selected', async () => {
+      const videoProvider = makeProvider({
+        id: 'video-doc',
+        specialization: 'Gynecologist',
+        videoConsultationEnabled: true,
+        homeVisitEnabled: false,
+        doctorPlaceVisitEnabled: false,
+        currentLat: null,
+        currentLng: null,
+      });
+      mockPrisma.providerProfile.findMany.mockResolvedValue([videoProvider]);
+
+      const result = await service.getNearbyProviders(
+        null,
+        null,
+        'others',
+        'VIDEO_CONSULTATION',
+      );
+
+      expect(result.length).toBe(1);
+      expect(result[0].id).toBe('video-doc');
+    });
+
     it('should not apply category filter for doctor service', async () => {
       mockPrisma.providerProfile.findMany.mockResolvedValue([]);
 

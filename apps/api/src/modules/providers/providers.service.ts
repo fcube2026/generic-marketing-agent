@@ -14,6 +14,57 @@ import { UploadKycDocumentDto } from './dto/upload-kyc-document.dto';
 
 const GENERIC_SERVICE_SLUGS = ['doctor', 'general-medicine'];
 
+// Maps common free-text variations to a canonical specialization name.
+const SPECIALIZATION_MAP: Record<string, string> = {
+  cardio: 'Cardiologist',
+  cardiology: 'Cardiologist',
+  cardiologist: 'Cardiologist',
+  derma: 'Dermatologist',
+  dermatology: 'Dermatologist',
+  dermatologist: 'Dermatologist',
+  gynae: 'Gynecologist',
+  gynaecology: 'Gynecologist',
+  gynecology: 'Gynecologist',
+  gynecologist: 'Gynecologist',
+  gynaecologist: 'Gynecologist',
+  'general physician': 'General Physician',
+  'general medicine': 'General Physician',
+  gp: 'General Physician',
+  mbbs: 'General Physician',
+  ortho: 'Orthopedic',
+  orthopedics: 'Orthopedic',
+  orthopaedics: 'Orthopedic',
+  orthopedic: 'Orthopedic',
+  orthopaedic: 'Orthopedic',
+  paediatrics: 'Pediatrician',
+  pediatrics: 'Pediatrician',
+  paediatrician: 'Pediatrician',
+  pediatrician: 'Pediatrician',
+  neuro: 'Neurologist',
+  neurology: 'Neurologist',
+  neurologist: 'Neurologist',
+  psychiatry: 'Psychiatrist',
+  psychiatrist: 'Psychiatrist',
+  ophthalmology: 'Ophthalmologist',
+  ophthalmologist: 'Ophthalmologist',
+  ent: 'ENT Specialist',
+  'ent specialist': 'ENT Specialist',
+  dentistry: 'Dentist',
+  dentist: 'Dentist',
+  radiology: 'Radiologist',
+  radiologist: 'Radiologist',
+  oncology: 'Oncologist',
+  oncologist: 'Oncologist',
+  urology: 'Urologist',
+  urologist: 'Urologist',
+};
+
+function normalizeSpecialization(value: string): string {
+  if (!value || typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return SPECIALIZATION_MAP[trimmed.toLowerCase()] ?? trimmed;
+}
+
 function haversineDistance(
   lat1: number,
   lng1: number,
@@ -191,6 +242,7 @@ export class ProvidersService {
     // and has a sensible fee even when the client omits these fields.
     const enrichedProfile = {
       ...profileData,
+      specialization: normalizeSpecialization(profileData.specialization),
       videoConsultationEnabled: profileData.videoConsultationEnabled ?? true,
       consultationFeeVideoConsultation:
         profileData.consultationFeeVideoConsultation != null &&
@@ -259,6 +311,13 @@ export class ProvidersService {
 
     if (serviceCategoryIds && serviceCategoryIds.length > 0) {
       await this.validateServiceCategoryIds(serviceCategoryIds);
+    }
+
+    // Normalize specialization if provided
+    if (profileData.specialization) {
+      profileData.specialization = normalizeSpecialization(
+        profileData.specialization,
+      );
     }
 
     await this.prisma.providerProfile.update({
@@ -695,9 +754,13 @@ export class ProvidersService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     const categoryLabel = normalizedCategorySlug?.replace(/-/g, ' ');
+    // 'others' is a patient-facing catch-all bucket — never filter by category
+    // so that doctors with any custom/unlisted specialization are returned.
+    const isOthersCatchAll = normalizedCategorySlug === 'others';
     const shouldApplyCategoryFilter =
-      (normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
-      !!serviceId;
+      !isOthersCatchAll &&
+      ((normalizedCategorySlug && normalizedCategorySlug !== 'doctor') ||
+        !!serviceId);
 
     const isVideoMode = mode === 'VIDEO_CONSULTATION';
 
