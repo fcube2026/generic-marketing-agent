@@ -6,17 +6,32 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { SupabaseSyncService } from '../../common/supabase/supabase-sync.service';
 import { VideoSessionStatus } from '@prisma/client';
+
+/** Default planned consultation duration in seconds (15 minutes). */
+const DEFAULT_PLANNED_DURATION_SECONDS = 15 * 60;
+
+/**
+ * Generates a short, human-readable session token (e.g. "A3BF92CD").
+ * Uses 4 random bytes → 8 uppercase hex chars.
+ */
+function generateSessionToken(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
 
 @Injectable()
 export class VideoConsultationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly supabaseSync: SupabaseSyncService,
+  ) {}
 
   /**
    * Returns (creating if necessary) the Jitsi room details for a booking.
    * Both patient and provider call this to get the join URL.
    *
-   * Returns { jitsiUrl, roomId, role }
+   * Returns { jitsiUrl, roomId, sessionToken, role }
    */
   async generateToken(
     userId: string,
@@ -24,6 +39,7 @@ export class VideoConsultationService {
   ): Promise<{
     jitsiUrl: string;
     roomId: string;
+    sessionToken: string;
     role: 'patient' | 'provider';
   }> {
     const booking = await this.prisma.booking.findUnique({
@@ -54,23 +70,47 @@ export class VideoConsultationService {
 
     if (!session) {
       const roomId = `curex-${crypto.randomBytes(16).toString('hex')}`;
+      const sessionToken = generateSessionToken();
       session = await this.prisma.videoSession.create({
         data: {
           bookingId,
           roomId,
+          sessionToken,
+          creatorUserId: userId,
+          duration: DEFAULT_PLANNED_DURATION_SECONDS,
           status: 'CREATED',
         },
       });
+
+      // Sync the new session to Supabase (best-effort)
+      void this.supabaseSync
+        .syncVideoSession({
+          id: session.id,
+          bookingId: session.bookingId,
+          roomId: session.roomId,
+          sessionToken: session.sessionToken ?? sessionToken,
+          creatorUserId: userId,
+          status: session.status,
+          duration: session.duration ?? DEFAULT_PLANNED_DURATION_SECONDS,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt,
+        })
+        .catch(() => undefined);
     }
 
     const jitsiUrl = `https://meet.jit.si/${session.roomId}`;
-    return { jitsiUrl, roomId: session.roomId, role };
+    return {
+      jitsiUrl,
+      roomId: session.roomId,
+      sessionToken: session.sessionToken ?? '',
+      role,
+    };
   }
 
   /**
    * Updates the VideoSession status. Allowed transitions:
    *   CREATED / WAITING → IN_PROGRESS (marks startedAt)
-   *   IN_PROGRESS → COMPLETED (marks endedAt and computes duration)
+   *   IN_PROGRESS → COMPLETED (marks endedAt and computes actual duration)
    */
   async updateSessionStatus(
     userId: string,
@@ -105,9 +145,9 @@ export class VideoConsultationService {
     }
 
     const now = new Date();
-    let duration: number | undefined;
+    let actualDuration: number | undefined;
     if (status === 'COMPLETED' && session.startedAt) {
-      duration = Math.max(
+      actualDuration = Math.max(
         0,
         Math.round((now.getTime() - session.startedAt.getTime()) / 1000),
       );
@@ -119,7 +159,7 @@ export class VideoConsultationService {
         status,
         ...(status === 'IN_PROGRESS' && { startedAt: now }),
         ...(status === 'COMPLETED' && { endedAt: now }),
-        duration: duration ?? undefined,
+        ...(actualDuration !== undefined && { duration: actualDuration }),
       },
     });
 
@@ -138,6 +178,21 @@ export class VideoConsultationService {
         data: { status: 'COMPLETED' },
       });
     }
+
+    // Sync updated session to Supabase (best-effort)
+    void this.supabaseSync
+      .syncVideoSession({
+        id: updated.id,
+        bookingId: updated.bookingId,
+        roomId: updated.roomId,
+        sessionToken: updated.sessionToken ?? undefined,
+        creatorUserId: updated.creatorUserId ?? undefined,
+        status: updated.status,
+        duration: updated.duration ?? undefined,
+        startedAt: updated.startedAt,
+        endedAt: updated.endedAt,
+      })
+      .catch(() => undefined);
 
     return { status: updated.status };
   }

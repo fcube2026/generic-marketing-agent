@@ -173,7 +173,41 @@ export class SupabaseSyncService {
     }
   }
 
-  // ------------------------------------------------------------- video session removed
+  // ------------------------------------------------------------- video sessions
+  async syncVideoSession(session: {
+    id: string;
+    bookingId: string;
+    roomId: string;
+    sessionToken?: string | null;
+    creatorUserId?: string | null;
+    status: string;
+    duration?: number | null;
+    startedAt?: Date | null;
+    endedAt?: Date | null;
+  }): Promise<void> {
+    if (!this.enabled || !this.client) return;
+    const row = {
+      source_id: session.id,
+      booking_source_id: session.bookingId,
+      room_id: session.roomId,
+      session_token: session.sessionToken ?? null,
+      creator_user_id: session.creatorUserId ?? null,
+      status: session.status,
+      duration: session.duration ?? null,
+      started_at: session.startedAt?.toISOString() ?? null,
+      ended_at: session.endedAt?.toISOString() ?? null,
+    };
+    const { error } = await this.client
+      .from('video_sessions')
+      .upsert(row, { onConflict: 'source_id' });
+    if (error) {
+      this.logger.warn(
+        `syncVideoSession(${session.id}) failed: [${error.code}] ${error.message}${
+          error.details ? ` - ${error.details}` : ''
+        }`,
+      );
+    }
+  }
 
   async backfillCoreData(): Promise<{
     patients: number;
