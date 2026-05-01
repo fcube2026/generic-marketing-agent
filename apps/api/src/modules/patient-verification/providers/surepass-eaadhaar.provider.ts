@@ -71,8 +71,10 @@ export class SurepassEaadhaarProvider {
    * Upload an eAadhaar PDF buffer to Surepass and extract personal details.
    *
    * @param pdfBuffer   Raw bytes of the eAadhaar PDF
-   * @param password    Optional PDF password (typically the 8-char postal code
-   *                    or a date-of-birth string set when downloading the PDF)
+   * @param password    Optional PDF password (Aadhaar PDFs are typically
+   *                    protected with a 6-digit pincode or a date-of-birth
+   *                    string — whatever the patient chose when downloading
+   *                    from myAadhaar.uidai.gov.in)
    */
   async processEaadhaar(
     pdfBuffer: Buffer,

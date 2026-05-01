@@ -229,7 +229,7 @@ export const PatientKycAadhaarScreen: React.FC<Props> = ({ navigation }) => {
             value={extractedPincode}
             onChangeText={setExtractedPincode}
             keyboardType="number-pad"
-            maxLength={10}
+            maxLength={6}
           />
         </View>
       )}

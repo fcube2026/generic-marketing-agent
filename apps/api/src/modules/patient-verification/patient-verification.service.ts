@@ -843,12 +843,33 @@ export class PatientVerificationService {
       );
     }
 
-    // Convert Surepass DOB (DD-MM-YYYY or DD/MM/YYYY) to ISO YYYY-MM-DD
+    // Convert Surepass DOB (DD-MM-YYYY or DD/MM/YYYY) to ISO YYYY-MM-DD.
+    // Guard against malformed values by validating each part.
     let dobIso: string | null = null;
     if (result.dob) {
-      const [d, m, y] = result.dob.split(/[-/]/);
-      if (d && m && y) {
-        dobIso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      const parts = result.dob.split(/[-/]/);
+      if (parts.length === 3) {
+        const [rawD, rawM, rawY] = parts;
+        const d = (rawD ?? '').trim();
+        const m = (rawM ?? '').trim();
+        const y = (rawY ?? '').trim();
+        // All three parts must be non-empty strings of digits
+        if (/^\d+$/.test(d) && /^\d+$/.test(m) && /^\d{4}$/.test(y)) {
+          dobIso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+          // Reject if the resulting date is not calendar-valid
+          const testDate = new Date(dobIso);
+          if (
+            Number.isNaN(testDate.getTime()) ||
+            testDate.getFullYear() !== Number(y) ||
+            testDate.getMonth() + 1 !== Number(m) ||
+            testDate.getDate() !== Number(d)
+          ) {
+            this.logger.warn(
+              `[surepass-eaadhaar] Ignoring invalid DOB from response: ${result.dob}`,
+            );
+            dobIso = null;
+          }
+        }
       }
     }
 
