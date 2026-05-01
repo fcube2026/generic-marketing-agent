@@ -26,7 +26,7 @@ export type ProviderStackParamList = {
   BookingDetail: { bookingId: string };
   SafetyChecklist: { bookingId: string };
   VisitOtp: { bookingId: string };
-  ConsultationForm: { bookingId: string };
+  ConsultationForm: { bookingId: string; patientName?: string; patientId?: string };
   Kyc: undefined;
   VideoConsultations: undefined;
   VideoLobby: { bookingId: string };
