@@ -54,17 +54,13 @@ export const OnboardingScreen: React.FC = () => {
   // Prefill form once profile data is available
   useEffect(() => {
     if (profile && !initialized) {
-      const knownSpec = SPECIALIZATIONS.includes(profile.specialization ?? '')
-        ? profile.specialization ?? ''
-        : profile.specialization ? 'Others' : '';
-      const otherSpec = !SPECIALIZATIONS.includes(profile.specialization ?? '') && profile.specialization
-        ? profile.specialization
-        : '';
+      const spec = profile.specialization ?? '';
+      const isKnown = SPECIALIZATIONS.includes(spec);
       setForm({
         name: profile.name ?? '',
         bio: profile.bio ?? '',
-        specialization: knownSpec,
-        otherSpecialization: otherSpec,
+        specialization: isKnown ? spec : (spec ? 'Others' : ''),
+        otherSpecialization: isKnown ? '' : spec,
         contactInfo: profile.contactInfo ?? user?.phone ?? '',
         homeVisitEnabled: profile.homeVisitEnabled ?? false,
         consultationFeeHomeVisit: profile.consultationFeeHomeVisit

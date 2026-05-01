@@ -78,6 +78,8 @@ export const VideoLobbyScreen: React.FC = () => {
   const appState = useRef(AppState.currentState);
   // Ref to hold the debounce timer for network status updates
   const networkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guard against state updates after the component has unmounted
+  const isMountedRef = useRef(true);
 
   // Fetch booking info for session details
   const { data: booking } = useQuery<Booking>({
@@ -92,17 +94,20 @@ export const VideoLobbyScreen: React.FC = () => {
     setNetworkStatus(null);
     const connected = await checkNetworkConnectivity();
     // Debounce the status update: only commit if no newer check arrives
-    // within NETWORK_DEBOUNCE_MS to prevent rapid flickering.
+    // within NETWORK_DEBOUNCE_MS to prevent rapid flickering. Skip if
+    // the component has already unmounted.
     if (networkDebounceRef.current) clearTimeout(networkDebounceRef.current);
     networkDebounceRef.current = setTimeout(() => {
-      setNetworkStatus(connected);
       networkDebounceRef.current = null;
+      if (isMountedRef.current) setNetworkStatus(connected);
     }, NETWORK_DEBOUNCE_MS);
   }, []);
 
   // Clear any pending debounce timer on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (networkDebounceRef.current) clearTimeout(networkDebounceRef.current);
     };
   }, []);
