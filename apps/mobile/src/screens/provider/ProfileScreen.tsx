@@ -120,6 +120,11 @@ export const ProfileScreen: React.FC = () => {
                 <Text style={styles.modeBadgeText}>🏥 Clinic — {formatCurrency(profile.consultationFeeDoctorPlace)}</Text>
               </View>
             )}
+            {profile.videoConsultationEnabled !== false && (
+              <View style={[styles.modeBadge, { backgroundColor: '#EFF6FF' }]}>
+                <Text style={styles.modeBadgeText}>📹 Video — {formatCurrency(profile.consultationFeeVideoConsultation || 500)}</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.radiusText}>
             📍 Service Radius: {profile.serviceRadius} km

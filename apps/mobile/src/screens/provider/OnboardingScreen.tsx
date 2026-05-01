@@ -19,7 +19,7 @@ export const OnboardingScreen: React.FC = () => {
     name: '', bio: '', specialization: '', contactInfo: '',
     homeVisitEnabled: false, consultationFeeHomeVisit: '',
     doctorPlaceVisitEnabled: false, consultationFeeDoctorPlace: '',
-    videoConsultationEnabled: false, consultationFeeVideoConsultation: '',
+    videoConsultationEnabled: true, consultationFeeVideoConsultation: '500',
     serviceRadius: '10',
   });
 
@@ -37,7 +37,7 @@ export const OnboardingScreen: React.FC = () => {
         doctorPlaceVisitEnabled: form.doctorPlaceVisitEnabled,
         consultationFeeDoctorPlace: parseFloat(form.consultationFeeDoctorPlace) || 0,
         videoConsultationEnabled: form.videoConsultationEnabled,
-        consultationFeeVideoConsultation: parseFloat(form.consultationFeeVideoConsultation) || 0,
+        consultationFeeVideoConsultation: parseFloat(form.consultationFeeVideoConsultation) || 500,
         serviceRadius: parseFloat(form.serviceRadius) || 10,
       });
       queryClient.invalidateQueries({ queryKey: ['provider-profile'] });
