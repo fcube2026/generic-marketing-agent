@@ -92,15 +92,25 @@ export class FaceVerificationProvider {
       clearTimeout(timeoutId);
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
+    const bodyText = await response.text();
+    const truncated =
+      bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
 
     if (!response.ok) {
-      this.logger.warn(
-        `[face-service] Error ${response.status}: ${JSON.stringify(data)}`,
-      );
+      this.logger.warn(`[face-service] Error ${response.status}: ${truncated}`);
       throw new Error(
         `Face verification service returned HTTP ${response.status}`,
       );
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      this.logger.warn(
+        `[face-service] Service returned non-JSON body: ${truncated}`,
+      );
+      throw new Error('Face verification service returned non-JSON body');
     }
 
     const similarityScore = (data.similarity_score as number) ?? 0;

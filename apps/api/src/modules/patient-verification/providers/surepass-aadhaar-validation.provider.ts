@@ -110,13 +110,28 @@ export class SurepassAadhaarValidationProvider {
       clearTimeout(timeoutId);
     }
 
-    const raw = (await response.json()) as Record<string, unknown>;
+    const bodyText = await response.text();
+    const truncated =
+      bodyText.length > 500 ? `${bodyText.slice(0, 500)}…` : bodyText;
 
     if (!response.ok) {
       this.logger.warn(
-        `[surepass-aadhaar-validation] API error ${response.status}: ${JSON.stringify(raw)}`,
+        `[surepass-aadhaar-validation] API error ${response.status}: ${truncated}`,
       );
-      return { valid: false, rawResponse: this.redactRaw(raw) };
+      return {
+        valid: false,
+        rawResponse: { httpStatus: response.status, body: truncated },
+      };
+    }
+
+    let raw: Record<string, unknown>;
+    try {
+      raw = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      this.logger.warn(
+        `[surepass-aadhaar-validation] API returned non-JSON body: ${truncated}`,
+      );
+      return { valid: false, rawResponse: { body: truncated } };
     }
 
     return this.parseResponse(raw);
