@@ -20,8 +20,8 @@ const suggestedPrompts = [
   "Create a carousel post script for Instagram — 5 slides on home doctor benefits",
   "Write a Twitter/X thread (7 tweets) on why home visits beat clinic queues",
   "Draft a WhatsApp re-engagement message for patients inactive 30 days",
-  "Write a 60-second Reels script for curex24 — provider day-in-the-life",
-  "Create an infographic brief: 'How curex24 Works in 4 Steps'",
+  "Write a 60-second Reels script for your brand — provider day-in-the-life",
+  "Create an infographic brief: 'How your brand Works in 4 Steps'",
   "Generate a DALL-E 3 prompt for a home doctor visit Instagram square post",
   "How should I allocate my ₹5L marketing budget?",
   "What's my biggest retention risk right now?",
@@ -44,7 +44,7 @@ const agentResponses: Record<string, string> = {
 • "Home Healthcare in 2 Minutes"
 
 **Description 1:**
-Curex24: trusted doctors at your doorstep in Mumbai. Book in 2 min, real-time tracking, transparent pricing. 4.8★ rated.
+your brand: trusted doctors at your doorstep in Mumbai. Book in 2 min, real-time tracking, transparent pricing. 4.8★ rated.
 
 **Description 2:**
 Home visits by verified doctors in Mumbai. Same-day appointments. Transparent pricing. Book online in minutes.
@@ -59,19 +59,19 @@ Home visits by verified doctors in Mumbai. Same-day appointments. Transparent pr
 
 Running a solo practice means spending more time chasing patients than actually seeing them.
 
-We built curex24 to flip that.
+We built your brand to flip that.
 
 Here's how it works:
-→ Patients book you directly on curex24
+→ Patients book you directly on your platform
 → You get same-day notifications
 → You choose your hours and visit types
 → Payment lands in your account automatically
 
-150+ verified doctors are already using curex24. Some are doing 40+ bookings a month.
+150+ verified doctors are already using your brand. Some are doing 40+ bookings a month.
 
 Zero upfront cost. No lock-in.
 
-If you want to grow your practice without growing your marketing budget, DM me or visit curex24.com/providers.
+If you want to grow your practice without growing your marketing budget, DM me or visit example.com/providers.
 
 #healthcare #doctors #medtech #india
 
@@ -110,7 +110,7 @@ Here's what happens when you book:
 If you have questions, just reply to this email — we read every message.
 
 Stay healthy,
-The curex24 team
+Your team
 
 ---
 **Tip:** Send this at 8 PM local time — highest email open rates for healthcare in India are 7–9 PM.`,
@@ -132,10 +132,10 @@ The curex24 team
 → Type: Transactional informational
 → CTA: Book diagnostic collection
 
-**4. "Curex24 vs Practo: Which Is Better for Home Doctor Visits?" (1,500 words)**
-→ Target keyword: "curex24 vs practo" + "practo alternative" (1,980/mo combined)
+**4. "your brand vs Practo: Which Is Better for Home Doctor Visits?" (1,500 words)**
+→ Target keyword: "your brand vs practo" + "practo alternative" (1,980/mo combined)
 → Type: Comparison
-→ CTA: Try curex24 free
+→ CTA: Try your brand free
 
 **5. "Doctor at Home for Children: A Parent's Guide to Paediatric Home Visits" (2,200 words)**
 → Target keyword: "paediatrician home visit" (2,600/mo)
@@ -155,7 +155,7 @@ Caption hook: "You deserve healthcare on YOUR schedule. Swipe to see why →"
 
 **Slide 2 — Reason 1:**
 Headline: "⏱ No Waiting Rooms"
-Body: "The average Indian patient spends 2+ hours in a clinic — 30 minutes seeing the doctor, 90+ minutes waiting. A curex24 home visit: doctor arrives in 30 minutes."
+Body: "The average Indian patient spends 2+ hours in a clinic — 30 minutes seeing the doctor, 90+ minutes waiting. Your home visit: doctor arrives in 30 minutes."
 Visual: Side-by-side — crowded waiting room vs. comfortable home setting.
 
 **Slide 3 — Reason 2:**
@@ -170,9 +170,9 @@ Visual: Doctor typing on tablet, patient nodding.
 
 **Slide 5 — CTA:**
 Headline: "Book Your Home Visit Today"
-Body: "Available in Mumbai, Delhi & Bengaluru. Book in 2 minutes at curex24.com"
-Visual: Bold brand visual with booking CTA. Curex24 logo prominent.
-Caption: "Your health, on your schedule. Link in bio to book. 🏠 #HomeDoctor #curex24 #HealthTech"
+Body: "Available in Mumbai, Delhi & Bengaluru. Book in 2 minutes at example.com"
+Visual: Bold brand visual with booking CTA. your brand’s logo prominent.
+Caption: "Your health, on your schedule. Link in bio to book. 🏠 #HomeDoctor #YourBrand #HealthTech"
 
 ---
 **Tip:** Post at 7–9 PM on weekdays. Save as a Canva template for rapid weekly use.`,
@@ -205,7 +205,7 @@ For children, elderly patients, and immunocompromised individuals — this matte
 **Tweet 4:**
 "But is the quality as good?"
 
-curex24 doctors are:
+your brand doctors are:
 ✅ MBBS/MD verified
 ✅ NMC registration confirmed
 ✅ Background-checked
@@ -230,11 +230,11 @@ We're live in Mumbai, Delhi, and Bengaluru.
 And we're just getting started.
 
 **Tweet 7 (CTA):**
-If you've ever lost half a day to a clinic queue, try curex24 for your next appointment.
+If you've ever lost half a day to a clinic queue, try your brand for your next appointment.
 
-Book a home visit → curex24.com
+Book a home visit → example.com
 
-(Your first visit is ₹100 off right now) #HomeDoctor #HealthTech #curex24`,
+(Your first visit is ₹100 off right now) #HomeDoctor #HealthTech #YourBrand`,
 
   "Draft a WhatsApp re-engagement message for patients inactive 30 days": `**WhatsApp Re-engagement Message — 30-Day Inactive Patients**
 
@@ -242,7 +242,7 @@ Book a home visit → curex24.com
 
 *Hi [First Name]* 👋
 
-It's been a while since your last curex24 visit, and we wanted to check in.
+It's been a while since your last your brand visit, and we wanted to check in.
 
 Your health doesn't wait for the right moment — and neither do we.
 
@@ -254,17 +254,17 @@ What we can help with:
 👶 Paediatric visits
 👴 Elderly care
 
-Book in 2 minutes → curex24.com/book
+Book in 2 minutes → example.com/book
 
 Reply *BOOK* and we'll send you a direct link. Or just tap the link above.
 
 Stay healthy,
-Team curex24 🏥
+Team your brand 🏥
 
 ---
 **Sending tip:** Send between 7–9 PM. Keep the list under 1,000/day for WhatsApp Business API compliance. Always use opt-in lists only.`,
 
-  "Write a 60-second Reels script for curex24 — provider day-in-the-life": `**60-Second Reels Script — Provider Day-in-the-Life**
+  "Write a 60-second Reels script for your brand — provider day-in-the-life": `**60-Second Reels Script — Provider Day-in-the-Life**
 
 ---
 
@@ -274,11 +274,11 @@ Team curex24 🏥
 Visual: Doctor checking phone, notifications popping up — "3 new bookings today"
 
 **[3–10 sec] The old way (B-roll + text)**
-Text: "Before curex24 → 6 AM clinic setup, 3 patients by noon, spend afternoons on admin"
+Text: "Before your brand → 6 AM clinic setup, 3 patients by noon, spend afternoons on admin"
 Visual: Empty clinic waiting room, paperwork, stressed expression
 
-**[10–25 sec] The curex24 way (action montage)**
-Voiceover: "Now, I check my curex24 app over morning chai. My day's already planned."
+**[10–25 sec] Your way (action montage)**
+Voiceover: "Now, I check my your brand app over morning chai. My day's already planned."
 Visuals:
 - App showing 5 bookings
 - Doctor in car, GPS tracking active
@@ -300,25 +300,25 @@ Voiceover: "But the best part? My patients actually thank me for coming to them.
 Visual: Elderly patient thanking the doctor at their door. Genuine moment.
 
 **[55–60 sec] CTA**
-Text: "Join 150+ doctors on curex24"
-Subtext: "curex24.com/providers — Free to join, zero lock-in"
+Text: "Join 150+ doctors on your platform"
+Subtext: "example.com/providers — Free to join, zero lock-in"
 Music fades. Logo hold.
 
 ---
 **Production notes:** Shoot vertical (9:16). Add captions for silent viewing. Use trending audio or original voiceover. Keep edits punchy — max 2-3 sec per clip.`,
 
-  "Create an infographic brief: 'How curex24 Works in 4 Steps'": `**Infographic Brief: "How curex24 Works in 4 Steps"**
+  "Create an infographic brief: 'How your brand Works in 4 Steps'": `**Infographic Brief: "How your brand Works in 4 Steps"**
 
 ---
 
-**Title:** How curex24 Works in 4 Simple Steps
+**Title:** How your brand Works in 4 Simple Steps
 
 **Format:** Vertical infographic — Pinterest/Instagram (1000×1500 px, 2:3 ratio)
 **Style:** Clean flat illustration, healthcare blue (#1E6FCC) + white + accent green (#22C55E)
 
-**Step 1 — "Open curex24"**
-Icon: Smartphone with curex24 app open
-Caption: "Visit curex24.com or open the app. Choose your service: GP, specialist, or diagnostics."
+**Step 1 — "Open your brand"**
+Icon: Smartphone with your brand app open
+Caption: "Visit example.com or open the app. Choose your service: GP, specialist, or diagnostics."
 
 **Step 2 — "Pick Your Doctor & Time"**
 Icon: Calendar with a doctor profile card
@@ -333,7 +333,7 @@ Icon: Checkmark + digital prescription on a phone
 Caption: "Doctor visits, examines, and sends your digital prescription within the hour. Follow-up plan included."
 
 **Bottom CTA:**
-"Book your home visit at curex24.com · Available in Mumbai, Delhi & Bengaluru"
+"Book your home visit at example.com · Available in Mumbai, Delhi & Bengaluru"
 
 ---
 
@@ -441,7 +441,7 @@ function getImagePromptForRequest(msg: string): string | null {
 
   // Platform-specific posts
   if (msg.includes('instagram')) {
-    return 'Instagram square social media post for healthcare brand curex24, doctor home visit lifestyle photography, warm natural lighting, photorealistic, 1:1 format, high quality';
+    return 'Instagram square social media post for healthcare brand your brand, doctor home visit lifestyle photography, warm natural lighting, photorealistic, 1:1 format, high quality';
   }
   if (msg.includes('linkedin')) {
     return 'LinkedIn post image for healthcare brand, professional doctor in modern bright home setting, blue and white corporate tones, trustworthy and clean, landscape format';
@@ -450,42 +450,42 @@ function getImagePromptForRequest(msg: string): string | null {
     return 'Facebook post visual for healthcare brand, warm doctor-patient home visit scene, inviting lifestyle photography, brand blue and white, high quality';
   }
   if (msg.includes('twitter') || msg.includes('thread') || msg.includes('tweet') || msg.includes(' x ')) {
-    return 'Twitter/X header visual for healthcare brand curex24, doctor and patient at home, clean modern composition, blue and white brand palette, 16:9 landscape';
+    return 'Twitter/X header visual for healthcare brand your brand, doctor and patient at home, clean modern composition, blue and white brand palette, 16:9 landscape';
   }
   if (msg.includes('whatsapp')) {
-    return 'WhatsApp marketing visual for healthcare brand curex24, friendly doctor with phone notification, warm brand colors, square format, photorealistic';
+    return 'WhatsApp marketing visual for healthcare brand your brand, friendly doctor with phone notification, warm brand colors, square format, photorealistic';
   }
   if (msg.includes('youtube') || msg.includes('thumbnail')) {
-    return 'YouTube thumbnail, doctor home visit curex24, high contrast bold composition, cinematic quality, expressive scene, 16:9 format';
+    return 'YouTube thumbnail, doctor home visit your brand, high contrast bold composition, cinematic quality, expressive scene, 16:9 format';
   }
 
   // Channel / format specific creatives
   if (msg.includes('google') || msg.includes('search ad') || msg.includes('ppc')) {
-    return 'Google search ad creative for healthcare brand curex24, clean modern doctor visiting patient at home, professional lifestyle photography, healthcare blue and white, landscape composition';
+    return 'Google search ad creative for healthcare brand your brand, clean modern doctor visiting patient at home, professional lifestyle photography, healthcare blue and white, landscape composition';
   }
   if (msg.includes('email') || msg.includes('onboarding') || msg.includes('newsletter')) {
-    return 'email header banner for healthcare brand curex24, friendly doctor at modern apartment door welcoming patient, warm natural lighting, clean editorial composition, wide landscape format';
+    return 'email header banner for healthcare brand your brand, friendly doctor at modern apartment door welcoming patient, warm natural lighting, clean editorial composition, wide landscape format';
   }
   if (msg.includes('seo') || msg.includes('blog') || msg.includes('article')) {
-    return 'editorial blog hero image for healthcare brand curex24, doctor at home with patient, warm photojournalistic style, soft natural light, wide landscape composition, high quality';
+    return 'editorial blog hero image for healthcare brand your brand, doctor at home with patient, warm photojournalistic style, soft natural light, wide landscape composition, high quality';
   }
   if (msg.includes('recruit') || msg.includes('provider') || msg.includes('doctor') || msg.includes('hire')) {
     return 'professional photograph of confident doctor in white coat smiling at camera in modern bright home environment, premium recruitment marketing visual, healthcare blue accents, photorealistic';
   }
   if (msg.includes('ad copy') || msg.includes('ad creative') || msg.includes('campaign')) {
-    return 'premium ad creative for healthcare brand curex24, doctor visiting patient at home, warm cinematic lighting, brand blue and white palette, high-converting lifestyle photography';
+    return 'premium ad creative for healthcare brand your brand, doctor visiting patient at home, warm cinematic lighting, brand blue and white palette, high-converting lifestyle photography';
   }
 
   // Strategy / analytics / generic chat → still ship a brand visual
   if (msg.includes('budget') || msg.includes('allocat') || msg.includes('spend')) {
-    return 'modern marketing dashboard visualization for healthcare brand curex24, clean charts and growth graphs, blue and white color palette, minimal editorial illustration style';
+    return 'modern marketing dashboard visualization for healthcare brand your brand, clean charts and growth graphs, blue and white color palette, minimal editorial illustration style';
   }
   if (msg.includes('retention') || msg.includes('churn') || msg.includes('lifecycle')) {
-    return 'editorial illustration of patient lifecycle journey for healthcare brand curex24, clean modern flat design, blue and white palette, friendly doctor and patient connection icons';
+    return 'editorial illustration of patient lifecycle journey for healthcare brand your brand, clean modern flat design, blue and white palette, friendly doctor and patient connection icons';
   }
 
   // Default fallback — every message gets a high-quality brand visual
-  return 'professional social media marketing visual for healthcare brand curex24, doctor visiting patient at home, warm photorealistic scene, healthcare blue accents, premium quality';
+  return 'professional social media marketing visual for healthcare brand your brand, doctor visiting patient at home, warm photorealistic scene, healthcare blue accents, premium quality';
 }
 
 function getAgentResponse(userMessage: string): string {
@@ -550,11 +550,11 @@ This is a lifecycle fix, not an acquisition fix. Don't spend more on ads until D
   }
 
   if (lower.includes('reel') || lower.includes('video script') || lower.includes('short video')) {
-    return agentResponses["Write a 60-second Reels script for curex24 — provider day-in-the-life"];
+    return agentResponses["Write a 60-second Reels script for your brand — provider day-in-the-life"];
   }
 
   if (lower.includes('infographic')) {
-    return agentResponses["Create an infographic brief: 'How curex24 Works in 4 Steps'"];
+    return agentResponses["Create an infographic brief: 'How your brand Works in 4 Steps'"];
   }
 
   if (lower.includes('dall-e') || lower.includes('dalle') || lower.includes('visual prompt') || lower.includes('image prompt')) {
@@ -588,7 +588,7 @@ Want me to produce the assets for any of these now? Or head to the **✨ Create 
 
 ${skill.description}
 
-Here's how I'd run this skill for **curex24**:
+Here's how I'd run this skill for **your brand**:
 
 **1. Discovery**
 • Pull the latest data from your business intake (ICP, budget, bottleneck) and recent KPIs.
@@ -596,7 +596,7 @@ Here's how I'd run this skill for **curex24**:
 
 **2. Framework**
 • Apply the proven \`${skill.id}\` workflow — frameworks, templates, and benchmarks from the marketing-skills library.
-• Tailor every step to curex24's home-doctor positioning and Mumbai/Delhi/Bengaluru markets.
+• Tailor every step to your brand's home-doctor positioning and Mumbai/Delhi/Bengaluru markets.
 
 **3. Output**
 • Ready-to-ship deliverables (copy, briefs, plans, or tracking specs) with clear next steps and owners.
@@ -612,7 +612,7 @@ Want me to run this skill end-to-end now? Reply with **yes — run ${skill.id}**
   const intentReply = getIntentDraft(trimmed, lower);
   if (intentReply) return intentReply;
 
-  return `Here's a starter answer for **"${trimmed}"** — tailored to curex24 (at-home doctor visits in Mumbai / Delhi / Bengaluru, early-growth stage, ₹5L/mo budget).
+  return `Here's a starter answer for **"${trimmed}"** — tailored to your brand (at-home doctor visits in Mumbai / Delhi / Bengaluru, early-growth stage, ₹5L/mo budget).
 
 **Recommended structure:**
 1. **Audience & intent** — who exactly is this for, and what are they trying to do right now?
@@ -636,7 +636,7 @@ Want me to run this skill end-to-end now? Reply with **yes — run ${skill.id}**
 // re-uses the user's phrasing instead of dumping the same boilerplate.
 function getIntentDraft(prompt: string, lower: string): string | null {
   // ---- Comparison / vs / alternatives page ------------------------------
-  // e.g. "Write a curex24 vs Practo comparison page optimised for SEO..."
+  // e.g. "Write your vs Practo comparison page optimised for SEO..."
   if (
     lower.includes('comparison page') ||
     lower.includes('alternatives page') ||
@@ -645,39 +645,39 @@ function getIntentDraft(prompt: string, lower: string): string | null {
     /\bversus\b/.test(lower)
   ) {
     const competitor = extractCompetitor(prompt);
-    return `**📄 Comparison page draft — curex24 vs ${competitor}**
+    return `**📄 Comparison page draft — your brand vs ${competitor}**
 _Optimised for SEO + bottom-of-funnel conversion_
 
 **Target query cluster:**
-• "${competitor.toLowerCase()} vs curex24"
+• "${competitor.toLowerCase()} vs your brand"
 • "${competitor.toLowerCase()} alternatives"
 • "best home doctor service india"
 • "${competitor.toLowerCase()} home visit price"
 
-**URL:** \`/compare/${slugify(competitor)}-vs-curex24\`
-**Title tag:** curex24 vs ${competitor} — Which Home Doctor Service Wins in 2026?
-**Meta description:** Compare curex24 and ${competitor} on price, doctor verification, ETA and coverage in Mumbai, Delhi and Bengaluru. Independent side-by-side breakdown.
+**URL:** \`/compare/${slugify(competitor)}-vs-yourbrand\`
+**Title tag:** your brand vs ${competitor} — Which Home Doctor Service Wins in 2026?
+**Meta description:** Compare your brand and ${competitor} on price, doctor verification, ETA and coverage in Mumbai, Delhi and Bengaluru. Independent side-by-side breakdown.
 
 **Page sections (in order):**
-1. **H1** — curex24 vs ${competitor}: Side-by-Side for Home Doctor Visits
+1. **H1** — your brand vs ${competitor}: Side-by-Side for Home Doctor Visits
 2. **TL;DR comparison table** — 6 rows: ETA, price (₹), doctor verification, cities live, payment options, refund policy
-3. **Who should pick which?** — 2 short paragraphs ("Pick curex24 if…" / "Pick ${competitor} if…") — honest, not snarky
+3. **Who should pick which?** — 2 short paragraphs ("Pick your brand if…" / "Pick ${competitor} if…") — honest, not snarky
 4. **Feature-by-feature breakdown** — 4–6 H2 sections, each with a 2-column table and 2-line summary
 5. **Pricing comparison** — real ₹ examples for GP visit, blood test, repeat consult
 6. **What real patients say** — 2 short verified quotes per side (no fabricated testimonials)
 7. **FAQ schema block** — 5 Qs (price, coverage, refund, emergency, insurance) with FAQPage JSON-LD
-8. **Bottom-of-funnel CTA** — "Book a curex24 home visit in 2 minutes" with phone number + WhatsApp deep-link
+8. **Bottom-of-funnel CTA** — "Book your home visit in 2 minutes" with phone number + WhatsApp deep-link
 9. **Related comparisons** — internal links to /compare/* siblings (programmatic-SEO hub)
 
 **On-page SEO checklist:**
 • Comparison schema (Product + Review) — ⚠️ avoid \`Review\` markup if you can't surface real reviews on-page (Google penalty risk).
 • Internal link from /pricing, /how-it-works, and the city pages.
 • 1 outbound link to ${competitor}'s homepage (rel="nofollow") — earns trust signals.
-• Image alt text uses the literal query "${competitor.toLowerCase()} vs curex24".
+• Image alt text uses the literal query "${competitor.toLowerCase()} vs your brand".
 
 **CRO levers (BoFU):**
 • Sticky bottom bar on mobile with "Book in 2 min — ₹X visit fee in your city".
-• Exit-intent overlay: "Not sure? Get a free 5-min call with a curex24 doctor — ₹0".
+• Exit-intent overlay: "Not sure? Get a free 5-min call with your doctor — ₹0".
 • Trust strip directly above the CTA: "150+ verified doctors • 4.8★ • Refund if doctor doesn't arrive in 60 min".
 
 Want me to expand any section into final copy, or generate the comparison table rows with concrete claims?`;
@@ -696,7 +696,7 @@ Want me to expand any section into final copy, or generate the comparison table 
 
 **Section order (top → bottom):**
 1. Hero (above)
-2. **3 ICP-pain bullets** — what curex24 fixes (queue, travel, unverified doctors)
+2. **3 ICP-pain bullets** — what your brand fixes (queue, travel, unverified doctors)
 3. **How it works — 4 steps** — book → match → arrive → pay (use the infographic brief)
 4. **What's included** — visit fee, prescription, lab order if needed
 5. **Social proof** — 3 short quotes + city + verified badge
@@ -729,7 +729,7 @@ C) Skip the queue. See a doctor at home today.
 **Secondary CTA:** See pricing in your city
 
 **Below the fold (in order):**
-1. **3-up "why curex24"** — Verified · Transparent · Fast
+1. **3-up "why your brand"** — Verified · Transparent · Fast
 2. **How it works — 4 cards** — Book / Match / Visit / Pay
 3. **Services** — GP, Paediatric, Diagnostics, Pharmacy delivery (each links out)
 4. **Cities live** — Mumbai, Delhi, Bengaluru (clickable city pages)
@@ -783,7 +783,7 @@ Want me to draft the actual ₹ table rows or the FAQ copy in full?`;
 **Primary keyword cluster:** [pull from Search Console / Ahrefs — e.g. "home doctor visit mumbai", "doctor at home cost"].
 
 **URL:** \`/blog/${slugify(prompt).slice(0, 60)}\`
-**Title tag (≤60 chars):** [keyword] — [benefit] | curex24
+**Title tag (≤60 chars):** [keyword] — [benefit] | your brand
 **Meta description (≤155 chars):** Plain-English answer in one sentence + soft CTA.
 
 **Outline (H2 / H3):**
@@ -792,7 +792,7 @@ Want me to draft the actual ₹ table rows or the FAQ copy in full?`;
 3. **How it works step-by-step** — numbered list, screenshot-able.
 4. **Cost in India** — real ₹ ranges per city (Mumbai / Delhi / Bengaluru).
 5. **When you should NOT use this** — honest, builds trust.
-6. **How curex24 does this** — single paragraph + product link (soft CTA).
+6. **How your brand does this** — single paragraph + product link (soft CTA).
 7. **FAQ** — 5 questions with FAQPage JSON-LD.
 
 **On-page checklist:**
@@ -867,7 +867,7 @@ A) Verified doctors at your doorstep. Transparent ₹ pricing. Book in 2 minutes
 B) Same-day home visits. 4.8★ rated. Refund if doctor doesn't arrive on time.
 
 **Primary text / long copy (Meta / LinkedIn):**
-Tired of waiting hours at a clinic? curex24 sends a verified doctor to your home in under 30 minutes — Mumbai, Delhi and Bengaluru. Transparent ₹ pricing, real-time tracking, 4.8★ from 12,000+ patients. Book in 2 minutes.
+Tired of waiting hours at a clinic? your brand sends a verified doctor to your home in under 30 minutes — Mumbai, Delhi and Bengaluru. Transparent ₹ pricing, real-time tracking, 4.8★ from 12,000+ patients. Book in 2 minutes.
 
 **CTA button:** Book Now
 **Landing page:** /book?utm_source=${platform.toLowerCase().replace(/[^a-z]/g, '')}&utm_medium=cpc&utm_campaign=[campaign]
@@ -902,7 +902,7 @@ Want full RSA assets (15 headlines × 4 descriptions) or a Meta carousel variant
 • What this means for the reader
 
 **CTA (last line):**
-"Book a curex24 home visit → curex24.com" OR a question that drives comments.
+"Book your home visit → example.com" OR a question that drives comments.
 
 **Hashtags (3–5, mix of broad + niche):** #healthcare #doctorathome #mumbaihealth #healthtechindia
 
@@ -919,7 +919,7 @@ Tell me the platform + content pillar (Education / Trust / Promo / Behind-the-sc
     return `**💬 ${channel} draft for: "${prompt}"**
 
 **Message (≤160 chars for SMS, ≤200 for ${channel}):**
-"Hi [Name] — your last curex24 visit was [N] days ago. Need a doctor today? Book in 2 min: [shortlink]. Reply STOP to opt out."
+"Hi [Name] — your last your brand visit was [N] days ago. Need a doctor today? Book in 2 min: [shortlink]. Reply STOP to opt out."
 
 **Best practice:**
 • Personalise with first name + last booking detail (real data, never fabricated).
@@ -961,11 +961,12 @@ Want me to expand any section into final copy?`;
 }
 
 function extractCompetitor(prompt: string): string {
-  // Heuristics: "curex24 vs X comparison page" → X.
-  const vsMatch = prompt.match(/(?:curex24\s*)?vs\.?\s+([A-Za-z0-9][\w\.\-]*(?:\s+[A-Z][\w\.\-]*){0,2})/i);
+  // Heuristics: "<our brand> vs X comparison page" → X. The leading brand
+  // token is optional so generic prompts like "vs Acme comparison" also work.
+  const vsMatch = prompt.match(/vs\.?\s+([A-Za-z0-9][\w.\-]*(?:\s+[A-Z][\w.\-]*){0,2})/i);
   if (vsMatch?.[1]) return vsMatch[1].trim().replace(/\s+(comparison|page|alternatives?|article|landing).*$/i, '').trim();
-  const altMatch = prompt.match(/([A-Za-z0-9][\w\.\-]*)\s+alternatives?/i);
-  if (altMatch?.[1] && altMatch[1].toLowerCase() !== 'curex24') return altMatch[1].trim();
+  const altMatch = prompt.match(/([A-Za-z0-9][\w.\-]*)\s+alternatives?/i);
+  if (altMatch?.[1]) return altMatch[1].trim();
   return 'the competitor';
 }
 
@@ -987,7 +988,7 @@ function slugify(s: string): string {
 
 const INTRO_MESSAGE: AgentMessage = {
   role: 'agent',
-  content: `👋 I'm your AI Marketing Agent for curex24 — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI DALL-E 3** for on-demand visuals.
+  content: `👋 I'm your AI Marketing Agent for your brand — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI DALL-E 3** for on-demand visuals.
 
 I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`ai-seo\`, \`pricing-strategy\`, and \`referral-program\`.
 

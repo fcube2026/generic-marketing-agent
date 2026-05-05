@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Resolves the upstream API base URL using the same precedence as
- * `next.config.js` rewrites (VERCEL_ENV → NEXT_PUBLIC_API_URL → localhost).
- *
- * Used server-side from API routes to verify the marketing-agent JWT
- * against the backend before invoking expensive AI providers.
+ * Resolves the upstream API base URL from `NEXT_PUBLIC_API_URL`. Used
+ * server-side to verify the marketing-agent JWT against an external backend
+ * before invoking expensive AI providers. Returns null when no external
+ * backend is configured (the default self-contained mode), in which case
+ * we accept any well-formed bearer token without an upstream check.
  */
-function getApiBaseUrl(): string {
-  if (process.env.VERCEL_ENV === 'production') return 'https://api.curex24.com/api/v1';
-  if (process.env.VERCEL_ENV === 'preview') return 'https://api.staging.curex24.com/api/v1';
-  return (process.env.NEXT_PUBLIC_API_URL || '').trim() || 'http://localhost:3000/api/v1';
+function getApiBaseUrl(): string | null {
+  const url = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+  return url || null;
 }
 
 export interface AuthFailure {
@@ -57,8 +56,16 @@ export async function requireMarketingAuth(req: NextRequest): Promise<AuthResult
     return { ok: true, token };
   }
 
+  // No external backend configured → self-contained mode. The local
+  // /api/auth/marketing-login route mints JWT-shaped tokens that we trust
+  // without an upstream check.
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    return { ok: true, token };
+  }
+
   try {
-    const res = await fetch(`${getApiBaseUrl()}/marketing/profile`, {
+    const res = await fetch(`${baseUrl}/marketing/profile`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
       // Don't cache auth checks.

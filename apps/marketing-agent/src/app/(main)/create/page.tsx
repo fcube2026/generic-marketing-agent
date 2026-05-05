@@ -142,7 +142,7 @@ function buildPostImagePrompt(platform: string, pillar: string): string {
     WhatsApp: 'simple clean square image, minimal design, clear and direct, professional',
   };
 
-  return `${pillarImages[pillar] ?? 'professional healthcare social media post, curex24 home doctor service'}, ${platformStyle[platform] ?? 'social media post format'}, healthcare blue accent, premium brand quality`;
+  return `${pillarImages[pillar] ?? 'professional healthcare social media post, your brand home doctor service'}, ${platformStyle[platform] ?? 'social media post format'}, healthcare blue accent, premium brand quality`;
 }
 
 // ─── Generators ───────────────────────────────────────────────────────────────
@@ -170,43 +170,43 @@ function generatePost(platform: string, pillar: string, tone: string): string {
   const pillarContent: Record<string, { hook: string; body: string; cta: string }> = {
     'Education & Awareness': {
       hook: platform === 'Twitter/X' ? `🧵 Most people don't know this about home doctor visits — thread 👇` : `Did you know? Getting a doctor home in under 30 minutes is now possible.`,
-      body: `At curex24, we're changing what healthcare looks like.\n\nNo waiting rooms. No wasted afternoons. Just verified doctors at your door — same day, every day.\n\n✅ 150+ verified doctors\n✅ Real-time tracking\n✅ Transparent pricing\n✅ Available across Mumbai, Delhi & Bengaluru`,
-      cta: platform === 'WhatsApp' ? `Book your first visit → curex24.com` : `👉 Book a home visit today: curex24.com`,
+      body: `At your brand, we're changing what healthcare looks like.\n\nNo waiting rooms. No wasted afternoons. Just verified doctors at your door — same day, every day.\n\n✅ 150+ verified doctors\n✅ Real-time tracking\n✅ Transparent pricing\n✅ Available across Mumbai, Delhi & Bengaluru`,
+      cta: platform === 'WhatsApp' ? `Book your first visit → example.com` : `👉 Book a home visit today: example.com`,
     },
     'Trust & Social Proof': {
-      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 2,400+ patients. Here's what they say about curex24 👇` : `4.8 ⭐ from 2,400+ patients — here's why curex24 is India's most trusted home healthcare platform.`,
-      body: `"The doctor arrived within 25 minutes. She was thorough, kind, and the follow-up prescription was ready in under an hour." — Priya M., Mumbai\n\nWe built curex24 on one principle: healthcare should work around your life, not the other way around.`,
-      cta: `Read more patient stories at curex24.com/stories`,
+      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 2,400+ patients. Here's what they say about your brand 👇` : `4.8 ⭐ from 2,400+ patients — here's why your brand is India's most trusted home healthcare platform.`,
+      body: `"The doctor arrived within 25 minutes. She was thorough, kind, and the follow-up prescription was ready in under an hour." — Priya M., Mumbai\n\nWe built your brand on one principle: healthcare should work around your life, not the other way around.`,
+      cta: `Read more patient stories at example.com/stories`,
     },
     'Product/Service Highlight': {
-      hook: platform === 'Twitter/X' ? `Booking a home doctor visit with curex24 takes exactly 2 minutes. Let me show you. 🧵` : `Your health, on your schedule. Book a verified doctor at home in 2 minutes.`,
-      body: `Here's how it works:\n1️⃣ Open curex24.com or the app\n2️⃣ Choose your service (GP, specialist, diagnostics)\n3️⃣ Pick a time slot\n4️⃣ Track your doctor in real time\n5️⃣ Get a digital prescription + follow-up plan\n\nNo more half-day hospital trips.`,
-      cta: `Try it today → curex24.com`,
+      hook: platform === 'Twitter/X' ? `Booking a home doctor visit with your brand takes exactly 2 minutes. Let me show you. 🧵` : `Your health, on your schedule. Book a verified doctor at home in 2 minutes.`,
+      body: `Here's how it works:\n1️⃣ Open example.com or the app\n2️⃣ Choose your service (GP, specialist, diagnostics)\n3️⃣ Pick a time slot\n4️⃣ Track your doctor in real time\n5️⃣ Get a digital prescription + follow-up plan\n\nNo more half-day hospital trips.`,
+      cta: `Try it today → example.com`,
     },
     'Brand Story': {
-      hook: platform === 'Twitter/X' ? `We started curex24 because our co-founder couldn't get a doctor for her mother at 11 PM. 🧵` : `Why we built curex24 — a story about a gap in Indian healthcare.`,
-      body: `Healthcare in India is brilliant — but access is broken.\n\nOur co-founder spent 4 hours in a hospital for what should have been a 20-minute consultation. That experience became curex24.\n\nToday, 150+ verified doctors use our platform to see patients at home. 1,240 patients trusted us last month alone.\n\nWe're just getting started.`,
-      cta: `Join us → curex24.com`,
+      hook: platform === 'Twitter/X' ? `We started your brand because our co-founder couldn't get a doctor for her mother at 11 PM. 🧵` : `Why we built your brand — a story about a gap in Indian healthcare.`,
+      body: `Healthcare in India is brilliant — but access is broken.\n\nOur co-founder spent 4 hours in a hospital for what should have been a 20-minute consultation. That experience became your brand.\n\nToday, 150+ verified doctors use our platform to see patients at home. 1,240 patients trusted us last month alone.\n\nWe're just getting started.`,
+      cta: `Join us → example.com`,
     },
     'Community & Engagement': {
       hook: platform === 'Twitter/X' ? `Quick poll: when you're not feeling well at home, what do you do first? 👇` : `We want to hear from you 👇`,
-      body: `When you're feeling unwell at home — what's your first move?\n\n🏥 Rush to a hospital\n📱 Search symptoms on Google\n🤙 Call a family member / friend\n🏠 Book a home visit\n\nThere's no wrong answer. But we're curious because your answer shapes how we build curex24.`,
+      body: `When you're feeling unwell at home — what's your first move?\n\n🏥 Rush to a hospital\n📱 Search symptoms on Google\n🤙 Call a family member / friend\n🏠 Book a home visit\n\nThere's no wrong answer. But we're curious because your answer shapes how we build your brand.`,
       cta: `Drop your answer below ⬇️`,
     },
     'Offer & Promotion': {
-      hook: platform === 'Twitter/X' ? `🚨 Limited: ₹100 off your first curex24 home visit this week only. 🧵` : `🎉 First home visit, ₹100 off — this week only.`,
-      body: `We want more people to experience what real healthcare convenience feels like.\n\nSo for the next 7 days: your first curex24 home visit is ₹100 off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ 150+ verified doctors\n✅ Same-day availability\n✅ Transparent pricing`,
-      cta: `Claim your discount → curex24.com/book`,
+      hook: platform === 'Twitter/X' ? `🚨 Limited: ₹100 off your first your brand home visit this week only. 🧵` : `🎉 First home visit, ₹100 off — this week only.`,
+      body: `We want more people to experience what real healthcare convenience feels like.\n\nSo for the next 7 days: your first your brand home visit is ₹100 off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ 150+ verified doctors\n✅ Same-day availability\n✅ Transparent pricing`,
+      cta: `Claim your discount → example.com/book`,
     },
   };
 
   const content = pillarContent[pillar] ?? pillarContent['Education & Awareness'];
 
   const hashtagSets: Record<string, string[]> = {
-    Instagram: ['#curex24', '#HomeDoctor', '#HealthcareAtHome', '#MumbaiHealth', '#DelhiDoctors', '#BengaluruHealth', '#HomeVisit', '#DoctorAtHome', '#HealthTech', '#IndiaHealth', '#PatientCare', '#Telemedicine', '#HealthcareIndia', '#WellnessIndia', '#BookADoctor'],
-    LinkedIn: ['#HealthTech', '#HealthcareIndia', '#HomeHealthcare', '#curex24'],
+    Instagram: ['#YourBrand', '#HomeDoctor', '#HealthcareAtHome', '#MumbaiHealth', '#DelhiDoctors', '#BengaluruHealth', '#HomeVisit', '#DoctorAtHome', '#HealthTech', '#IndiaHealth', '#PatientCare', '#Telemedicine', '#HealthcareIndia', '#WellnessIndia', '#BookADoctor'],
+    LinkedIn: ['#HealthTech', '#HealthcareIndia', '#HomeHealthcare', '#YourBrand'],
     'Twitter/X': ['#HealthTech', '#HomeDoctor'],
-    Facebook: ['#HomeDoctor', '#curex24', '#HealthcareAtHome'],
+    Facebook: ['#HomeDoctor', '#YourBrand', '#HealthcareAtHome'],
     WhatsApp: [],
   };
 
@@ -217,7 +217,7 @@ function generatePost(platform: string, pillar: string, tone: string): string {
   if (platform === 'Twitter/X') {
     output += `**Tweet 1 (hook):**\n${content.hook}\n\n`;
     output += `**Tweet 2:**\n${content.body.split('\n').slice(0, 3).join(' ')}\n\n`;
-    output += `**Tweet 3:**\nHere's what makes curex24 different: verified doctors, real-time tracking, digital prescriptions — all from your living room.\n\n`;
+    output += `**Tweet 3:**\nHere's what makes your brand different: verified doctors, real-time tracking, digital prescriptions — all from your living room.\n\n`;
     output += `**Tweet 4:**\nWe serve Mumbai, Delhi, and Bengaluru today. More cities coming this quarter.\n\n`;
     output += `**Tweet 5 (CTA):**\n${content.cta} ${hashtags.join(' ')}\n`;
   } else if (platform === 'WhatsApp') {
@@ -256,16 +256,16 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
     'Story / Reel (9:16)': 'A full-height mobile-first visual. Top: bold headline text area. Middle: doctor at patient\'s door, bright daylight, warm colour palette. Bottom: app booking CTA button area.',
     'Landscape Banner (16:9)': 'Wide-angle scene of a doctor and patient interaction in a cosy living room. Doctor is reviewing notes on a tablet. Bright, airy, healthcare-blue and white tones.',
     'Twitter/X Card (2:1)': 'A horizontal split design: left side — bold headline "Doctor at Home in 30 Min", right side — doctor icon / photo with warm background.',
-    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. Curex24 logo on left, tagline in centre, doctor silhouette on right.',
-    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to book a home doctor visit" infographic. Clean icons, numbered steps, curex24 brand colours.',
+    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. your brand’s logo on left, tagline in centre, doctor silhouette on right.',
+    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to book a home doctor visit" infographic. Clean icons, numbered steps, your brand brand colours.',
     'YouTube Thumbnail (16:9)': 'Bold thumbnail. Large, readable text overlay: "Doctor at Home in 30 MINUTES?!". Surprised-face reaction image on left, doctor photo on right. High contrast.',
-    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: curex24 logo + tagline. Centre: key USPs as icons (speed, trust, tracking). Right: doctor illustration.',
+    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: your brand’s logo + tagline. Centre: key USPs as icons (speed, trust, tracking). Right: doctor illustration.',
     'WhatsApp Status (9:16)': 'Vertical status card. Top: greeting + brand name. Middle: core message with emoji. Bottom: CTA with phone number or link. WhatsApp green accent.',
   };
 
   const concept = customSubject?.trim()
     ? customSubject.trim()
-    : (conceptMap[format] ?? 'A professional healthcare brand visual for curex24, focusing on home doctor visits.');
+    : (conceptMap[format] ?? 'A professional healthcare brand visual for your brand, focusing on home doctor visits.');
 
   let prompt = `**Format:** ${format}\n**Dimensions:** ${dimensions}\n**Visual Style:** ${style}\n**AI Tool:** ${tool}\n\n`;
   prompt += `---\n\n`;
@@ -284,7 +284,7 @@ function generateAdCreative(platform: string, objective: string): string {
   const objectiveMap: Record<string, string> = {
     'Brand Awareness': 'maximise impressions and recall among target audience',
     'Patient Acquisition': 'drive first booking completions from high-intent searchers',
-    'Provider Recruitment': 'attract verified doctors to join the curex24 provider network',
+    'Provider Recruitment': 'attract verified doctors to join your provider network',
     'App Install': 'drive app downloads from relevant audiences',
     'Re-engagement / Retargeting': 're-activate users who visited but did not convert',
     'Seasonal Offer': 'drive urgency and immediate bookings with a time-limited offer',
@@ -304,10 +304,10 @@ function generateAdCreative(platform: string, objective: string): string {
   const adSets: Record<string, Record<string, { headlines: string[]; descriptions: string[]; callouts: string[]; sitelinks: string[]; visualDirection: string }>> = {
     'Patient Acquisition': {
       'Google Search': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Book Verified Home Doctor Now', 'Home Visits — Skip the Queue', 'Verified Mumbai Doctors', 'Get a Doctor Home Today', 'Home Healthcare in 2 Min', 'Same-Day Doctor at Home', 'Doctor Home Visit Booking', '4.8★ Home Healthcare App', 'Book in Under 2 Minutes', 'Real-Time Doctor Tracking', 'Home Visits From ₹299', 'GP, Specialist, Diagnostics', 'Curex24 — India\'s #1', 'Home Doctor — Book Now'],
-        descriptions: ['Trusted doctors at your doorstep in Mumbai, Delhi & Bengaluru. Book in 2 minutes, real-time tracking, transparent pricing. 4.8★ rated by 2,400+ patients.', 'Home visits by verified doctors. Same-day appointments. No waiting rooms. Get a digital prescription + follow-up plan. Book online in minutes.', 'Skip the hospital queue. 150+ verified doctors available for home visits. Book now and track your doctor in real time — like Uber for healthcare.', 'Curex24: India\'s most trusted home healthcare platform. Verified doctors, transparent pricing, real-time tracking. First visit ₹100 off.'],
+        headlines: ['Doctor at Home in 30 Minutes', 'Book Verified Home Doctor Now', 'Home Visits — Skip the Queue', 'Verified Mumbai Doctors', 'Get a Doctor Home Today', 'Home Healthcare in 2 Min', 'Same-Day Doctor at Home', 'Doctor Home Visit Booking', '4.8★ Home Healthcare App', 'Book in Under 2 Minutes', 'Real-Time Doctor Tracking', 'Home Visits From ₹299', 'GP, Specialist, Diagnostics', 'your brand — India\'s #1', 'Home Doctor — Book Now'],
+        descriptions: ['Trusted doctors at your doorstep in Mumbai, Delhi & Bengaluru. Book in 2 minutes, real-time tracking, transparent pricing. 4.8★ rated by 2,400+ patients.', 'Home visits by verified doctors. Same-day appointments. No waiting rooms. Get a digital prescription + follow-up plan. Book online in minutes.', 'Skip the hospital queue. 150+ verified doctors available for home visits. Book now and track your doctor in real time — like Uber for healthcare.', 'your brand: India\'s most trusted home healthcare platform. Verified doctors, transparent pricing, real-time tracking. First visit ₹100 off.'],
         callouts: ['Same-Day Appointments', 'Verified Doctors', 'Real-Time Tracking', 'Transparent Pricing', '4.8★ Rated', 'Digital Prescriptions', 'No Hidden Fees', '150+ Doctors'],
-        sitelinks: ['Book Home Visit | curex24.com/book', 'How It Works | curex24.com/how', 'Our Doctors | curex24.com/doctors', 'Pricing | curex24.com/pricing', 'Patient Reviews | curex24.com/reviews', 'FAQ | curex24.com/faq'],
+        sitelinks: ['Book Home Visit | example.com/book', 'How It Works | example.com/how', 'Our Doctors | example.com/doctors', 'Pricing | example.com/pricing', 'Patient Reviews | example.com/reviews', 'FAQ | example.com/faq'],
         visualDirection: 'N/A — text-only format',
       },
       'Meta (Facebook/Instagram)': {
@@ -319,75 +319,75 @@ function generateAdCreative(platform: string, objective: string): string {
       },
       'LinkedIn Ads': {
         headlines: ['Doctor at Home in 30 Minutes', 'Healthcare That Works Around You', 'Verified Home Doctors — Book Now'],
-        descriptions: ['Curex24 brings verified doctors to your home. Same-day availability, real-time tracking, transparent pricing. Trusted by 1,240 patients last month.', 'No waiting rooms. No wasted afternoons. Book a home visit in 2 minutes and get a digital prescription within the hour.', 'Join 1,240+ patients who chose curex24. 150+ verified doctors available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.'],
+        descriptions: ['your brand brings verified doctors to your home. Same-day availability, real-time tracking, transparent pricing. Trusted by 1,240 patients last month.', 'No waiting rooms. No wasted afternoons. Book a home visit in 2 minutes and get a digital prescription within the hour.', 'Join 1,240+ patients who chose your brand. 150+ verified doctors available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.'],
         callouts: [],
         sitelinks: [],
         visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A professional lifestyle setting — a person working from home on a laptop, looking relieved, with a doctor visible in the background having just completed a visit.\nStyle: Clean, professional, LinkedIn aesthetic. Blue tones, bright and airy.\nDimensions: 1.91:1 (1200×628 px) for LinkedIn single image ad.\nPrompt: "Professional lifestyle photo of a person working from home at a desk, doctor visible in background packing up medical kit, warm home office setting, blue and white colour palette, clean and trustworthy feel, 1200×628"',
       },
       'Google Display': {
         headlines: ['Doctor at Home — Book Now', 'Verified Home Doctor Visits', '30-Min Home Doctor Booking', 'Skip the Hospital Queue', '4.8★ Home Healthcare App'],
-        descriptions: ['150+ verified doctors. Same-day home visits. Book in 2 minutes.', 'Transparent pricing, real-time tracking, digital prescriptions.', 'Available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.', 'Trusted by 2,400+ patients. Book your curex24 home visit today.', 'Healthcare on your schedule — verified doctors at your door.'],
+        descriptions: ['150+ verified doctors. Same-day home visits. Book in 2 minutes.', 'Transparent pricing, real-time tracking, digital prescriptions.', 'Available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.', 'Trusted by 2,400+ patients. Book your your brand home visit today.', 'Healthcare on your schedule — verified doctors at your door.'],
         callouts: [],
         sitelinks: [],
         visualDirection: '**DALL-E 3 Visual Direction:**\nCreate a clean display ad visual: doctor icon on warm gradient background (healthcare blue to white). Bold headline space at top, CTA button at bottom.\nSizes needed: 300×250 (medium rectangle), 728×90 (leaderboard), 160×600 (wide skyscraper), 320×50 (mobile banner).\nPrompt for hero image: "Clean healthcare brand illustration, friendly doctor silhouette on a gradient blue-to-white background, minimal flat design, medical cross icon, trustworthy and modern, no text, 300×250"',
       },
       'YouTube Ads': {
         headlines: ['Doctor at Home in 30 Minutes', 'Verified Doctors at Your Door', 'Skip the Hospital — Book Now'],
-        descriptions: ['See how curex24 brings verified doctors to your home in 30 minutes. Real-time tracking, transparent pricing, digital prescriptions.', '150+ verified doctors. Same-day availability. Book in 2 minutes. Available in Mumbai, Delhi & Bengaluru.'],
+        descriptions: ['See how your brand brings verified doctors to your home in 30 minutes. Real-time tracking, transparent pricing, digital prescriptions.', '150+ verified doctors. Same-day availability. Book in 2 minutes. Available in Mumbai, Delhi & Bengaluru.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing booking confirmation, then cut to doctor arriving at door.\nHero visual for companion banner: Doctor and patient interaction, warm home setting, curex24 branding visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a healthcare booking app confirmation, bright screen, hands holding phone, excited expression visible, photorealistic, 1280×720"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing booking confirmation, then cut to doctor arriving at door.\nHero visual for companion banner: Doctor and patient interaction, warm home setting, your brand branding visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a healthcare booking app confirmation, bright screen, hands holding phone, excited expression visible, photorealistic, 1280×720"',
       },
       'WhatsApp Ads': {
         headlines: ['Doctor Home Visit — Book Now', 'Verified Doctors at Your Door'],
-        descriptions: ['150+ verified doctors. Same-day home visits in Mumbai, Delhi & Bengaluru. Book in 2 minutes → curex24.com', 'Skip the hospital queue. Get a verified doctor home today. Transparent pricing. 4.8★ rated. Book now → curex24.com/book'],
+        descriptions: ['150+ verified doctors. Same-day home visits in Mumbai, Delhi & Bengaluru. Book in 2 minutes → example.com', 'Skip the hospital queue. Get a verified doctor home today. Transparent pricing. 4.8★ rated. Book now → example.com/book'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple, clean WhatsApp-safe image: doctor icon + brand name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800) for WhatsApp image messages.\nPrompt: "Simple clean illustration of a friendly doctor avatar with curex24 branding, white background, healthcare blue accent, minimal design, WhatsApp-safe image, 800×800"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple, clean WhatsApp-safe image: doctor icon + brand name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800) for WhatsApp image messages.\nPrompt: "Simple clean illustration of a friendly doctor avatar with your brand branding, white background, healthcare blue accent, minimal design, WhatsApp-safe image, 800×800"',
       },
     },
     'Provider Recruitment': {
       'Google Search': {
-        headlines: ['Join curex24 as a Doctor', 'Grow Your Practice — Apply Now', 'Verified Doctors Wanted — Apply', '40+ Bookings/Month Possible', 'Doctor Earnings — Zero Lock-in', 'Independent Doctors — Join Us', 'Medical Practice Growth Tool', 'Earn More as a Home Doctor', 'Doctor Registration — Free', 'Build Your Patient Base Fast', 'Flexible Doctor Schedule', 'Join 150+ Curex24 Doctors', 'Medical Platform India', 'Doctor Home Visit Platform', 'Grow Practice With Curex24'],
-        descriptions: ['curex24 connects verified independent doctors with patients who need home visits. 40+ bookings/month possible. Zero upfront cost, no lock-in. Apply today.', 'Independent doctors in Mumbai, Delhi & Bengaluru — grow your practice with curex24. We handle bookings, payments, and marketing. You focus on care.', 'Join 150+ verified doctors on curex24. Set your own hours, choose your speciality and visit types. Payment processed automatically. No upfront fee.', 'Stop chasing patients. curex24 brings bookings to you. Same-day scheduling, transparent earnings, real-time navigation. Apply as a verified doctor today.'],
+        headlines: ['Join your brand as a Doctor', 'Grow Your Practice — Apply Now', 'Verified Doctors Wanted — Apply', '40+ Bookings/Month Possible', 'Doctor Earnings — Zero Lock-in', 'Independent Doctors — Join Us', 'Medical Practice Growth Tool', 'Earn More as a Home Doctor', 'Doctor Registration — Free', 'Build Your Patient Base Fast', 'Flexible Doctor Schedule', 'Join 150+ your brand Doctors', 'Medical Platform India', 'Doctor Home Visit Platform', 'Grow Practice With your brand'],
+        descriptions: ['your brand connects verified independent doctors with patients who need home visits. 40+ bookings/month possible. Zero upfront cost, no lock-in. Apply today.', 'Independent doctors in Mumbai, Delhi & Bengaluru — grow your practice with your brand. We handle bookings, payments, and marketing. You focus on care.', 'Join 150+ verified doctors on your platform. Set your own hours, choose your speciality and visit types. Payment processed automatically. No upfront fee.', 'Stop chasing patients. your brand brings bookings to you. Same-day scheduling, transparent earnings, real-time navigation. Apply as a verified doctor today.'],
         callouts: ['Zero Upfront Cost', 'Set Your Own Hours', 'Instant Payments', '40+ Bookings Possible', 'No Lock-in Contract', 'Free to Join', '150+ Active Doctors'],
-        sitelinks: ['Apply Now | curex24.com/providers/apply', 'How Earnings Work | curex24.com/providers/earnings', 'Doctor FAQ | curex24.com/providers/faq', 'Success Stories | curex24.com/providers/stories'],
+        sitelinks: ['Apply Now | example.com/providers/apply', 'How Earnings Work | example.com/providers/earnings', 'Doctor FAQ | example.com/providers/faq', 'Success Stories | example.com/providers/stories'],
         visualDirection: 'N/A — text-only format',
       },
       'LinkedIn Ads': {
-        headlines: ['Independent Doctors — Join curex24', 'Grow Your Practice With curex24', '40+ Bookings/Month on curex24'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — curex24 brings home visit bookings directly to you. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors who use curex24 to grow their practice. Average 40+ bookings/month. No lock-in. Apply in 5 minutes.', 'Stop spending time and money on marketing. curex24 fills your schedule with verified home visit bookings. You focus on care — we handle the rest.'],
+        headlines: ['Independent Doctors — Join your brand', 'Grow Your Practice With your brand', '40+ Bookings/Month on your platform'],
+        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand brings home visit bookings directly to you. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors who use your brand to grow their practice. Average 40+ bookings/month. No lock-in. Apply in 5 minutes.', 'Stop spending time and money on marketing. your brand fills your schedule with verified home visit bookings. You focus on care — we handle the rest.'],
         callouts: [],
         sitelinks: [],
         visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A confident, professional doctor reviewing patient bookings on a smartphone. Clean home office or clinic background. Successful, empowered professional vibe.\nStyle: Professional LinkedIn aesthetic, blue tones.\nDimensions: 1200×628 px.\nPrompt: "Confident professional Indian doctor in white coat checking a smartphone with a satisfied expression, bright modern clinic background, professional and trustworthy, blue and white colour palette, 1200×628"',
       },
       'Meta (Facebook/Instagram)': {
-        headlines: ['Doctors: Grow Your Practice', 'Join 150+ curex24 Doctors', '40+ Bookings — Zero Marketing'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — curex24 fills your schedule with home visit bookings. Zero upfront cost, no lock-in. Apply today.', 'Tired of empty appointment slots? curex24 brings patients to you. 150+ doctors trust us. 40+ bookings/month average. Free to join.', 'Build your patient base without spending on marketing. curex24 handles discovery, booking, and payment. You just show up and care.'],
+        headlines: ['Doctors: Grow Your Practice', 'Join 150+ your brand Doctors', '40+ Bookings — Zero Marketing'],
+        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand fills your schedule with home visit bookings. Zero upfront cost, no lock-in. Apply today.', 'Tired of empty appointment slots? your brand brings patients to you. 150+ doctors trust us. 40+ bookings/month average. Free to join.', 'Build your patient base without spending on marketing. your brand handles discovery, booking, and payment. You just show up and care.'],
         callouts: [],
         sitelinks: [],
         visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A doctor looking at their phone and smiling, with a notification visible showing "New booking confirmed — home visit". Split with brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories.\nPrompt: "Indian doctor in white coat happily looking at smartphone notification, bright clean background, healthcare blue accents, professional and approachable, 1080×1080"',
       },
       'Google Display': {
-        headlines: ['Doctors — Join curex24', 'Grow Practice With curex24', '40+ Monthly Bookings', 'Zero-Cost Doctor Platform', 'Apply as curex24 Doctor'],
-        descriptions: ['Join 150+ doctors. Zero upfront cost, flexible hours, instant payments.', 'curex24 brings home visit bookings to you. Apply for free.', 'Independent doctors — fill your schedule with curex24. No lock-in.', 'Grow your practice. 40+ bookings/month possible with curex24.', 'Doctor network India — join curex24 today. Free registration.'],
+        headlines: ['Doctors — Join your brand', 'Grow Practice With your brand', '40+ Monthly Bookings', 'Zero-Cost Doctor Platform', 'Apply as your brand Doctor'],
+        descriptions: ['Join 150+ doctors. Zero upfront cost, flexible hours, instant payments.', 'your brand brings home visit bookings to you. Apply for free.', 'Independent doctors — fill your schedule with your brand. No lock-in.', 'Grow your practice. 40+ bookings/month possible with your brand.', 'Doctor network India — join your brand today. Free registration.'],
         callouts: [],
         sitelinks: [],
         visualDirection: '**DALL-E 3 Visual Direction:**\nClean display banner: doctor silhouette + booking notification graphic + brand colours.\nPrompt: "Minimalist display ad visual, friendly doctor silhouette, smartphone showing booking notification, healthcare blue gradient, clean and professional, no text, 300×250"',
       },
       'YouTube Ads': {
-        headlines: ['Doctors — Join curex24', 'Grow Your Practice — Apply Now', 'Build Your Patient Base Fast'],
-        descriptions: ['See how curex24 helps independent doctors in India grow their practice with home visit bookings. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors on curex24. Average 40+ bookings/month. Apply in 5 minutes.'],
+        headlines: ['Doctors — Join your brand', 'Grow Your Practice — Apply Now', 'Build Your Patient Base Fast'],
+        descriptions: ['See how your brand helps independent doctors in India grow their practice with home visit bookings. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors on your platform. Average 40+ bookings/month. Apply in 5 minutes.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds: Doctor receiving a booking notification, looking pleased. Then testimonial-style "I went from 10 bookings a week to 40 with curex24."\nPrompt: "Cinematic close-up of a doctor\'s phone showing a booking confirmation notification, doctor hand visible, warm lighting, professional setting, 1280×720"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds: Doctor receiving a booking notification, looking pleased. Then testimonial-style "I went from 10 bookings a week to 40 with your brand."\nPrompt: "Cinematic close-up of a doctor\'s phone showing a booking confirmation notification, doctor hand visible, warm lighting, professional setting, 1280×720"',
       },
       'WhatsApp Ads': {
-        headlines: ['Doctors — Join curex24 Today', 'Grow Your Practice Free'],
-        descriptions: ['Join 150+ doctors on curex24. Get home visit bookings — zero upfront cost, flexible schedule. Apply: curex24.com/providers', 'Independent doctors: curex24 fills your schedule with bookings. Free to join. 40+ bookings/month possible → curex24.com/providers/apply'],
+        headlines: ['Doctors — Join your brand Today', 'Grow Your Practice Free'],
+        descriptions: ['Join 150+ doctors on your platform. Get home visit bookings — zero upfront cost, flexible schedule. Apply: example.com/providers', 'Independent doctors: your brand fills your schedule with bookings. Free to join. 40+ bookings/month possible → example.com/providers/apply'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple image: doctor + stethoscope icon with "Join curex24" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration of a doctor with stethoscope, curex24 logo area, white background, blue accents, friendly and professional, 800×800"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple image: doctor + stethoscope icon with "Join your brand" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration of a doctor with stethoscope, your brand’s logo area, white background, blue accents, friendly and professional, 800×800"',
       },
     },
   };

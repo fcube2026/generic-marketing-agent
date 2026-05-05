@@ -23,7 +23,7 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
     subsections: [
       {
         heading: 'Positioning Statement',
-        content: '"curex24 is the fastest, most trusted way to connect with verified healthcare providers — on your terms, at your time."',
+        content: '"your brand is the fastest, most trusted way to connect with verified healthcare providers — on your terms, at your time."',
         type: 'quote',
       },
       {
@@ -152,7 +152,7 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         items: [
           { icon: '📚', label: 'Patient Education', detail: 'Health tips, when to see a doctor, how diagnostics work' },
           { icon: '⭐', label: 'Provider Spotlights', detail: 'Build trust through featured provider stories' },
-          { icon: '📱', label: 'Product Education', detail: 'How to use curex24 features (home visit, tracking, payments)' },
+          { icon: '📱', label: 'Product Education', detail: 'How to use your brand features (home visit, tracking, payments)' },
           { icon: '🏆', label: 'Social Proof', detail: 'Patient testimonials, booking milestones, provider reviews' },
           { icon: '🏙️', label: 'Local Health', detail: 'City-specific health events, disease awareness, local partnerships' },
         ],
@@ -205,7 +205,7 @@ export default function StrategyPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
         <p className="text-sm text-purple-700">
-          <strong>📌 Strategy Framework</strong> — This is your full marketing strategy, tailored to curex24&apos;s healthcare marketplace model. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
+          <strong>📌 Strategy Framework</strong> — This is your full marketing strategy, tailored to your brand&apos;s healthcare marketplace model. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
         </p>
       </div>
 

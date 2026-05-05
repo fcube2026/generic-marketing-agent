@@ -1,5 +1,5 @@
 /**
- * Hydrates a skill run with curex24-specific context — business profile,
+ * Hydrates a skill run with your brand-specific context — business profile,
  * latest KPIs, top campaigns / experiments / SEO pages — so the model's
  * output is grounded in the org's real data, not generic web wisdom.
  *
@@ -66,7 +66,7 @@ function formatProfile(p: BusinessProfile | undefined): string {
   if (p.targetCities?.length) lines.push(`  - Target cities: ${p.targetCities.join(', ')}`);
   if (p.topPatientPersona) lines.push(`  - Top patient persona: ${p.topPatientPersona}`);
   if (p.topReasonPatientChooses)
-    lines.push(`  - #1 reason patients choose curex24: ${p.topReasonPatientChooses}`);
+    lines.push(`  - #1 reason patients choose your brand: ${p.topReasonPatientChooses}`);
   if (p.topReasonProviderJoins)
     lines.push(`  - #1 reason providers join: ${p.topReasonProviderJoins}`);
   if (p.competitors?.length) lines.push(`  - Top competitors: ${p.competitors.join(', ')}`);
@@ -161,7 +161,7 @@ export async function loadOrgContext(tools: SkillTool[] = []): Promise<OrgContex
   const text = sections.filter(Boolean).join('').trim();
   return {
     text: text
-      ? `Live curex24 org context (use this to ground every recommendation in real numbers):\n${text}`
+      ? `Live org context (use this to ground every recommendation in real numbers):\n${text}`
       : '',
     data: {
       profile,

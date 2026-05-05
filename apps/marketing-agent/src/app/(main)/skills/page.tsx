@@ -128,7 +128,7 @@ export default function SkillsPage() {
           {relevantSkills.length} marketing skills your AI agent can run
         </h1>
         <p className="text-sm text-gray-500 max-w-2xl">
-          Each skill is a <strong>structured workflow</strong> with typed inputs, live curex24 KPI
+          Each skill is a <strong>structured workflow</strong> with typed inputs, live your brand KPI
           context, multi-tab artifacts (markdown, JSON spec, visual), and an automatic critic pass
           that scores the output against a rubric. Click <strong>Use skill</strong> to open the
           Brief → Run → Artifact runner.
@@ -234,7 +234,7 @@ export default function SkillsPage() {
             </span>
             <span className="flex items-center gap-2 text-xs text-gray-500">
               <span className="hidden sm:inline">
-                {showNotApplicable ? 'Hide' : 'Show'} skills not aligned with curex24&apos;s current focus
+                {showNotApplicable ? 'Hide' : 'Show'} skills not aligned with your brand&apos;s current focus
               </span>
               <span aria-hidden="true" className="text-gray-400">
                 {showNotApplicable ? '▾' : '▸'}
@@ -245,7 +245,7 @@ export default function SkillsPage() {
           {showNotApplicable && (
             <div id="not-applicable-skills" className="mt-4 space-y-3">
               <p className="text-xs text-gray-500 max-w-2xl">
-                These skills are hidden by default because they don&apos;t fit curex24&apos;s current B2C
+                These skills are hidden by default because they don&apos;t fit your brand&apos;s current B2C
                 home-doctor / care-plan motion (B2B-only outreach, comparison pages, generic free tools, etc.).
                 Use them only if your situation changes.
               </p>

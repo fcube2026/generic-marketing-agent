@@ -9,14 +9,14 @@ Next.js dashboard for an AI-powered Marketing Agent. The agent is generic — it
 pnpm install
 
 # Start the development server (port 3002)
-pnpm --filter @curex24/marketing-agent dev
+pnpm --filter @your brand/marketing-agent dev
 ```
 
 ## Environment Variables
 
 | Variable | Required (hosted) | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | **Yes** | Full base URL of the Curex24 API, e.g. `https://api.curex24.com/api/v1` |
+| `NEXT_PUBLIC_API_URL` | **Yes** | Full base URL of your API, e.g. `https://api.example.com/api/v1` |
 | `OPENAI_API_KEY` | **Yes (for live AI)** | Server-side OpenAI key. Powers `/api/ai/chat` and `/api/ai/image`. Without it the agent falls back to canned responses and the Visual Generator returns a friendly error. |
 | `OPENAI_TEXT_MODEL` | No | Chat/completion model. Defaults to `gpt-4o-mini`. Use `gpt-4o` for higher quality. |
 | `OPENAI_IMAGE_MODEL` | No | Image model. Defaults to `gpt-image-1` (DALL-E 3 successor). |
@@ -76,7 +76,7 @@ The API client resolves the base URL in the following priority order:
 
 1. `NEXT_PUBLIC_API_URL` environment variable — used whenever set (server-side and client-side).
 2. `http://localhost:3000/api/v1` — used automatically when running in a browser on `localhost`, `127.0.0.1`, or `0.0.0.0` (local development only).
-3. `https://api.curex24.com/api/v1` — default fallback for all other environments.
+3. `https://api.example.com/api/v1` — default fallback for all other environments.
 
 > **Important:** All hosted deployments (Vercel, staging, etc.) **must** set `NEXT_PUBLIC_API_URL` at build time. Without it the app will attempt to reach the production API URL, which may differ from your actual deployed API endpoint and cause login failures.
 
@@ -89,11 +89,11 @@ The API client resolves the base URL in the following priority order:
 ## Building
 
 ```bash
-pnpm --filter @curex24/marketing-agent build
+pnpm --filter @your brand/marketing-agent build
 ```
 
 ## Linting
 
 ```bash
-pnpm --filter @curex24/marketing-agent lint
+pnpm --filter @your brand/marketing-agent lint
 ```

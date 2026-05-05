@@ -183,7 +183,7 @@ export default function SeoPage() {
           <li>• <strong>Each SEO page needs: </strong> unique H1 with primary keyword, 300+ words, internal links to 2+ related pages, schema markup.</li>
           <li>• <strong>Blog posts:</strong> 1,500–3,000 words, structured with H2/H3, include FAQ schema for featured snippets.</li>
           <li>• <strong>Track rankings weekly</strong> in Google Search Console or Ahrefs. Flag any page losing 3+ positions week-on-week.</li>
-          <li>• <strong>Build backlinks</strong> through health media outreach and provider partnerships mentioning curex24.</li>
+          <li>• <strong>Build backlinks</strong> through health media outreach and provider partnerships mentioning your brand.</li>
         </ul>
       </Card>
     </div>

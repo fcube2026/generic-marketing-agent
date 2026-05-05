@@ -1,20 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    // VERCEL_ENV is automatically set by Vercel ('production' | 'preview' | 'development')
-    // and cannot be overridden by user-configured env vars, making it a reliable
-    // signal for which API to proxy to.  For local development we fall back to
-    // NEXT_PUBLIC_API_URL (if set) or localhost.
-    let apiUrl;
-    if (process.env.VERCEL_ENV === 'production') {
-      apiUrl = 'https://api.curex24.com/api/v1';
-    } else if (process.env.VERCEL_ENV === 'preview') {
-      apiUrl = 'https://api.staging.curex24.com/api/v1';
-    } else {
-      apiUrl =
-        (process.env.NEXT_PUBLIC_API_URL || '').trim() ||
-        'http://localhost:3000/api/v1';
-    }
+    // The marketing-agent ships with built-in Next.js route handlers under
+    // /api/backend/* that serve generic seed data from in-memory storage,
+    // so the app is fully self-contained out of the box.
+    //
+    // To proxy /api/backend/* to a real external API instead, set
+    // NEXT_PUBLIC_API_URL (e.g. https://api.your-domain.com/api/v1).
+    // When unset, the local route handlers serve every request and there
+    // is no rewrite — this is what powers the dashboard, campaigns, etc.
+    // without any external backend.
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+    if (!apiUrl) return [];
 
     return [
       {
