@@ -9,8 +9,14 @@ Next.js dashboard for an AI-powered Marketing Agent. The agent is generic — it
 pnpm install
 
 # Start the development server (port 3002)
-pnpm --filter @your brand/marketing-agent dev
+pnpm --filter @curex24/marketing-agent dev
 ```
+
+> The `@curex24/...` prefix in `pnpm --filter` arguments is the npm
+> workspace identifier from `package.json` and is unrelated to the
+> branding of the app itself — the UI, content, and APIs are fully
+> generic. The workspace name is kept as-is so the monorepo build
+> continues to resolve cross-package dependencies.
 
 ## Environment Variables
 
@@ -89,11 +95,11 @@ The API client resolves the base URL in the following priority order:
 ## Building
 
 ```bash
-pnpm --filter @your brand/marketing-agent build
+pnpm --filter @curex24/marketing-agent build
 ```
 
 ## Linting
 
 ```bash
-pnpm --filter @your brand/marketing-agent lint
+pnpm --filter @curex24/marketing-agent lint
 ```
