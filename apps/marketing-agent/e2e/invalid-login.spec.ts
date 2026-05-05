@@ -4,7 +4,7 @@ import { gotoLogin, fillLogin } from "./_helpers";
 test("shows error on invalid credentials", async ({ page }) => {
   await gotoLogin(page);
 
-  await fillLogin(page, "admin@curex24.com", "wrong-password-123");
+  await fillLogin(page, "admin@example.com", "wrong-password-123");
 
   // Expect still on login (or not on dashboard)
   await expect(page).toHaveURL(/\/login/i, { timeout: 20_000 });

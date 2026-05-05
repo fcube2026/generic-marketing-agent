@@ -4,7 +4,7 @@ import { gotoLogin, fillLogin } from "./_helpers";
 test("marketing agent admin can log in", async ({ page }) => {
   await gotoLogin(page);
 
-  await fillLogin(page, "admin@curex24.com", "admin123");
+  await fillLogin(page, "admin@example.com", "admin123");
 
   // Some apps redirect to "/" or "/dashboard"
   await expect(page).toHaveURL(/\/(dashboard)?$/i, { timeout: 30_000 });

@@ -51,8 +51,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 to-blue-50">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-primary">Curex24</h1>
-          <p className="text-gray-500 mt-1">Marketing Agent</p>
+          <h1 className="text-3xl font-extrabold text-primary">Marketing Agent</h1>
+          <p className="text-gray-500 mt-1">AI-powered marketing for any brand</p>
         </div>
 
         <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-lg p-8 space-y-5">
@@ -72,7 +72,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-              placeholder="marketing@curex24.com"
+              placeholder="marketing@example.com"
             />
           </div>
 
@@ -98,7 +98,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Curex24 © {new Date().getFullYear()} — Healthcare, anytime. Anywhere.
+          Marketing Agent © {new Date().getFullYear()} — Plan, create, and ship marketing — faster.
         </p>
       </div>
     </div>

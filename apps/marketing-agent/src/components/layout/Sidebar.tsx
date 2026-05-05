@@ -51,7 +51,7 @@ export default function Sidebar() {
       <div className="px-6 py-4 border-t border-gray-100">
         <div className="text-xs text-gray-400 space-y-0.5">
           <p className="font-semibold text-gray-500">Marketing Agent v2.0</p>
-          <p>Healthcare, anytime. Anywhere.</p>
+          <p>Plan, create, and ship marketing — faster.</p>
         </div>
       </div>
     </aside>

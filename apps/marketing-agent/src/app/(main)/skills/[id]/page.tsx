@@ -379,7 +379,7 @@ export default function SkillRunnerPage() {
 
           <div className="text-[11px] text-gray-400 leading-relaxed">
             We auto-inject your business profile + the latest KPIs into the prompt so the agent&apos;s output
-            is grounded in real curex24 data.
+            is grounded in real your brand data.
           </div>
         </section>
 

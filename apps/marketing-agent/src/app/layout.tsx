@@ -3,8 +3,8 @@ import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'Curex24 Marketing Agent',
-  description: 'AI-powered marketing strategy and execution agent for curex24',
+  title: 'Marketing Agent',
+  description: 'AI-powered marketing strategy and execution agent for your brand',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
