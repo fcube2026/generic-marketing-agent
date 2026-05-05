@@ -242,7 +242,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-dev-${{ github.run_id }}
           path: apps/admin/playwright-report/
@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-dev-${{ github.run_id }}
           path: apps/admin/test-results/
