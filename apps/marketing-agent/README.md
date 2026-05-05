@@ -1,6 +1,6 @@
-# Curex24 Marketing Agent
+# Marketing Agent
 
-Next.js dashboard for Curex24 marketing operations.
+Next.js dashboard for an AI-powered Marketing Agent. The agent is generic — it can be used for any brand, product, industry or topic, and will also answer general questions outside of marketing.
 
 ## Getting Started
 
