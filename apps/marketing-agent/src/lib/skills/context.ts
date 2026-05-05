@@ -1,5 +1,5 @@
 /**
- * Hydrates a skill run with your brand-specific context — business profile,
+ * Hydrates a skill run with brand-specific context — business profile,
  * latest KPIs, top campaigns / experiments / SEO pages — so the model's
  * output is grounded in the org's real data, not generic web wisdom.
  *
@@ -64,11 +64,11 @@ function formatProfile(p: BusinessProfile | undefined): string {
   lines.push(`  - Biggest bottleneck: ${p.biggestBottleneck}`);
   if (p.monthlyBudget) lines.push(`  - Monthly marketing budget: ₹${p.monthlyBudget.toLocaleString('en-IN')}`);
   if (p.targetCities?.length) lines.push(`  - Target cities: ${p.targetCities.join(', ')}`);
-  if (p.topPatientPersona) lines.push(`  - Top patient persona: ${p.topPatientPersona}`);
-  if (p.topReasonPatientChooses)
-    lines.push(`  - #1 reason patients choose your brand: ${p.topReasonPatientChooses}`);
-  if (p.topReasonProviderJoins)
-    lines.push(`  - #1 reason providers join: ${p.topReasonProviderJoins}`);
+  if (p.topCustomerPersona) lines.push(`  - Top customer persona: ${p.topCustomerPersona}`);
+  if (p.topReasonCustomerChooses)
+    lines.push(`  - #1 reason customers choose us: ${p.topReasonCustomerChooses}`);
+  if (p.topReasonPartnerJoins)
+    lines.push(`  - #1 reason partners join: ${p.topReasonPartnerJoins}`);
   if (p.competitors?.length) lines.push(`  - Top competitors: ${p.competitors.join(', ')}`);
   if (p.bestPerforming) lines.push(`  - Best-performing channel/tactic so far: ${p.bestPerforming}`);
   return lines.length ? `\nBusiness profile:\n${lines.join('\n')}` : '';

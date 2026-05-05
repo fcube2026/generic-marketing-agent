@@ -78,7 +78,7 @@ export default function ReportsPage() {
       <div className="bg-green-50 border border-green-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-green-800 mb-1">📊 Weekly Marketing Digest</p>
         <p className="text-sm text-green-700">
-          Live KPIs computed from booking, payment, and signup data.
+          Live KPIs computed from transaction, payment, and signup data.
         </p>
       </div>
 

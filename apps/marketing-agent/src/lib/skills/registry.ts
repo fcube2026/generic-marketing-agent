@@ -20,7 +20,7 @@ import { marketingSkills, type MarketingSkill } from '../data';
 const COMMON_CRITERIA: SkillRubricCriterion[] = [
   {
     id: 'specificity',
-    description: 'Output is specific to your brand (cities, ICP, tone) — not generic ChatGPT advice.',
+    description: 'Output is specific to the brand (audience, ICP, tone) — not generic ChatGPT advice.',
     weight: 5,
   },
   {
@@ -30,13 +30,13 @@ const COMMON_CRITERIA: SkillRubricCriterion[] = [
   },
   {
     id: 'brand_voice',
-    description: 'Tone matches your brand — clear, warm, professional, India-localised, ₹ pricing.',
+    description: 'Tone matches the brand — clear, professional, and consistent.',
     weight: 3,
   },
   {
     id: 'compliance',
     description:
-      'No medical claims, no fabricated testimonials, respects NMC/DPDP norms, no unverifiable promises.',
+      'No fabricated testimonials, ratings, or unverifiable claims; respect applicable advertising and privacy norms.',
     weight: 5,
   },
   {
@@ -46,11 +46,11 @@ const COMMON_CRITERIA: SkillRubricCriterion[] = [
   },
 ];
 
-const HEALTHCARE_GUARDRAILS = [
-  'Never make medical claims, prescribe treatment, or diagnose conditions.',
-  'Never invent doctor names, patient names, ratings, or testimonials.',
-  'Quote prices in ₹ INR and use Indian formats (lakhs, crores) when natural.',
-  'Comply with NMC advertising rules (no superlative cure claims) and DPDP Act (no PII in copy).',
+const BRAND_GUARDRAILS = [
+  'Never invent customer names, partner names, ratings, or testimonials.',
+  'Never make unverified claims (about performance, outcomes, or any other quantitative or factual matter).',
+  'Use the currency and number formats appropriate to the brand’s primary market.',
+  'Comply with applicable advertising and data-protection rules; avoid PII in copy.',
   'When uncertain, flag the assumption and suggest how to validate.',
 ];
 
@@ -59,8 +59,8 @@ const HEALTHCARE_GUARDRAILS = [
 const BESPOKE: Record<string, AdvancedSkillConfig> = {
   // ── 1. Ad Creative ─────────────────────────────────────────────────────────
   'ad-creative': {
-    systemPrompt: `You are a senior performance-creative strategist for your brand (at-home doctor visits, India). You produce ad-creative matrices that maximise CTR and lower CPA. You think in **hook × angle × format** combinations and explain WHY each variant should win for a specific audience.`,
-    promptTemplate: `Produce a **{{variantCount}}-variant ad creative matrix** for your brand on **{{platform}}** targeting **{{audience}}** in **{{cities}}**.
+    systemPrompt: `You are a senior performance-creative strategist. You produce ad-creative matrices that maximise CTR and lower CPA. You think in **hook × angle × format** combinations and explain WHY each variant should win for a specific audience.`,
+    promptTemplate: `Produce a **{{variantCount}}-variant ad creative matrix** on **{{platform}}** targeting **{{audience}}** in **{{cities}}**.
 
 Campaign objective: **{{objective}}**
 Primary offer / CTA: **{{offer}}**
@@ -94,21 +94,21 @@ After the matrix:
         type: 'select',
         required: true,
         options: [
-          'Patient acquisition (first booking)',
+          'Customer acquisition (first transaction)',
           'App installs',
-          'Care-plan subscription',
-          'Provider recruitment',
+          'Subscription / care-plan signup',
+          'Partner recruitment',
           'Brand awareness',
           'Retargeting / re-engagement',
         ],
-        defaultValue: 'Patient acquisition (first booking)',
+        defaultValue: 'Customer acquisition (first transaction)',
       },
       {
         name: 'audience',
         label: 'Target audience',
         type: 'textarea',
         required: true,
-        placeholder: 'e.g. Urban working women 28-45 with elderly parents at home',
+        placeholder: 'e.g. Urban working professionals 28–45 in tier-1 cities',
       },
       {
         name: 'cities',
@@ -122,7 +122,7 @@ After the matrix:
         label: 'Primary offer / CTA',
         type: 'text',
         required: true,
-        placeholder: 'e.g. ₹100 off first home visit — book in 60 seconds',
+        placeholder: 'e.g. 10% off first transaction — sign up in 60 seconds',
       },
       {
         name: 'variantCount',
@@ -149,7 +149,7 @@ After the matrix:
       { key: 'visual', label: 'Sample visual', kind: 'image' },
     ],
     tools: ['profile', 'kpis.acquisition', 'campaigns'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: [
       ...COMMON_CRITERIA,
       {
@@ -170,8 +170,8 @@ After the matrix:
 
   // ── 2. Copywriting ─────────────────────────────────────────────────────────
   copywriting: {
-    systemPrompt: `You are a senior brand copywriter for your brand. You rewrite marketing copy using a chosen framework (PAS, AIDA, StoryBrand, JTBD, BAB) while staying inside your brand voice. You always produce **3 variants** so the user can A/B them, plus a side-by-side comparison vs the original.`,
-    promptTemplate: `Rewrite this copy using the **{{framework}}** framework, in your brand's voice ({{tone}}).
+    systemPrompt: `You are a senior brand copywriter. You rewrite marketing copy using a chosen framework (PAS, AIDA, StoryBrand, JTBD, BAB) while staying inside the brand voice. You always produce **3 variants** so the user can A/B them, plus a side-by-side comparison vs the original.`,
+    promptTemplate: `Rewrite this copy using the **{{framework}}** framework, in the brand's voice ({{tone}}).
 
 Page / surface: **{{surface}}**
 Primary audience: **{{audience}}**
@@ -221,7 +221,7 @@ For each variant include: headline, sub-headline, body, CTA. Then add:
         name: 'tone',
         label: 'Tone',
         type: 'select',
-        options: ['Warm + reassuring', 'Confident + clinical', 'Friendly + casual', 'Premium + minimal'],
+        options: ['Warm + reassuring', 'Confident + authoritative', 'Friendly + casual', 'Premium + minimal'],
         defaultValue: 'Warm + reassuring',
       },
       {
@@ -235,7 +235,7 @@ For each variant include: headline, sub-headline, body, CTA. Then add:
         label: 'Goal of the copy',
         type: 'text',
         required: true,
-        placeholder: 'e.g. Get the visitor to tap "Book a home visit"',
+        placeholder: 'e.g. Get the visitor to tap "Get started"',
       },
       { name: 'mustInclude', label: 'Must-include phrases / proof', type: 'textarea' },
       { name: 'avoidWords', label: 'Words / claims to avoid', type: 'textarea' },
@@ -245,7 +245,7 @@ For each variant include: headline, sub-headline, body, CTA. Then add:
       { key: 'diff', label: 'Side-by-side vs original', kind: 'markdown' },
     ],
     tools: ['profile'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: [
       ...COMMON_CRITERIA,
       {
@@ -260,8 +260,8 @@ For each variant include: headline, sub-headline, body, CTA. Then add:
 
   // ── 3. SEO Audit ───────────────────────────────────────────────────────────
   'seo-audit': {
-    systemPrompt: `You are a technical + content SEO auditor for healthcare brands in India. You produce **prioritised, ICE-scored** audit findings (Impact × Confidence × Ease) for your brand, distinguishing technical / on-page / content / off-page issues. Every finding becomes a **one-click plan item**.`,
-    promptTemplate: `Run a full SEO audit for your page **{{pageUrl}}** targeting the keyword **"{{targetKeyword}}"** in **{{geo}}**.
+    systemPrompt: `You are a technical + content SEO auditor. You produce **prioritised, ICE-scored** audit findings (Impact × Confidence × Ease), distinguishing technical / on-page / content / off-page issues. Every finding becomes a **one-click plan item**.`,
+    promptTemplate: `Run a full SEO audit for the page **{{pageUrl}}** targeting the keyword **"{{targetKeyword}}"** in **{{geo}}**.
 
 {{#if competitors}}Top competitors currently ranking for this query: {{competitors}}{{/if}}
 {{#if knownIssues}}Known issues already on our radar: {{knownIssues}}{{/if}}
@@ -283,7 +283,7 @@ Deliver:
    Aim for **10-15 findings**, sorted by ICE score descending.
 3. **Quick wins** — top 5 ranked by ICE.
 4. **Content gap analysis** vs the competitors above (entities / FAQs / formats they have and we don't).
-5. **Local + healthcare-specific recommendations** (NAP, Physician schema, DigiLocker / NMC mentions where relevant).
+5. **Local + industry-specific recommendations** (NAP, relevant schema types, citations and trust signals where applicable).
 6. **Suggested measurement** — exact GA4 / Search Console queries to validate each top fix.`,
     inputs: [
       { name: 'pageUrl', label: 'Page URL to audit', type: 'url', required: true, placeholder: 'https://example.com/...' },
@@ -292,8 +292,8 @@ Deliver:
         name: 'geo',
         label: 'Primary geo',
         type: 'select',
-        options: ['India (national)', 'Mumbai', 'Delhi NCR', 'Bengaluru', 'Hyderabad', 'Chennai', 'Pune'],
-        defaultValue: 'India (national)',
+        options: ['Global', 'India (national)', 'United States', 'United Kingdom', 'Mumbai', 'Delhi NCR', 'Bengaluru'],
+        defaultValue: 'Global',
       },
       { name: 'competitors', label: 'Competitor URLs (optional)', type: 'textarea' },
       { name: 'knownIssues', label: 'Known issues (optional)', type: 'textarea' },
@@ -305,7 +305,7 @@ Deliver:
       { key: 'contentGaps', label: 'Content gap analysis', kind: 'markdown' },
     ],
     tools: ['seoPages', 'keywordClusters', 'profile'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: [
       ...COMMON_CRITERIA,
       {
@@ -325,8 +325,8 @@ Deliver:
 
   // ── 4. Email Sequence ─────────────────────────────────────────────────────
   'email-sequence': {
-    systemPrompt: `You are a lifecycle email expert for your brand. You design sequences that ship as a real \`MarketingLifecycleFlow\` row — every step has a trigger, day offset, channel, subject, preheader, body, and a measurable goal. You write 2 subject-line variants per step for A/B testing, and propose send-time-optimised slots in IST.`,
-    promptTemplate: `Design a **{{stepCount}}-step {{audience}}** lifecycle sequence for your brand.
+    systemPrompt: `You are a lifecycle email expert. You design sequences that ship as a real \`MarketingLifecycleFlow\` row — every step has a trigger, day offset, channel, subject, preheader, body, and a measurable goal. You write 2 subject-line variants per step for A/B testing, and propose send-time-optimised slots.`,
+    promptTemplate: `Design a **{{stepCount}}-step {{audience}}** lifecycle sequence.
 
 Trigger event: **{{trigger}}**
 Primary goal: **{{goal}}**
@@ -334,7 +334,7 @@ Success metric: **{{metric}}**
 {{#if exclusions}}Exclude users who: {{exclusions}}{{/if}}
 
 For each step output:
-- **Day offset from trigger** + recommended **IST send window** (e.g. Tue 10:00–11:00 IST, with reasoning).
+- **Day offset from trigger** + recommended **send window** (e.g. Tue 10:00–11:00 local, with reasoning).
 - **Channel** (email / WhatsApp / push / in-app — pick what suits the message).
 - **Subject A** and **Subject B** (≤45 chars each), with which one is the safer baseline.
 - **Preheader** (≤90 chars).
@@ -351,8 +351,8 @@ After the steps, add:
         label: 'Audience',
         type: 'select',
         required: true,
-        options: ['patient', 'provider'],
-        defaultValue: 'patient',
+        options: ['customer', 'partner'],
+        defaultValue: 'customer',
       },
       {
         name: 'trigger',
@@ -360,30 +360,30 @@ After the steps, add:
         type: 'select',
         required: true,
         options: [
-          'New patient signup (no booking yet)',
-          'First booking completed',
-          'Cancelled before consultation',
-          'Care-plan trial started',
-          'Provider applied (KYC pending)',
-          'Provider went inactive (>14 days)',
+          'New customer signup (no transaction yet)',
+          'First transaction completed',
+          'Cancelled before completion',
+          'Trial / subscription started',
+          'Partner applied (review pending)',
+          'Partner went inactive (>14 days)',
           'Failed payment',
           'Custom (describe in notes)',
         ],
-        defaultValue: 'New patient signup (no booking yet)',
+        defaultValue: 'New customer signup (no transaction yet)',
       },
       {
         name: 'goal',
         label: 'Primary goal',
         type: 'text',
         required: true,
-        placeholder: 'e.g. First booking within 14 days',
+        placeholder: 'e.g. First transaction within 14 days',
       },
       {
         name: 'metric',
         label: 'Success metric',
         type: 'text',
         required: true,
-        placeholder: 'e.g. Signup → Booking conversion rate',
+        placeholder: 'e.g. Signup → Transaction conversion rate',
       },
       { name: 'stepCount', label: 'Number of steps', type: 'number', defaultValue: 7 },
       { name: 'exclusions', label: 'Exclusion rules', type: 'textarea' },
@@ -394,12 +394,12 @@ After the steps, add:
       { key: 'funnel', label: 'Predicted funnel', kind: 'table' },
     ],
     tools: ['profile', 'lifecycleFlows', 'kpis.activation', 'kpis.retention'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: [
       ...COMMON_CRITERIA,
       {
         id: 'send_time_logic',
-        description: 'Send-time recommendations consider IST work patterns and trigger context.',
+        description: 'Send-time recommendations consider work patterns and trigger context.',
         weight: 3,
       },
       {
@@ -414,8 +414,8 @@ After the steps, add:
 
   // ── 5. Page CRO ────────────────────────────────────────────────────────────
   'page-cro': {
-    systemPrompt: `You are a senior conversion-rate optimisation strategist for your brand landing pages. You ingest a page (URL or pasted content) and produce an **ICE-scored experiment backlog** that is one-click importable into the experiments dashboard. You always cite the funnel KPI you expect each test to move and propose an MDE-aware sample size.`,
-    promptTemplate: `Audit and propose CRO experiments for your page **{{pageUrl}}**.
+    systemPrompt: `You are a senior conversion-rate optimisation strategist for landing pages. You ingest a page (URL or pasted content) and produce an **ICE-scored experiment backlog** that is one-click importable into the experiments dashboard. You always cite the funnel KPI you expect each test to move and propose an MDE-aware sample size.`,
+    promptTemplate: `Audit and propose CRO experiments for the page **{{pageUrl}}**.
 
 Current monthly traffic: **{{monthlyTraffic}}** | Current conversion rate: **{{currentCvr}}%** → target: **{{targetCvr}}%**
 Primary conversion event: **{{conversionEvent}}**
@@ -448,7 +448,7 @@ Deliver:
     inputs: [
       { name: 'pageUrl', label: 'Page URL', type: 'url', required: true },
       { name: 'audience', label: 'Audience visiting', type: 'textarea', required: true },
-      { name: 'conversionEvent', label: 'Primary conversion event', type: 'text', required: true, placeholder: 'e.g. booking_completed' },
+      { name: 'conversionEvent', label: 'Primary conversion event', type: 'text', required: true, placeholder: 'e.g. signup_completed' },
       { name: 'monthlyTraffic', label: 'Monthly traffic to this page', type: 'number', defaultValue: 10000 },
       { name: 'currentCvr', label: 'Current conversion rate (%)', type: 'number', defaultValue: 2.5 },
       { name: 'targetCvr', label: 'Target conversion rate (%)', type: 'number', defaultValue: 4 },
@@ -462,7 +462,7 @@ Deliver:
       { key: 'measurement', label: 'Measurement plan', kind: 'markdown' },
     ],
     tools: ['kpis.activation', 'profile', 'experiments'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: [
       ...COMMON_CRITERIA,
       {
@@ -485,8 +485,8 @@ Deliver:
 
 function baselineConfig(skill: MarketingSkill): AdvancedSkillConfig {
   return {
-    systemPrompt: `You are a senior marketing operator running the **${skill.name}** skill for your brand (at-home doctor visits, India). You produce structured, prioritised, brand-safe deliverables — not generic advice. Use the live org context provided to ground every recommendation in real numbers.`,
-    promptTemplate: `Run the **${skill.name}** skill for your brand.
+    systemPrompt: `You are a senior marketing operator running the **${skill.name}** skill for the brand. You produce structured, prioritised, brand-safe deliverables — not generic advice. Use the live org context provided to ground every recommendation in real numbers.`,
+    promptTemplate: `Run the **${skill.name}** skill.
 
 Objective: **{{objective}}**
 {{#if context}}Context the user provided:
@@ -518,7 +518,7 @@ Deliver:
         label: 'Primary success metric',
         type: 'text',
         required: true,
-        placeholder: 'e.g. +20% bookings, -15% CAC, 15% referral rate',
+        placeholder: 'e.g. +20% signups, -15% CAC, 15% referral rate',
       },
       {
         name: 'timeHorizon',
@@ -535,7 +535,7 @@ Deliver:
       { key: 'planJson', label: 'Plan JSON (importable)', kind: 'json', downloadExtension: 'json' },
     ],
     tools: ['profile', 'kpis.northStar'],
-    guardrails: HEALTHCARE_GUARDRAILS,
+    guardrails: BRAND_GUARDRAILS,
     successCriteria: COMMON_CRITERIA,
     model: 'gpt-4o-mini',
     tier: 'free',

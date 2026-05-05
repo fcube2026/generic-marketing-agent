@@ -23,22 +23,22 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
     subsections: [
       {
         heading: 'Positioning Statement',
-        content: '"your brand is the fastest, most trusted way to connect with verified healthcare providers — on your terms, at your time."',
+        content: '"Our brand is the fastest, most trusted way to get [your core outcome] — on your terms, at your time."',
         type: 'quote',
       },
       {
         heading: 'Brand Narrative Pillars',
         type: 'pillars',
         items: [
-          { icon: '🔒', label: 'Trust', detail: 'Verified providers, transparent pricing, real reviews' },
-          { icon: '⚡', label: 'Speed', detail: 'Book in minutes, get care today' },
-          { icon: '🏠', label: 'Convenience', detail: 'Home visits, clinic visits, on-demand' },
-          { icon: '💪', label: 'Empowerment', detail: 'Patients in control of their health' },
+          { icon: '🔒', label: 'Trust', detail: 'Verified partners, transparent pricing, real reviews' },
+          { icon: '⚡', label: 'Speed', detail: 'Get started in minutes — value delivered today' },
+          { icon: '🏠', label: 'Convenience', detail: 'Available where and when our customers need us' },
+          { icon: '💪', label: 'Empowerment', detail: 'Customers in control of their own decisions' },
         ],
       },
       {
         heading: 'Tone of Voice',
-        content: 'Warm, clear, confident, human. Not clinical. Not corporate. Speaks like a trusted friend who happens to know healthcare.',
+        content: 'Warm, clear, confident, human. Not corporate. Speaks like a trusted friend who knows the category.',
         type: 'text',
       },
     ],
@@ -49,24 +49,24 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
     title: 'Audience Segmentation',
     subsections: [
       {
-        heading: 'Patient ICPs',
+        heading: 'Customer ICPs',
         type: 'table',
         headers: ['Persona', 'Description', 'Key Message'],
         rows: [
-          ['Urban Busy Professional', '25–40, metro city, needs care without taking a day off', '"Book in 2 min, skip the waiting room"'],
-          ['Parent / Caregiver', '30–50, managing family health, needs reliability', '"Trusted doctors, at home or clinic"'],
-          ['Senior / Elderly Support', '55+, or adult children managing for them', '"Easy, safe, verified — no tech stress"'],
-          ['Chronic Condition Manager', 'Frequent diagnostics/consultations, needs continuity', '"Your care team, always available"'],
+          ['Urban Busy Professional', '25–40, metro city, needs the outcome without taking a day off', '"Get started in 2 min, skip the friction"'],
+          ['Household Decision-Maker', '30–50, manages the family or team, needs reliability', '"Trusted partners, anywhere you need us"'],
+          ['Senior / Assisted User', '55+, or adult children managing on their behalf', '"Easy, safe, verified — no tech stress"'],
+          ['Power User', 'Frequent / repeat usage, needs continuity and depth', '"Your workspace, always available"'],
         ],
       },
       {
-        heading: 'Provider ICPs',
+        heading: 'Partner ICPs',
         type: 'table',
         headers: ['Persona', 'Description', 'Key Message'],
         rows: [
-          ['Independent Doctor', 'Solo practice, wants more patients without marketing effort', '"Grow your practice. We bring patients to you."'],
-          ['Clinic Owner', 'Has staff, wants to fill appointment slots', '"Fill your schedule. Zero upfront cost."'],
-          ['Diagnostic Center', 'High-volume, needs steady patient flow', '"Expand reach. Grow bookings."'],
+          ['Independent Operator', 'Solo professional, wants more customers without marketing effort', '"Grow your practice. We bring customers to you."'],
+          ['Established Business', 'Has staff, wants to fill capacity', '"Fill your schedule. Zero upfront cost."'],
+          ['High-Volume Supplier', 'High throughput, needs steady demand flow', '"Expand reach. Grow transactions."'],
         ],
       },
     ],
@@ -106,9 +106,9 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Launch Sequence',
         type: 'steps',
         items: [
-          { step: '1', title: 'Seed Supply', detail: 'Onboard 50 verified providers in target city before demand launch' },
-          { step: '2', title: 'Activate Demand', detail: 'Launch Google Search + referral in parallel — prioritise high-intent patients' },
-          { step: '3', title: 'Collect Proof', detail: 'Drive first 100 completed bookings; collect reviews and testimonials' },
+          { step: '1', title: 'Seed Supply', detail: 'Onboard 50 verified partners in target market before launching demand' },
+          { step: '2', title: 'Activate Demand', detail: 'Launch Google Search + referral in parallel — prioritise high-intent customers' },
+          { step: '3', title: 'Collect Proof', detail: 'Drive first 100 completed transactions; collect reviews and testimonials' },
           { step: '4', title: 'Amplify', detail: 'Use social proof to scale paid ads and content — lower CAC through trust' },
           { step: '5', title: 'Expand', detail: 'Replicate city playbook in next market with learnings from city 1' },
         ],
@@ -124,8 +124,8 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Referral Strategy',
         type: 'two-col',
         items: [
-          { label: 'Patient Referral', detail: 'Reward: ₹100 booking credit (drives repeat use). Mechanic: unique link in post-booking screen + email. Goal: 15% of new acquisitions within 6 months.' },
-          { label: 'Provider Referral', detail: 'Reward: reduced commission for 3 months per referred provider. Mechanic: dashboard link + WhatsApp sharing. Goal: 20% of new provider supply via referral.' },
+          { label: 'Customer Referral', detail: 'Reward: a credit toward the next purchase (drives repeat use). Mechanic: unique link in post-purchase screen + email. Goal: 15% of new acquisitions within 6 months.' },
+          { label: 'Partner Referral', detail: 'Reward: reduced commission for 3 months per referred partner. Mechanic: dashboard link + WhatsApp/email sharing. Goal: 20% of new partner supply via referral.' },
         ],
       },
       {
@@ -133,10 +133,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Tier', 'Partner Type', 'Goal'],
         rows: [
-          ['Tier 1', 'Corporate HR / employee wellness', 'Bulk patient acquisition, B2B revenue'],
-          ['Tier 2', 'Insurance companies', 'Co-marketing, claims-linked bookings'],
-          ['Tier 3', 'Pharmacies / medical supply', 'Cross-referral, bundle offers'],
-          ['Tier 4', 'Health content creators / patient advocates', 'Awareness, trust'],
+          ['Tier 1', 'Corporate / employee-perk programs', 'Bulk customer acquisition, B2B revenue'],
+          ['Tier 2', 'Adjacent platforms (insurance, fintech, etc.)', 'Co-marketing, embedded distribution'],
+          ['Tier 3', 'Complementary product / service vendors', 'Cross-referral, bundle offers'],
+          ['Tier 4', 'Content creators / category advocates', 'Awareness, trust'],
         ],
       },
     ],
@@ -150,11 +150,11 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Content Pillars',
         type: 'pillars',
         items: [
-          { icon: '📚', label: 'Patient Education', detail: 'Health tips, when to see a doctor, how diagnostics work' },
-          { icon: '⭐', label: 'Provider Spotlights', detail: 'Build trust through featured provider stories' },
-          { icon: '📱', label: 'Product Education', detail: 'How to use your brand features (home visit, tracking, payments)' },
-          { icon: '🏆', label: 'Social Proof', detail: 'Patient testimonials, booking milestones, provider reviews' },
-          { icon: '🏙️', label: 'Local Health', detail: 'City-specific health events, disease awareness, local partnerships' },
+          { icon: '📚', label: 'Audience Education', detail: 'Useful tips, when and why to use the category, how the process works' },
+          { icon: '⭐', label: 'Partner Spotlights', detail: 'Build trust through featured partner stories' },
+          { icon: '📱', label: 'Product Education', detail: 'How to use core features (signup, tracking, payments, etc.)' },
+          { icon: '🏆', label: 'Social Proof', detail: 'Customer testimonials, milestones, partner reviews' },
+          { icon: '🏙️', label: 'Local & Community', detail: 'City-specific events, awareness moments, local partnerships' },
         ],
       },
       {
@@ -162,10 +162,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Platform', 'Content Type', 'Frequency'],
         rows: [
-          ['Instagram', 'Visual storytelling, provider spotlights, patient journeys', '4x/week'],
-          ['LinkedIn', 'B2B provider recruitment, company updates, thought leadership', '3x/week'],
-          ['YouTube Shorts/Reels', '30–60 sec explainers and patient stories', '2x/week'],
-          ['WhatsApp Broadcast', 'Retention, re-engagement, health reminders', '2x/week'],
+          ['Instagram', 'Visual storytelling, partner spotlights, customer journeys', '4x/week'],
+          ['LinkedIn', 'B2B partner recruitment, company updates, thought leadership', '3x/week'],
+          ['YouTube Shorts/Reels', '30–60 sec explainers and customer stories', '2x/week'],
+          ['WhatsApp Broadcast', 'Retention, re-engagement, timely reminders', '2x/week'],
           ['Blog/SEO', 'Long-form informational + transactional content', '2x/week'],
         ],
       },
@@ -181,8 +181,8 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Cohort', 'Target', 'Primary Lever'],
         rows: [
-          ['D7', '> 40%', 'Post-booking review request + follow-up care suggestion'],
-          ['D30', '> 25%', 'Re-engagement email + personalised provider recommendation'],
+          ['D7', '> 40%', 'Post-purchase review request + follow-up suggestion'],
+          ['D30', '> 25%', 'Re-engagement email + personalised partner / product recommendation'],
           ['D90', '> 15%', 'Win-back campaign + loyalty credit'],
         ],
       },
@@ -190,10 +190,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Key CRM Triggers',
         type: 'steps',
         items: [
-          { step: '✅', title: 'Booking completed', detail: 'Review request 24h after booking completes' },
-          { step: '❌', title: 'Booking cancelled', detail: 'Recovery flow — offer alternative provider or time slot' },
-          { step: '⏰', title: 'Upcoming appointment', detail: 'Reminder 1 day + 1 hour before appointment' },
-          { step: '📋', title: 'License renewal approaching', detail: 'Alert notification to provider 30 days before expiry' },
+          { step: '✅', title: 'Transaction completed', detail: 'Review request 24h after the transaction completes' },
+          { step: '❌', title: 'Transaction cancelled', detail: 'Recovery flow — offer alternative partner or time slot' },
+          { step: '⏰', title: 'Upcoming appointment / delivery', detail: 'Reminder 1 day + 1 hour before the scheduled time' },
+          { step: '📋', title: 'Partner credential renewal', detail: 'Alert notification to partner 30 days before expiry' },
         ],
       },
     ],
@@ -205,7 +205,7 @@ export default function StrategyPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
         <p className="text-sm text-purple-700">
-          <strong>📌 Strategy Framework</strong> — This is your full marketing strategy, tailored to your brand&apos;s healthcare marketplace model. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
+          <strong>📌 Strategy Framework</strong> — This is a full marketing strategy you can adapt to your brand. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
         </p>
       </div>
 

@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Simple in-memory token-bucket rate limiter, scoped per Node.js process.
  *
- * Mirrors the WebhookRateLimitGuard pattern used in the API service
- * (apps/api/src/modules/pharmacy/webhooks/guards/webhook-rate-limit.guard.ts).
  * Good enough for a single Vercel instance / dev server; for multi-instance
  * production deployments, swap for Upstash/Redis.
  */

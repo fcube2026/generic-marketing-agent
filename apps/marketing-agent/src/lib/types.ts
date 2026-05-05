@@ -2,15 +2,15 @@
 // Static catalog/UI types stay in lib/data.ts.
 
 export interface BusinessProfile {
-  primaryGrowthFocus: 'patients' | 'providers' | 'both';
+  primaryGrowthFocus: 'customers' | 'partners' | 'both';
   biggestBottleneck: 'supply' | 'demand' | 'activation';
   monthlyBudget: number;
   allocatedBudget: number;
   targetCities: string[];
   bestPerforming: string;
-  topPatientPersona: string;
-  topReasonPatientChooses: string;
-  topReasonProviderJoins: string;
+  topCustomerPersona: string;
+  topReasonCustomerChooses: string;
+  topReasonPartnerJoins: string;
   competitors: string[];
   founderLedBrand: boolean;
 }
@@ -25,11 +25,11 @@ export interface KpiMetric {
 }
 
 export type ContentPillar =
-  | 'patient-education'
-  | 'provider-spotlight'
+  | 'audience-education'
+  | 'partner-spotlight'
   | 'product-education'
   | 'social-proof'
-  | 'local-health';
+  | 'local-community';
 
 export interface ContentItem {
   id: string;
@@ -59,7 +59,7 @@ export interface Campaign {
 export interface KeywordCluster {
   id: string;
   cluster: string;
-  type: 'transactional' | 'informational' | 'comparison' | 'provider-side';
+  type: 'transactional' | 'informational' | 'comparison' | 'partner-side';
   priority: 'high' | 'medium' | 'low';
   keywords: Array<{ keyword: string; volume: string; difficulty: string }>;
 }
@@ -67,7 +67,7 @@ export interface KeywordCluster {
 export interface SeoPage {
   id: string;
   url: string;
-  type: 'city-specialty' | 'condition' | 'blog' | 'comparison';
+  type: 'city-service' | 'category' | 'blog' | 'comparison';
   title: string;
   status: 'live' | 'in-progress' | 'planned';
   targetKeyword: string;
@@ -83,7 +83,7 @@ export interface LifecycleFlowStep {
 export interface LifecycleFlow {
   id: string;
   name: string;
-  segment: 'patient' | 'provider';
+  segment: 'customer' | 'partner';
   trigger: string;
   steps: LifecycleFlowStep[];
   status: 'active' | 'draft' | 'paused';

@@ -49,9 +49,9 @@ const seed: Store = {
     allocatedBudget: 320000,
     targetCities: ['Mumbai', 'Bengaluru', 'Delhi'],
     bestPerforming: 'Word-of-mouth referrals and a focused Google Search campaign on high-intent keywords.',
-    topPatientPersona: 'Urban professional, 28–38, time-poor, high digital fluency.',
-    topReasonPatientChooses: 'Speed of booking and transparent pricing.',
-    topReasonProviderJoins: 'Steady customer flow with no upfront cost.',
+    topCustomerPersona: 'Urban professional, 28–38, time-poor, high digital fluency.',
+    topReasonCustomerChooses: 'Speed of signup and transparent pricing.',
+    topReasonPartnerJoins: 'Steady customer flow with no upfront cost.',
     competitors: ['Competitor A', 'Competitor B'],
     founderLedBrand: true,
   },
@@ -79,7 +79,7 @@ const seed: Store = {
       duration: '6 weeks',
       kpi: 'Conversions / CAC',
       status: 'active',
-      headline: ['Book in 2 minutes', 'Verified providers near you'],
+      headline: ['Get started in 2 minutes', 'Verified partners near you'],
       description: ['Trusted by thousands. Transparent pricing. No hidden fees.'],
     },
     {
@@ -140,13 +140,13 @@ const seed: Store = {
   contentItems: [
     { id: 'ci1', week: 1, day: 'Mon', platform: 'LinkedIn', pillar: 'product-education', title: 'How our platform works in 4 steps', format: 'Carousel', status: 'ready' },
     { id: 'ci2', week: 1, day: 'Wed', platform: 'Instagram', pillar: 'social-proof', title: 'Customer story — Priya, Mumbai', format: 'Reel', status: 'in-progress' },
-    { id: 'ci3', week: 1, day: 'Fri', platform: 'Twitter/X', pillar: 'patient-education', title: '5 myths about online booking', format: 'Thread', status: 'planned' },
-    { id: 'ci4', week: 2, day: 'Tue', platform: 'LinkedIn', pillar: 'provider-spotlight', title: 'Meet our top-rated partner of the month', format: 'Single image', status: 'planned' },
-    { id: 'ci5', week: 2, day: 'Thu', platform: 'Instagram', pillar: 'local-health', title: 'Bengaluru launch teaser', format: 'Story', status: 'planned' },
+    { id: 'ci3', week: 1, day: 'Fri', platform: 'Twitter/X', pillar: 'audience-education', title: '5 myths about getting started online', format: 'Thread', status: 'planned' },
+    { id: 'ci4', week: 2, day: 'Tue', platform: 'LinkedIn', pillar: 'partner-spotlight', title: 'Meet our top-rated partner of the month', format: 'Single image', status: 'planned' },
+    { id: 'ci5', week: 2, day: 'Thu', platform: 'Instagram', pillar: 'local-community', title: 'Bengaluru launch teaser', format: 'Story', status: 'planned' },
   ],
   seoPages: [
-    { id: 'sp1', url: '/services/mumbai', type: 'city-specialty', title: 'Services in Mumbai', status: 'live', targetKeyword: 'services mumbai' },
-    { id: 'sp2', url: '/services/bengaluru', type: 'city-specialty', title: 'Services in Bengaluru', status: 'in-progress', targetKeyword: 'services bengaluru' },
+    { id: 'sp1', url: '/services/mumbai', type: 'city-service', title: 'Services in Mumbai', status: 'live', targetKeyword: 'services mumbai' },
+    { id: 'sp2', url: '/services/bengaluru', type: 'city-service', title: 'Services in Bengaluru', status: 'in-progress', targetKeyword: 'services bengaluru' },
     { id: 'sp3', url: '/blog/getting-started', type: 'blog', title: 'Getting started — a step-by-step guide', status: 'live', targetKeyword: 'getting started guide' },
     { id: 'sp4', url: '/compare/competitor-a', type: 'comparison', title: 'How we compare to Competitor A', status: 'planned', targetKeyword: 'competitor a alternative' },
   ],
@@ -158,7 +158,7 @@ const seed: Store = {
       priority: 'high',
       keywords: [
         { keyword: 'service in mumbai', volume: '4.4K', difficulty: 'Medium' },
-        { keyword: 'best provider mumbai', volume: '2.1K', difficulty: 'Medium' },
+        { keyword: 'best partner mumbai', volume: '2.1K', difficulty: 'Medium' },
       ],
     },
     {
@@ -167,7 +167,7 @@ const seed: Store = {
       type: 'informational',
       priority: 'medium',
       keywords: [
-        { keyword: 'how to choose a provider', volume: '1.6K', difficulty: 'Low' },
+        { keyword: 'how to choose a partner', volume: '1.6K', difficulty: 'Low' },
         { keyword: 'what to expect on first visit', volume: '900', difficulty: 'Low' },
       ],
     },
@@ -176,7 +176,7 @@ const seed: Store = {
     {
       id: 'lf1',
       name: 'Customer onboarding — first 14 days',
-      segment: 'patient',
+      segment: 'customer',
       trigger: 'New signup',
       status: 'active',
       steps: [
@@ -189,7 +189,7 @@ const seed: Store = {
     {
       id: 'lf2',
       name: 'Partner onboarding — first 30 days',
-      segment: 'provider',
+      segment: 'partner',
       trigger: 'Partner approved',
       status: 'active',
       steps: [

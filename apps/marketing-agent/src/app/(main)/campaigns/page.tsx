@@ -156,14 +156,14 @@ export default function CampaignsPage() {
       <Card title="📋 Campaign Brief Template" subtitle="Use this structure when requesting a new campaign brief from your team or AI agent">
         <div className="space-y-3 text-sm text-gray-700">
           {[
-            { field: 'Campaign Name', example: 'e.g. Google Search — Diagnostics Delhi Q2' },
-            { field: 'Objective', example: 'e.g. Acquire patients searching for home diagnostic tests in Delhi' },
-            { field: 'Target Audience', example: 'e.g. Users searching "blood test at home delhi", "lab collection home"' },
+            { field: 'Campaign Name', example: 'e.g. Google Search — Category Launch Q2' },
+            { field: 'Objective', example: 'e.g. Acquire customers searching for our category in priority cities' },
+            { field: 'Target Audience', example: 'e.g. Users searching "[primary keyword] near me", "best [category] online"' },
             { field: 'Channel', example: 'e.g. Google Search Ads' },
             { field: 'Budget', example: 'e.g. ₹60,000/month' },
             { field: 'Duration', example: 'e.g. 8 weeks (Q2 2026)' },
-            { field: 'Primary KPI', example: 'e.g. Booking completions, CAC < ₹280' },
-            { field: 'Key Message', example: 'e.g. "Get a lab test at home — results in 24 hours"' },
+            { field: 'Primary KPI', example: 'e.g. Signups / first transactions, CAC under target' },
+            { field: 'Key Message', example: 'e.g. "Get started in minutes — results you can count on"' },
             { field: 'Creative Assets Needed', example: 'e.g. 3 headlines, 3 descriptions, 1 landing page' },
           ].map((row) => (
             <div key={row.field} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">

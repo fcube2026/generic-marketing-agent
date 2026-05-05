@@ -10,7 +10,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/campaigns': { title: 'Campaigns', subtitle: 'Campaign briefs, ad copy, and execution tracking' },
   '/content-calendar': { title: 'Content Calendar', subtitle: 'Monthly content plan across platforms and pillars' },
   '/seo': { title: 'SEO Strategy', subtitle: 'Keyword clusters, content SEO pages, and ranking opportunities' },
-  '/lifecycle': { title: 'Lifecycle & CRM', subtitle: 'Patient and provider onboarding, re-engagement, and retention flows' },
+  '/lifecycle': { title: 'Lifecycle & CRM', subtitle: 'Customer and partner onboarding, re-engagement, and retention flows' },
   '/experiments': { title: 'Experiments', subtitle: 'A/B tests, experiment log, results, and learnings' },
   '/reports': { title: 'Reports & KPIs', subtitle: 'Performance reporting, funnel analysis, and channel comparison' },
   '/agent': { title: 'AI Marketing Agent', subtitle: 'Chat with your AI CMO for strategy, copy, and execution guidance' },

@@ -34,9 +34,9 @@ function normalizeProfile(raw: any): BusinessProfile {
     allocatedBudget: raw.allocatedBudget ?? 0,
     targetCities: raw.targetCities ?? [],
     bestPerforming: raw.bestPerforming ?? '',
-    topPatientPersona: raw.topPatientPersona ?? '',
-    topReasonPatientChooses: raw.topReasonPatientChooses ?? '',
-    topReasonProviderJoins: raw.topReasonProviderJoins ?? '',
+    topCustomerPersona: raw.topCustomerPersona ?? raw.topPatientPersona ?? '',
+    topReasonCustomerChooses: raw.topReasonCustomerChooses ?? raw.topReasonPatientChooses ?? '',
+    topReasonPartnerJoins: raw.topReasonPartnerJoins ?? raw.topReasonProviderJoins ?? '',
     competitors: raw.competitors ?? [],
     founderLedBrand: !!raw.founderLedBrand,
   };

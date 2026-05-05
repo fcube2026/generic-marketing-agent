@@ -84,8 +84,8 @@ const POST_PLATFORM_PIXELS: Record<string, { w: number; h: number }> = {
 const AD_PLATFORMS = ['Google Search', 'Google Display', 'Meta (Facebook/Instagram)', 'LinkedIn Ads', 'YouTube Ads', 'WhatsApp Ads'] as const;
 const CAMPAIGN_OBJECTIVES = [
   'Brand Awareness',
-  'Patient Acquisition',
-  'Provider Recruitment',
+  'Customer Acquisition',
+  'Partner Recruitment',
   'App Install',
   'Re-engagement / Retargeting',
   'Seasonal Offer',
@@ -99,16 +99,16 @@ function buildImagePromptForVisual(
   customSubject?: string,
 ): string {
   const conceptMap: Record<typeof FORMAT_TYPES[number], string> = {
-    'Square Post (1:1)': 'warm welcoming scene of a professional doctor visiting a patient at home, doctor in white coat smiling, bright modern apartment',
-    'Portrait Post (4:5)': 'close-up portrait of a confident smiling Indian doctor holding a medical kit, soft bokeh home background',
-    'Story / Reel (9:16)': 'full-height vertical social media visual, doctor at patient door in bright daylight, warm colour palette, mobile-first composition',
-    'Landscape Banner (16:9)': 'wide-angle doctor and patient interaction in a cosy living room, doctor reviewing notes on tablet, bright airy room',
-    'Twitter/X Card (2:1)': 'horizontal composition doctor at home visit, bold clean design, blue and white healthcare tones, professional photography',
-    'LinkedIn Banner (4:1)': 'ultra-wide professional banner, subtle gradient navy to white, doctor silhouette, clean corporate healthcare aesthetic',
-    'Pinterest Pin (2:3)': 'tall vertical pin, healthcare booking steps infographic, clean icons, numbered, blue and white',
-    'YouTube Thumbnail (16:9)': 'bold YouTube thumbnail composition, high contrast, doctor at door, expressive cinematic scene',
-    'Facebook Cover (2.7:1)': 'wide Facebook cover, gradient background, doctor and patient USP illustration, professional brand visual',
-    'WhatsApp Status (9:16)': 'vertical WhatsApp status card, friendly doctor avatar, minimal clean design, healthcare blue accent',
+    'Square Post (1:1)': 'warm, welcoming brand scene featuring a satisfied customer using the product, bright modern environment, premium feel',
+    'Portrait Post (4:5)': 'close-up portrait of a confident smiling person, soft bokeh background, premium brand quality',
+    'Story / Reel (9:16)': 'full-height vertical social media visual, dynamic lifestyle scene, warm colour palette, mobile-first composition',
+    'Landscape Banner (16:9)': 'wide-angle lifestyle scene of a customer enjoying the product, bright airy environment, modern aesthetic',
+    'Twitter/X Card (2:1)': 'horizontal composition with bold clean design, premium brand tones, professional photography',
+    'LinkedIn Banner (4:1)': 'ultra-wide professional banner, subtle gradient navy to white, clean corporate aesthetic',
+    'Pinterest Pin (2:3)': 'tall vertical pin, step-by-step infographic, clean icons, numbered, brand colour palette',
+    'YouTube Thumbnail (16:9)': 'bold YouTube thumbnail composition, high contrast, expressive cinematic scene',
+    'Facebook Cover (2.7:1)': 'wide Facebook cover, gradient background, brand value-prop illustration, professional brand visual',
+    'WhatsApp Status (9:16)': 'vertical WhatsApp status card, friendly avatar, minimal clean design, brand accent',
   };
 
   const styleMap: Record<typeof VISUAL_STYLES[number], string> = {
@@ -121,17 +121,17 @@ function buildImagePromptForVisual(
     'Neon / Dark Mode': 'neon colours, dark background, glowing effects, high contrast, modern digital aesthetic',
   };
 
-  return `${customSubject?.trim() ? customSubject.trim() : conceptMap[format]}, ${styleMap[style]}, healthcare blue #1E6FCC accent, professional`;
+  return `${customSubject?.trim() ? customSubject.trim() : conceptMap[format]}, ${styleMap[style]}, brand accent colour, professional`;
 }
 
 function buildPostImagePrompt(platform: string, pillar: string): string {
   const pillarImages: Record<string, string> = {
-    'Education & Awareness': 'educational healthcare scene, doctor explaining to patient in bright home, warm and informative, clear and professional',
-    'Trust & Social Proof': 'happy patient giving thumbs up after home doctor visit, warm genuine moment, bright home environment, trustworthy healthcare scene',
-    'Product/Service Highlight': 'doctor using smartphone healthcare booking app during home visit, modern technology in healthcare, clean professional scene',
-    'Brand Story': 'heartfelt moment between doctor and elderly patient at home, warm emotional lighting, storytelling photography',
-    'Community & Engagement': 'diverse group of happy healthy urban Indian people, community healthcare, vibrant energetic social visual',
-    'Offer & Promotion': 'vibrant promotional healthcare visual, doctor home visit, energetic call-to-action composition, bold brand colours',
+    'Education & Awareness': 'educational scene, friendly explainer in bright modern setting, warm and informative, clear and professional',
+    'Trust & Social Proof': 'happy customer giving thumbs up after using the product, warm genuine moment, bright environment, trustworthy scene',
+    'Product/Service Highlight': 'person using a smartphone app, modern technology in everyday life, clean professional scene',
+    'Brand Story': 'heartfelt moment between two people, warm emotional lighting, storytelling photography',
+    'Community & Engagement': 'diverse group of happy people, community vibe, vibrant energetic social visual',
+    'Offer & Promotion': 'vibrant promotional brand visual, energetic call-to-action composition, bold brand colours',
   };
 
   const platformStyle: Record<string, string> = {
@@ -142,7 +142,7 @@ function buildPostImagePrompt(platform: string, pillar: string): string {
     WhatsApp: 'simple clean square image, minimal design, clear and direct, professional',
   };
 
-  return `${pillarImages[pillar] ?? 'professional healthcare social media post, your brand home doctor service'}, ${platformStyle[platform] ?? 'social media post format'}, healthcare blue accent, premium brand quality`;
+  return `${pillarImages[pillar] ?? 'professional brand social media post'}, ${platformStyle[platform] ?? 'social media post format'}, brand accent colour, premium brand quality`;
 }
 
 // ─── Generators ───────────────────────────────────────────────────────────────
@@ -169,44 +169,44 @@ function generatePost(platform: string, pillar: string, tone: string): string {
 
   const pillarContent: Record<string, { hook: string; body: string; cta: string }> = {
     'Education & Awareness': {
-      hook: platform === 'Twitter/X' ? `🧵 Most people don't know this about home doctor visits — thread 👇` : `Did you know? Getting a doctor home in under 30 minutes is now possible.`,
-      body: `At your brand, we're changing what healthcare looks like.\n\nNo waiting rooms. No wasted afternoons. Just verified doctors at your door — same day, every day.\n\n✅ 150+ verified doctors\n✅ Real-time tracking\n✅ Transparent pricing\n✅ Available across Mumbai, Delhi & Bengaluru`,
-      cta: platform === 'WhatsApp' ? `Book your first visit → example.com` : `👉 Book a home visit today: example.com`,
+      hook: platform === 'Twitter/X' ? `🧵 Most people don't know this about our category — thread 👇` : `Did you know? Getting started with us takes under 2 minutes.`,
+      body: `At our brand, we're changing how this works.\n\nNo friction. No wasted time. Just a verified experience, on demand.\n\n✅ Verified partners\n✅ Real-time updates\n✅ Transparent pricing\n✅ Available in your region`,
+      cta: platform === 'WhatsApp' ? `Get started → example.com` : `👉 Get started today: example.com`,
     },
     'Trust & Social Proof': {
-      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 2,400+ patients. Here's what they say about your brand 👇` : `4.8 ⭐ from 2,400+ patients — here's why your brand is India's most trusted home healthcare platform.`,
-      body: `"The doctor arrived within 25 minutes. She was thorough, kind, and the follow-up prescription was ready in under an hour." — Priya M., Mumbai\n\nWe built your brand on one principle: healthcare should work around your life, not the other way around.`,
-      cta: `Read more patient stories at example.com/stories`,
+      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 2,400+ happy customers. Here's what they say 👇` : `4.8 ⭐ from 2,400+ customers — here's why people trust our brand.`,
+      body: `"Everything was handled in under 25 minutes. Smooth, kind, and the follow-up was exactly what I needed." — Priya M.\n\nWe built this on one principle: it should work around your life, not the other way around.`,
+      cta: `Read more customer stories at example.com/stories`,
     },
     'Product/Service Highlight': {
-      hook: platform === 'Twitter/X' ? `Booking a home doctor visit with your brand takes exactly 2 minutes. Let me show you. 🧵` : `Your health, on your schedule. Book a verified doctor at home in 2 minutes.`,
-      body: `Here's how it works:\n1️⃣ Open example.com or the app\n2️⃣ Choose your service (GP, specialist, diagnostics)\n3️⃣ Pick a time slot\n4️⃣ Track your doctor in real time\n5️⃣ Get a digital prescription + follow-up plan\n\nNo more half-day hospital trips.`,
+      hook: platform === 'Twitter/X' ? `Getting started with our brand takes exactly 2 minutes. Let me show you. 🧵` : `On your schedule. Get started in 2 minutes.`,
+      body: `Here's how it works:\n1️⃣ Open example.com or the app\n2️⃣ Choose what you need\n3️⃣ Pick a time slot\n4️⃣ Track progress in real time\n5️⃣ Get a digital summary + follow-up plan\n\nNo more wasted afternoons.`,
       cta: `Try it today → example.com`,
     },
     'Brand Story': {
-      hook: platform === 'Twitter/X' ? `We started your brand because our co-founder couldn't get a doctor for her mother at 11 PM. 🧵` : `Why we built your brand — a story about a gap in Indian healthcare.`,
-      body: `Healthcare in India is brilliant — but access is broken.\n\nOur co-founder spent 4 hours in a hospital for what should have been a 20-minute consultation. That experience became your brand.\n\nToday, 150+ verified doctors use our platform to see patients at home. 1,240 patients trusted us last month alone.\n\nWe're just getting started.`,
+      hook: platform === 'Twitter/X' ? `We started this brand because our co-founder couldn't find a reliable option when she needed one most. 🧵` : `Why we built this — a story about a gap in the market.`,
+      body: `The category is full of options — but reliable access is broken.\n\nOur co-founder spent 4 hours on what should have been a 20-minute task. That experience became this brand.\n\nToday, hundreds of partners use our platform to serve customers better. Thousands of customers trusted us last month alone.\n\nWe're just getting started.`,
       cta: `Join us → example.com`,
     },
     'Community & Engagement': {
-      hook: platform === 'Twitter/X' ? `Quick poll: when you're not feeling well at home, what do you do first? 👇` : `We want to hear from you 👇`,
-      body: `When you're feeling unwell at home — what's your first move?\n\n🏥 Rush to a hospital\n📱 Search symptoms on Google\n🤙 Call a family member / friend\n🏠 Book a home visit\n\nThere's no wrong answer. But we're curious because your answer shapes how we build your brand.`,
+      hook: platform === 'Twitter/X' ? `Quick poll: when you need help with this, what do you do first? 👇` : `We want to hear from you 👇`,
+      body: `When you need help with this — what's your first move?\n\n🏢 Visit a physical location\n📱 Search online\n🤙 Call a friend / family member\n🏠 Open our app\n\nThere's no wrong answer. But we're curious because your answer shapes how we build this product.`,
       cta: `Drop your answer below ⬇️`,
     },
     'Offer & Promotion': {
-      hook: platform === 'Twitter/X' ? `🚨 Limited: ₹100 off your first your brand home visit this week only. 🧵` : `🎉 First home visit, ₹100 off — this week only.`,
-      body: `We want more people to experience what real healthcare convenience feels like.\n\nSo for the next 7 days: your first your brand home visit is ₹100 off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ 150+ verified doctors\n✅ Same-day availability\n✅ Transparent pricing`,
-      cta: `Claim your discount → example.com/book`,
+      hook: platform === 'Twitter/X' ? `🚨 Limited: 10% off your first order this week only. 🧵` : `🎉 First order, 10% off — this week only.`,
+      body: `We want more people to experience what real convenience feels like.\n\nSo for the next 7 days: your first order is 10% off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ Verified partners\n✅ Same-day availability\n✅ Transparent pricing`,
+      cta: `Claim your discount → example.com`,
     },
   };
 
   const content = pillarContent[pillar] ?? pillarContent['Education & Awareness'];
 
   const hashtagSets: Record<string, string[]> = {
-    Instagram: ['#YourBrand', '#HomeDoctor', '#HealthcareAtHome', '#MumbaiHealth', '#DelhiDoctors', '#BengaluruHealth', '#HomeVisit', '#DoctorAtHome', '#HealthTech', '#IndiaHealth', '#PatientCare', '#Telemedicine', '#HealthcareIndia', '#WellnessIndia', '#BookADoctor'],
-    LinkedIn: ['#HealthTech', '#HealthcareIndia', '#HomeHealthcare', '#YourBrand'],
-    'Twitter/X': ['#HealthTech', '#HomeDoctor'],
-    Facebook: ['#HomeDoctor', '#YourBrand', '#HealthcareAtHome'],
+    Instagram: ['#YourBrand', '#OnDemand', '#GetStarted', '#CustomerFirst', '#Reliable', '#Trusted', '#Modern', '#Lifestyle', '#NewWay', '#Verified', '#PremiumService', '#Community', '#Wellbeing', '#Innovation', '#YourExperience'],
+    LinkedIn: ['#Innovation', '#StartupIndia', '#CustomerExperience', '#YourBrand'],
+    'Twitter/X': ['#Innovation', '#OnDemand'],
+    Facebook: ['#OnDemand', '#YourBrand', '#GetStarted'],
     WhatsApp: [],
   };
 
@@ -217,8 +217,8 @@ function generatePost(platform: string, pillar: string, tone: string): string {
   if (platform === 'Twitter/X') {
     output += `**Tweet 1 (hook):**\n${content.hook}\n\n`;
     output += `**Tweet 2:**\n${content.body.split('\n').slice(0, 3).join(' ')}\n\n`;
-    output += `**Tweet 3:**\nHere's what makes your brand different: verified doctors, real-time tracking, digital prescriptions — all from your living room.\n\n`;
-    output += `**Tweet 4:**\nWe serve Mumbai, Delhi, and Bengaluru today. More cities coming this quarter.\n\n`;
+    output += `**Tweet 3:**\nHere's what makes our brand different: verified partners, real-time updates, transparent pricing — all from one app.\n\n`;
+    output += `**Tweet 4:**\nWe serve our priority markets today. More expansion coming this quarter.\n\n`;
     output += `**Tweet 5 (CTA):**\n${content.cta} ${hashtags.join(' ')}\n`;
   } else if (platform === 'WhatsApp') {
     output += `*Hi [First Name]* 👋\n\n${content.hook}\n\n${content.body}\n\n${content.cta}`;
@@ -251,28 +251,28 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
   };
 
   const conceptMap: Record<string, string> = {
-    'Square Post (1:1)': 'A warm, welcoming scene of a professional doctor visiting a patient at home. The doctor is wearing a white coat and smiling. The home is bright and modern.',
-    'Portrait Post (4:5)': 'A close-up portrait of a confident, smiling doctor holding a medical kit. Soft bokeh background suggesting a home environment.',
-    'Story / Reel (9:16)': 'A full-height mobile-first visual. Top: bold headline text area. Middle: doctor at patient\'s door, bright daylight, warm colour palette. Bottom: app booking CTA button area.',
-    'Landscape Banner (16:9)': 'Wide-angle scene of a doctor and patient interaction in a cosy living room. Doctor is reviewing notes on a tablet. Bright, airy, healthcare-blue and white tones.',
-    'Twitter/X Card (2:1)': 'A horizontal split design: left side — bold headline "Doctor at Home in 30 Min", right side — doctor icon / photo with warm background.',
-    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. your brand’s logo on left, tagline in centre, doctor silhouette on right.',
-    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to book a home doctor visit" infographic. Clean icons, numbered steps, your brand brand colours.',
-    'YouTube Thumbnail (16:9)': 'Bold thumbnail. Large, readable text overlay: "Doctor at Home in 30 MINUTES?!". Surprised-face reaction image on left, doctor photo on right. High contrast.',
-    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: your brand’s logo + tagline. Centre: key USPs as icons (speed, trust, tracking). Right: doctor illustration.',
+    'Square Post (1:1)': 'A warm, welcoming brand scene featuring a satisfied customer using the product. Bright modern environment, premium feel.',
+    'Portrait Post (4:5)': 'A close-up portrait of a confident, smiling person, soft bokeh background, premium brand quality.',
+    'Story / Reel (9:16)': 'A full-height mobile-first visual. Top: bold headline text area. Middle: lifestyle scene, bright daylight, warm colour palette. Bottom: app CTA button area.',
+    'Landscape Banner (16:9)': 'Wide-angle lifestyle scene of a customer enjoying the product or service. Bright, airy environment, brand colour palette.',
+    'Twitter/X Card (2:1)': 'A horizontal split design: left side — bold headline, right side — product visual or icon with a warm background.',
+    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. Brand logo on left, tagline in centre, product/illustration on right.',
+    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to get started" infographic. Clean icons, numbered steps, brand colour palette.',
+    'YouTube Thumbnail (16:9)': 'Bold thumbnail. Large, readable text overlay with a high-contrast brand colour. Expressive scene that earns the click.',
+    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: brand logo + tagline. Centre: key value props as icons. Right: product illustration.',
     'WhatsApp Status (9:16)': 'Vertical status card. Top: greeting + brand name. Middle: core message with emoji. Bottom: CTA with phone number or link. WhatsApp green accent.',
   };
 
   const concept = customSubject?.trim()
     ? customSubject.trim()
-    : (conceptMap[format] ?? 'A professional healthcare brand visual for your brand, focusing on home doctor visits.');
+    : (conceptMap[format] ?? 'A professional brand visual focused on the brand\'s core value proposition.');
 
   let prompt = `**Format:** ${format}\n**Dimensions:** ${dimensions}\n**Visual Style:** ${style}\n**AI Tool:** ${tool}\n\n`;
   prompt += `---\n\n`;
   prompt += `**Production Prompt:**\n\n`;
   prompt += `${concept}\n\n`;
   prompt += `Style: ${stylePrompts[style] ?? style}.\n\n`;
-  prompt += `Brand palette: Healthcare blue (#1E6FCC), clean white (#FFFFFF), warm grey (#F5F5F5), accent green (#22C55E).\n\n`;
+  prompt += `Brand palette: Primary brand colour, clean white (#FFFFFF), warm grey (#F5F5F5), accent (e.g. #22C55E).\n\n`;
   prompt += `Technical: ${dimensions}, optimised for digital display, no text overlaid (add in design tool).\n\n`;
 
   prompt += `---\n\n**Tool Guidance:**\n${toolGuide[tool] ?? ''}`;
@@ -283,11 +283,11 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
 function generateAdCreative(platform: string, objective: string): string {
   const objectiveMap: Record<string, string> = {
     'Brand Awareness': 'maximise impressions and recall among target audience',
-    'Patient Acquisition': 'drive first booking completions from high-intent searchers',
-    'Provider Recruitment': 'attract verified doctors to join your provider network',
+    'Customer Acquisition': 'drive first signups / transactions from high-intent searchers',
+    'Partner Recruitment': 'attract verified partners to join the platform',
     'App Install': 'drive app downloads from relevant audiences',
     'Re-engagement / Retargeting': 're-activate users who visited but did not convert',
-    'Seasonal Offer': 'drive urgency and immediate bookings with a time-limited offer',
+    'Seasonal Offer': 'drive urgency and immediate purchases with a time-limited offer',
   };
 
   const platformFormats: Record<string, { headlines: number; descriptions: number; hasCallouts: boolean; hasSitelinks: boolean; hasVisual: boolean }> = {
@@ -302,99 +302,99 @@ function generateAdCreative(platform: string, objective: string): string {
   const cfg = platformFormats[platform] ?? platformFormats['Google Search'];
 
   const adSets: Record<string, Record<string, { headlines: string[]; descriptions: string[]; callouts: string[]; sitelinks: string[]; visualDirection: string }>> = {
-    'Patient Acquisition': {
+    'Customer Acquisition': {
       'Google Search': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Book Verified Home Doctor Now', 'Home Visits — Skip the Queue', 'Verified Mumbai Doctors', 'Get a Doctor Home Today', 'Home Healthcare in 2 Min', 'Same-Day Doctor at Home', 'Doctor Home Visit Booking', '4.8★ Home Healthcare App', 'Book in Under 2 Minutes', 'Real-Time Doctor Tracking', 'Home Visits From ₹299', 'GP, Specialist, Diagnostics', 'your brand — India\'s #1', 'Home Doctor — Book Now'],
-        descriptions: ['Trusted doctors at your doorstep in Mumbai, Delhi & Bengaluru. Book in 2 minutes, real-time tracking, transparent pricing. 4.8★ rated by 2,400+ patients.', 'Home visits by verified doctors. Same-day appointments. No waiting rooms. Get a digital prescription + follow-up plan. Book online in minutes.', 'Skip the hospital queue. 150+ verified doctors available for home visits. Book now and track your doctor in real time — like Uber for healthcare.', 'your brand: India\'s most trusted home healthcare platform. Verified doctors, transparent pricing, real-time tracking. First visit ₹100 off.'],
-        callouts: ['Same-Day Appointments', 'Verified Doctors', 'Real-Time Tracking', 'Transparent Pricing', '4.8★ Rated', 'Digital Prescriptions', 'No Hidden Fees', '150+ Doctors'],
-        sitelinks: ['Book Home Visit | example.com/book', 'How It Works | example.com/how', 'Our Doctors | example.com/doctors', 'Pricing | example.com/pricing', 'Patient Reviews | example.com/reviews', 'FAQ | example.com/faq'],
+        headlines: ['Get Started in 2 Minutes', 'Verified Partners Near You', 'Skip the Queue — Sign Up Now', 'Trusted by 2,400+ Customers', 'Start Today — Risk Free', 'Set Up in Under 2 Min', 'Same-Day Service Available', 'Online Signup — Easy', '4.8★ Rated App', 'Sign Up in Under 2 Minutes', 'Real-Time Updates', 'Plans From a Low Monthly Fee', 'All-In-One Platform', 'Our Brand — Top Rated', 'Get Started — Sign Up Now'],
+        descriptions: ['Trusted partners in your city. Sign up in 2 minutes, real-time updates, transparent pricing. 4.8★ rated by 2,400+ customers.', 'Service by verified partners. Same-day availability. No hidden steps. Get a digital receipt + follow-up plan. Sign up online in minutes.', 'Skip the friction. Hundreds of verified partners available. Sign up now and track progress in real time — like a modern marketplace.', 'Our brand: a trusted modern platform. Verified partners, transparent pricing, real-time updates. First order 10% off.'],
+        callouts: ['Same-Day Service', 'Verified Partners', 'Real-Time Updates', 'Transparent Pricing', '4.8★ Rated', 'Digital Receipts', 'No Hidden Fees', '150+ Partners'],
+        sitelinks: ['Get Started | example.com/start', 'How It Works | example.com/how', 'Our Partners | example.com/partners', 'Pricing | example.com/pricing', 'Customer Reviews | example.com/reviews', 'FAQ | example.com/faq'],
         visualDirection: 'N/A — text-only format',
       },
       'Meta (Facebook/Instagram)': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Skip the Hospital Queue', 'Verified Doctors at Your Door'],
-        descriptions: ['Book a verified doctor for your home in under 2 minutes. Real-time tracking, transparent pricing, digital prescriptions. Available in Mumbai, Delhi & Bengaluru.', '150+ verified doctors. Same-day home visits. 4.8★ from 2,400+ patients. Book now and get ₹100 off your first visit.', 'Your health deserves convenience. Get a verified doctor home today — no waiting rooms, no wasted time.'],
+        headlines: ['Get Started in 2 Minutes', 'Skip the Friction', 'Verified Partners at Your Service'],
+        descriptions: ['Sign up with a verified partner in under 2 minutes. Real-time updates, transparent pricing, digital receipts. Available in your city.', 'Hundreds of verified partners. Same-day availability. 4.8★ from 2,400+ customers. Sign up now and get 10% off your first order.', 'You deserve convenience. Get started today — no friction, no wasted time.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A friendly, professional doctor arriving at a bright, modern apartment door. Patient (young urban professional) opening the door and smiling. Doctor is holding a medical kit.\nStyle: Photorealistic, warm lighting, welcoming. Brand colours: healthcare blue + clean white.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories/Reels.\nPrompt: "Photorealistic image of a smiling doctor in a white coat arriving at a modern apartment door, patient welcoming them in, bright natural lighting, warm healthcare setting, medical kit visible, clean and professional, 1080×1080"',
+        visualDirection: '**Visual Direction:**\nScene: A friendly customer using the product on a smartphone in a bright modern environment, smiling and relaxed.\nStyle: Photorealistic, warm lighting, welcoming. Brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories/Reels.\nPrompt: "Photorealistic image of a smiling person using a smartphone in a bright modern environment, warm natural lighting, premium clean setting, 1080×1080"',
       },
       'LinkedIn Ads': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Healthcare That Works Around You', 'Verified Home Doctors — Book Now'],
-        descriptions: ['your brand brings verified doctors to your home. Same-day availability, real-time tracking, transparent pricing. Trusted by 1,240 patients last month.', 'No waiting rooms. No wasted afternoons. Book a home visit in 2 minutes and get a digital prescription within the hour.', 'Join 1,240+ patients who chose your brand. 150+ verified doctors available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.'],
+        headlines: ['Get Started in 2 Minutes', 'A Service That Works Around You', 'Verified Partners — Sign Up Now'],
+        descriptions: ['Our brand connects you with verified partners. Same-day availability, real-time updates, transparent pricing. Trusted by 1,240 customers last month.', 'No friction. No wasted time. Sign up in 2 minutes and get a digital receipt within the hour.', 'Join 1,240+ customers who chose our brand. Hundreds of verified partners available. First order 10% off.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A professional lifestyle setting — a person working from home on a laptop, looking relieved, with a doctor visible in the background having just completed a visit.\nStyle: Clean, professional, LinkedIn aesthetic. Blue tones, bright and airy.\nDimensions: 1.91:1 (1200×628 px) for LinkedIn single image ad.\nPrompt: "Professional lifestyle photo of a person working from home at a desk, doctor visible in background packing up medical kit, warm home office setting, blue and white colour palette, clean and trustworthy feel, 1200×628"',
+        visualDirection: '**Visual Direction:**\nScene: A professional working from home on a laptop, looking pleased, with a delivery / completed task visible nearby.\nStyle: Clean, professional, LinkedIn aesthetic. Blue tones, bright and airy.\nDimensions: 1.91:1 (1200×628 px) for LinkedIn single image ad.\nPrompt: "Professional lifestyle photo of a person working from home at a desk, delivery / outcome visible, warm home office setting, blue and white colour palette, clean and trustworthy feel, 1200×628"',
       },
       'Google Display': {
-        headlines: ['Doctor at Home — Book Now', 'Verified Home Doctor Visits', '30-Min Home Doctor Booking', 'Skip the Hospital Queue', '4.8★ Home Healthcare App'],
-        descriptions: ['150+ verified doctors. Same-day home visits. Book in 2 minutes.', 'Transparent pricing, real-time tracking, digital prescriptions.', 'Available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.', 'Trusted by 2,400+ patients. Book your your brand home visit today.', 'Healthcare on your schedule — verified doctors at your door.'],
+        headlines: ['Get Started — Sign Up Now', 'Verified Partner Network', '2-Min Online Signup', 'Skip the Friction', '4.8★ Rated App'],
+        descriptions: ['Hundreds of verified partners. Same-day service. Sign up in 2 minutes.', 'Transparent pricing, real-time updates, digital receipts.', 'Available in your city. First order 10% off.', 'Trusted by 2,400+ customers. Sign up today.', 'A service on your schedule — verified partners on demand.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nCreate a clean display ad visual: doctor icon on warm gradient background (healthcare blue to white). Bold headline space at top, CTA button at bottom.\nSizes needed: 300×250 (medium rectangle), 728×90 (leaderboard), 160×600 (wide skyscraper), 320×50 (mobile banner).\nPrompt for hero image: "Clean healthcare brand illustration, friendly doctor silhouette on a gradient blue-to-white background, minimal flat design, medical cross icon, trustworthy and modern, no text, 300×250"',
+        visualDirection: '**Visual Direction:**\nClean display ad visual: brand icon on warm gradient background. Bold headline space at top, CTA button at bottom.\nSizes needed: 300×250, 728×90, 160×600, 320×50.\nPrompt for hero image: "Clean brand illustration, friendly icon on a gradient background, minimal flat design, trustworthy and modern, no text, 300×250"',
       },
       'YouTube Ads': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Verified Doctors at Your Door', 'Skip the Hospital — Book Now'],
-        descriptions: ['See how your brand brings verified doctors to your home in 30 minutes. Real-time tracking, transparent pricing, digital prescriptions.', '150+ verified doctors. Same-day availability. Book in 2 minutes. Available in Mumbai, Delhi & Bengaluru.'],
+        headlines: ['Get Started in 2 Minutes', 'Verified Partners on Demand', 'Skip the Friction — Sign Up'],
+        descriptions: ['See how our brand connects you with verified partners in minutes. Real-time updates, transparent pricing, digital receipts.', 'Hundreds of verified partners. Same-day availability. Sign up in 2 minutes. Available in your city.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing booking confirmation, then cut to doctor arriving at door.\nHero visual for companion banner: Doctor and patient interaction, warm home setting, your brand branding visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a healthcare booking app confirmation, bright screen, hands holding phone, excited expression visible, photorealistic, 1280×720"',
+        visualDirection: '**Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing signup confirmation, then cut to the customer using the product.\nHero visual for companion banner: Customer / partner interaction, warm setting, brand visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a signup confirmation, bright screen, hands holding phone, excited expression visible, photorealistic, 1280×720"',
       },
       'WhatsApp Ads': {
-        headlines: ['Doctor Home Visit — Book Now', 'Verified Doctors at Your Door'],
-        descriptions: ['150+ verified doctors. Same-day home visits in Mumbai, Delhi & Bengaluru. Book in 2 minutes → example.com', 'Skip the hospital queue. Get a verified doctor home today. Transparent pricing. 4.8★ rated. Book now → example.com/book'],
+        headlines: ['Sign Up Now — Get Started', 'Verified Partners on Demand'],
+        descriptions: ['Hundreds of verified partners. Same-day service in your city. Sign up in 2 minutes → example.com', 'Skip the friction. Get started today. Transparent pricing. 4.8★ rated. Sign up now → example.com/start'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple, clean WhatsApp-safe image: doctor icon + brand name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800) for WhatsApp image messages.\nPrompt: "Simple clean illustration of a friendly doctor avatar with your brand branding, white background, healthcare blue accent, minimal design, WhatsApp-safe image, 800×800"',
+        visualDirection: '**Visual Direction:**\nSimple, clean WhatsApp-safe image: brand icon + name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800).\nPrompt: "Simple clean illustration of a friendly brand avatar, white background, brand accent colour, minimal design, WhatsApp-safe image, 800×800"',
       },
     },
-    'Provider Recruitment': {
+    'Partner Recruitment': {
       'Google Search': {
-        headlines: ['Join your brand as a Doctor', 'Grow Your Practice — Apply Now', 'Verified Doctors Wanted — Apply', '40+ Bookings/Month Possible', 'Doctor Earnings — Zero Lock-in', 'Independent Doctors — Join Us', 'Medical Practice Growth Tool', 'Earn More as a Home Doctor', 'Doctor Registration — Free', 'Build Your Patient Base Fast', 'Flexible Doctor Schedule', 'Join 150+ your brand Doctors', 'Medical Platform India', 'Doctor Home Visit Platform', 'Grow Practice With your brand'],
-        descriptions: ['your brand connects verified independent doctors with patients who need home visits. 40+ bookings/month possible. Zero upfront cost, no lock-in. Apply today.', 'Independent doctors in Mumbai, Delhi & Bengaluru — grow your practice with your brand. We handle bookings, payments, and marketing. You focus on care.', 'Join 150+ verified doctors on your platform. Set your own hours, choose your speciality and visit types. Payment processed automatically. No upfront fee.', 'Stop chasing patients. your brand brings bookings to you. Same-day scheduling, transparent earnings, real-time navigation. Apply as a verified doctor today.'],
-        callouts: ['Zero Upfront Cost', 'Set Your Own Hours', 'Instant Payments', '40+ Bookings Possible', 'No Lock-in Contract', 'Free to Join', '150+ Active Doctors'],
-        sitelinks: ['Apply Now | example.com/providers/apply', 'How Earnings Work | example.com/providers/earnings', 'Doctor FAQ | example.com/providers/faq', 'Success Stories | example.com/providers/stories'],
+        headlines: ['Join Our Brand as a Partner', 'Grow Your Business — Apply Now', 'Verified Partners Wanted', '40+ Orders/Month Possible', 'Partner Earnings — No Lock-In', 'Independent Operators — Join Us', 'Business Growth Tool', 'Earn More as a Partner', 'Partner Registration — Free', 'Build Your Customer Base Fast', 'Flexible Partner Schedule', 'Join 150+ Partners', 'A Modern Partner Platform', 'On-Demand Partner Network', 'Grow With Our Brand'],
+        descriptions: ['Our brand connects verified independent partners with customers who need on-demand service. 40+ orders/month possible. Zero upfront cost, no lock-in. Apply today.', 'Independent operators in your city — grow your business with our brand. We handle bookings, payments, and marketing. You focus on the work.', 'Join 150+ verified partners on our platform. Set your own hours, choose your category. Payment processed automatically. No upfront fee.', 'Stop chasing customers. Our brand brings orders to you. Same-day scheduling, transparent earnings, real-time navigation. Apply as a verified partner today.'],
+        callouts: ['Zero Upfront Cost', 'Set Your Own Hours', 'Instant Payments', '40+ Orders Possible', 'No Lock-In Contract', 'Free to Join', '150+ Active Partners'],
+        sitelinks: ['Apply Now | example.com/partners/apply', 'How Earnings Work | example.com/partners/earnings', 'Partner FAQ | example.com/partners/faq', 'Success Stories | example.com/partners/stories'],
         visualDirection: 'N/A — text-only format',
       },
       'LinkedIn Ads': {
-        headlines: ['Independent Doctors — Join your brand', 'Grow Your Practice With your brand', '40+ Bookings/Month on your platform'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand brings home visit bookings directly to you. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors who use your brand to grow their practice. Average 40+ bookings/month. No lock-in. Apply in 5 minutes.', 'Stop spending time and money on marketing. your brand fills your schedule with verified home visit bookings. You focus on care — we handle the rest.'],
+        headlines: ['Independent Operators — Join Our Brand', 'Grow Your Business With Us', '40+ Orders/Month on Our Platform'],
+        descriptions: ['Independent operators in your city — our brand brings orders directly to you. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified partners who use our brand to grow their business. Average 40+ orders/month. No lock-in. Apply in 5 minutes.', 'Stop spending time and money on marketing. Our brand fills your schedule with verified orders. You focus on the work — we handle the rest.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A confident, professional doctor reviewing patient bookings on a smartphone. Clean home office or clinic background. Successful, empowered professional vibe.\nStyle: Professional LinkedIn aesthetic, blue tones.\nDimensions: 1200×628 px.\nPrompt: "Confident professional Indian doctor in white coat checking a smartphone with a satisfied expression, bright modern clinic background, professional and trustworthy, blue and white colour palette, 1200×628"',
+        visualDirection: '**Visual Direction:**\nScene: A confident professional reviewing orders on a smartphone. Clean home office background. Successful, empowered professional vibe.\nStyle: Professional LinkedIn aesthetic, blue tones.\nDimensions: 1200×628 px.\nPrompt: "Confident professional checking a smartphone with a satisfied expression, bright modern setting, professional and trustworthy, blue and white colour palette, 1200×628"',
       },
       'Meta (Facebook/Instagram)': {
-        headlines: ['Doctors: Grow Your Practice', 'Join 150+ your brand Doctors', '40+ Bookings — Zero Marketing'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand fills your schedule with home visit bookings. Zero upfront cost, no lock-in. Apply today.', 'Tired of empty appointment slots? your brand brings patients to you. 150+ doctors trust us. 40+ bookings/month average. Free to join.', 'Build your patient base without spending on marketing. your brand handles discovery, booking, and payment. You just show up and care.'],
+        headlines: ['Partners: Grow Your Business', 'Join 150+ Verified Partners', '40+ Orders — Zero Marketing'],
+        descriptions: ['Independent operators in your city — our brand fills your schedule. Zero upfront cost, no lock-in. Apply today.', 'Tired of empty slots? Our brand brings customers to you. 150+ partners trust us. 40+ orders/month average. Free to join.', 'Build your customer base without spending on marketing. Our brand handles discovery, booking, and payment. You just deliver.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A doctor looking at their phone and smiling, with a notification visible showing "New booking confirmed — home visit". Split with brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories.\nPrompt: "Indian doctor in white coat happily looking at smartphone notification, bright clean background, healthcare blue accents, professional and approachable, 1080×1080"',
+        visualDirection: '**Visual Direction:**\nScene: A partner looking at their phone and smiling, with a notification visible showing "New order confirmed". Split with brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories.\nPrompt: "Professional happily looking at smartphone notification, bright clean background, brand accent colour, professional and approachable, 1080×1080"',
       },
       'Google Display': {
-        headlines: ['Doctors — Join your brand', 'Grow Practice With your brand', '40+ Monthly Bookings', 'Zero-Cost Doctor Platform', 'Apply as your brand Doctor'],
-        descriptions: ['Join 150+ doctors. Zero upfront cost, flexible hours, instant payments.', 'your brand brings home visit bookings to you. Apply for free.', 'Independent doctors — fill your schedule with your brand. No lock-in.', 'Grow your practice. 40+ bookings/month possible with your brand.', 'Doctor network India — join your brand today. Free registration.'],
+        headlines: ['Partners — Join Our Brand', 'Grow Your Business With Us', '40+ Monthly Orders', 'Zero-Cost Partner Platform', 'Apply as a Partner'],
+        descriptions: ['Join 150+ partners. Zero upfront cost, flexible hours, instant payments.', 'Our brand brings orders to you. Apply for free.', 'Independent operators — fill your schedule with our brand. No lock-in.', 'Grow your business. 40+ orders/month possible.', 'Partner network — join our brand today. Free registration.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nClean display banner: doctor silhouette + booking notification graphic + brand colours.\nPrompt: "Minimalist display ad visual, friendly doctor silhouette, smartphone showing booking notification, healthcare blue gradient, clean and professional, no text, 300×250"',
+        visualDirection: '**Visual Direction:**\nClean display banner: partner silhouette + order notification graphic + brand colours.\nPrompt: "Minimalist display ad visual, friendly silhouette, smartphone showing order notification, brand colour gradient, clean and professional, no text, 300×250"',
       },
       'YouTube Ads': {
-        headlines: ['Doctors — Join your brand', 'Grow Your Practice — Apply Now', 'Build Your Patient Base Fast'],
-        descriptions: ['See how your brand helps independent doctors in India grow their practice with home visit bookings. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors on your platform. Average 40+ bookings/month. Apply in 5 minutes.'],
+        headlines: ['Partners — Join Our Brand', 'Grow Your Business — Apply Now', 'Build Your Customer Base Fast'],
+        descriptions: ['See how our brand helps independent operators grow their business with verified orders. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified partners on our platform. Average 40+ orders/month. Apply in 5 minutes.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds: Doctor receiving a booking notification, looking pleased. Then testimonial-style "I went from 10 bookings a week to 40 with your brand."\nPrompt: "Cinematic close-up of a doctor\'s phone showing a booking confirmation notification, doctor hand visible, warm lighting, professional setting, 1280×720"',
+        visualDirection: '**Visual Direction:**\nFirst 5 seconds: Partner receiving a notification, looking pleased. Then testimonial-style "I went from 10 orders a week to 40 with this brand."\nPrompt: "Cinematic close-up of a phone showing an order confirmation notification, hand visible, warm lighting, professional setting, 1280×720"',
       },
       'WhatsApp Ads': {
-        headlines: ['Doctors — Join your brand Today', 'Grow Your Practice Free'],
-        descriptions: ['Join 150+ doctors on your platform. Get home visit bookings — zero upfront cost, flexible schedule. Apply: example.com/providers', 'Independent doctors: your brand fills your schedule with bookings. Free to join. 40+ bookings/month possible → example.com/providers/apply'],
+        headlines: ['Partners — Join Us Today', 'Grow Your Business Free'],
+        descriptions: ['Join 150+ partners on our platform. Get verified orders — zero upfront cost, flexible schedule. Apply: example.com/partners', 'Independent operators: our brand fills your schedule. Free to join. 40+ orders/month possible → example.com/partners/apply'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple image: doctor + stethoscope icon with "Join your brand" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration of a doctor with stethoscope, your brand’s logo area, white background, blue accents, friendly and professional, 800×800"',
+        visualDirection: '**Visual Direction:**\nSimple image: partner icon with "Join Our Brand" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration with brand logo area, white background, brand accent colour, friendly and professional, 800×800"',
       },
     },
   };
 
-  // Default to Patient Acquisition if the specific objective/platform combo isn't defined
-  const objectiveKey = objective === 'Provider Recruitment' ? 'Provider Recruitment' : 'Patient Acquisition';
-  const platformData = adSets[objectiveKey]?.[platform] ?? adSets['Patient Acquisition']['Google Search'];
+  // Default to Customer Acquisition if the specific objective/platform combo isn't defined
+  const objectiveKey = objective === 'Partner Recruitment' ? 'Partner Recruitment' : 'Customer Acquisition';
+  const platformData = adSets[objectiveKey]?.[platform] ?? adSets['Customer Acquisition']['Google Search'];
 
   let output = `**Platform:** ${platform}\n**Campaign Objective:** ${objective} — ${objectiveMap[objective] ?? ''}\n\n---\n\n`;
 
@@ -561,7 +561,7 @@ function VisualGeneratorTab() {
           value={customSubject}
           onChange={(e) => setCustomSubject(e.target.value)}
           rows={3}
-          placeholder="e.g. A friendly female pediatrician examining a smiling toddler in a bright clinic, parent watching from the side"
+          placeholder="e.g. A friendly customer using the product on a smartphone in a bright modern environment, smiling and relaxed"
           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
         />
         <p className="mt-1 text-xs text-gray-500">
@@ -645,7 +645,7 @@ function VisualGeneratorTab() {
 
 function AdCreativeGeneratorTab() {
   const [adPlatform, setAdPlatform] = useState<typeof AD_PLATFORMS[number]>('Google Search');
-  const [objective, setObjective] = useState<typeof CAMPAIGN_OBJECTIVES[number]>('Patient Acquisition');
+  const [objective, setObjective] = useState<typeof CAMPAIGN_OBJECTIVES[number]>('Customer Acquisition');
   const [output, setOutput] = useState('');
 
   function generate() {
