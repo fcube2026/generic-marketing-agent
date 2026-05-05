@@ -636,7 +636,7 @@ Want me to run this skill end-to-end now? Reply with **yes — run ${skill.id}**
 // re-uses the user's phrasing instead of dumping the same boilerplate.
 function getIntentDraft(prompt: string, lower: string): string | null {
   // ---- Comparison / vs / alternatives page ------------------------------
-  // e.g. "Write your vs Practo comparison page optimised for SEO..."
+  // e.g. "Write our vs Acme comparison page optimised for SEO..."
   if (
     lower.includes('comparison page') ||
     lower.includes('alternatives page') ||
@@ -988,7 +988,7 @@ function slugify(s: string): string {
 
 const INTRO_MESSAGE: AgentMessage = {
   role: 'agent',
-  content: `👋 I'm your AI Marketing Agent for your brand — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI DALL-E 3** for on-demand visuals.
+  content: `👋 I'm your AI Marketing Agent — powered by **OpenAI GPT-4o** for chat and strategy and **OpenAI DALL-E 3** for on-demand visuals.
 
 I can run **${marketingSkills.length}+ specialised marketing skills** end-to-end — from \`page-cro\` and \`copywriting\` to \`churn-prevention\`, \`ai-seo\`, \`pricing-strategy\`, and \`referral-program\`.
 

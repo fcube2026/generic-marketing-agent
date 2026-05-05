@@ -4,7 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@keyframes curex-spin {
+@keyframes spin-360 {
   to {
     transform: rotate(360deg);
   }
