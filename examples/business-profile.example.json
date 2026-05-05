@@ -1,0 +1,83 @@
+{
+  "business": {
+    "name": "Acme Notes",
+    "one_liner": "AI-powered meeting notes that turn calls into decisions and tasks.",
+    "stage": "seed",
+    "founded": 2025,
+    "team_size": 6,
+    "geography_primary": "United States",
+    "geography_secondary": ["Canada", "United Kingdom"],
+    "languages": ["en"]
+  },
+  "offering": {
+    "type": "SaaS",
+    "category": "Productivity / AI meeting assistant",
+    "pricing_model": "Freemium + per-seat subscription",
+    "price_points_usd": { "free": 0, "pro": 12, "team": 18, "enterprise": "custom" },
+    "core_use_cases": [
+      "Auto-summarize meetings",
+      "Extract action items and owners",
+      "Sync decisions to project tools"
+    ]
+  },
+  "audience": {
+    "icps": [
+      {
+        "name": "Series A startup operators",
+        "roles": ["Founder", "Chief of Staff", "Head of Ops"],
+        "company_size": "11-50",
+        "pain": "Lose follow-ups across Zoom, Slack, and docs.",
+        "channels": ["LinkedIn", "Twitter/X", "Founder communities"]
+      },
+      {
+        "name": "Mid-market RevOps leaders",
+        "roles": ["RevOps Manager", "Sales Ops"],
+        "company_size": "100-500",
+        "pain": "CRM hygiene; reps don't log call notes.",
+        "channels": ["LinkedIn", "RevOps newsletters", "Pavilion"]
+      }
+    ]
+  },
+  "value": {
+    "problem": "Meetings produce decisions and tasks that never make it back into the system of record.",
+    "promise": "Every meeting ends with a shipped summary, decisions, and tasks in the right tool.",
+    "differentiators": [
+      "Decision-first summaries (not transcripts)",
+      "Native bi-directional sync with Linear, Jira, Notion, HubSpot",
+      "Privacy-first: on-device redaction"
+    ],
+    "current_brand_perception": "Unknown / early"
+  },
+  "competitors": [
+    { "name": "Otter.ai", "positioning": "Transcription-first" },
+    { "name": "Fireflies.ai", "positioning": "Sales-team-first notetaker" },
+    { "name": "Granola", "positioning": "Founder-favorite minimalist notetaker" }
+  ],
+  "current_marketing": {
+    "channels_active": ["Founder LinkedIn", "Product Hunt waitlist"],
+    "channels_tried_and_paused": [],
+    "monthly_budget_usd": 8000,
+    "team": [
+      { "role": "Founder (part-time on marketing)" },
+      { "role": "Generalist marketer (full-time)" },
+      { "role": "Contract designer (10 hrs/wk)" }
+    ],
+    "tools": ["HubSpot", "Webflow", "Mixpanel", "Google Analytics 4", "Buffer"]
+  },
+  "challenges": {
+    "acquisition": "Hard to break through in a crowded notetaker category.",
+    "activation": "~40% of signups never connect a calendar.",
+    "conversion": "Free → Pro conversion at 3.1%, target 6%.",
+    "retention": "M2 retention 58%, target 70%.",
+    "referral": "No referral loop in place yet."
+  },
+  "goals_next_12_months": [
+    "Reach $1M ARR",
+    "Build a defensible content moat in 'meeting → action' search intent",
+    "Activate a creator/partner program with 25 signed partners"
+  ],
+  "constraints": [
+    "Single marketer headcount until Q3",
+    "No paid ads above $3k/month until CAC payback < 9 months proven"
+  ]
+}

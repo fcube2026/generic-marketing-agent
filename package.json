@@ -1,0 +1,44 @@
+{
+  "name": "generic-marketing-agent",
+  "version": "0.1.0",
+  "description": "A generic, business-agnostic AI Marketing Agent (CMO-Agent) that owns marketing strategy and execution end-to-end.",
+  "main": "src/agent.js",
+  "type": "commonjs",
+  "bin": {
+    "cmo-agent": "bin/cmo-agent.js"
+  },
+  "scripts": {
+    "start": "node bin/cmo-agent.js",
+    "init": "node bin/cmo-agent.js init",
+    "discover": "node bin/cmo-agent.js discover",
+    "strategy": "node bin/cmo-agent.js strategy",
+    "plan": "node bin/cmo-agent.js plan",
+    "content": "node bin/cmo-agent.js content",
+    "lifecycle": "node bin/cmo-agent.js lifecycle",
+    "analytics": "node bin/cmo-agent.js analytics",
+    "outreach": "node bin/cmo-agent.js outreach",
+    "run-all": "node bin/cmo-agent.js run-all",
+    "show": "node bin/cmo-agent.js show",
+    "export": "node bin/cmo-agent.js export",
+    "test": "node test/smoke.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "marketing",
+    "ai-agent",
+    "cmo",
+    "growth",
+    "content",
+    "seo",
+    "lifecycle",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5"
+  }
+}
