@@ -167,7 +167,7 @@ jobs:
 
       - name: Notify Slack on failure
         if: (steps.smoke.outcome == 'failure' || steps.regression.outcome == 'failure') && env.SLACK_WEBHOOK_URL != ''
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@v3.0.3
         with:
           payload: |
             {
