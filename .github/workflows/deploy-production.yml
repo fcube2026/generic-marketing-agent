@@ -24,7 +24,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -64,7 +64,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -125,7 +125,7 @@ jobs:
       DIRECT_URL: postgresql://test:test@localhost:5432/curex24_test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -199,7 +199,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         if: steps.check-secrets.outputs.skip != 'true'
@@ -314,7 +314,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         if: steps.check-secrets.outputs.skip != 'true'
@@ -378,7 +378,7 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -534,7 +534,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         if: steps.check-secrets.outputs.skip != 'true'
@@ -627,7 +627,7 @@ jobs:
 
       - name: Checkout code
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         if: steps.check-secrets.outputs.skip != 'true'
