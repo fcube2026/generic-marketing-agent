@@ -56,7 +56,7 @@ function isRubric(v: unknown): v is RubricItem[] {
 }
 
 function buildSystemPrompt(skillName: string): string {
-  return `You are a strict, evidence-based marketing-output evaluator for curex24. You score the supplied output against the provided rubric. Be honest, terse, and actionable. The skill being evaluated is: ${skillName}.
+  return `You are a strict, evidence-based marketing-output evaluator. You score the supplied output against the provided rubric. Be honest, terse, and actionable. The skill being evaluated is: ${skillName}.
 
 You MUST respond with a single JSON object (no prose, no markdown fence). Schema:
 {

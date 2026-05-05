@@ -24,8 +24,8 @@ export default function Sidebar() {
   return (
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
       <div className="px-6 py-5 border-b border-gray-100">
-        <h1 className="text-xl font-extrabold text-primary">curex24</h1>
-        <p className="text-xs text-gray-400 mt-0.5">Marketing Agent</p>
+        <h1 className="text-xl font-extrabold text-primary">Marketing Agent</h1>
+        <p className="text-xs text-gray-400 mt-0.5">AI-powered</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

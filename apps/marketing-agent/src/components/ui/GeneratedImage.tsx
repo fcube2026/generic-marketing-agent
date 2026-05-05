@@ -5,7 +5,7 @@ import { describeAiError, generateImage } from '@/lib/services/aiService';
 import { ImageProvider, useImageProvider } from '@/lib/hooks/useImageProvider';
 
 const BRAND_SUFFIX =
-  ', curex24 healthcare brand, professional quality, clean composition, no watermark, no text overlay';
+  ', professional quality, clean composition, no watermark, no text overlay';
 
 const MAX_ATTEMPTS = 3;
 
@@ -129,7 +129,7 @@ export function GeneratedImage({ prompt, width = 1024, height = 1024, label, pro
             {status === 'loaded' && (
               <a
                 href={image.src}
-                download={`curex24-${Date.now()}.png`}
+                download={`marketing-agent-${Date.now()}.png`}
                 target="_blank"
                 rel="noreferrer"
                 className="absolute bottom-2 right-2 text-xs px-2.5 py-1 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-700 hover:bg-white transition shadow-sm"
