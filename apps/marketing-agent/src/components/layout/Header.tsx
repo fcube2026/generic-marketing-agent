@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import DataSourceBanner from './DataSourceBanner';
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Marketing Dashboard', subtitle: 'North star metrics, quick actions, and weekly priorities' },
@@ -15,6 +16,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/reports': { title: 'Reports & KPIs', subtitle: 'Performance reporting, funnel analysis, and channel comparison' },
   '/agent': { title: 'AI Marketing Agent', subtitle: 'Chat with your AI CMO for strategy, copy, and execution guidance' },
   '/create': { title: 'AI Content Studio', subtitle: 'Generate posts, visuals, and ad creatives — powered by ChatGPT, DALL-E 3, Midjourney, and more' },
+  '/settings/data-source': { title: 'Data Source', subtitle: 'Connect any database — the dashboard adapts to your schema' },
 };
 
 export default function Header() {
@@ -31,6 +33,7 @@ export default function Header() {
         {meta.subtitle && <p className="text-sm text-gray-500 mt-0.5">{meta.subtitle}</p>}
       </div>
       <div className="flex items-center gap-3">
+        <DataSourceBanner />
         {user && (
           <div className="text-right">
             <p className="text-sm font-medium text-gray-700 leading-none">{user.email}</p>
