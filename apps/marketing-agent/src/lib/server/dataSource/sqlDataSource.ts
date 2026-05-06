@@ -45,9 +45,12 @@ const STATEMENT_TIMEOUT_MS = 5000;
 const ROW_CAP = 1000;
 
 // Lazily import pg so we don't pay the cost when SQL mode is unused.
+// The `webpackIgnore` magic comment prevents webpack from trying to resolve
+// `pg` at build time — it is an optional dependency that may not be
+// installed (e.g. when no SQL data source is configured), and bundling it
+// would otherwise fail the Next.js build with `Module not found`.
 async function getPgPool(dsn: string): Promise<any> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pg = await import('pg').catch(() => {
+  const pg = await import(/* webpackIgnore: true */ 'pg').catch(() => {
     throw new Error('The "pg" package is required for SQL data sources but failed to load.');
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
