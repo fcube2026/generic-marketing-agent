@@ -60,6 +60,8 @@ function resolveDataSource(): DataSourceConfig {
   switch (kind) {
     case 'prisma':
       return { kind, options: { datasourceUrl: process.env.DATABASE_URL } };
+    case 'fcube':
+      return { kind, options: { datasourceUrl: process.env.DATABASE_URL } };
     case 'rest':
       return {
         kind,

@@ -111,7 +111,7 @@ async function dispatch(req: AgentRequest): Promise<AgentResponse> {
   // ── Domain pack metadata ──────────────────────────────────────────────
   if (root === 'pack') {
     if (a === 'skills') return ok(req.deps.domainPack.skills);
-    if (a === 'kpis') return ok(req.deps.domainPack.kpis);
+    if (a === 'kpis') return ok(await enrichKpis(req));
     if (a === 'resources') return ok(req.deps.domainPack.resources);
     if (a === 'intake') return ok(req.deps.domainPack.intakeQuestions);
     if (a === 'terminology') return ok(req.deps.domainPack.terminology);
@@ -182,6 +182,34 @@ function isAllowedType(pack: DomainPack, type: string): boolean {
 
 function isAllowedSingleton(pack: DomainPack, type: string): boolean {
   return pack.resources.some((r) => r.id === type && r.singleton === true);
+}
+
+/**
+ * Merge `pack.kpis` (static definitions with `target`) with any live values
+ * the data source can compute. Adapters opt in by implementing
+ * `computeKpis(ctx)`; failures are swallowed (we never want a flaky KPI
+ * query to break the dashboard chrome) and a debug-friendly `_kpiError`
+ * field is included so ops can spot it in network responses.
+ */
+async function enrichKpis(req: AgentRequest) {
+  const definitions = req.deps.domainPack.kpis;
+  const compute = req.deps.dataSource.computeKpis;
+  if (typeof compute !== 'function') return definitions;
+  let values: Record<string, string | number> = {};
+  let error: string | undefined;
+  try {
+    values = await compute.call(req.deps.dataSource, req.ctx);
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+  return definitions.map((kpi) => {
+    const value = values[kpi.id];
+    return value === undefined
+      ? error
+        ? { ...kpi, _kpiError: error }
+        : kpi
+      : { ...kpi, value };
+  });
 }
 
 function asObject(body: unknown): Record<string, unknown> {
