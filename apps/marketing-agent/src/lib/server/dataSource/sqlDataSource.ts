@@ -13,6 +13,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { createRequire } from 'module';
 import type {
   BusinessProfile,
   Campaign,
@@ -44,15 +45,30 @@ import {
 const STATEMENT_TIMEOUT_MS = 5000;
 const ROW_CAP = 1000;
 
-// Lazily import pg so we don't pay the cost when SQL mode is unused.
-// The `webpackIgnore` magic comment prevents webpack from trying to resolve
-// `pg` at build time — it is an optional dependency that may not be
-// installed (e.g. when no SQL data source is configured), and bundling it
-// would otherwise fail the Next.js build with `Module not found`.
+// Lazily load `pg` so we don't pay the cost when SQL mode is unused.
+//
+// `pg` is declared as an `optionalDependency` because most installs never
+// configure a SQL data source. We must therefore prevent webpack/Next.js
+// from trying to resolve it at build time — otherwise the build fails
+// with `Module not found: Can't resolve 'pg'` whenever the package is
+// absent (and `webpackIgnore` magic comments are not always honoured by
+// Next.js's bundler pipeline).
+//
+// The most reliable way to defeat the bundler's static analysis is to
+// hide the module specifier behind a runtime expression, so webpack
+// cannot see the literal string `'pg'` in the source. We use Node's
+// `createRequire` to load the package at runtime on the server.
+const requireFromHere = createRequire(__filename);
+
 async function getPgPool(dsn: string): Promise<any> {
-  const pg = await import(/* webpackIgnore: true */ 'pg').catch(() => {
+  // Build the specifier at runtime so static bundlers can't resolve it.
+  const pkg = ['p', 'g'].join('');
+  let pg: any;
+  try {
+    pg = requireFromHere(pkg);
+  } catch {
     throw new Error('The "pg" package is required for SQL data sources but failed to load.');
-  });
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Pool = (pg as any).Pool ?? (pg as any).default?.Pool;
   return new Pool({
