@@ -1401,3 +1401,31 @@ model LocalPharmacyInventory {
   @@index([medicineName])
   @@map("local_pharmacy_inventory")
 }
+
+// =======================
+// MARKETING AGENT
+// =======================
+//
+// Generic key/value table backing the marketing-agent dashboard's
+// non-clinical resources (campaigns, experiments, content calendar,
+// SEO pages, lifecycle flows, plan items, profile/intake singletons,
+// etc.). Clinical data is read directly from the typed fcube tables
+// via the FcubeDataSource projections; this table only persists
+// marketing artefacts that have no equivalent in the fcube schema.
+//
+// One generic schema serves any DomainPack — adding a new vertical
+// never requires another migration here.
+
+model AgentResource {
+  id        String   @id
+  tenantId  String
+  type      String
+  data      Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, id], name: "tenantId_type_id")
+  @@index([tenantId, type])
+  @@map("agent_resources")
+}

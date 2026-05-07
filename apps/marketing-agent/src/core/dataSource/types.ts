@@ -113,6 +113,19 @@ export interface DataSource {
     type: string,
     data: T,
   ): Promise<T>;
+
+  /**
+   * Optional: produce *live* values for the active domain pack's KPIs.
+   *
+   * Returned as a flat `{ kpiId: value }` map. The router merges these
+   * onto the static `pack.kpis` definitions so the dashboard can render
+   * `target` (from the pack) alongside `value` (from the data source).
+   *
+   * Adapters that don't compute KPIs (memory / generic Prisma / REST)
+   * simply omit this method and the route falls back to the static
+   * definitions only.
+   */
+  computeKpis?(ctx: TenantContext): Promise<Record<string, string | number>>;
 }
 
 export class ReadOnlyDataSourceError extends Error {
