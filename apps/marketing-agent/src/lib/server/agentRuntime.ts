@@ -72,8 +72,9 @@ async function seedMemory(
     for (const item of items) {
       const obj = item as Record<string, unknown>;
       const id = typeof obj.id === 'string' ? obj.id : undefined;
+      // Strip `id` so the data source can re-derive / accept the supplied id.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id: _ignored, ...data } = obj;
-      void _ignored;
       await ds.create(ctx, type, data, id);
     }
   }

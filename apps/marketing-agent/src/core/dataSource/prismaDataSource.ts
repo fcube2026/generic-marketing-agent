@@ -140,7 +140,7 @@ export class PrismaDataSource implements DataSource {
     id?: string,
   ): Promise<Resource<T>> {
     const m = await this.model();
-    const generatedId = id ?? `${type.slice(0, 4)}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const generatedId = id ?? generateResourceId(type);
     const row = await m.create({
       data: {
         id: generatedId,
@@ -239,4 +239,24 @@ function safeMaskUrl(url: string): string {
   } catch {
     return '<invalid DATABASE_URL>';
   }
+}
+
+/**
+ * Generate a collision-resistant resource id. Uses Web Crypto's
+ * `randomUUID()` when available (Node 19+, modern browsers, edge runtimes)
+ * and falls back to a `crypto.randomBytes` hex string. We never use
+ * `Math.random()` since these ids are persisted and may end up in URLs.
+ */
+function generateResourceId(type: string): string {
+  const prefix = type.slice(0, 4);
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c && typeof c.randomUUID === 'function') {
+    return `${prefix}_${c.randomUUID()}`;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  const nodeCrypto = require('node:crypto') as { randomUUID?: () => string };
+  if (typeof nodeCrypto.randomUUID === 'function') {
+    return `${prefix}_${nodeCrypto.randomUUID()}`;
+  }
+  throw new Error('No secure random source available for id generation.');
 }

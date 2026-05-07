@@ -62,7 +62,25 @@ const notFound = (msg = 'Not found') => ok({ error: msg }, 404);
 const methodNotAllowed = () => ok({ error: 'Method not allowed' }, 405);
 const badRequest = (msg: string) => ok({ error: msg }, 400);
 
+/** Thrown by helper validators; converted to a 400 response by the router. */
+export class BadRequestError extends Error {
+  readonly status = 400 as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'BadRequestError';
+  }
+}
+
 export async function handleRequest(req: AgentRequest): Promise<AgentResponse> {
+  try {
+    return await dispatch(req);
+  } catch (err) {
+    if (err instanceof BadRequestError) return badRequest(err.message);
+    throw err;
+  }
+}
+
+async function dispatch(req: AgentRequest): Promise<AgentResponse> {
   const segments = req.path.split('/').filter(Boolean);
   if (segments.length === 0) return ok({ status: req.deps.dataSource.status });
 
@@ -170,7 +188,7 @@ function isAllowedSingleton(pack: DomainPack, type: string): boolean {
 function asObject(body: unknown): Record<string, unknown> {
   if (body == null) return {};
   if (typeof body === 'object' && !Array.isArray(body)) return body as Record<string, unknown>;
-  throw Object.assign(new Error('Request body must be a JSON object'), { status: 400 });
+  throw new BadRequestError('Request body must be a JSON object');
 }
 
 function num(v: unknown): number | undefined {

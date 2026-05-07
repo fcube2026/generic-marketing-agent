@@ -29,8 +29,10 @@ import {
 // Side-effect import to auto-register the bundled pack.
 import '@/packs/healthcare-clinic';
 
-const env = (key: string, fallback?: string): string | undefined =>
-  process.env[key] && process.env[key]!.length > 0 ? process.env[key] : fallback;
+const env = (key: string, fallback?: string): string | undefined => {
+  const value = process.env[key];
+  return value && value.length > 0 ? value : fallback;
+};
 
 export interface AgentConfig {
   tenant: Tenant;
