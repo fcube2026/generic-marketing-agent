@@ -29,8 +29,7 @@ async function route(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
   }
 
   const url = new URL(req.url);
-  const query: Record<string, string> = {};
-  url.searchParams.forEach((v, k) => { query[k] = v; });
+  const query = Object.fromEntries(url.searchParams);
 
   const result = await handleRequest({
     method: req.method,

@@ -117,9 +117,8 @@ async function dispatch(req: AgentRequest): Promise<AgentResponse> {
     if (a === 'terminology') return ok(req.deps.domainPack.terminology);
     if (!a) {
       // Pack metadata WITHOUT the seed payload (which can be large).
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { seedData, seedSingletons, ...rest } = req.deps.domainPack;
-      void seedData;
-      void seedSingletons;
       return ok(rest);
     }
     return notFound();
