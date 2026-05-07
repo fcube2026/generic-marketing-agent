@@ -652,6 +652,48 @@ async function seedMarketing() {
     });
   }
 
+  // KPIs grouped by dashboard category. Seeded with realistic starter values
+  // so the dashboard renders meaningful tiles before any real telemetry feeds
+  // are wired up. Operators can edit these rows directly in the DB or via the
+  // admin UI as soon as production numbers become available.
+  const kpis: Array<{
+    id: string;
+    category: 'north-star' | 'acquisition' | 'activation' | 'retention';
+    label: string;
+    value: string;
+    target: string;
+    trend: string;
+    status: 'on-track' | 'at-risk' | 'behind';
+    icon: string;
+    order: number;
+  }> = [
+    { id: 'seed-kpi-ns-1', category: 'north-star', label: 'Monthly active customers', value: '4,820', target: '6,000', trend: '+8.2% MoM', status: 'on-track', icon: '👥', order: 0 },
+    { id: 'seed-kpi-ns-2', category: 'north-star', label: 'Weekly transactions',     value: '1,240', target: '1,500', trend: '+5.1% WoW', status: 'on-track', icon: '🛒', order: 1 },
+    { id: 'seed-kpi-ns-3', category: 'north-star', label: 'Active partners',         value: '148',   target: '200',   trend: '+3.4% MoM', status: 'at-risk',  icon: '🤝', order: 2 },
+
+    { id: 'seed-kpi-acq-1', category: 'acquisition', label: 'New signups',    value: '1,820', target: '2,200', trend: '+11% MoM',  status: 'on-track', icon: '✨', order: 0 },
+    { id: 'seed-kpi-acq-2', category: 'acquisition', label: 'CAC',            value: '₹612',  target: '₹550',  trend: '-3% MoM',   status: 'at-risk',  icon: '💰', order: 1 },
+    { id: 'seed-kpi-acq-3', category: 'acquisition', label: 'Paid CTR',       value: '3.4%',  target: '3.0%',  trend: '+0.4 pts',  status: 'on-track', icon: '🎯', order: 2 },
+    { id: 'seed-kpi-acq-4', category: 'acquisition', label: 'Organic visits', value: '38.5K', target: '45K',   trend: '+9% MoM',   status: 'on-track', icon: '🌱', order: 3 },
+    { id: 'seed-kpi-acq-5', category: 'acquisition', label: 'Referral share', value: '9%',    target: '15%',   trend: '+1 pt MoM', status: 'behind',   icon: '🔗', order: 4 },
+
+    { id: 'seed-kpi-act-1', category: 'activation', label: 'Signup → first action (7d)', value: '28%',  target: '35%',  trend: '+2 pts MoM', status: 'at-risk',  icon: '⚡',  order: 0 },
+    { id: 'seed-kpi-act-2', category: 'activation', label: 'Onboarding completion',      value: '64%',  target: '75%',  trend: '+4 pts MoM', status: 'at-risk',  icon: '🧭',  order: 1 },
+    { id: 'seed-kpi-act-3', category: 'activation', label: 'Time to first value',        value: '2.4d', target: '1.5d', trend: '-0.3d MoM',  status: 'on-track', icon: '⏱️', order: 2 },
+
+    { id: 'seed-kpi-ret-1', category: 'retention', label: 'D7 retention',  value: '45%', target: '50%', trend: '+1 pt MoM', status: 'at-risk',  icon: '🔁', order: 0 },
+    { id: 'seed-kpi-ret-2', category: 'retention', label: 'D30 retention', value: '22%', target: '28%', trend: '+1 pt MoM', status: 'at-risk',  icon: '🔁', order: 1 },
+    { id: 'seed-kpi-ret-3', category: 'retention', label: 'D90 retention', value: '13%', target: '18%', trend: 'flat',      status: 'behind',   icon: '🔁', order: 2 },
+    { id: 'seed-kpi-ret-4', category: 'retention', label: 'NPS',           value: '47',  target: '55',  trend: '+3 MoM',    status: 'on-track', icon: '⭐', order: 3 },
+  ];
+  for (const kpi of kpis) {
+    await prisma.marketingKpi.upsert({
+      where: { id: kpi.id },
+      create: kpi,
+      update: {},
+    });
+  }
+
   console.log('✅ Marketing seed data inserted');
 }
 

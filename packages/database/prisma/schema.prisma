@@ -1114,6 +1114,23 @@ model MarketingIntakeResponse {
   @@map("marketing_intake_responses")
 }
 
+model MarketingKpi {
+  id        String   @id @default(cuid())
+  category  String // 'north-star' | 'acquisition' | 'activation' | 'retention'
+  label     String
+  value     String
+  target    String
+  trend     String
+  status    String   @default("on-track") // 'on-track' | 'at-risk' | 'behind'
+  icon      String   @default("")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, order])
+  @@map("marketing_kpis")
+}
+
 // =======================
 // PATIENT VERIFICATION (PHASE 1)
 // =======================
