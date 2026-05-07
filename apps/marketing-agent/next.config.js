@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // `pg` is an optional dependency used only when a SQL data source is
+  // configured. Listing it here ensures Next.js treats it as an external
+  // node module and does not attempt to bundle it (which would fail when
+  // the package is not installed).
+  serverExternalPackages: ['pg'],
   async rewrites() {
     // The marketing-agent ships with built-in Next.js route handlers under
     // /api/backend/* that serve generic seed data from in-memory storage,
