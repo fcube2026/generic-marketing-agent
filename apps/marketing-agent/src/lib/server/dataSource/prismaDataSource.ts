@@ -39,6 +39,13 @@ import type {
 
 const PROFILE_ID = 'default';
 
+/** Strip the `id` from a patch so it can't override the row primary key. */
+function stripId<T extends { id?: unknown }>(patch: T): Omit<T, 'id'> {
+  const { id: _ignored, ...rest } = patch;
+  void _ignored;
+  return rest;
+}
+
 const DEFAULT_PROFILE: BusinessProfile = {
   primaryGrowthFocus: 'both',
   biggestBottleneck: 'demand',
@@ -262,9 +269,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateCampaign(id: string, patch: Partial<Campaign>): Promise<Campaign | null> {
     try {
-      const { id: _ignored, ...rest } = patch;
-      void _ignored;
-      const row = await prisma.marketingCampaign.update({ where: { id }, data: rest });
+      const row = await prisma.marketingCampaign.update({ where: { id }, data: stripId(patch) });
       return rowToCampaign(row);
     } catch {
       return null;
@@ -290,9 +295,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateExperiment(id: string, patch: Partial<Experiment>): Promise<Experiment | null> {
     try {
-      const { id: _ignored, ...rest } = patch;
-      void _ignored;
-      const row = await prisma.marketingExperiment.update({ where: { id }, data: rest });
+      const row = await prisma.marketingExperiment.update({ where: { id }, data: stripId(patch) });
       return rowToExperiment(row);
     } catch {
       return null;
@@ -318,9 +321,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateContentItem(id: string, patch: Partial<ContentItem>): Promise<ContentItem | null> {
     try {
-      const { id: _ignored, ...rest } = patch;
-      void _ignored;
-      const row = await prisma.marketingContentItem.update({ where: { id }, data: rest });
+      const row = await prisma.marketingContentItem.update({ where: { id }, data: stripId(patch) });
       return rowToContentItem(row);
     } catch {
       return null;
@@ -346,9 +347,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateSeoPage(id: string, patch: Partial<SeoPage>): Promise<SeoPage | null> {
     try {
-      const { id: _ignored, ...rest } = patch;
-      void _ignored;
-      const row = await prisma.marketingSeoPage.update({ where: { id }, data: rest });
+      const row = await prisma.marketingSeoPage.update({ where: { id }, data: stripId(patch) });
       return rowToSeoPage(row);
     } catch {
       return null;
@@ -381,8 +380,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateKeywordCluster(id: string, patch: Partial<KeywordCluster>): Promise<KeywordCluster | null> {
     try {
-      const { id: _ignored, keywords, ...rest } = patch;
-      void _ignored;
+      const { keywords, ...rest } = stripId(patch);
       const data: any = { ...rest };
       if (keywords !== undefined) data.keywords = keywords as any;
       const row = await prisma.marketingKeywordCluster.update({ where: { id }, data });
@@ -431,8 +429,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updateLifecycleFlow(id: string, patch: Partial<LifecycleFlow>): Promise<LifecycleFlow | null> {
     try {
-      const { id: _ignored, steps, ...rest } = patch;
-      void _ignored;
+      const { steps, ...rest } = stripId(patch);
       // If steps are supplied, replace the whole step set (matches mock semantics).
       if (steps !== undefined) {
         await prisma.marketingLifecycleStep.deleteMany({ where: { flowId: id } });
@@ -477,9 +474,7 @@ export class PrismaDataSource implements DataSource {
   }
   async updatePlanItem(id: string, patch: Partial<PlanItem>): Promise<PlanItem | null> {
     try {
-      const { id: _ignored, ...rest } = patch;
-      void _ignored;
-      const row = await prisma.marketingPlanItem.update({ where: { id }, data: rest });
+      const row = await prisma.marketingPlanItem.update({ where: { id }, data: stripId(patch) });
       return rowToPlanItem(row);
     } catch {
       return null;
