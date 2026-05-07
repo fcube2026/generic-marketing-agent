@@ -213,9 +213,8 @@ export class FcubeDataSource implements DataSource {
       c.patientProfile.count({ where: { totalBookings: { gt: 0 } } }),
     ]);
 
-    const onboardingRatePct = patients30d > 0
-      ? Math.round((onboardedPatients / Math.max(patients30d, 1)) * 100)
-      : 0;
+    const onboardingRatePct =
+      patients30d > 0 ? Math.round((onboardedPatients / patients30d) * 100) : 0;
     // Retention proxies: share of *recent* signups that have already
     // completed at least one booking in the same window. Real cohort
     // retention requires event tracking we don't have here yet.
