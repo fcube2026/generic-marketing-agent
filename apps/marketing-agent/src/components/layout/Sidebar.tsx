@@ -16,7 +16,6 @@ const navItems = [
   { href: '/create', label: 'Create Content', icon: '✨' },
   { href: '/skills', label: 'Skills Library', icon: '🧠' },
   { href: '/agent', label: 'AI Marketing Agent', icon: '🤖' },
-  { href: '/settings/data-source', label: 'Data Source', icon: '🗄️' },
 ];
 
 export default function Sidebar() {

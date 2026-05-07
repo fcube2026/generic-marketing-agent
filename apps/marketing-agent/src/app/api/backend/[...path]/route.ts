@@ -5,12 +5,7 @@
  * external API is configured (i.e. `NEXT_PUBLIC_API_URL` is unset).
  *
  * Reads & writes go through the active `DataSource` returned by
- * `getActiveDataSource()`:
- *
- *   - With **no DB configured** → `MockDataSource` (in-memory seed data).
- *   - With a DB configured under Settings → Data Source → `SqlDataSource`
- *     wrapped in a write-fallback so writes still hit the in-memory mock
- *     (the SQL source is intentionally read-only).
+ * `getActiveDataSource()`, which is always an in-memory `MockDataSource`.
  *
  * When `NEXT_PUBLIC_API_URL` is set, `next.config.js` rewrites these paths
  * to the external API and this handler is never hit.
@@ -19,18 +14,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveDataSource, resetActiveDataSource } from '@/lib/server/dataSource';
-import {
-  buildConfig,
-  clearConfig,
-  loadConfig,
-  saveConfig,
-  summarizeConfig,
-  type ResourceMapping,
-} from '@/lib/server/dataSource/config';
-import { introspectSchema, testConnection, SqlDataSource } from '@/lib/server/dataSource/sqlDataSource';
-import { validateMapping } from '@/lib/server/dataSource/introspect';
-import type { KpiCategory, ResourceKey } from '@/lib/server/dataSource/types';
+import { getActiveDataSource } from '@/lib/server/dataSource';
+import type { KpiCategory } from '@/lib/server/dataSource/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,92 +99,6 @@ async function handleAuthLogin(req: NextRequest) {
   });
 }
 
-// ─── Data source admin endpoints ────────────────────────────────────────────
-
-async function handleDataSourceStatus(req: NextRequest) {
-  if (req.method !== 'GET') return methodNotAllowed();
-  const ds = getActiveDataSource();
-  return json({ ...ds.status, config: summarizeConfig(loadConfig()) });
-}
-
-async function handleDataSourceTest(req: NextRequest) {
-  if (req.method !== 'POST') return methodNotAllowed();
-  const body = await readJson(req);
-  const dsn = typeof body.dsn === 'string' ? body.dsn : '';
-  if (!dsn) return json({ ok: false, error: 'Missing dsn' }, 400);
-  const result = await testConnection(dsn);
-  return json(result, result.ok ? 200 : 502);
-}
-
-async function handleDataSourceConfig(req: NextRequest) {
-  if (req.method === 'GET') return json(summarizeConfig(loadConfig()));
-  if (req.method === 'PUT') {
-    const body = await readJson(req);
-    const dsn = typeof body.dsn === 'string' ? body.dsn : '';
-    if (!dsn) return json({ error: 'Missing dsn' }, 400);
-    const dialect = body.dialect === 'postgres' ? 'postgres' : 'postgres';
-    const test = await testConnection(dsn);
-    if (!test.ok) return json({ error: `Connection failed: ${test.error}` }, 502);
-    const cfg = buildConfig({
-      dialect,
-      dsn,
-      label: typeof body.label === 'string' ? body.label : undefined,
-      mappings: typeof body.mappings === 'object' && body.mappings ? body.mappings : {},
-    });
-    saveConfig(cfg);
-    resetActiveDataSource();
-    return json(summarizeConfig(cfg));
-  }
-  if (req.method === 'DELETE') {
-    clearConfig();
-    resetActiveDataSource();
-    return json({ ok: true });
-  }
-  return methodNotAllowed();
-}
-
-async function handleDataSourceSchema(req: NextRequest) {
-  if (req.method !== 'GET') return methodNotAllowed();
-  const cfg = loadConfig();
-  if (!cfg) return json({ error: 'No data source configured' }, 404);
-  try {
-    const { getDsn } = await import('@/lib/server/dataSource/config');
-    const schema = await introspectSchema(getDsn(cfg));
-    // Also surface the resolved (auto + override) mappings.
-    const ds = getActiveDataSource();
-    const live = (ds as any).primary instanceof SqlDataSource
-      ? await ((ds as any).primary as SqlDataSource).getResolvedMappings()
-      : ds instanceof SqlDataSource
-        ? await ds.getResolvedMappings()
-        : {};
-    return json({ schema, mappings: cfg.mappings, resolvedMappings: live });
-  } catch (e: any) {
-    return json({ error: e?.message || String(e) }, 502);
-  }
-}
-
-async function handleDataSourceMappings(req: NextRequest) {
-  if (req.method !== 'PUT') return methodNotAllowed();
-  const cfg = loadConfig();
-  if (!cfg) return json({ error: 'No data source configured' }, 404);
-  const body = await readJson(req);
-  const incoming = (body?.mappings ?? {}) as Partial<Record<ResourceKey, ResourceMapping>>;
-  // Validate against the live schema.
-  const { getDsn } = await import('@/lib/server/dataSource/config');
-  const schema = await introspectSchema(getDsn(cfg));
-  const cleaned: Partial<Record<ResourceKey, ResourceMapping>> = {};
-  for (const [key, mapping] of Object.entries(incoming)) {
-    if (!mapping) continue;
-    const v = validateMapping(key as ResourceKey, mapping, schema);
-    if (!v.ok) return json({ error: `Invalid mapping for ${key}: ${v.error}` }, 400);
-    cleaned[key as ResourceKey] = mapping;
-  }
-  const next = { ...cfg, mappings: cleaned, updatedAt: new Date().toISOString() };
-  saveConfig(next);
-  resetActiveDataSource();
-  return json(summarizeConfig(next));
-}
-
 // ─── Router ──────────────────────────────────────────────────────────────────
 
 async function route(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
@@ -209,16 +108,6 @@ async function route(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
   if (root === 'auth') {
     const [sub] = rest;
     if (sub === 'marketing-login') return handleAuthLogin(req);
-    return notFound();
-  }
-
-  if (root === 'datasource') {
-    const [sub] = rest;
-    if (sub === 'status') return handleDataSourceStatus(req);
-    if (sub === 'test') return handleDataSourceTest(req);
-    if (sub === 'config') return handleDataSourceConfig(req);
-    if (sub === 'schema') return handleDataSourceSchema(req);
-    if (sub === 'mappings') return handleDataSourceMappings(req);
     return notFound();
   }
 
