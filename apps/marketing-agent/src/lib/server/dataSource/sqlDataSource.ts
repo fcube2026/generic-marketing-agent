@@ -13,7 +13,6 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { createRequire } from 'module';
 import type {
   BusinessProfile,
   Campaign,
@@ -51,21 +50,32 @@ const ROW_CAP = 1000;
 // configure a SQL data source. We must therefore prevent webpack/Next.js
 // from trying to resolve it at build time — otherwise the build fails
 // with `Module not found: Can't resolve 'pg'` whenever the package is
-// absent (and `webpackIgnore` magic comments are not always honoured by
-// Next.js's bundler pipeline).
+// absent. Approaches like `await import('pg')`, `require('pg')`, or even
+// `createRequire(__filename)('pg')` are all detectable by the bundler's
+// static analysis and can produce that error in `next dev` and
+// `next build` (especially with stale `.next` caches).
 //
-// The most reliable way to defeat the bundler's static analysis is to
-// hide the module specifier behind a runtime expression, so webpack
-// cannot see the literal string `'pg'` in the source. We use Node's
-// `createRequire` to load the package at runtime on the server.
-const requireFromHere = createRequire(__filename);
-
-async function getPgPool(dsn: string): Promise<any> {
+// The canonical, bundler-proof workaround is to obtain `require` itself
+// via `eval`, so neither webpack nor turbopack ever sees a require/import
+// expression to analyse. The literal `'pg'` is also assembled at runtime
+// as a second layer of defence. `next.config.js` additionally lists
+// `pg` under `serverExternalPackages`.
+//
+// This file only runs on the Node.js server runtime (the route handler
+// that imports it sets `dynamic = 'force-dynamic'`), so `eval('require')`
+// is safe here.
+function loadPg(): any {
+  // eslint-disable-next-line no-eval
+  const nodeRequire: NodeRequire = eval('require');
   // Build the specifier at runtime so static bundlers can't resolve it.
   const pkg = ['p', 'g'].join('');
+  return nodeRequire(pkg);
+}
+
+async function getPgPool(dsn: string): Promise<any> {
   let pg: any;
   try {
-    pg = requireFromHere(pkg);
+    pg = loadPg();
   } catch {
     throw new Error('The "pg" package is required for SQL data sources but failed to load.');
   }
