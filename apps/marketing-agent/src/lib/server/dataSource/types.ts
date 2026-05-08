@@ -42,7 +42,7 @@ export type ResourceKey =
  * to the UI banner so users always know which backend is in play.
  */
 export interface DataSourceStatus {
-  kind: 'mock' | 'sql' | 'rest';
+  kind: 'mock' | 'sql' | 'rest' | 'prisma';
   label: string;
   /** Human-readable detail (host/db for SQL, base URL for REST, etc.). */
   detail?: string;

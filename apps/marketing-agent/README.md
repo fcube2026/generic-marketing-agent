@@ -33,6 +33,28 @@ pnpm --filter @curex24/marketing-agent dev
 | `GOOGLE_AI_BASE_URL` | No | Override the Generative Language API base URL (e.g. proxy / regional endpoint). |
 | `AI_IMAGE_PROVIDER` | No | Default image provider when the client does not specify one. `openai` (default) or `google`. The UI toggle always overrides this per request. |
 | `MARKETING_AGENT_SKIP_AUTH` | No | Set to `true` only in dev/test to skip the upstream JWT-validation hop on AI routes. **Never set this in production.** |
+| `DATABASE_URL` | **Yes (for live data)** | Postgres connection string for the fcube database. When set, `/api/backend/*` reads & writes from the `Marketing*` tables in `packages/database/prisma/schema.prisma` instead of the in-memory mock store. |
+| `MARKETING_DATA_SOURCE` | No | Force a specific backend: `prisma` (always Postgres) or `mock` (always in-memory seed). Defaults to auto-detect from `DATABASE_URL`. |
+
+### Wiring the dashboard to the fcube database
+
+By default the dashboard renders real fcube data when `DATABASE_URL` is set; otherwise it falls back to an empty in-memory store. Set `MARKETING_DATA_SOURCE=mock` to opt into the legacy seeded sample content for offline UI development.
+
+```bash
+# 1. Generate the Prisma client (once per workspace)
+pnpm --filter @curex24/database db:generate
+
+# 2. Apply migrations against the target database
+DATABASE_URL=postgresql://... pnpm --filter @curex24/database db:migrate:deploy
+
+# 3. Optional — seed sample marketing rows
+DATABASE_URL=postgresql://... pnpm --filter @curex24/database db:seed
+
+# 4. Boot the dashboard against the live database
+DATABASE_URL=postgresql://... pnpm --filter @curex24/marketing-agent dev
+```
+
+If the Prisma client can't be loaded (e.g. you forgot `db:generate`) the dashboard banner reports `degraded` instead of silently falling back to mock data.
 
 > ⚠️ **Do not** prefix the OpenAI **or** Google variables with `NEXT_PUBLIC_`. They are read only from server-side route handlers; prefixing would leak the key to the browser bundle.
 

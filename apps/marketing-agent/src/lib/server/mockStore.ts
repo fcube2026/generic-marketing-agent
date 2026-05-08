@@ -240,12 +240,61 @@ const seed: Store = {
   },
 };
 
+/**
+ * Empty starting state used when `MARKETING_DATA_SOURCE` is not `mock`.
+ * Production deployments should never see the placeholder seed above —
+ * those numbers must come from the real backend (Prisma / fcube DB).
+ */
+const emptyStore: Store = {
+  profile: {
+    primaryGrowthFocus: 'both',
+    biggestBottleneck: 'acquisition',
+    monthlyBudget: 0,
+    allocatedBudget: 0,
+    targetCities: [],
+    bestPerforming: '',
+    topMemberPersona: '',
+    topReasonMemberJoins: '',
+    topReasonMemberSubscribes: '',
+    competitors: [],
+    founderLedBrand: false,
+  },
+  campaigns: [],
+  experiments: [],
+  contentItems: [],
+  seoPages: [],
+  keywordClusters: [],
+  lifecycleFlows: [],
+  planItems: [],
+  intakeResponses: {},
+  kpis: {
+    'north-star': [],
+    acquisition: [],
+    activation: [],
+    retention: [],
+  },
+};
+
 // Use a globalThis-cached store so it survives Next.js dev hot reloads.
 type GlobalWithStore = typeof globalThis & { __marketingAgentStore?: Store };
 const g = globalThis as GlobalWithStore;
 if (!g.__marketingAgentStore) {
-  // Deep-clone the seed so mutations don't bleed across reloads.
-  g.__marketingAgentStore = JSON.parse(JSON.stringify(seed));
+  // The mock store only ships seed data when the agent is *explicitly*
+  // running in mock mode. With a real database (or no env preference)
+  // the dashboard should render only what's in the fcube DB — never
+  // fabricated placeholder content. This keeps `MARKETING_DATA_SOURCE=mock`
+  // working end-to-end for offline dev while making sure a real
+  // deployment never accidentally surfaces seed numbers.
+  const pref = (process.env.MARKETING_DATA_SOURCE ?? process.env.DATA_SOURCE ?? '')
+    .trim()
+    .toLowerCase();
+  const useSeed = pref === 'mock' || pref === 'memory';
+  if (useSeed) {
+    // Deep-clone the seed so mutations don't bleed across reloads.
+    g.__marketingAgentStore = JSON.parse(JSON.stringify(seed));
+  } else {
+    g.__marketingAgentStore = JSON.parse(JSON.stringify(emptyStore));
+  }
 }
 export const store: Store = g.__marketingAgentStore!;
 
