@@ -24,8 +24,8 @@ function FlowCard({ flow }: { flow: LifecycleFlow }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-base font-semibold text-gray-800">{flow.name}</h3>
-            <Badge variant={flow.segment === 'patient' ? 'info' : 'purple'}>
-              {flow.segment === 'patient' ? '🧑‍⚕️ Patient' : '👨‍⚕️ Provider'}
+            <Badge variant={flow.segment === 'member' ? 'info' : 'purple'}>
+              {flow.segment === 'member' ? '👤 Member' : '💳 Subscriber'}
             </Badge>
             <StatusBadge status={flow.status} />
           </div>
@@ -68,7 +68,7 @@ function FlowCard({ flow }: { flow: LifecycleFlow }) {
 }
 
 export default function LifecyclePage() {
-  const [segment, setSegment] = useState<'all' | 'patient' | 'provider'>('all');
+  const [segment, setSegment] = useState<'all' | 'member' | 'subscriber'>('all');
   const [lifecycleFlows, setLifecycleFlows] = useState<LifecycleFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +122,7 @@ export default function LifecyclePage() {
 
       {/* Segment filter */}
       <div className="flex gap-2">
-        {(['all', 'patient', 'provider'] as const).map((s) => (
+        {(['all', 'member', 'subscriber'] as const).map((s) => (
           <button
             key={s}
             onClick={() => setSegment(s)}
@@ -130,7 +130,7 @@ export default function LifecyclePage() {
               segment === s ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary'
             }`}
           >
-            {s === 'all' ? 'All Flows' : s === 'patient' ? '🧑‍⚕️ Patient' : '👨‍⚕️ Provider'}
+            {s === 'all' ? 'All Flows' : s === 'member' ? '👤 Member' : '💳 Subscriber'}
           </button>
         ))}
       </div>
@@ -146,15 +146,15 @@ export default function LifecyclePage() {
       <Card title="Key CRM Automation Triggers" subtitle="Auto-triggered based on platform events">
         <div className="space-y-3">
           {[
-            { trigger: 'Booking completed', action: 'Review request email + push 24h after', priority: 'high' },
-            { trigger: 'Booking cancelled', action: 'Recovery flow — alternative provider/slot suggestions', priority: 'high' },
-            { trigger: 'Upcoming appointment (1 day)', action: 'Reminder email + push notification', priority: 'high' },
-            { trigger: 'Upcoming appointment (1 hour)', action: 'Final reminder push + SMS', priority: 'medium' },
-            { trigger: '7 days since signup, no booking', action: 'Nudge email with ₹100 first-booking incentive', priority: 'high' },
-            { trigger: '30 days inactive (patient)', action: 'Re-engagement email with personalised recommendation', priority: 'high' },
-            { trigger: '60 days inactive (patient)', action: 'Win-back email with ₹200 credit offer', priority: 'medium' },
-            { trigger: 'Provider license expiry in 30 days', action: 'Alert notification to provider dashboard + email', priority: 'high' },
-            { trigger: 'Provider receives 5-star review', action: 'Congratulations email + referral program CTA', priority: 'low' },
+            { trigger: 'First budget set up', action: 'Celebration email + push: invite to set a savings goal', priority: 'high' },
+            { trigger: 'First savings goal created', action: 'Suggest auto-debit + share with family circle', priority: 'high' },
+            { trigger: 'Free trial day 12 of 14', action: 'Trial-ending email with upgrade incentive', priority: 'high' },
+            { trigger: 'Failed renewal payment', action: 'Dunning sequence: retry, switch payment method, save offer', priority: 'high' },
+            { trigger: '7 days since signup, no budget', action: 'Nudge email with ₹100 off first month', priority: 'high' },
+            { trigger: '30 days inactive (member)', action: 'Re-engagement email with personalised insights', priority: 'high' },
+            { trigger: '60 days inactive (member)', action: 'Win-back email with ₹200 credit on annual plan', priority: 'medium' },
+            { trigger: 'Subscription renewal in 30 days', action: 'Renewal reminder + upsell to family / annual plan', priority: 'high' },
+            { trigger: 'Family-circle invite sent', action: 'Reminder to invitee + thank-you to inviter', priority: 'low' },
           ].map((row) => (
             <div key={row.trigger} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold mt-0.5 ${
@@ -174,10 +174,10 @@ export default function LifecyclePage() {
       <Card title="📌 Lifecycle Agent Guidance">
         <ul className="space-y-2 text-sm text-gray-600">
           <li>• <strong>Day 3 email is the highest-leverage onboarding step</strong> — this is when intent is highest and the incentive has most impact.</li>
-          <li>• <strong>Always personalise</strong> with first name, city, and relevant provider type (e.g., &ldquo;Cardiologists near you in Mumbai&rdquo;).</li>
-          <li>• <strong>Review requests within 24h</strong> of booking completion drive 3x higher review rate than requests sent later.</li>
-          <li>• <strong>Win-back campaigns</strong> should include a tangible incentive — credits outperform discounts for driving repeat bookings.</li>
-          <li>• <strong>Provider flows</strong> should lead with performance data — show them what they earned and what patients said, not just platform instructions.</li>
+          <li>• <strong>Always personalise</strong> with first name, city, and the goal the member is working towards (e.g., &ldquo;your ₹50k emergency fund in Mumbai&rdquo;).</li>
+          <li>• <strong>Educational nudges within 24h</strong> of a first deposit drive 3x higher follow-up actions than nudges sent later.</li>
+          <li>• <strong>Win-back campaigns</strong> should include a tangible incentive — credits or premium-feature unlocks outperform discounts for driving repeat usage.</li>
+          <li>• <strong>Subscriber flows</strong> should lead with progress data — show them what they saved and how their goals are tracking, not just product instructions.</li>
         </ul>
       </Card>
     </div>

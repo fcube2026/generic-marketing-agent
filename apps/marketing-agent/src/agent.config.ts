@@ -9,7 +9,7 @@
  *   - auth adapter
  *
  * Defaults preserve today's behavior exactly: in-memory data, mock AI for
- * tests, anonymous auth, healthcare-clinic pack. Production deployments
+ * tests, anonymous auth, fcube-finance pack. Production deployments
  * override via env vars — no code changes required.
  *
  * Adding a new vertical = `import '@/packs/my-pack'` + set
@@ -28,7 +28,6 @@ import {
 
 // Side-effect imports to auto-register the bundled packs. Add a new
 // vertical here to make `DOMAIN_PACK=<id>` work out of the box.
-import '@/packs/healthcare-clinic';
 import '@/packs/fcube-finance';
 
 const env = (key: string, fallback?: string): string | undefined => {
@@ -61,8 +60,6 @@ function resolveDataSource(): DataSourceConfig {
   const kind = (env('DATA_SOURCE', 'memory') ?? 'memory') as DataSourceConfig['kind'];
   switch (kind) {
     case 'prisma':
-      return { kind, options: { datasourceUrl: process.env.DATABASE_URL } };
-    case 'fcube':
       return { kind, options: { datasourceUrl: process.env.DATABASE_URL } };
     case 'rest':
       return {

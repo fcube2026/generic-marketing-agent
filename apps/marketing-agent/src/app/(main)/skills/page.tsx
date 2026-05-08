@@ -245,8 +245,8 @@ export default function SkillsPage() {
           {showNotApplicable && (
             <div id="not-applicable-skills" className="mt-4 space-y-3">
               <p className="text-xs text-gray-500 max-w-2xl">
-                These skills are hidden by default because they don&apos;t fit your brand&apos;s current B2C
-                home-doctor / care-plan motion (B2B-only outreach, comparison pages, generic free tools, etc.).
+                These skills are hidden by default because they don&apos;t fit the brand&apos;s current B2C
+                free-member / paid-subscription motion (B2B-only outreach, comparison pages, generic free tools, etc.).
                 Use them only if your situation changes.
               </p>
               {filteredNotApplicable.length === 0 ? (

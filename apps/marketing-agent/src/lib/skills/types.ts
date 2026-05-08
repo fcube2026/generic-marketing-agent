@@ -103,7 +103,7 @@ export interface AdvancedSkillConfig {
   inputs: SkillInput[];
   outputs: SkillOutput[];
   tools?: SkillTool[];
-  /** Healthcare/brand guardrails applied to every run. */
+  /** Brand / compliance guardrails applied to every run. */
   guardrails?: string[];
   /** Critic rubric used by `/api/ai/critique`. */
   successCriteria?: SkillRubricCriterion[];

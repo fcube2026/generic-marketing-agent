@@ -4,7 +4,7 @@
  * A pack is a versioned bundle of declarations that tells the agent what
  * domain it's running in: which resources exist, what KPIs to track, what
  * skills are available, what onboarding questions to ask, and what to call
- * each thing in the UI ("campaign" → "outreach", "patient" → "client").
+ * each thing in the UI ("campaign" → "outreach", "member" → "client").
  *
  * Packs are pure data — JSON/TS modules shipped in `src/packs/*`, loaded
  * from disk in dev, or fetched from a remote registry in prod. Adding a
@@ -107,7 +107,7 @@ export interface IntakeQuestionDef {
 // ─── Pack ───────────────────────────────────────────────────────────────────
 
 export interface DomainPack {
-  /** URL-safe id (e.g. "healthcare-clinic", "ecommerce", "saas"). */
+  /** URL-safe id (e.g. "fcube-finance", "ecommerce", "saas"). */
   id: string;
   /** Semver version — tenants pin to a specific version to upgrade safely. */
   version: string;

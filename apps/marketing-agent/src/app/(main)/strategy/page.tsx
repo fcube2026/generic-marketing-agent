@@ -23,22 +23,22 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
     subsections: [
       {
         heading: 'Positioning Statement',
-        content: '"your brand is the fastest, most trusted way to connect with verified healthcare providers — on your terms, at your time."',
+        content: '"your brand is the simplest, most trusted way to budget, save and invest as a household — on your terms, in your language."',
         type: 'quote',
       },
       {
         heading: 'Brand Narrative Pillars',
         type: 'pillars',
         items: [
-          { icon: '🔒', label: 'Trust', detail: 'Verified providers, transparent pricing, real reviews' },
-          { icon: '⚡', label: 'Speed', detail: 'Book in minutes, get care today' },
-          { icon: '🏠', label: 'Convenience', detail: 'Home visits, clinic visits, on-demand' },
-          { icon: '💪', label: 'Empowerment', detail: 'Patients in control of their health' },
+          { icon: '🔒', label: 'Trust', detail: 'Bank-grade security, transparent pricing, real members' },
+          { icon: '⚡', label: 'Simplicity', detail: 'Set up in minutes, jargon-free explanations' },
+          { icon: '👨\u200d👩\u200d👧', label: 'Family-first', detail: 'Shared budgets, goals and circles for the whole household' },
+          { icon: '💪', label: 'Empowerment', detail: 'Members in control of their money, every month' },
         ],
       },
       {
         heading: 'Tone of Voice',
-        content: 'Warm, clear, confident, human. Not clinical. Not corporate. Speaks like a trusted friend who happens to know healthcare.',
+        content: 'Warm, clear, confident, human. Not jargon-heavy. Not corporate. Speaks like a trusted friend who happens to know personal finance.',
         type: 'text',
       },
     ],
@@ -49,24 +49,24 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
     title: 'Audience Segmentation',
     subsections: [
       {
-        heading: 'Patient ICPs',
+        heading: 'Member ICPs',
         type: 'table',
         headers: ['Persona', 'Description', 'Key Message'],
         rows: [
-          ['Urban Busy Professional', '25–40, metro city, needs care without taking a day off', '"Book in 2 min, skip the waiting room"'],
-          ['Parent / Caregiver', '30–50, managing family health, needs reliability', '"Trusted doctors, at home or clinic"'],
-          ['Senior / Elderly Support', '55+, or adult children managing for them', '"Easy, safe, verified — no tech stress"'],
-          ['Chronic Condition Manager', 'Frequent diagnostics/consultations, needs continuity', '"Your care team, always available"'],
+          ['Urban Salaried Professional', '25–40, metro city, salaried, first-time investor', '"Start your SIP in 2 minutes — track every rupee"'],
+          ['Household CFO', '30–50, runs the family budget, juggles EMIs and goals', '"One app for the whole family\u2019s money"'],
+          ['Senior / Retiree Support', '55+, or adult children managing for them', '"Simple, safe, transparent — no jargon"'],
+          ['Goal-oriented Saver', 'Saving for a specific goal — house, education, retirement', '"Your goal, on autopilot"'],
         ],
       },
       {
-        heading: 'Provider ICPs',
+        heading: 'Subscriber ICPs',
         type: 'table',
         headers: ['Persona', 'Description', 'Key Message'],
         rows: [
-          ['Independent Doctor', 'Solo practice, wants more patients without marketing effort', '"Grow your practice. We bring patients to you."'],
-          ['Clinic Owner', 'Has staff, wants to fill appointment slots', '"Fill your schedule. Zero upfront cost."'],
-          ['Diagnostic Center', 'High-volume, needs steady patient flow', '"Expand reach. Grow bookings."'],
+          ['Premium Family', 'Couple/family wanting shared dashboards and goal-based investing', '"One plan for the whole household"'],
+          ['Tax & Wealth Planner', 'High-income earner needing tax + portfolio tools', '"Premium tools to keep more of what you earn"'],
+          ['Annual-plan Loyalist', 'Active free user, ready to commit to a yearly plan for savings', '"Save 20% — switch to annual"'],
         ],
       },
     ],
@@ -81,7 +81,7 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Stage', 'Primary Channels', 'Secondary'],
         rows: [
-          ['0→1 (pre-PMF)', 'Referrals, community, local partnerships, content SEO', 'LinkedIn, WhatsApp groups'],
+          ['0→1 (pre-PMF)', 'Referrals, community, creator partnerships, content SEO', 'LinkedIn, WhatsApp groups'],
           ['1→10 (early growth)', 'Google Performance Max, Meta retargeting, SEO, email', 'Influencers, PR'],
           ['10→100 (scale)', 'Paid search + social at scale, affiliate, PLG', 'OOH in target cities, partnerships'],
         ],
@@ -106,9 +106,9 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Launch Sequence',
         type: 'steps',
         items: [
-          { step: '1', title: 'Seed Supply', detail: 'Onboard 50 verified providers in target city before demand launch' },
-          { step: '2', title: 'Activate Demand', detail: 'Launch Google Search + referral in parallel — prioritise high-intent patients' },
-          { step: '3', title: 'Collect Proof', detail: 'Drive first 100 completed bookings; collect reviews and testimonials' },
+          { step: '1', title: 'Seed Members', detail: 'Onboard 500 active members in target city before paid launch' },
+          { step: '2', title: 'Activate Demand', detail: 'Launch Google Search + referral in parallel — prioritise high-intent budget/SIP keywords' },
+          { step: '3', title: 'Collect Proof', detail: 'Drive first 100 paid subscriptions; collect reviews and member testimonials' },
           { step: '4', title: 'Amplify', detail: 'Use social proof to scale paid ads and content — lower CAC through trust' },
           { step: '5', title: 'Expand', detail: 'Replicate city playbook in next market with learnings from city 1' },
         ],
@@ -124,8 +124,8 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Referral Strategy',
         type: 'two-col',
         items: [
-          { label: 'Patient Referral', detail: 'Reward: ₹100 booking credit (drives repeat use). Mechanic: unique link in post-booking screen + email. Goal: 15% of new acquisitions within 6 months.' },
-          { label: 'Provider Referral', detail: 'Reward: reduced commission for 3 months per referred provider. Mechanic: dashboard link + WhatsApp sharing. Goal: 20% of new provider supply via referral.' },
+          { label: 'Member Referral', detail: 'Reward: ₹100 subscription credit (drives upgrade). Mechanic: unique link in post-budget-setup screen + email. Goal: 15% of new acquisitions within 6 months.' },
+          { label: 'Family-Circle Referral', detail: 'Reward: 1 free month of premium per joined family member. Mechanic: in-app share + WhatsApp. Goal: 30% of subscribers add at least one family member within 90 days.' },
         ],
       },
       {
@@ -133,10 +133,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Tier', 'Partner Type', 'Goal'],
         rows: [
-          ['Tier 1', 'Corporate HR / employee wellness', 'Bulk patient acquisition, B2B revenue'],
-          ['Tier 2', 'Insurance companies', 'Co-marketing, claims-linked bookings'],
-          ['Tier 3', 'Pharmacies / medical supply', 'Cross-referral, bundle offers'],
-          ['Tier 4', 'Health content creators / patient advocates', 'Awareness, trust'],
+          ['Tier 1', 'Corporate HR / employee financial-wellness', 'Bulk member acquisition, B2B revenue'],
+          ['Tier 2', 'Banks / NBFCs / mutual fund houses', 'Co-marketing, embedded subscriptions'],
+          ['Tier 3', 'Tax filing / accounting platforms', 'Cross-referral, bundled offers'],
+          ['Tier 4', 'Personal-finance creators / educators', 'Awareness, trust'],
         ],
       },
     ],
@@ -150,11 +150,11 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Content Pillars',
         type: 'pillars',
         items: [
-          { icon: '📚', label: 'Patient Education', detail: 'Health tips, when to see a doctor, how diagnostics work' },
-          { icon: '⭐', label: 'Provider Spotlights', detail: 'Build trust through featured provider stories' },
-          { icon: '📱', label: 'Product Education', detail: 'How to use your brand features (home visit, tracking, payments)' },
-          { icon: '🏆', label: 'Social Proof', detail: 'Patient testimonials, booking milestones, provider reviews' },
-          { icon: '🏙️', label: 'Local Health', detail: 'City-specific health events, disease awareness, local partnerships' },
+          { icon: '💸', label: 'Budgeting & Money Habits', detail: 'How to budget, save, and avoid common money mistakes' },
+          { icon: '📈', label: 'Saving & Investing', detail: 'SIP, mutual funds, FDs, tax-saving — explained simply' },
+          { icon: '📱', label: 'Product Education', detail: 'How to use your brand features (budgets, goals, family circles)' },
+          { icon: '🏆', label: 'Social Proof', detail: 'Member testimonials, savings milestones, goal achievements' },
+          { icon: '👨\u200d👩\u200d👧', label: 'Family Finance', detail: 'Household budgeting, kids\u2019 money habits, joint goals' },
         ],
       },
       {
@@ -162,10 +162,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Platform', 'Content Type', 'Frequency'],
         rows: [
-          ['Instagram', 'Visual storytelling, provider spotlights, patient journeys', '4x/week'],
-          ['LinkedIn', 'B2B provider recruitment, company updates, thought leadership', '3x/week'],
-          ['YouTube Shorts/Reels', '30–60 sec explainers and patient stories', '2x/week'],
-          ['WhatsApp Broadcast', 'Retention, re-engagement, health reminders', '2x/week'],
+          ['Instagram', 'Visual storytelling, member spotlights, money journeys', '4x/week'],
+          ['LinkedIn', 'B2B financial-wellness, company updates, thought leadership', '3x/week'],
+          ['YouTube Shorts/Reels', '30–60 sec explainers and member stories', '2x/week'],
+          ['WhatsApp Broadcast', 'Retention, re-engagement, money tips', '2x/week'],
           ['Blog/SEO', 'Long-form informational + transactional content', '2x/week'],
         ],
       },
@@ -181,8 +181,8 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         type: 'table',
         headers: ['Cohort', 'Target', 'Primary Lever'],
         rows: [
-          ['D7', '> 40%', 'Post-booking review request + follow-up care suggestion'],
-          ['D30', '> 25%', 'Re-engagement email + personalised provider recommendation'],
+          ['D7', '> 40%', 'Post-first-budget nudge + first savings-goal suggestion'],
+          ['D30', '> 25%', 'Re-engagement email + personalised savings insight'],
           ['D90', '> 15%', 'Win-back campaign + loyalty credit'],
         ],
       },
@@ -190,10 +190,10 @@ const sections: Array<{ id: string; icon: string; title: string; subsections: Su
         heading: 'Key CRM Triggers',
         type: 'steps',
         items: [
-          { step: '✅', title: 'Booking completed', detail: 'Review request 24h after booking completes' },
-          { step: '❌', title: 'Booking cancelled', detail: 'Recovery flow — offer alternative provider or time slot' },
-          { step: '⏰', title: 'Upcoming appointment', detail: 'Reminder 1 day + 1 hour before appointment' },
-          { step: '📋', title: 'License renewal approaching', detail: 'Alert notification to provider 30 days before expiry' },
+          { step: '✅', title: 'First budget set up', detail: 'Celebration email 24h after, with savings-goal CTA' },
+          { step: '❌', title: 'Subscription cancelled', detail: 'Recovery flow — offer pause / downgrade / annual switch' },
+          { step: '⏰', title: 'Renewal upcoming', detail: 'Reminder 7 days + 1 day before renewal' },
+          { step: '📋', title: 'Failed payment', detail: 'Dunning sequence: retry, alternative method, save offer' },
         ],
       },
     ],
@@ -205,7 +205,7 @@ export default function StrategyPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
         <p className="text-sm text-purple-700">
-          <strong>📌 Strategy Framework</strong> — This is your full marketing strategy, tailored to your brand&apos;s healthcare marketplace model. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
+          <strong>📌 Strategy Framework</strong> — This is your full marketing strategy, tailored to a personal-finance subscription business. Use the intake questionnaire to refine these recommendations to your specific stage and budget.
         </p>
       </div>
 
