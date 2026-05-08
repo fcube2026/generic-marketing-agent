@@ -327,7 +327,7 @@ export class PrismaDataSource implements DataSource {
     const row = await prisma.marketingKeywordCluster.create({
       data: {
         cluster: input.cluster,
-        type: toDbKeywordType(input.type),
+        type: input.type,
         priority: input.priority,
         keywords: input.keywords as any,
       },
@@ -344,7 +344,7 @@ export class PrismaDataSource implements DataSource {
         where: { id },
         data: {
           ...(patch.cluster !== undefined ? { cluster: patch.cluster } : {}),
-          ...(patch.type !== undefined ? { type: toDbKeywordType(patch.type) } : {}),
+          ...(patch.type !== undefined ? { type: patch.type } : {}),
           ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
           ...(patch.keywords !== undefined ? { keywords: patch.keywords as any } : {}),
         },
@@ -478,7 +478,7 @@ function toDbContentItemPayload(payload: Partial<Omit<ContentItem, 'id'>>): Reco
     ...(payload.week !== undefined ? { week: payload.week } : {}),
     ...(payload.day !== undefined ? { day: payload.day } : {}),
     ...(payload.platform !== undefined ? { platform: payload.platform } : {}),
-    ...(payload.pillar !== undefined ? { pillar: toDbPillar(payload.pillar) } : {}),
+    ...(payload.pillar !== undefined ? { pillar: payload.pillar } : {}),
     ...(payload.title !== undefined ? { title: payload.title } : {}),
     ...(payload.format !== undefined ? { format: payload.format } : {}),
     ...(payload.status !== undefined ? { status: payload.status } : {}),
@@ -610,10 +610,6 @@ function fromDbPillar(value: string): ContentItem['pillar'] {
   return 'family-finance';
 }
 
-function toDbPillar(value: ContentItem['pillar']): string {
-  return value;
-}
-
 function fromDbSeoType(value: string): SeoPage['type'] {
   if (
     value === 'landing' ||
@@ -632,7 +628,10 @@ function fromDbSeoType(value: string): SeoPage['type'] {
 function toDbSeoType(value: SeoPage['type']): string {
   if (value === 'landing') return 'city-specialty';
   if (value === 'guide') return 'condition';
-  return value;
+  if (value === 'calculator') return 'calculator';
+  if (value === 'blog') return 'blog';
+  if (value === 'comparison') return 'comparison';
+  return 'blog';
 }
 
 function fromDbKeywordType(value: string): KeywordCluster['type'] {
@@ -647,10 +646,6 @@ function fromDbKeywordType(value: string): KeywordCluster['type'] {
   return 'calculator';
 }
 
-function toDbKeywordType(value: KeywordCluster['type']): string {
-  return value;
-}
-
 function fromDbSegment(value: string): LifecycleFlow['segment'] {
   if (value === 'member' || value === 'subscriber') return value;
   if (value === 'patient') return 'member';
@@ -659,7 +654,8 @@ function fromDbSegment(value: string): LifecycleFlow['segment'] {
 
 function toDbSegment(value: LifecycleFlow['segment']): string {
   if (value === 'member') return 'patient';
-  return 'provider';
+  if (value === 'subscriber') return 'provider';
+  throw new Error(`Unsupported lifecycle segment: ${String(value)}`);
 }
 
 function mkKpi(label: string, value: number, target: number, icon: string): KpiMetric {
