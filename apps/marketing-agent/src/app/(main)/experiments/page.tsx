@@ -129,7 +129,7 @@ export default function ExperimentsPage() {
         <Card title="Key Learnings" subtitle="Decisions made from completed experiments">
           <div className="space-y-2">
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-              <strong>Landing page hero:</strong> Benefit-led copy (&ldquo;Get care in 30 minutes&rdquo;) outperforms feature-led copy (+14% booking start rate). <strong>Apply to all landing pages.</strong>
+              <strong>Landing page hero:</strong> Benefit-led copy (&ldquo;Set up your budget in 2 minutes&rdquo;) outperforms feature-led copy (+14% signup start rate). <strong>Apply to all landing pages.</strong>
             </div>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
               <strong>Email subject line:</strong> Discount-led subject (&ldquo;Your ₹100 credit is waiting&rdquo;) outperforms FOMO subject (+4pp open rate). <strong>Use discount framing for onboarding emails.</strong>
@@ -164,12 +164,12 @@ export default function ExperimentsPage() {
       <Card title="📋 Experiment Design Template" subtitle="Use this structure when designing a new A/B test">
         <div className="space-y-2 text-sm text-gray-700">
           {[
-            { field: 'Experiment Name', example: 'e.g. Meta Creative — Doctor Photo vs Patient Story' },
-            { field: 'Hypothesis', example: 'e.g. Patient story video will drive higher CTR than doctor photo static ad' },
+            { field: 'Experiment Name', example: 'e.g. Meta Creative — Calculator Demo vs Member Story' },
+            { field: 'Hypothesis', example: 'e.g. A 20s member story video will drive higher CTR than a calculator demo static ad' },
             { field: 'Channel', example: 'e.g. Meta Ads' },
-            { field: 'Control (A)', example: 'e.g. Static image: doctor with rating overlay' },
-            { field: 'Variant (B)', example: 'e.g. 20-second patient testimonial video' },
-            { field: 'Primary Metric', example: 'e.g. CTR, Cost per booking start' },
+            { field: 'Control (A)', example: 'e.g. Static image: SIP calculator screenshot with hero stat' },
+            { field: 'Variant (B)', example: 'e.g. 20-second member testimonial video' },
+            { field: 'Primary Metric', example: 'e.g. CTR, Cost per signup' },
             { field: 'Sample Size / Duration', example: 'e.g. Minimum 500 clicks per variant, 14 days' },
             { field: 'Decision Rule', example: 'e.g. Launch winner if >10% relative lift with statistical significance at 95%' },
           ].map((row) => (

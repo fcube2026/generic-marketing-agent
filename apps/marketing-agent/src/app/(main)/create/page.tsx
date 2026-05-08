@@ -84,8 +84,8 @@ const POST_PLATFORM_PIXELS: Record<string, { w: number; h: number }> = {
 const AD_PLATFORMS = ['Google Search', 'Google Display', 'Meta (Facebook/Instagram)', 'LinkedIn Ads', 'YouTube Ads', 'WhatsApp Ads'] as const;
 const CAMPAIGN_OBJECTIVES = [
   'Brand Awareness',
-  'Patient Acquisition',
-  'Provider Recruitment',
+  'Member Acquisition',
+  'Subscription Upgrade',
   'App Install',
   'Re-engagement / Retargeting',
   'Seasonal Offer',
@@ -99,16 +99,16 @@ function buildImagePromptForVisual(
   customSubject?: string,
 ): string {
   const conceptMap: Record<typeof FORMAT_TYPES[number], string> = {
-    'Square Post (1:1)': 'warm welcoming scene of a professional doctor visiting a patient at home, doctor in white coat smiling, bright modern apartment',
-    'Portrait Post (4:5)': 'close-up portrait of a confident smiling Indian doctor holding a medical kit, soft bokeh home background',
-    'Story / Reel (9:16)': 'full-height vertical social media visual, doctor at patient door in bright daylight, warm colour palette, mobile-first composition',
-    'Landscape Banner (16:9)': 'wide-angle doctor and patient interaction in a cosy living room, doctor reviewing notes on tablet, bright airy room',
-    'Twitter/X Card (2:1)': 'horizontal composition doctor at home visit, bold clean design, blue and white healthcare tones, professional photography',
-    'LinkedIn Banner (4:1)': 'ultra-wide professional banner, subtle gradient navy to white, doctor silhouette, clean corporate healthcare aesthetic',
-    'Pinterest Pin (2:3)': 'tall vertical pin, healthcare booking steps infographic, clean icons, numbered, blue and white',
-    'YouTube Thumbnail (16:9)': 'bold YouTube thumbnail composition, high contrast, doctor at door, expressive cinematic scene',
-    'Facebook Cover (2.7:1)': 'wide Facebook cover, gradient background, doctor and patient USP illustration, professional brand visual',
-    'WhatsApp Status (9:16)': 'vertical WhatsApp status card, friendly doctor avatar, minimal clean design, healthcare blue accent',
+    'Square Post (1:1)': 'warm welcoming scene of a young Indian couple reviewing a personal-finance app on a phone at a bright modern kitchen table',
+    'Portrait Post (4:5)': 'close-up portrait of a confident smiling young Indian professional holding a smartphone showing a budget app, soft bokeh home background',
+    'Story / Reel (9:16)': 'full-height vertical social media visual, young Indian professional smiling at goal-progress screen on phone in bright daylight, warm colour palette, mobile-first composition',
+    'Landscape Banner (16:9)': 'wide-angle scene of a couple reviewing their family budget on a tablet in a cosy living room, bright airy room',
+    'Twitter/X Card (2:1)': 'horizontal composition of a personal-finance dashboard on a phone with goal progress, bold clean design, navy and white finance tones, professional photography',
+    'LinkedIn Banner (4:1)': 'ultra-wide professional banner, subtle gradient navy to white, finance dashboard silhouette, clean corporate fintech aesthetic',
+    'Pinterest Pin (2:3)': 'tall vertical pin, monthly budgeting steps infographic, clean icons, numbered, navy and white',
+    'YouTube Thumbnail (16:9)': 'bold YouTube thumbnail composition, high contrast, surprised member looking at savings milestone on phone, expressive cinematic scene',
+    'Facebook Cover (2.7:1)': 'wide Facebook cover, gradient background, family-finance USP illustration, professional brand visual',
+    'WhatsApp Status (9:16)': 'vertical WhatsApp status card, friendly money-coach avatar, minimal clean design, finance navy accent',
   };
 
   const styleMap: Record<typeof VISUAL_STYLES[number], string> = {
@@ -121,28 +121,28 @@ function buildImagePromptForVisual(
     'Neon / Dark Mode': 'neon colours, dark background, glowing effects, high contrast, modern digital aesthetic',
   };
 
-  return `${customSubject?.trim() ? customSubject.trim() : conceptMap[format]}, ${styleMap[style]}, healthcare blue #1E6FCC accent, professional`;
+  return `${customSubject?.trim() ? customSubject.trim() : conceptMap[format]}, ${styleMap[style]}, finance navy #0F2A5F accent, professional`;
 }
 
 function buildPostImagePrompt(platform: string, pillar: string): string {
   const pillarImages: Record<string, string> = {
-    'Education & Awareness': 'educational healthcare scene, doctor explaining to patient in bright home, warm and informative, clear and professional',
-    'Trust & Social Proof': 'happy patient giving thumbs up after home doctor visit, warm genuine moment, bright home environment, trustworthy healthcare scene',
-    'Product/Service Highlight': 'doctor using smartphone healthcare booking app during home visit, modern technology in healthcare, clean professional scene',
-    'Brand Story': 'heartfelt moment between doctor and elderly patient at home, warm emotional lighting, storytelling photography',
-    'Community & Engagement': 'diverse group of happy healthy urban Indian people, community healthcare, vibrant energetic social visual',
-    'Offer & Promotion': 'vibrant promotional healthcare visual, doctor home visit, energetic call-to-action composition, bold brand colours',
+    'Education & Awareness': 'educational personal-finance scene, money coach explaining a budget on a tablet to a young couple in a bright home, warm and informative, clear and professional',
+    'Trust & Social Proof': 'happy member giving thumbs up after hitting a savings milestone on phone, warm genuine moment, bright home environment, trustworthy finance scene',
+    'Product/Service Highlight': 'member using personal-finance app on smartphone showing a goal at 60%, modern fintech, clean professional scene',
+    'Brand Story': 'heartfelt moment between adult child helping elderly parent set up their first budget on phone, warm emotional lighting, storytelling photography',
+    'Community & Engagement': 'diverse group of happy urban Indian people in a money-talk meetup, community personal-finance, vibrant energetic social visual',
+    'Offer & Promotion': 'vibrant promotional personal-finance visual, family budgeting on phone with discount tag, energetic call-to-action composition, bold brand colours',
   };
 
   const platformStyle: Record<string, string> = {
     Instagram: 'Instagram square 1:1 format, high-quality lifestyle photography, warm saturated tones',
-    LinkedIn: 'LinkedIn professional landscape format, clean corporate aesthetic, blue and white tones',
+    LinkedIn: 'LinkedIn professional landscape format, clean corporate aesthetic, navy and white tones',
     'Twitter/X': 'Twitter card 2:1 horizontal, bold punchy design, high contrast',
     Facebook: 'Facebook post format, engaging lifestyle image, approachable and warm',
     WhatsApp: 'simple clean square image, minimal design, clear and direct, professional',
   };
 
-  return `${pillarImages[pillar] ?? 'professional healthcare social media post, your brand home doctor service'}, ${platformStyle[platform] ?? 'social media post format'}, healthcare blue accent, premium brand quality`;
+  return `${pillarImages[pillar] ?? 'professional personal-finance social media post, your brand family-finance app'}, ${platformStyle[platform] ?? 'social media post format'}, finance navy accent, premium brand quality`;
 }
 
 // ─── Generators ───────────────────────────────────────────────────────────────
@@ -169,44 +169,44 @@ function generatePost(platform: string, pillar: string, tone: string): string {
 
   const pillarContent: Record<string, { hook: string; body: string; cta: string }> = {
     'Education & Awareness': {
-      hook: platform === 'Twitter/X' ? `🧵 Most people don't know this about home doctor visits — thread 👇` : `Did you know? Getting a doctor home in under 30 minutes is now possible.`,
-      body: `At your brand, we're changing what healthcare looks like.\n\nNo waiting rooms. No wasted afternoons. Just verified doctors at your door — same day, every day.\n\n✅ 150+ verified doctors\n✅ Real-time tracking\n✅ Transparent pricing\n✅ Available across Mumbai, Delhi & Bengaluru`,
-      cta: platform === 'WhatsApp' ? `Book your first visit → example.com` : `👉 Book a home visit today: example.com`,
+      hook: platform === 'Twitter/X' ? `🧵 Most people don't know this about budgeting and SIPs in India — thread 👇` : `Did you know? You can set up a household budget and start a SIP in under 2 minutes.`,
+      body: `At your brand, we're changing what personal finance looks like.\n\nNo spreadsheets. No jargon. Just clear plans, real progress, and money goals you actually hit.\n\n✅ 12,000+ active members\n✅ Bank-grade security\n✅ Transparent pricing\n✅ Available across India`,
+      cta: platform === 'WhatsApp' ? `Set up your first budget → example.com` : `👉 Start your free budget today: example.com`,
     },
     'Trust & Social Proof': {
-      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 2,400+ patients. Here's what they say about your brand 👇` : `4.8 ⭐ from 2,400+ patients — here's why your brand is India's most trusted home healthcare platform.`,
-      body: `"The doctor arrived within 25 minutes. She was thorough, kind, and the follow-up prescription was ready in under an hour." — Priya M., Mumbai\n\nWe built your brand on one principle: healthcare should work around your life, not the other way around.`,
-      cta: `Read more patient stories at example.com/stories`,
+      hook: platform === 'Twitter/X' ? `⭐ 4.8 stars. 12,000+ members. Here's what they say about your brand 👇` : `4.8 ⭐ from 12,000+ members — here's why your brand is India's most trusted family-finance app.`,
+      body: `"I set up my budget in 5 minutes. 6 months later I've saved ₹62,000 — for the first time in my life." — Priya M., Mumbai\n\nWe built your brand on one principle: money should work for your life, not the other way around.`,
+      cta: `Read more member stories at example.com/stories`,
     },
     'Product/Service Highlight': {
-      hook: platform === 'Twitter/X' ? `Booking a home doctor visit with your brand takes exactly 2 minutes. Let me show you. 🧵` : `Your health, on your schedule. Book a verified doctor at home in 2 minutes.`,
-      body: `Here's how it works:\n1️⃣ Open example.com or the app\n2️⃣ Choose your service (GP, specialist, diagnostics)\n3️⃣ Pick a time slot\n4️⃣ Track your doctor in real time\n5️⃣ Get a digital prescription + follow-up plan\n\nNo more half-day hospital trips.`,
+      hook: platform === 'Twitter/X' ? `Setting up your first family budget with your brand takes exactly 2 minutes. Let me show you. 🧵` : `Your money, on your schedule. Set up a family budget in 2 minutes.`,
+      body: `Here's how it works:\n1️⃣ Open example.com or the app\n2️⃣ Pick a budget template (or build your own)\n3️⃣ Securely link an account or upload a statement\n4️⃣ Get personalised savings suggestions\n5️⃣ Start a SIP or savings goal in one tap\n\nNo more end-of-month panic.`,
       cta: `Try it today → example.com`,
     },
     'Brand Story': {
-      hook: platform === 'Twitter/X' ? `We started your brand because our co-founder couldn't get a doctor for her mother at 11 PM. 🧵` : `Why we built your brand — a story about a gap in Indian healthcare.`,
-      body: `Healthcare in India is brilliant — but access is broken.\n\nOur co-founder spent 4 hours in a hospital for what should have been a 20-minute consultation. That experience became your brand.\n\nToday, 150+ verified doctors use our platform to see patients at home. 1,240 patients trusted us last month alone.\n\nWe're just getting started.`,
+      hook: platform === 'Twitter/X' ? `We started your brand because our co-founder's family fought about money every single month. 🧵` : `Why we built your brand — a story about a gap in Indian household finance.`,
+      body: `Indian families earn well — but most can\u2019t see where the money goes.\n\nOur co-founder watched her parents argue about EMIs and end-of-month spending for years. That experience became your brand.\n\nToday, 12,000+ members use our platform to budget, save and invest as a family. ₹4.2 crore was saved by them last quarter alone.\n\nWe're just getting started.`,
       cta: `Join us → example.com`,
     },
     'Community & Engagement': {
-      hook: platform === 'Twitter/X' ? `Quick poll: when you're not feeling well at home, what do you do first? 👇` : `We want to hear from you 👇`,
-      body: `When you're feeling unwell at home — what's your first move?\n\n🏥 Rush to a hospital\n📱 Search symptoms on Google\n🤙 Call a family member / friend\n🏠 Book a home visit\n\nThere's no wrong answer. But we're curious because your answer shapes how we build your brand.`,
+      hook: platform === 'Twitter/X' ? `Quick poll: when an unexpected ₹10,000 expense hits, what do you do first? 👇` : `We want to hear from you 👇`,
+      body: `An unexpected ₹10,000 expense lands today — what's your first move?\n\n💳 Put it on a credit card\n🏦 Dip into your emergency fund\n📱 Borrow / buy now pay later\n👨\u200d👩\u200d👧 Talk to family\n\nThere's no wrong answer. But your answer shapes how we build your brand.`,
       cta: `Drop your answer below ⬇️`,
     },
     'Offer & Promotion': {
-      hook: platform === 'Twitter/X' ? `🚨 Limited: ₹100 off your first your brand home visit this week only. 🧵` : `🎉 First home visit, ₹100 off — this week only.`,
-      body: `We want more people to experience what real healthcare convenience feels like.\n\nSo for the next 7 days: your first your brand home visit is ₹100 off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ 150+ verified doctors\n✅ Same-day availability\n✅ Transparent pricing`,
-      cta: `Claim your discount → example.com/book`,
+      hook: platform === 'Twitter/X' ? `🚨 Limited: ₹100 off your first month of your brand premium this week only. 🧵` : `🎉 First month of premium, ₹100 off — this week only.`,
+      body: `We want more families to feel in control of their money.\n\nSo for the next 7 days: your first month of your brand premium is ₹100 off.\n\nNo coupon code needed. Discount applies automatically at checkout.\n\n✅ Goal-based investing\n✅ Tax tools\n✅ Family circle for shared budgets`,
+      cta: `Claim your discount → example.com/upgrade`,
     },
   };
 
   const content = pillarContent[pillar] ?? pillarContent['Education & Awareness'];
 
   const hashtagSets: Record<string, string[]> = {
-    Instagram: ['#YourBrand', '#HomeDoctor', '#HealthcareAtHome', '#MumbaiHealth', '#DelhiDoctors', '#BengaluruHealth', '#HomeVisit', '#DoctorAtHome', '#HealthTech', '#IndiaHealth', '#PatientCare', '#Telemedicine', '#HealthcareIndia', '#WellnessIndia', '#BookADoctor'],
-    LinkedIn: ['#HealthTech', '#HealthcareIndia', '#HomeHealthcare', '#YourBrand'],
-    'Twitter/X': ['#HealthTech', '#HomeDoctor'],
-    Facebook: ['#HomeDoctor', '#YourBrand', '#HealthcareAtHome'],
+    Instagram: ['#YourBrand', '#PersonalFinance', '#MoneyTipsIndia', '#FamilyFinance', '#SIPInvesting', '#BudgetingTips', '#SavingsGoal', '#FintechIndia', '#MoneyMatters', '#IndiaFinance', '#FinancialFreedom', '#WealthBuilding', '#MoneyMindset', '#SmartMoney', '#PlanYourMoney'],
+    LinkedIn: ['#Fintech', '#PersonalFinanceIndia', '#FinancialWellness', '#YourBrand'],
+    'Twitter/X': ['#PersonalFinance', '#SIP'],
+    Facebook: ['#FamilyFinance', '#YourBrand', '#MoneyTipsIndia'],
     WhatsApp: [],
   };
 
@@ -217,8 +217,8 @@ function generatePost(platform: string, pillar: string, tone: string): string {
   if (platform === 'Twitter/X') {
     output += `**Tweet 1 (hook):**\n${content.hook}\n\n`;
     output += `**Tweet 2:**\n${content.body.split('\n').slice(0, 3).join(' ')}\n\n`;
-    output += `**Tweet 3:**\nHere's what makes your brand different: verified doctors, real-time tracking, digital prescriptions — all from your living room.\n\n`;
-    output += `**Tweet 4:**\nWe serve Mumbai, Delhi, and Bengaluru today. More cities coming this quarter.\n\n`;
+    output += `**Tweet 3:**\nHere's what makes your brand different: bank-grade security, family circles, and goal-based saving — all in one app.\n\n`;
+    output += `**Tweet 4:**\nWe serve members across India today, with deeper city-level features in Mumbai, Delhi, Bengaluru and Hyderabad.\n\n`;
     output += `**Tweet 5 (CTA):**\n${content.cta} ${hashtags.join(' ')}\n`;
   } else if (platform === 'WhatsApp') {
     output += `*Hi [First Name]* 👋\n\n${content.hook}\n\n${content.body}\n\n${content.cta}`;
@@ -251,28 +251,28 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
   };
 
   const conceptMap: Record<string, string> = {
-    'Square Post (1:1)': 'A warm, welcoming scene of a professional doctor visiting a patient at home. The doctor is wearing a white coat and smiling. The home is bright and modern.',
-    'Portrait Post (4:5)': 'A close-up portrait of a confident, smiling doctor holding a medical kit. Soft bokeh background suggesting a home environment.',
-    'Story / Reel (9:16)': 'A full-height mobile-first visual. Top: bold headline text area. Middle: doctor at patient\'s door, bright daylight, warm colour palette. Bottom: app booking CTA button area.',
-    'Landscape Banner (16:9)': 'Wide-angle scene of a doctor and patient interaction in a cosy living room. Doctor is reviewing notes on a tablet. Bright, airy, healthcare-blue and white tones.',
-    'Twitter/X Card (2:1)': 'A horizontal split design: left side — bold headline "Doctor at Home in 30 Min", right side — doctor icon / photo with warm background.',
-    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. your brand’s logo on left, tagline in centre, doctor silhouette on right.',
-    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to book a home doctor visit" infographic. Clean icons, numbered steps, your brand brand colours.',
-    'YouTube Thumbnail (16:9)': 'Bold thumbnail. Large, readable text overlay: "Doctor at Home in 30 MINUTES?!". Surprised-face reaction image on left, doctor photo on right. High contrast.',
-    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: your brand’s logo + tagline. Centre: key USPs as icons (speed, trust, tracking). Right: doctor illustration.',
-    'WhatsApp Status (9:16)': 'Vertical status card. Top: greeting + brand name. Middle: core message with emoji. Bottom: CTA with phone number or link. WhatsApp green accent.',
+    'Square Post (1:1)': 'A warm, welcoming scene of a young Indian couple reviewing a personal-finance app together at a bright modern kitchen table. Soft natural light, warm tones, calm and in-control money moment.',
+    'Portrait Post (4:5)': 'A close-up portrait of a confident, smiling young Indian professional holding a smartphone showing a clean budget app. Soft bokeh background suggesting a home environment.',
+    'Story / Reel (9:16)': 'A full-height mobile-first visual. Top: bold headline text area. Middle: member smiling at a goal-progress screen on a phone, bright daylight, warm colour palette. Bottom: app signup CTA button area.',
+    'Landscape Banner (16:9)': 'Wide-angle scene of a couple reviewing their monthly family budget on a tablet in a cosy living room. Bright, airy, finance-navy and white tones.',
+    'Twitter/X Card (2:1)': 'A horizontal split design: left side — bold headline "Set Up Your Budget in 2 Min", right side — phone showing a clean monthly budget with a goal at 60%.',
+    'LinkedIn Banner (4:1)': 'Ultra-wide professional banner. Subtle gradient from navy to white. your brand\u2019s logo on left, tagline in centre, abstract finance dashboard silhouette on right.',
+    'Pinterest Pin (2:3)': 'Tall pin design with a step-by-step "How to set up a monthly family budget" infographic. Clean icons, numbered steps, your brand brand colours.',
+    'YouTube Thumbnail (16:9)': 'Bold thumbnail. Large, readable text overlay: "Saved ₹62,000 in 6 MONTHS?!". Surprised-face reaction image on left, phone with goal progress on right. High contrast.',
+    'Facebook Cover (2.7:1)': 'Wide cover with gradient background. Left: your brand\u2019s logo + tagline. Centre: key USPs as icons (security, family-circle, goals). Right: family-finance illustration.',
+    'WhatsApp Status (9:16)': 'Vertical status card. Top: greeting + brand name. Middle: core message with emoji. Bottom: CTA with link. WhatsApp green accent.',
   };
 
   const concept = customSubject?.trim()
     ? customSubject.trim()
-    : (conceptMap[format] ?? 'A professional healthcare brand visual for your brand, focusing on home doctor visits.');
+    : (conceptMap[format] ?? 'A professional personal-finance brand visual for your brand, focusing on family budgeting and goal-based saving.');
 
   let prompt = `**Format:** ${format}\n**Dimensions:** ${dimensions}\n**Visual Style:** ${style}\n**AI Tool:** ${tool}\n\n`;
   prompt += `---\n\n`;
   prompt += `**Production Prompt:**\n\n`;
   prompt += `${concept}\n\n`;
   prompt += `Style: ${stylePrompts[style] ?? style}.\n\n`;
-  prompt += `Brand palette: Healthcare blue (#1E6FCC), clean white (#FFFFFF), warm grey (#F5F5F5), accent green (#22C55E).\n\n`;
+  prompt += `Brand palette: Finance navy (#0F2A5F), clean white (#FFFFFF), warm grey (#F5F5F5), accent green (#22C55E).\n\n`;
   prompt += `Technical: ${dimensions}, optimised for digital display, no text overlaid (add in design tool).\n\n`;
 
   prompt += `---\n\n**Tool Guidance:**\n${toolGuide[tool] ?? ''}`;
@@ -283,11 +283,11 @@ function generateVisualPrompt(format: typeof FORMAT_TYPES[number], style: string
 function generateAdCreative(platform: string, objective: string): string {
   const objectiveMap: Record<string, string> = {
     'Brand Awareness': 'maximise impressions and recall among target audience',
-    'Patient Acquisition': 'drive first booking completions from high-intent searchers',
-    'Provider Recruitment': 'attract verified doctors to join your provider network',
+    'Member Acquisition': 'drive first signup completions from high-intent searchers',
+    'Subscription Upgrade': 'convert active free members to paid premium subscribers',
     'App Install': 'drive app downloads from relevant audiences',
     'Re-engagement / Retargeting': 're-activate users who visited but did not convert',
-    'Seasonal Offer': 'drive urgency and immediate bookings with a time-limited offer',
+    'Seasonal Offer': 'drive urgency and immediate signups with a time-limited offer',
   };
 
   const platformFormats: Record<string, { headlines: number; descriptions: number; hasCallouts: boolean; hasSitelinks: boolean; hasVisual: boolean }> = {
@@ -302,99 +302,99 @@ function generateAdCreative(platform: string, objective: string): string {
   const cfg = platformFormats[platform] ?? platformFormats['Google Search'];
 
   const adSets: Record<string, Record<string, { headlines: string[]; descriptions: string[]; callouts: string[]; sitelinks: string[]; visualDirection: string }>> = {
-    'Patient Acquisition': {
+    'Member Acquisition': {
       'Google Search': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Book Verified Home Doctor Now', 'Home Visits — Skip the Queue', 'Verified Mumbai Doctors', 'Get a Doctor Home Today', 'Home Healthcare in 2 Min', 'Same-Day Doctor at Home', 'Doctor Home Visit Booking', '4.8★ Home Healthcare App', 'Book in Under 2 Minutes', 'Real-Time Doctor Tracking', 'Home Visits From ₹299', 'GP, Specialist, Diagnostics', 'your brand — India\'s #1', 'Home Doctor — Book Now'],
-        descriptions: ['Trusted doctors at your doorstep in Mumbai, Delhi & Bengaluru. Book in 2 minutes, real-time tracking, transparent pricing. 4.8★ rated by 2,400+ patients.', 'Home visits by verified doctors. Same-day appointments. No waiting rooms. Get a digital prescription + follow-up plan. Book online in minutes.', 'Skip the hospital queue. 150+ verified doctors available for home visits. Book now and track your doctor in real time — like Uber for healthcare.', 'your brand: India\'s most trusted home healthcare platform. Verified doctors, transparent pricing, real-time tracking. First visit ₹100 off.'],
-        callouts: ['Same-Day Appointments', 'Verified Doctors', 'Real-Time Tracking', 'Transparent Pricing', '4.8★ Rated', 'Digital Prescriptions', 'No Hidden Fees', '150+ Doctors'],
-        sitelinks: ['Book Home Visit | example.com/book', 'How It Works | example.com/how', 'Our Doctors | example.com/doctors', 'Pricing | example.com/pricing', 'Patient Reviews | example.com/reviews', 'FAQ | example.com/faq'],
+        headlines: ['Set Up a Budget in 2 Min', 'India\u2019s Trusted Money App', 'Plan, Save & Invest — Free', 'Family Budgeting Made Simple', 'Start Your First SIP Today', 'Goal-Based Saving in 2 Min', 'Track Spending Automatically', 'Personal Finance App India', '4.8★ Family-Finance App', 'Sign Up in Under 2 Minutes', 'Bank-Grade Security', 'Free Forever Plan Available', 'Budget · Goals · SIP · Tax', 'your brand — India\'s #1', 'Personal Finance — Start Free'],
+        descriptions: ['Plan, save and invest as a household with your brand. Bank-grade security, transparent pricing, available across India. 4.8★ rated by 12,000+ members.', 'Family-friendly budgeting and goal-based saving. Free forever plan, premium from ₹199/month. Set up in 2 minutes. Investments are subject to market risk.', 'Stop end-of-month panic. Build a real plan in 2 minutes. Track every rupee, hit every goal — your brand is the money app you\'ve been waiting for.', 'your brand: India\u2019s most trusted personal-finance app. Bank-grade security, transparent pricing, family circles. First month of premium ₹100 off.'],
+        callouts: ['Bank-Grade Security', 'Family Circles', 'Goal-Based Saving', 'Auto SIP Setup', '4.8★ Rated', 'Tax-Saving Tools', 'No Hidden Fees', '12,000+ Members'],
+        sitelinks: ['Start Free | example.com/signup', 'How It Works | example.com/how', 'Pricing | example.com/pricing', 'Member Reviews | example.com/reviews', 'SIP Calculator | example.com/sip', 'FAQ | example.com/faq'],
         visualDirection: 'N/A — text-only format',
       },
       'Meta (Facebook/Instagram)': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Skip the Hospital Queue', 'Verified Doctors at Your Door'],
-        descriptions: ['Book a verified doctor for your home in under 2 minutes. Real-time tracking, transparent pricing, digital prescriptions. Available in Mumbai, Delhi & Bengaluru.', '150+ verified doctors. Same-day home visits. 4.8★ from 2,400+ patients. Book now and get ₹100 off your first visit.', 'Your health deserves convenience. Get a verified doctor home today — no waiting rooms, no wasted time.'],
+        headlines: ['Set Up a Budget in 2 Min', 'Plan Your Money, Hit Goals', 'Family Finance, Made Simple'],
+        descriptions: ['Build your first monthly budget in under 2 minutes. Bank-grade security, transparent pricing, family-friendly. Available across India.', '12,000+ members. Goal-based saving and SIPs. 4.8★ rated. Sign up free and get ₹100 off your first month of premium.', 'Your money deserves a real plan. Set up a household budget today — no spreadsheets, no jargon, no end-of-month panic.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A friendly, professional doctor arriving at a bright, modern apartment door. Patient (young urban professional) opening the door and smiling. Doctor is holding a medical kit.\nStyle: Photorealistic, warm lighting, welcoming. Brand colours: healthcare blue + clean white.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories/Reels.\nPrompt: "Photorealistic image of a smiling doctor in a white coat arriving at a modern apartment door, patient welcoming them in, bright natural lighting, warm healthcare setting, medical kit visible, clean and professional, 1080×1080"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A young Indian couple at a bright modern kitchen table, smiling and looking at a personal-finance app on a smartphone together.\nStyle: Photorealistic, warm lighting, welcoming. Brand colours: finance navy + clean white.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories/Reels.\nPrompt: "Photorealistic image of a young Indian couple at a bright modern kitchen table reviewing a personal-finance app on a smartphone, calm in-control money moment, warm natural lighting, navy and white tones, clean and professional, 1080×1080"',
       },
       'LinkedIn Ads': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Healthcare That Works Around You', 'Verified Home Doctors — Book Now'],
-        descriptions: ['your brand brings verified doctors to your home. Same-day availability, real-time tracking, transparent pricing. Trusted by 1,240 patients last month.', 'No waiting rooms. No wasted afternoons. Book a home visit in 2 minutes and get a digital prescription within the hour.', 'Join 1,240+ patients who chose your brand. 150+ verified doctors available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.'],
+        headlines: ['Set Up a Budget in 2 Min', 'Money That Works Around You', 'Family Finance — Start Free'],
+        descriptions: ['your brand brings personal-finance planning to your household. Bank-grade security, family circles, goal-based saving. Trusted by 12,000+ members across India.', 'No spreadsheets. No jargon. Set up your first budget in 2 minutes and start a SIP from the same screen.', 'Join 12,000+ members who chose your brand. Free forever plan, premium from ₹199/month. First month ₹100 off.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A professional lifestyle setting — a person working from home on a laptop, looking relieved, with a doctor visible in the background having just completed a visit.\nStyle: Clean, professional, LinkedIn aesthetic. Blue tones, bright and airy.\nDimensions: 1.91:1 (1200×628 px) for LinkedIn single image ad.\nPrompt: "Professional lifestyle photo of a person working from home at a desk, doctor visible in background packing up medical kit, warm home office setting, blue and white colour palette, clean and trustworthy feel, 1200×628"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A professional lifestyle setting — a person working from home on a laptop, looking calm and in control, with a finance dashboard visible on a second screen.\nStyle: Clean, professional, LinkedIn aesthetic. Navy tones, bright and airy.\nDimensions: 1.91:1 (1200×628 px) for LinkedIn single image ad.\nPrompt: "Professional lifestyle photo of a person working from home at a desk, finance dashboard visible on a second screen showing goal progress, warm home office setting, navy and white colour palette, clean and trustworthy feel, 1200×628"',
       },
       'Google Display': {
-        headlines: ['Doctor at Home — Book Now', 'Verified Home Doctor Visits', '30-Min Home Doctor Booking', 'Skip the Hospital Queue', '4.8★ Home Healthcare App'],
-        descriptions: ['150+ verified doctors. Same-day home visits. Book in 2 minutes.', 'Transparent pricing, real-time tracking, digital prescriptions.', 'Available in Mumbai, Delhi & Bengaluru. First visit ₹100 off.', 'Trusted by 2,400+ patients. Book your your brand home visit today.', 'Healthcare on your schedule — verified doctors at your door.'],
+        headlines: ['Personal Finance — Start Free', 'Set Up a Budget in 2 Min', 'India\u2019s Trusted Money App', 'Plan · Save · Invest', '4.8★ Family-Finance App'],
+        descriptions: ['12,000+ members. Free forever plan. Set up in 2 minutes.', 'Bank-grade security, transparent pricing, family circles.', 'Available across India. First month of premium ₹100 off.', 'Trusted by 12,000+ members. Sign up for your brand today.', 'Money that works on your schedule — your brand for India.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nCreate a clean display ad visual: doctor icon on warm gradient background (healthcare blue to white). Bold headline space at top, CTA button at bottom.\nSizes needed: 300×250 (medium rectangle), 728×90 (leaderboard), 160×600 (wide skyscraper), 320×50 (mobile banner).\nPrompt for hero image: "Clean healthcare brand illustration, friendly doctor silhouette on a gradient blue-to-white background, minimal flat design, medical cross icon, trustworthy and modern, no text, 300×250"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nCreate a clean display ad visual: a stylised goal-progress bar or coin icon on a warm gradient background (finance navy to white). Bold headline space at top, CTA button at bottom.\nSizes needed: 300×250 (medium rectangle), 728×90 (leaderboard), 160×600 (wide skyscraper), 320×50 (mobile banner).\nPrompt for hero image: "Clean fintech brand illustration, friendly stylised coin and goal-progress icon on a gradient navy-to-white background, minimal flat design, trustworthy and modern, no text, 300×250"',
       },
       'YouTube Ads': {
-        headlines: ['Doctor at Home in 30 Minutes', 'Verified Doctors at Your Door', 'Skip the Hospital — Book Now'],
-        descriptions: ['See how your brand brings verified doctors to your home in 30 minutes. Real-time tracking, transparent pricing, digital prescriptions.', '150+ verified doctors. Same-day availability. Book in 2 minutes. Available in Mumbai, Delhi & Bengaluru.'],
+        headlines: ['Set Up a Budget in 2 Min', 'Plan Your Money, Hit Goals', 'Skip End-of-Month Panic'],
+        descriptions: ['See how your brand helps Indian families budget, save and invest in 2 minutes. Bank-grade security, family circles, goal-based investing.', '12,000+ members. Free forever plan. Available across India. First month of premium ₹100 off.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing booking confirmation, then cut to doctor arriving at door.\nHero visual for companion banner: Doctor and patient interaction, warm home setting, your brand branding visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a healthcare booking app confirmation, bright screen, hands holding phone, excited expression visible, photorealistic, 1280×720"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds (before skip): High-energy open — close-up of phone screen showing a goal hitting 100%, then cut to family celebrating around the kitchen table.\nHero visual for companion banner: Family-money moment in a warm home setting, your brand branding visible.\nPrompt: "Cinematic close-up of a smartphone screen showing a savings goal at 100% with confetti animation, hands holding phone, excited expression visible, photorealistic, 1280×720"',
       },
       'WhatsApp Ads': {
-        headlines: ['Doctor Home Visit — Book Now', 'Verified Doctors at Your Door'],
-        descriptions: ['150+ verified doctors. Same-day home visits in Mumbai, Delhi & Bengaluru. Book in 2 minutes → example.com', 'Skip the hospital queue. Get a verified doctor home today. Transparent pricing. 4.8★ rated. Book now → example.com/book'],
+        headlines: ['Family Finance — Start Free', 'Plan Your Money in 2 Min'],
+        descriptions: ['12,000+ members. Free forever plan. Family circles, goal-based saving, SIPs. Sign up in 2 minutes → example.com', 'Stop end-of-month panic. Build a real plan today. Bank-grade security. 4.8★ rated. Start free → example.com/signup'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple, clean WhatsApp-safe image: doctor icon + brand name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800) for WhatsApp image messages.\nPrompt: "Simple clean illustration of a friendly doctor avatar with your brand branding, white background, healthcare blue accent, minimal design, WhatsApp-safe image, 800×800"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple, clean WhatsApp-safe image: stylised piggy-bank or goal-progress icon + brand name on a white background with a simple border. Keep it friendly and non-cluttered.\nDimensions: 1:1 (800×800) for WhatsApp image messages.\nPrompt: "Simple clean illustration of a friendly money-coach avatar with your brand branding, white background, finance navy accent, minimal design, WhatsApp-safe image, 800×800"',
       },
     },
-    'Provider Recruitment': {
+    'Subscription Upgrade': {
       'Google Search': {
-        headlines: ['Join your brand as a Doctor', 'Grow Your Practice — Apply Now', 'Verified Doctors Wanted — Apply', '40+ Bookings/Month Possible', 'Doctor Earnings — Zero Lock-in', 'Independent Doctors — Join Us', 'Medical Practice Growth Tool', 'Earn More as a Home Doctor', 'Doctor Registration — Free', 'Build Your Patient Base Fast', 'Flexible Doctor Schedule', 'Join 150+ your brand Doctors', 'Medical Platform India', 'Doctor Home Visit Platform', 'Grow Practice With your brand'],
-        descriptions: ['your brand connects verified independent doctors with patients who need home visits. 40+ bookings/month possible. Zero upfront cost, no lock-in. Apply today.', 'Independent doctors in Mumbai, Delhi & Bengaluru — grow your practice with your brand. We handle bookings, payments, and marketing. You focus on care.', 'Join 150+ verified doctors on your platform. Set your own hours, choose your speciality and visit types. Payment processed automatically. No upfront fee.', 'Stop chasing patients. your brand brings bookings to you. Same-day scheduling, transparent earnings, real-time navigation. Apply as a verified doctor today.'],
-        callouts: ['Zero Upfront Cost', 'Set Your Own Hours', 'Instant Payments', '40+ Bookings Possible', 'No Lock-in Contract', 'Free to Join', '150+ Active Doctors'],
-        sitelinks: ['Apply Now | example.com/providers/apply', 'How Earnings Work | example.com/providers/earnings', 'Doctor FAQ | example.com/providers/faq', 'Success Stories | example.com/providers/stories'],
+        headlines: ['Upgrade to your brand Premium', 'Premium Family Finance — Try', 'Tax-Saving + SIP Tools', 'Goal-Based Investing — Premium', 'Family Circle — Premium Only', 'Premium for Serious Savers', '7-Day Money-Back Premium', 'Premium From ₹199/Month', 'Unlock Premium Insights', 'Annual Plan — 2 Months Free', 'Premium Tax Filing Tools', 'Join 3k+ Premium Members', 'Smart Money Tools — Premium', 'your brand Premium — Try', 'Upgrade — First Month ₹100 Off'],
+        descriptions: ['Unlock goal-based investing, family circles, and premium tax tools with your brand Premium. From ₹199/month. 7-day money-back, cancel anytime.', 'Premium gives you SIP automation, tax-saving suggestions, and a shared family-finance dashboard. Trusted by 3,000+ paying members across India.', 'Ready for the next step? your brand Premium turns budgeting into goal-based investing — with bank-grade security and family-friendly tools.', 'First month of your brand Premium is ₹100 off. Annual plan saves you 2 months. Cancel anytime — no questions asked.'],
+        callouts: ['7-Day Money-Back', 'Cancel Anytime', 'SIP Automation', 'Tax-Saving Tools', 'Family Circle', 'Annual Saves 2 Months', 'No Hidden Fees', '3k+ Premium Members'],
+        sitelinks: ['Compare Plans | example.com/pricing', 'Premium Features | example.com/premium', 'SIP Calculator | example.com/sip', 'Tax Tools | example.com/tax', 'Member Reviews | example.com/reviews', 'FAQ | example.com/faq'],
         visualDirection: 'N/A — text-only format',
       },
       'LinkedIn Ads': {
-        headlines: ['Independent Doctors — Join your brand', 'Grow Your Practice With your brand', '40+ Bookings/Month on your platform'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand brings home visit bookings directly to you. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors who use your brand to grow their practice. Average 40+ bookings/month. No lock-in. Apply in 5 minutes.', 'Stop spending time and money on marketing. your brand fills your schedule with verified home visit bookings. You focus on care — we handle the rest.'],
+        headlines: ['Upgrade to your brand Premium', 'Goal-Based Investing — Premium', 'Premium for Serious Savers'],
+        descriptions: ['Unlock SIP automation, family circles, and premium tax tools. Trusted by 3,000+ paying members across India. From ₹199/month, cancel anytime.', 'Join 3,000+ paying members who upgraded to Premium. Average premium member tracks 3+ goals and saves 2.4× more than free users.', 'Stop guessing. your brand Premium turns budgeting into goal-based investing — with personalised tax suggestions for your income band.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A confident, professional doctor reviewing patient bookings on a smartphone. Clean home office or clinic background. Successful, empowered professional vibe.\nStyle: Professional LinkedIn aesthetic, blue tones.\nDimensions: 1200×628 px.\nPrompt: "Confident professional Indian doctor in white coat checking a smartphone with a satisfied expression, bright modern clinic background, professional and trustworthy, blue and white colour palette, 1200×628"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A confident, professional person reviewing a clean premium dashboard on a tablet. Calm, in-control vibe. Bright modern home office.\nStyle: Professional LinkedIn aesthetic, navy tones.\nDimensions: 1200×628 px.\nPrompt: "Confident young Indian professional reviewing a clean premium personal-finance dashboard on a tablet with goal progress and SIP cards, bright modern home office, professional and trustworthy, navy and white colour palette, 1200×628"',
       },
       'Meta (Facebook/Instagram)': {
-        headlines: ['Doctors: Grow Your Practice', 'Join 150+ your brand Doctors', '40+ Bookings — Zero Marketing'],
-        descriptions: ['Independent doctors in Mumbai, Delhi & Bengaluru — your brand fills your schedule with home visit bookings. Zero upfront cost, no lock-in. Apply today.', 'Tired of empty appointment slots? your brand brings patients to you. 150+ doctors trust us. 40+ bookings/month average. Free to join.', 'Build your patient base without spending on marketing. your brand handles discovery, booking, and payment. You just show up and care.'],
+        headlines: ['Upgrade to your brand Premium', 'Premium Members Save 2.4× More', 'Goal-Based Investing in 1 Tap'],
+        descriptions: ['Unlock SIP automation, family circles, and premium tax tools. From ₹199/month. 7-day money-back, cancel anytime.', 'Tired of saving "in general"? Premium turns vague intent into named goals with auto-debit. Join 3,000+ paying members.', 'Build real wealth without spreadsheets. your brand Premium handles the heavy lifting — you just live your life.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A doctor looking at their phone and smiling, with a notification visible showing "New booking confirmed — home visit". Split with brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories.\nPrompt: "Indian doctor in white coat happily looking at smartphone notification, bright clean background, healthcare blue accents, professional and approachable, 1080×1080"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nScene: A person looking at their phone and smiling, with a notification visible showing "Goal hit · ₹50,000 saved". Split with brand colours.\nDimensions: 1:1 (1080×1080) for feed, 9:16 (1080×1920) for Stories.\nPrompt: "Indian professional happily looking at smartphone notification showing a savings-goal milestone hit, bright clean background, finance navy accents, professional and approachable, 1080×1080"',
       },
       'Google Display': {
-        headlines: ['Doctors — Join your brand', 'Grow Practice With your brand', '40+ Monthly Bookings', 'Zero-Cost Doctor Platform', 'Apply as your brand Doctor'],
-        descriptions: ['Join 150+ doctors. Zero upfront cost, flexible hours, instant payments.', 'your brand brings home visit bookings to you. Apply for free.', 'Independent doctors — fill your schedule with your brand. No lock-in.', 'Grow your practice. 40+ bookings/month possible with your brand.', 'Doctor network India — join your brand today. Free registration.'],
+        headlines: ['Upgrade to Premium', 'Premium From ₹199/Month', 'SIP + Tax + Family Circle', '7-Day Money-Back', 'Premium Members Save More'],
+        descriptions: ['Unlock SIP automation, tax tools and family circles. Cancel anytime.', 'your brand Premium — built for serious savers and families.', '3,000+ paying members. From ₹199/month. Try risk-free.', 'Annual plan saves you 2 months. First month ₹100 off.', 'Premium Member Insights — your wealth, on your schedule.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nClean display banner: doctor silhouette + booking notification graphic + brand colours.\nPrompt: "Minimalist display ad visual, friendly doctor silhouette, smartphone showing booking notification, healthcare blue gradient, clean and professional, no text, 300×250"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nClean display banner: stylised goal-progress + premium-badge graphic + brand colours.\nPrompt: "Minimalist display ad visual, friendly goal-progress icon with a small premium badge, finance navy gradient, clean and professional, no text, 300×250"',
       },
       'YouTube Ads': {
-        headlines: ['Doctors — Join your brand', 'Grow Your Practice — Apply Now', 'Build Your Patient Base Fast'],
-        descriptions: ['See how your brand helps independent doctors in India grow their practice with home visit bookings. Zero upfront cost, flexible schedule, instant payments.', 'Join 150+ verified doctors on your platform. Average 40+ bookings/month. Apply in 5 minutes.'],
+        headlines: ['Upgrade to your brand Premium', 'Premium Members Save 2.4× More', 'Goal-Based Investing in 1 Tap'],
+        descriptions: ['See how your brand Premium helps Indian families budget, save and invest with SIPs, tax tools and family circles. From ₹199/month, cancel anytime.', 'Join 3,000+ paying members. Average premium member tracks 3+ goals. First month ₹100 off.'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds: Doctor receiving a booking notification, looking pleased. Then testimonial-style "I went from 10 bookings a week to 40 with your brand."\nPrompt: "Cinematic close-up of a doctor\'s phone showing a booking confirmation notification, doctor hand visible, warm lighting, professional setting, 1280×720"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nFirst 5 seconds: Phone showing "Goal hit · ₹50,000" notification, then testimonial-style "I saved 2× more after upgrading to Premium."\nPrompt: "Cinematic close-up of a phone showing a savings-goal milestone hit notification, hand visible, warm lighting, professional setting, 1280×720"',
       },
       'WhatsApp Ads': {
-        headlines: ['Doctors — Join your brand Today', 'Grow Your Practice Free'],
-        descriptions: ['Join 150+ doctors on your platform. Get home visit bookings — zero upfront cost, flexible schedule. Apply: example.com/providers', 'Independent doctors: your brand fills your schedule with bookings. Free to join. 40+ bookings/month possible → example.com/providers/apply'],
+        headlines: ['Upgrade to Premium Today', 'Premium From ₹199/Month'],
+        descriptions: ['Unlock SIP automation, tax tools and family circles. From ₹199/month. 7-day money-back. Try: example.com/upgrade', 'Premium members save 2.4× more on average. First month ₹100 off → example.com/upgrade'],
         callouts: [],
         sitelinks: [],
-        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple image: doctor + stethoscope icon with "Join your brand" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration of a doctor with stethoscope, your brand’s logo area, white background, blue accents, friendly and professional, 800×800"',
+        visualDirection: '**DALL-E 3 Visual Direction:**\nSimple image: goal-progress icon with a small premium badge + "Try Premium" CTA. Clean, WhatsApp-safe.\nPrompt: "Simple clean illustration of a goal-progress meter with a small premium badge, your brand\u2019s logo area, white background, navy accents, friendly and professional, 800×800"',
       },
     },
   };
 
-  // Default to Patient Acquisition if the specific objective/platform combo isn't defined
-  const objectiveKey = objective === 'Provider Recruitment' ? 'Provider Recruitment' : 'Patient Acquisition';
-  const platformData = adSets[objectiveKey]?.[platform] ?? adSets['Patient Acquisition']['Google Search'];
+  // Default to Member Acquisition if the specific objective/platform combo isn't defined
+  const objectiveKey = objective === 'Subscription Upgrade' ? 'Subscription Upgrade' : 'Member Acquisition';
+  const platformData = adSets[objectiveKey]?.[platform] ?? adSets['Member Acquisition']['Google Search'];
 
   let output = `**Platform:** ${platform}\n**Campaign Objective:** ${objective} — ${objectiveMap[objective] ?? ''}\n\n---\n\n`;
 
@@ -561,7 +561,7 @@ function VisualGeneratorTab() {
           value={customSubject}
           onChange={(e) => setCustomSubject(e.target.value)}
           rows={3}
-          placeholder="e.g. A friendly female pediatrician examining a smiling toddler in a bright clinic, parent watching from the side"
+          placeholder="e.g. A young Indian couple at a sunlit kitchen table reviewing a personal-finance app on a phone, calm and in-control money moment"
           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-y"
         />
         <p className="mt-1 text-xs text-gray-500">
@@ -645,7 +645,7 @@ function VisualGeneratorTab() {
 
 function AdCreativeGeneratorTab() {
   const [adPlatform, setAdPlatform] = useState<typeof AD_PLATFORMS[number]>('Google Search');
-  const [objective, setObjective] = useState<typeof CAMPAIGN_OBJECTIVES[number]>('Patient Acquisition');
+  const [objective, setObjective] = useState<typeof CAMPAIGN_OBJECTIVES[number]>('Member Acquisition');
   const [output, setOutput] = useState('');
 
   function generate() {

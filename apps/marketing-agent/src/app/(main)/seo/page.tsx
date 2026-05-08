@@ -13,7 +13,7 @@ const typeColors: Record<string, string> = {
   transactional: 'bg-green-100 text-green-700',
   informational: 'bg-blue-100 text-blue-700',
   comparison: 'bg-yellow-100 text-yellow-700',
-  'provider-side': 'bg-purple-100 text-purple-700',
+  calculator: 'bg-purple-100 text-purple-700',
 };
 
 const priorityColors: Record<string, string> = {
@@ -29,8 +29,9 @@ const difficultyColors: Record<string, string> = {
 };
 
 const pageTypeColors: Record<string, string> = {
-  'city-specialty': 'bg-purple-100 text-purple-700',
-  'condition': 'bg-blue-100 text-blue-700',
+  'landing': 'bg-purple-100 text-purple-700',
+  'calculator': 'bg-blue-100 text-blue-700',
+  'guide': 'bg-indigo-100 text-indigo-700',
   'blog': 'bg-green-100 text-green-700',
   'comparison': 'bg-yellow-100 text-yellow-700',
 };
@@ -157,14 +158,14 @@ export default function SeoPage() {
       <Card title="Technical SEO Checklist">
         <div className="space-y-2">
           {[
-            { item: 'MedicalBusiness schema markup on provider profile pages', done: false },
-            { item: 'Physician schema markup on individual doctor pages', done: false },
-            { item: 'LocalBusiness schema on city landing pages', done: false },
+            { item: 'FinancialProduct schema markup on subscription / pricing pages', done: false },
+            { item: 'SoftwareApplication schema markup on calculator pages (SIP, EMI, FD, tax)', done: false },
+            { item: 'Organization + LocalBusiness schema on city / about pages', done: false },
             { item: 'Core Web Vitals: LCP < 2.5s, FID < 100ms, CLS < 0.1', done: false },
             { item: 'XML sitemap submitted to Google Search Console', done: true },
             { item: 'Canonical tags on all paginated and filter pages', done: false },
             { item: 'Hreflang tags if expanding to regional languages', done: false },
-            { item: 'Internal linking between city pages and blog content', done: false },
+            { item: 'Internal linking between calculator pages and related guides', done: false },
             { item: 'Google Search Console property set up and verified', done: true },
             { item: 'Mobile-first responsive design on all SEO pages', done: true },
           ].map((row) => (
@@ -179,11 +180,11 @@ export default function SeoPage() {
       {/* Content SEO Tips */}
       <Card title="📌 SEO Agent Guidance">
         <ul className="space-y-2 text-sm text-gray-600">
-          <li>• <strong>Prioritise transactional cluster first</strong> — these drive bookings. Publish city + specialty landing pages before blog content.</li>
-          <li>• <strong>Each SEO page needs: </strong> unique H1 with primary keyword, 300+ words, internal links to 2+ related pages, schema markup.</li>
+          <li>• <strong>Prioritise transactional cluster first</strong> — these drive paid signups. Publish calculator + comparison landing pages before broad blog content.</li>
+          <li>• <strong>Each SEO page needs:</strong> unique H1 with primary keyword, 300+ words, internal links to 2+ related pages, schema markup.</li>
           <li>• <strong>Blog posts:</strong> 1,500–3,000 words, structured with H2/H3, include FAQ schema for featured snippets.</li>
           <li>• <strong>Track rankings weekly</strong> in Google Search Console or Ahrefs. Flag any page losing 3+ positions week-on-week.</li>
-          <li>• <strong>Build backlinks</strong> through health media outreach and provider partnerships mentioning your brand.</li>
+          <li>• <strong>Build backlinks</strong> through personal-finance media outreach and partnerships with creators in the money / investing space.</li>
         </ul>
       </Card>
     </div>
