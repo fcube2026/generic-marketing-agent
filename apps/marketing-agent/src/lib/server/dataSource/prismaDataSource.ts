@@ -655,7 +655,7 @@ function fromDbSegment(value: string): LifecycleFlow['segment'] {
 function toDbSegment(value: LifecycleFlow['segment']): string {
   if (value === 'member') return 'patient';
   if (value === 'subscriber') return 'provider';
-  throw new Error(`Unsupported lifecycle segment: ${String(value)}`);
+  throw new Error(`Unsupported segment value: ${String(value)}`);
 }
 
 function mkKpi(label: string, value: number, target: number, icon: string): KpiMetric {

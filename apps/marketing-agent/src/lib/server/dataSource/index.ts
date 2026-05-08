@@ -32,8 +32,8 @@ export function resetActiveDataSource(): void {
 export type { DataSource } from './types';
 
 function resolveDataSourceKey(): 'mock' | 'prisma' {
-  const pref = (process.env.MARKETING_DATA_SOURCE || '').trim().toLowerCase();
-  if (pref === 'mock') return 'mock';
-  if (pref === 'prisma') return 'prisma';
+  const explicitDataSource = (process.env.MARKETING_DATA_SOURCE || '').trim().toLowerCase();
+  if (explicitDataSource === 'mock') return 'mock';
+  if (explicitDataSource === 'prisma') return 'prisma';
   return process.env.DATABASE_URL ? 'prisma' : 'mock';
 }
