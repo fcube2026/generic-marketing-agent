@@ -37,6 +37,8 @@ export interface SkillRunResult {
   /** If the skill declares a `visual`, this is the prompt to feed into <GeneratedImage>. */
   visualPrompt?: string;
   visualSize?: { width: number; height: number };
+  /** Optional image provider override for the visual (e.g. 'google' = nano-banana). */
+  visualProvider?: 'openai' | 'google';
 }
 
 function joinGuardrails(guardrails: string[] | undefined): string {
@@ -70,9 +72,11 @@ export async function runSkill(input: RunSkillInput): Promise<SkillRunResult> {
   //    can independently retry on transient failures.
   let visualPrompt: string | undefined;
   let visualSize: { width: number; height: number } | undefined;
+  let visualProvider: 'openai' | 'google' | undefined;
   if (config.visual) {
     visualPrompt = `${config.visual.promptHint}. Context: ${userPrompt.slice(0, 400)}`;
     visualSize = { width: config.visual.width, height: config.visual.height };
+    visualProvider = config.visual.provider;
   }
 
   return {
@@ -83,6 +87,7 @@ export async function runSkill(input: RunSkillInput): Promise<SkillRunResult> {
     orgContext,
     visualPrompt,
     visualSize,
+    visualProvider,
   };
 }
 

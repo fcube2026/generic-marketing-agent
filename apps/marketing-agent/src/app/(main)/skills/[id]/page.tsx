@@ -18,6 +18,11 @@ import type {
   SkillInputValue,
 } from '@/lib/skills/types';
 import { describeAiError } from '@/lib/services/aiService';
+import {
+  publishLandingPagePreview,
+  extractHtmlBlock,
+  type PublishLandingPageResult,
+} from '@/lib/services/landingPageService';
 import { createPlanItem } from '@/lib/services/marketingService';
 import { GeneratedImage } from '@/components/ui/GeneratedImage';
 
@@ -183,6 +188,14 @@ export default function SkillRunnerPage() {
   const [planSaved, setPlanSaved] = useState<number | null>(null);
   const [planSaveError, setPlanSaveError] = useState<string | null>(null);
 
+  // Hosted preview URL for the Landing Page Builder skill. Auto-published
+  // from the first ```html block in the reply so the user gets a real,
+  // shareable URL alongside the raw output.
+  const [preview, setPreview] = useState<PublishLandingPageResult | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [copiedPreviewUrl, setCopiedPreviewUrl] = useState(false);
+
   // Re-init form values whenever the skill changes (deep navigation).
   useEffect(() => {
     if (config) setValues(buildInitialValues(config));
@@ -191,7 +204,42 @@ export default function SkillRunnerPage() {
     setError(null);
     setCritiqueError(null);
     setPlanSaved(null);
+    setPreview(null);
+    setPublishError(null);
+    setCopiedPreviewUrl(false);
   }, [config, skillId]);
+
+  // Auto-publish a hosted preview URL whenever the Landing Page Builder
+  // skill produces a reply that contains a self-contained HTML document.
+  // Re-runs each time `result` changes so subsequent runs get fresh URLs.
+  useEffect(() => {
+    if (!result || skillId !== 'landing-page') return;
+    const html = extractHtmlBlock(result.reply);
+    if (!html) {
+      setPreview(null);
+      setPublishError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreview(null);
+    setPublishError(null);
+    setPublishing(true);
+    (async () => {
+      try {
+        const published = await publishLandingPagePreview({ html });
+        if (!cancelled) setPreview(published);
+      } catch (err) {
+        if (!cancelled) {
+          setPublishError(describeAiError(err, 'Failed to publish landing page preview'));
+        }
+      } finally {
+        if (!cancelled) setPublishing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [result, skillId]);
 
   const jsonBlock = useMemo(() => (result ? extractJsonBlock(result.reply) : null), [result]);
 
@@ -453,6 +501,64 @@ export default function SkillRunnerPage() {
               <div className="flex-1 overflow-auto p-5 space-y-4">
                 {tab === 'output' && (
                   <div className="space-y-3">
+                    {skillId === 'landing-page' && (publishing || preview || publishError) && (
+                      <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-white to-purple-50 p-4">
+                        {publishing && (
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <span>Publishing landing page preview…</span>
+                          </div>
+                        )}
+                        {preview && !publishing && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-xs font-bold text-primary uppercase tracking-wide">
+                                🌐 Live preview URL
+                              </p>
+                              <span className="text-[10px] text-gray-400">
+                                Preview lives in memory — re-run to refresh
+                              </span>
+                            </div>
+                            <div className="flex items-stretch gap-2">
+                              <input
+                                type="text"
+                                readOnly
+                                value={preview.url}
+                                onFocus={(e) => e.currentTarget.select()}
+                                className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-800"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  copyToClipboard(preview.url);
+                                  setCopiedPreviewUrl(true);
+                                  window.setTimeout(() => setCopiedPreviewUrl(false), 2000);
+                                }}
+                                className="text-xs px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:border-primary hover:text-primary font-semibold"
+                              >
+                                {copiedPreviewUrl ? '✓ Copied' : 'Copy'}
+                              </button>
+                              <a
+                                href={preview.path}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs px-3 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary-dark transition"
+                              >
+                                Open ↗
+                              </a>
+                            </div>
+                            {preview.title && (
+                              <p className="text-[11px] text-gray-500 truncate">
+                                <span className="font-semibold">Title:</span> {preview.title}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {publishError && !publishing && (
+                          <p className="text-xs text-red-600">⚠️ {publishError}</p>
+                        )}
+                      </div>
+                    )}
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
@@ -509,6 +615,7 @@ export default function SkillRunnerPage() {
                       width={result.visualSize?.width}
                       height={result.visualSize?.height}
                       label={`${skill.name} — sample visual`}
+                      provider={result.visualProvider}
                     />
                     <p className="text-[11px] text-gray-400 font-mono">
                       visual prompt: {result.visualPrompt}

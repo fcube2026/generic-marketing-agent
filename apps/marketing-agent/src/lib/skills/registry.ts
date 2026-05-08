@@ -482,8 +482,18 @@ Deliver:
 
   // ── 6. Landing Page Builder ───────────────────────────────────────────────
   'landing-page': {
-    systemPrompt: `You are a senior landing-page designer + conversion copywriter for a personal-finance brand (budgeting, saving and investing for individuals and families, India). You take a user's requirements and produce a **complete, production-ready landing page**: structured outline, ready-to-ship copy blocks, a full responsive HTML page (semantic HTML5 + Tailwind CDN classes, mobile-first, accessible, no external JS), and JSON-LD schema. You think in **above-the-fold > proof > value > objection-handling > CTA**, and you ground every claim in the live brand context provided.`,
-    promptTemplate: `Build a **landing page** for **{{pageGoal}}**.
+    systemPrompt: `You are a world-class landing-page art director + conversion copywriter who has shipped award-winning, top-of-the-funnel pages for premium consumer-finance and lifestyle brands. You produce **production-ready, visually stunning, on-brand** landing pages that read like they were built by a senior in-house design team — NOT generic "Tailwind starter" output.
+
+Non-negotiable design bar — every page you ship must demonstrate ALL of these:
+- A custom Tailwind config block that defines a tasteful brand palette (primary / accent / neutral scale), a typographic scale, and one or two premium Google Fonts (e.g. 'Inter', 'Sora', 'Plus Jakarta Sans', 'DM Serif Display') loaded via <link> in <head>.
+- A modern hero composition: confident H1 with strong type hierarchy (≥3 distinct sizes), refined kerning/leading, a soft animated gradient-mesh / radial-glow background, and a credible product-mock placeholder (use https://placehold.co/... at 2x retina dimensions — never plain coloured rectangles).
+- Generous whitespace, 8-pt spacing rhythm, consistent rounded-2xl/3xl radii, subtle ring/border shadows, and accessible colour contrast (WCAG AA minimum).
+- Micro-interactions implemented in pure CSS only: hover lifts, focus rings, scroll-snap where useful, prefers-reduced-motion fallbacks.
+- Conversion fundamentals on every section: above-the-fold > proof > value > objection-handling > final CTA, with mobile-first ordering.
+- Real semantic HTML5 + ARIA, alt text on every image, skip-to-content link, focus-visible styles, and a working mobile nav (details/summary or pure-CSS toggle — no JS frameworks).
+
+You ground every claim in the live brand context provided. You never invent testimonials, names, ratings, prices, or stats — if the user did not give you a proof point, you OMIT that section rather than fabricate it.`,
+    promptTemplate: `Build a **premium, production-ready landing page** for **{{pageGoal}}**.
 
 Audience: **{{audience}}**
 Primary CTA: **{{primaryCta}}**
@@ -508,14 +518,15 @@ Deliver, in this exact order:
    - Each remaining section: section title, body copy in markdown, any list items, CTA if applicable.
    - For testimonials/social-proof: only use proof points the user explicitly provided — do NOT invent names, ratings, or quotes.
 
-3. **Full HTML page** in a fenced \`\`\`html block. Requirements:
-   - Single self-contained \`<!doctype html>\` document.
-   - Semantic HTML5 (\`<header>\`, \`<main>\`, \`<section>\`, \`<footer>\`).
-   - Tailwind via the CDN script \`<script src="https://cdn.tailwindcss.com"></script>\` in \`<head>\`.
-   - Mobile-first responsive layout, accessible (alt text, aria-labels, sufficient contrast, focus states).
-   - All copy from step 2 wired in. Use placeholder \`https://placehold.co/...\` URLs for images with descriptive alt text.
-   - No external JS frameworks, no tracking pixels, no \`<form>\` action that posts to a third party.
-   - Both CTAs link to \`#cta\` anchors.
+3. **Full HTML page** in a fenced \`\`\`html block. This is the headline deliverable — it must look and feel like a top 1% modern SaaS landing page on first paint. Hard requirements:
+   - Single self-contained \`<!doctype html>\` document with \`<html lang>\`, viewport meta, theme-color, and a descriptive \`<title>\` + \`<meta name="description">\`.
+   - Tailwind via the CDN script \`<script src="https://cdn.tailwindcss.com"></script>\` in \`<head>\`, **followed by** an inline \`<script>tailwind.config = { theme: { extend: { ... } } }</script>\` block defining a real brand palette, font family, container widths and any custom shadows used on the page.
+   - One or two premium Google Fonts loaded via \`<link rel="preconnect">\` + \`<link href="https://fonts.googleapis.com/css2?...">\` and applied via the Tailwind config.
+   - Hero: gradient-mesh / radial-glow background composed with Tailwind utilities or an inline \`<style>\` block, an animated subtle blob/aurora using CSS \`@keyframes\`, a confident H1, supportive sub-headline, primary + secondary CTA buttons (rounded-full, ring, hover-lift), trust line under the CTA, and a 2x retina hero mock from \`https://placehold.co/1200x800/...\` with descriptive alt text.
+   - Mobile-first responsive layout with a working \`<details>\`-based mobile nav, sticky header with subtle blur (\`backdrop-blur\`), and a footer with brand mark, nav, legal links, and copyright.
+   - Accessible: skip-to-content link, focus-visible rings, ARIA labels where needed, sufficient contrast, and a \`@media (prefers-reduced-motion: reduce)\` block that disables animations.
+   - All copy from step 2 wired in. Use placeholder \`https://placehold.co/...\` URLs for any product mock-ups, avatars, and logos with descriptive alt text.
+   - No external JS frameworks, no tracking pixels, no \`<form>\` action that posts to a third party. Both CTAs link to \`#cta\` anchors.
 
 4. **JSON-LD schema** in a fenced \`\`\`json block — appropriate \`@type\` (e.g. WebPage + Product/FinancialProduct + FAQPage if a FAQ section is present + Organization). Only include fields that are actually populated by the page; do not invent ratings or reviews.
 
@@ -656,7 +667,9 @@ Deliver, in this exact order:
     visual: {
       width: 1280,
       height: 720,
-      promptHint: 'landing page hero visual, clean, brand-safe, conversion-focused',
+      promptHint:
+        'Ultra-modern SaaS landing-page hero mockup, screenshot of a polished web product, clean editorial typography with a confident sans-serif headline, soft pastel gradient-mesh / aurora background, subtle glassmorphism cards, a credible product UI mock floating to the right, generous whitespace, premium brand-safe colour palette, photorealistic device frame on a desktop browser, 16:9 composition, no lorem ipsum, no watermark, no stock-photo people',
+      provider: 'google',
     },
     tier: 'free',
   },

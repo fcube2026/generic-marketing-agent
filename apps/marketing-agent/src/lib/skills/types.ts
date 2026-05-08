@@ -114,7 +114,19 @@ export interface AdvancedSkillConfig {
    * If set, after the main run we generate a visual at this aspect ratio.
    * width/height in pixels — the server picks the closest supported size.
    */
-  visual?: { width: number; height: number; promptHint: string };
+  visual?: {
+    width: number;
+    height: number;
+    promptHint: string;
+    /**
+     * Optional explicit image provider for this skill's hero visual. When
+     * set, the runner forwards it to `<GeneratedImage>` so it overrides the
+     * user's globally-stored preference. Use `'google'` to force the
+     * nano-banana / Gemini image model — it produces dramatically better
+     * UI mock-ups and product hero shots than `'openai'` for landing pages.
+     */
+    provider?: 'openai' | 'google';
+  };
 }
 
 // ─── Skill run + critique results (client side) ──────────────────────────────
