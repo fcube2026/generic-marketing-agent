@@ -9,6 +9,7 @@
  * of the dev server process and reset on restart.
  */
 
+import { dataSourcePreferenceFromEnv } from './dataSource/preference';
 import type {
   BusinessProfile,
   Campaign,
@@ -285,10 +286,7 @@ if (!g.__marketingAgentStore) {
   // fabricated placeholder content. This keeps `MARKETING_DATA_SOURCE=mock`
   // working end-to-end for offline dev while making sure a real
   // deployment never accidentally surfaces seed numbers.
-  const pref = (process.env.MARKETING_DATA_SOURCE ?? process.env.DATA_SOURCE ?? '')
-    .trim()
-    .toLowerCase();
-  const useSeed = pref === 'mock' || pref === 'memory';
+  const useSeed = dataSourcePreferenceFromEnv() === 'mock';
   if (useSeed) {
     // Deep-clone the seed so mutations don't bleed across reloads.
     g.__marketingAgentStore = JSON.parse(JSON.stringify(seed));

@@ -21,26 +21,16 @@
  */
 
 import { MockDataSource } from './mockDataSource';
+import { dataSourcePreferenceFromEnv } from './preference';
 import { PrismaDataSource } from './prismaDataSource';
 import type { DataSource } from './types';
 
 let cached: DataSource | null = null;
 
-function preferenceFromEnv(): 'mock' | 'prisma' | 'auto' {
-  const raw = (
-    process.env.MARKETING_DATA_SOURCE ?? process.env.DATA_SOURCE ?? ''
-  )
-    .trim()
-    .toLowerCase();
-  if (raw === 'mock' || raw === 'memory') return 'mock';
-  if (raw === 'prisma' || raw === 'fcube') return 'prisma';
-  return 'auto';
-}
-
 export function getActiveDataSource(): DataSource {
   if (cached) return cached;
 
-  const preference = preferenceFromEnv();
+  const preference = dataSourcePreferenceFromEnv();
   const hasDatabaseUrl = !!process.env.DATABASE_URL && process.env.DATABASE_URL.length > 0;
 
   if (preference === 'mock') {
