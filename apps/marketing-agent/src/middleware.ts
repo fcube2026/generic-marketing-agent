@@ -22,6 +22,11 @@ export function middleware(request: NextRequest) {
     pathname === '/login' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
+    // Published landing-page previews are addressed by an unguessable UUID
+    // and intentionally shareable with external reviewers (the whole point
+    // of the feature). Bypass the JWT redirect here so the URL works for
+    // anyone with the link.
+    pathname.startsWith('/landing-preview/') ||
     pathname.startsWith('/favicon')
   ) {
     if (pathname === '/login' && token && isValidJwtStructure(token)) {
