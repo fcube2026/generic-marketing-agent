@@ -277,8 +277,10 @@ export const fcubeFinancePack: DomainPack = {
   ],
 
   // Finance KPIs grouped by acquisition / activation / monetisation /
-  // retention / referral / behavior. Targets are illustrative defaults
-  // — tenants override via the BusinessProfile / KPI editor.
+  // retention / referral / behavior. Targets are illustrative INR
+  // defaults — tenants override them per-deployment via the
+  // BusinessProfile / KPI editor, and currency symbols should be
+  // re-formatted to match `AGENT_CURRENCY`.
   kpis: [
     // North-star
     { id: 'mrr',                     label: 'MRR',                        category: 'north-star',   target: '₹25L',    icon: '📈' },
@@ -301,7 +303,7 @@ export const fcubeFinancePack: DomainPack = {
     { id: 'subscription-conversion', label: 'Free → paid conversion',     category: 'monetisation', target: '8%',      icon: '💳' },
     { id: 'arpu',                    label: 'ARPU',                       category: 'monetisation', target: '₹350',    icon: '🪙' },
     { id: 'ltv',                     label: 'LTV',                        category: 'monetisation', target: '₹4,200',  icon: '🏆' },
-    { id: 'discounts-given',         label: 'Discounts given',            category: 'monetisation', target: '< 12%',   icon: '🏷️' },
+    { id: 'discount-redemption-rate', label: 'Discount redemption rate', category: 'monetisation', target: '< 12%',   icon: '🏷️', formula: 'orders_with_discount / total_orders' },
     { id: 'revenue-generated',       label: 'Revenue (30d)',              category: 'monetisation', target: '₹30L',    icon: '💵' },
 
     // Retention & churn
