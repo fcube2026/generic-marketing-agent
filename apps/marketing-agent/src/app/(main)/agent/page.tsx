@@ -358,6 +358,12 @@ Caption: "Auto-debit on salary day. Watch your goals fund themselves. Tax-saving
 
 **Variation B — Minimalist brand visual:**
 "Minimalist flat illustration of a phone screen showing a clean monthly budget with categories and a savings goal at 60%. Simple line icons, finance navy (#0F2A5F) and white colour palette, accent green for the saved portion, no text, 1:1 square, suitable for Instagram grid."
+
+---
+**Tip:** Generate all 3 variations and A/B test in Meta Ads Manager. The photorealistic family-at-the-table scene typically outperforms in member acquisition campaigns by 15–25% CTR.`,
+};
+
+// Image generation is opt-in — the agent only generates a visual when the
 // user's message explicitly asks for one (e.g. "image", "visual", "post",
 // "carousel", "reel", "thumbnail", "banner", "infographic", "ad creative",
 // "dall-e", etc.). For normal text questions the function returns null so
