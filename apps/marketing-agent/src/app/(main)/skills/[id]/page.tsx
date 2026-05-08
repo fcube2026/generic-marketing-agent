@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { marketingSkills, type MarketingSkill } from '@/lib/data';
@@ -195,6 +195,18 @@ export default function SkillRunnerPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [copiedPreviewUrl, setCopiedPreviewUrl] = useState(false);
+  const copiedTimerRef = useRef<number | null>(null);
+
+  // Clear the "copied" toast timer on unmount to avoid setState on an
+  // unmounted component if the user navigates away within the 2s window.
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Re-init form values whenever the skill changes (deep navigation).
   useEffect(() => {
@@ -532,7 +544,13 @@ export default function SkillRunnerPage() {
                                 onClick={() => {
                                   copyToClipboard(preview.url);
                                   setCopiedPreviewUrl(true);
-                                  window.setTimeout(() => setCopiedPreviewUrl(false), 2000);
+                                  if (copiedTimerRef.current !== null) {
+                                    window.clearTimeout(copiedTimerRef.current);
+                                  }
+                                  copiedTimerRef.current = window.setTimeout(() => {
+                                    setCopiedPreviewUrl(false);
+                                    copiedTimerRef.current = null;
+                                  }, 2000);
                                 }}
                                 className="text-xs px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:border-primary hover:text-primary font-semibold"
                               >
