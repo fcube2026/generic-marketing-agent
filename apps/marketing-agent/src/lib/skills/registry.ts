@@ -479,6 +479,187 @@ Deliver:
     model: 'gpt-4o-mini',
     tier: 'free',
   },
+
+  // ── 6. Landing Page Builder ───────────────────────────────────────────────
+  'landing-page': {
+    systemPrompt: `You are a senior landing-page designer + conversion copywriter for a personal-finance brand (budgeting, saving and investing for individuals and families, India). You take a user's requirements and produce a **complete, production-ready landing page**: structured outline, ready-to-ship copy blocks, a full responsive HTML page (semantic HTML5 + Tailwind CDN classes, mobile-first, accessible, no external JS), and JSON-LD schema. You think in **above-the-fold > proof > value > objection-handling > CTA**, and you ground every claim in the live brand context provided.`,
+    promptTemplate: `Build a **landing page** for **{{pageGoal}}**.
+
+Audience: **{{audience}}**
+Primary CTA: **{{primaryCta}}**
+Secondary CTA (optional): **{{secondaryCta}}**
+Offer / value proposition: **{{offer}}**
+Tone: **{{tone}}**
+Design style: **{{designStyle}}**
+Sections to include (in order): **{{sections}}**
+{{#if keyBenefits}}Key benefits / features to highlight:
+{{keyBenefits}}{{/if}}
+{{#if socialProof}}Social proof / testimonials / numbers we can cite:
+{{socialProof}}{{/if}}
+{{#if mustInclude}}Must-include phrases or compliance lines: {{mustInclude}}{{/if}}
+{{#if avoidWords}}Avoid: {{avoidWords}}{{/if}}
+
+Deliver, in this exact order:
+
+1. **Page outline** — a numbered list of the sections in final order, each with a 1-line purpose and the conversion job it does.
+
+2. **Copy blocks** — for every section produce final copy:
+   - Hero: eyebrow, H1 (≤60 chars), sub-headline (≤140 chars), primary CTA label, supporting micro-copy under the CTA, hero visual brief.
+   - Each remaining section: section title, body copy in markdown, any list items, CTA if applicable.
+   - For testimonials/social-proof: only use proof points the user explicitly provided — do NOT invent names, ratings, or quotes.
+
+3. **Full HTML page** in a fenced \`\`\`html block. Requirements:
+   - Single self-contained \`<!doctype html>\` document.
+   - Semantic HTML5 (\`<header>\`, \`<main>\`, \`<section>\`, \`<footer>\`).
+   - Tailwind via the CDN script \`<script src="https://cdn.tailwindcss.com"></script>\` in \`<head>\`.
+   - Mobile-first responsive layout, accessible (alt text, aria-labels, sufficient contrast, focus states).
+   - All copy from step 2 wired in. Use placeholder \`https://placehold.co/...\` URLs for images with descriptive alt text.
+   - No external JS frameworks, no tracking pixels, no \`<form>\` action that posts to a third party.
+   - Both CTAs link to \`#cta\` anchors.
+
+4. **JSON-LD schema** in a fenced \`\`\`json block — appropriate \`@type\` (e.g. WebPage + Product/FinancialProduct + FAQPage if a FAQ section is present + Organization). Only include fields that are actually populated by the page; do not invent ratings or reviews.
+
+5. **Recommended A/B tests** — top 5 prioritised experiments to run on this page after launch (hypothesis + variant + primary metric).
+
+6. **Measurement plan** — exact GA4 events to fire on the page (event name, trigger, parameters) covering page_view, CTA clicks, scroll depth, and form submit if relevant.`,
+    inputs: [
+      {
+        name: 'pageGoal',
+        label: 'Page goal',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. Drive free signups for the family budgeting plan',
+      },
+      {
+        name: 'audience',
+        label: 'Target audience',
+        type: 'textarea',
+        required: true,
+        placeholder: 'e.g. Dual-income parents in Mumbai/Bengaluru, 30-45, juggling EMIs + kids\u2019 school fees',
+      },
+      {
+        name: 'offer',
+        label: 'Offer / value proposition',
+        type: 'textarea',
+        required: true,
+        placeholder: 'e.g. Free family budget in 60 seconds — link 2 accounts, see where the money goes',
+      },
+      {
+        name: 'primaryCta',
+        label: 'Primary CTA label',
+        type: 'text',
+        required: true,
+        defaultValue: 'Start free',
+      },
+      {
+        name: 'secondaryCta',
+        label: 'Secondary CTA (optional)',
+        type: 'text',
+        placeholder: 'e.g. See how it works',
+      },
+      {
+        name: 'tone',
+        label: 'Tone',
+        type: 'select',
+        options: ['Warm + reassuring', 'Confident + expert', 'Friendly + casual', 'Premium + minimal'],
+        defaultValue: 'Warm + reassuring',
+      },
+      {
+        name: 'designStyle',
+        label: 'Design style',
+        type: 'select',
+        options: [
+          'Clean + minimal (lots of whitespace)',
+          'Bold + colorful (strong gradients)',
+          'Editorial / story-driven',
+          'Trust-heavy (lots of proof + numbers)',
+          'Premium + dark mode',
+        ],
+        defaultValue: 'Clean + minimal (lots of whitespace)',
+      },
+      {
+        name: 'sections',
+        label: 'Sections to include',
+        type: 'multiselect',
+        options: [
+          'Hero',
+          'Logo bar / press',
+          'Problem / pain points',
+          'How it works (3 steps)',
+          'Features / benefits',
+          'Social proof / testimonials',
+          'Numbers / stats',
+          'Comparison table',
+          'Pricing',
+          'FAQ',
+          'Final CTA',
+          'Footer',
+        ],
+        defaultValue: [
+          'Hero',
+          'How it works (3 steps)',
+          'Features / benefits',
+          'Social proof / testimonials',
+          'FAQ',
+          'Final CTA',
+          'Footer',
+        ],
+      },
+      {
+        name: 'keyBenefits',
+        label: 'Key benefits / features (one per line)',
+        type: 'textarea',
+        placeholder: 'e.g.\n- Auto-categorises every transaction\n- Shared family budget with spending alerts\n- Goal-based savings buckets',
+      },
+      {
+        name: 'socialProof',
+        label: 'Social proof / testimonials / numbers (optional)',
+        type: 'textarea',
+        placeholder: 'Paste real testimonials, member counts, ratings — only what you can verify.',
+      },
+      { name: 'mustInclude', label: 'Must-include phrases / compliance lines', type: 'textarea' },
+      { name: 'avoidWords', label: 'Words / claims to avoid', type: 'textarea' },
+    ],
+    outputs: [
+      { key: 'outline', label: 'Page outline', kind: 'markdown' },
+      { key: 'copyBlocks', label: 'Section-by-section copy', kind: 'copy' },
+      { key: 'html', label: 'Full HTML page', kind: 'code', downloadExtension: 'html' },
+      { key: 'schema', label: 'JSON-LD schema', kind: 'json', downloadExtension: 'json' },
+      { key: 'experiments', label: 'A/B tests to run', kind: 'table' },
+      { key: 'measurement', label: 'Measurement plan', kind: 'markdown' },
+      { key: 'hero', label: 'Hero visual', kind: 'image' },
+    ],
+    tools: ['profile', 'kpis.acquisition', 'kpis.activation'],
+    guardrails: FINANCE_GUARDRAILS,
+    successCriteria: [
+      ...COMMON_CRITERIA,
+      {
+        id: 'page_completeness',
+        description:
+          'Every section listed in the user\u2019s requirements is present in both the copy blocks and the HTML output, in the requested order.',
+        weight: 5,
+      },
+      {
+        id: 'html_validity',
+        description:
+          'HTML block is a single self-contained document, mobile-first responsive, accessible (alt text + aria where needed), and uses Tailwind CDN classes consistently.',
+        weight: 5,
+      },
+      {
+        id: 'no_invented_proof',
+        description:
+          'No fabricated testimonials, names, ratings, or stats — only proof points the user provided are surfaced on the page.',
+        weight: 5,
+      },
+    ],
+    model: 'gpt-4o-mini',
+    visual: {
+      width: 1280,
+      height: 720,
+      promptHint: 'landing page hero visual, clean, brand-safe, conversion-focused',
+    },
+    tier: 'free',
+  },
 };
 
 // ─── Baseline factory for the remaining 15 skills ────────────────────────────

@@ -312,6 +312,16 @@ export const marketingSkills: MarketingSkill[] = [
 
   // Conversion Optimization
   {
+    id: 'landing-page',
+    name: 'Landing Page Builder',
+    category: 'Conversion Optimization',
+    icon: '🛬',
+    description:
+      'Generate a complete landing page from your requirements — structured outline, ready-to-ship copy blocks, responsive HTML, JSON-LD schema, and a hero visual.',
+    examplePrompt:
+      'Build a landing page for our new family budgeting plan — audience: dual-income parents in metros, goal: free signup, include hero, social proof, 3 features, FAQ, and CTA.',
+  },
+  {
     id: 'page-cro',
     name: 'Page CRO',
     category: 'Conversion Optimization',
