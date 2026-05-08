@@ -26,8 +26,10 @@ import {
   type Tenant,
 } from '@/core';
 
-// Side-effect import to auto-register the bundled pack.
+// Side-effect imports to auto-register the bundled packs. Add a new
+// vertical here to make `DOMAIN_PACK=<id>` work out of the box.
 import '@/packs/healthcare-clinic';
+import '@/packs/fcube-finance';
 
 const env = (key: string, fallback?: string): string | undefined => {
   const value = process.env[key];
