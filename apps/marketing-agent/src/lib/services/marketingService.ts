@@ -29,14 +29,14 @@ export async function updateBusinessProfile(
 function normalizeProfile(raw: any): BusinessProfile {
   return {
     primaryGrowthFocus: raw.primaryGrowthFocus ?? 'both',
-    biggestBottleneck: raw.biggestBottleneck ?? 'demand',
+    biggestBottleneck: raw.biggestBottleneck ?? 'acquisition',
     monthlyBudget: raw.monthlyBudget ?? 0,
     allocatedBudget: raw.allocatedBudget ?? 0,
     targetCities: raw.targetCities ?? [],
     bestPerforming: raw.bestPerforming ?? '',
-    topPatientPersona: raw.topPatientPersona ?? '',
-    topReasonPatientChooses: raw.topReasonPatientChooses ?? '',
-    topReasonProviderJoins: raw.topReasonProviderJoins ?? '',
+    topMemberPersona: raw.topMemberPersona ?? '',
+    topReasonMemberJoins: raw.topReasonMemberJoins ?? '',
+    topReasonMemberSubscribes: raw.topReasonMemberSubscribes ?? '',
     competitors: raw.competitors ?? [],
     founderLedBrand: !!raw.founderLedBrand,
   };

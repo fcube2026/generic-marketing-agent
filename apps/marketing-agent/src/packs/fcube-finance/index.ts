@@ -9,7 +9,8 @@
  * Strictly additive: registering this pack does not change the default
  * tenant. To activate, set `DOMAIN_PACK=fcube-finance` (and optionally
  * `AGENT_TENANT_NAME=FCube`, `AGENT_CURRENCY=INR`, etc.) in the runtime
- * environment. The healthcare-clinic pack remains the zero-config default.
+ * environment. fcube-finance is the zero-config default; this comment is
+ * preserved to document the override mechanism for additional packs.
  *
  * This is Phase 0 of the FCube finance roadmap: brand + taxonomy + KPI
  * scaffolding + intake + skill metadata. Subsequent phases add a
@@ -385,8 +386,7 @@ export const fcubeFinancePack: DomainPack = {
   // No mock seed data: finance reads should come from the FCube backend
   // via the (Phase 1) `FinanceDataSource`. Memory-mode dev workspaces
   // start empty and let users author their own campaigns / experiments
-  // / SEO pages without leaking healthcare seed content into the
-  // finance UI.
+  // / SEO pages from a clean slate.
 };
 
 // Auto-register so a single `import '@/packs/fcube-finance'` is enough.

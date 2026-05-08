@@ -11,11 +11,11 @@
  */
 
 export interface Tenant {
-  /** Stable, URL-safe identifier (e.g. "acme-clinic", "default"). */
+  /** Stable, URL-safe identifier (e.g. "acme-finance", "default"). */
   id: string;
   /** Human label shown in the UI. */
   name: string;
-  /** ID of the active domain pack (e.g. "healthcare-clinic", "ecommerce"). */
+  /** ID of the active domain pack (e.g. "fcube-finance", "ecommerce"). */
   domainPackId: string;
   /** BCP-47 locale tag, e.g. "en-IN". Defaults to "en". */
   locale?: string;
@@ -52,7 +52,7 @@ export interface TenantContext {
 export const DEFAULT_TENANT: Tenant = {
   id: 'default',
   name: 'Default workspace',
-  domainPackId: 'healthcare-clinic',
+  domainPackId: 'fcube-finance',
   locale: 'en',
   currency: 'USD',
   timezone: 'UTC',

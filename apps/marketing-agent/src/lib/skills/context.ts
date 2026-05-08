@@ -64,11 +64,11 @@ function formatProfile(p: BusinessProfile | undefined): string {
   lines.push(`  - Biggest bottleneck: ${p.biggestBottleneck}`);
   if (p.monthlyBudget) lines.push(`  - Monthly marketing budget: ₹${p.monthlyBudget.toLocaleString('en-IN')}`);
   if (p.targetCities?.length) lines.push(`  - Target cities: ${p.targetCities.join(', ')}`);
-  if (p.topPatientPersona) lines.push(`  - Top patient persona: ${p.topPatientPersona}`);
-  if (p.topReasonPatientChooses)
-    lines.push(`  - #1 reason patients choose your brand: ${p.topReasonPatientChooses}`);
-  if (p.topReasonProviderJoins)
-    lines.push(`  - #1 reason providers join: ${p.topReasonProviderJoins}`);
+  if (p.topMemberPersona) lines.push(`  - Top member persona: ${p.topMemberPersona}`);
+  if (p.topReasonMemberJoins)
+    lines.push(`  - #1 reason members join: ${p.topReasonMemberJoins}`);
+  if (p.topReasonMemberSubscribes)
+    lines.push(`  - #1 reason members upgrade to a paid subscription: ${p.topReasonMemberSubscribes}`);
   if (p.competitors?.length) lines.push(`  - Top competitors: ${p.competitors.join(', ')}`);
   if (p.bestPerforming) lines.push(`  - Best-performing channel/tactic so far: ${p.bestPerforming}`);
   return lines.length ? `\nBusiness profile:\n${lines.join('\n')}` : '';

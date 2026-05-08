@@ -2,15 +2,15 @@
 // Static catalog/UI types stay in lib/data.ts.
 
 export interface BusinessProfile {
-  primaryGrowthFocus: 'patients' | 'providers' | 'both';
-  biggestBottleneck: 'supply' | 'demand' | 'activation';
+  primaryGrowthFocus: 'members' | 'subscribers' | 'both';
+  biggestBottleneck: 'acquisition' | 'activation' | 'subscription-conversion';
   monthlyBudget: number;
   allocatedBudget: number;
   targetCities: string[];
   bestPerforming: string;
-  topPatientPersona: string;
-  topReasonPatientChooses: string;
-  topReasonProviderJoins: string;
+  topMemberPersona: string;
+  topReasonMemberJoins: string;
+  topReasonMemberSubscribes: string;
   competitors: string[];
   founderLedBrand: boolean;
 }
@@ -25,11 +25,11 @@ export interface KpiMetric {
 }
 
 export type ContentPillar =
-  | 'patient-education'
-  | 'provider-spotlight'
+  | 'budgeting'
+  | 'saving-investing'
   | 'product-education'
   | 'social-proof'
-  | 'local-health';
+  | 'family-finance';
 
 export interface ContentItem {
   id: string;
@@ -59,7 +59,7 @@ export interface Campaign {
 export interface KeywordCluster {
   id: string;
   cluster: string;
-  type: 'transactional' | 'informational' | 'comparison' | 'provider-side';
+  type: 'transactional' | 'informational' | 'comparison' | 'calculator';
   priority: 'high' | 'medium' | 'low';
   keywords: Array<{ keyword: string; volume: string; difficulty: string }>;
 }
@@ -67,7 +67,7 @@ export interface KeywordCluster {
 export interface SeoPage {
   id: string;
   url: string;
-  type: 'city-specialty' | 'condition' | 'blog' | 'comparison';
+  type: 'landing' | 'calculator' | 'guide' | 'blog' | 'comparison';
   title: string;
   status: 'live' | 'in-progress' | 'planned';
   targetKeyword: string;
@@ -83,7 +83,7 @@ export interface LifecycleFlowStep {
 export interface LifecycleFlow {
   id: string;
   name: string;
-  segment: 'patient' | 'provider';
+  segment: 'member' | 'subscriber';
   trigger: string;
   steps: LifecycleFlowStep[];
   status: 'active' | 'draft' | 'paused';

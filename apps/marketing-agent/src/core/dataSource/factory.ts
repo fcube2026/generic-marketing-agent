@@ -18,7 +18,6 @@ export type DataSourceKind =
   | 'memory'
   | 'mock' // alias for "memory"
   | 'prisma'
-  | 'fcube'
   | 'mongo'
   | 'rest'
   | 'supabase'
@@ -51,14 +50,6 @@ export async function createDataSource(config: DataSourceConfig): Promise<DataSo
         'prisma',
         'Install `@prisma/client` and run `pnpm --filter @curex24/database db:generate`, then set DATA_SOURCE=prisma + DATABASE_URL.',
       ).then((mod) => new mod.PrismaDataSource(config.options ?? {}));
-      break;
-
-    case 'fcube':
-      ds = await loadOptional(
-        () => import('./fcubeDataSource'),
-        'fcube',
-        'Run `pnpm --filter @curex24/database db:generate` so the typed Prisma client exists, then set DATA_SOURCE=fcube + DATABASE_URL pointing at your fcube Postgres.',
-      ).then((mod) => new mod.FcubeDataSource(config.options ?? {}));
       break;
 
     case 'rest':
