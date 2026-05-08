@@ -611,9 +611,6 @@ function fromDbPillar(value: string): ContentItem['pillar'] {
 }
 
 function toDbPillar(value: ContentItem['pillar']): string {
-  if (value === 'budgeting') return 'patient-education';
-  if (value === 'saving-investing') return 'provider-spotlight';
-  if (value === 'family-finance') return 'local-health';
   return value;
 }
 
@@ -651,7 +648,6 @@ function fromDbKeywordType(value: string): KeywordCluster['type'] {
 }
 
 function toDbKeywordType(value: KeywordCluster['type']): string {
-  if (value === 'calculator') return 'provider-side';
   return value;
 }
 
