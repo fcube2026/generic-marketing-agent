@@ -140,17 +140,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Claude returned an empty reply', code: 'empty_reply' }, { status: 502 });
       }
 
-      const inputTokens = anthropicData.usage?.input_tokens;
-      const outputTokens = anthropicData.usage?.output_tokens;
+      const promptTokens = anthropicData.usage?.input_tokens;
+      const completionTokens = anthropicData.usage?.output_tokens;
       const payload: ChatResponsePayload = {
         reply,
         model: anthropicData.model || CLAUDE_TEXT_MODEL,
       };
-      if (typeof inputTokens === 'number' && typeof outputTokens === 'number') {
+      if (typeof promptTokens === 'number' && typeof completionTokens === 'number') {
         payload.usage = {
-          promptTokens: inputTokens,
-          completionTokens: outputTokens,
-          totalTokens: inputTokens + outputTokens,
+          promptTokens,
+          completionTokens,
+          totalTokens: promptTokens + completionTokens,
         };
       }
 
