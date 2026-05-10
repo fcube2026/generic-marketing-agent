@@ -32,6 +32,13 @@ interface ChatResponsePayload {
   };
 }
 
+interface AnthropicResponsePayload {
+  error?: { message?: string };
+  model?: string;
+  content?: Array<{ type?: string; text?: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
 function badRequest(message: string, code: string) {
   return NextResponse.json({ error: message, code }, { status: 400 });
 }
@@ -118,12 +125,7 @@ export async function POST(req: NextRequest) {
         }),
       });
 
-      const anthropicData = (await anthropicResponse.json()) as {
-        error?: { message?: string };
-        model?: string;
-        content?: Array<{ type?: string; text?: string }>;
-        usage?: { input_tokens?: number; output_tokens?: number };
-      };
+      const anthropicData = (await anthropicResponse.json()) as AnthropicResponsePayload;
 
       if (!anthropicResponse.ok) {
         const providerError = anthropicData.error?.message || 'Claude request failed';

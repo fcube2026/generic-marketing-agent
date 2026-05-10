@@ -16,7 +16,7 @@ pnpm --filter @curex24/landing-page-builder dev
 
 | Variable | Required | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Recommended | Server-side Claude key. When present, `/api/ai/chat` uses Claude for generation. |
+| `ANTHROPIC_API_KEY` | No (preferred) | Server-side Claude key. When present, `/api/ai/chat` uses Claude for generation. |
 | `CLAUDE_TEXT_MODEL` | No | Claude model. Defaults to `claude-3-5-sonnet-latest`. |
 | `ANTHROPIC_BASE_URL` | No | Optional Anthropic-compatible base URL override. |
 | `OPENAI_API_KEY` | Fallback | OpenAI key used only when `ANTHROPIC_API_KEY` is not set. |
