@@ -133,6 +133,9 @@ export default function HomePage() {
       ).length,
     [values],
   );
+  const stepProgressPercent = LANDING_PAGE_WIZARD_STEPS.length
+    ? Math.round((completedSteps / LANDING_PAGE_WIZARD_STEPS.length) * 100)
+    : 0;
   const prompt = useMemo(() => buildLandingPagePrompt(values), [values]);
   const htmlBlock = useMemo(() => (result ? extractHtmlBlock(result.reply) : null), [result]);
   const jsonBlock = useMemo(() => (result ? extractJsonBlock(result.reply) : null), [result]);
@@ -210,35 +213,86 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.22),_transparent_35%),linear-gradient(180deg,#020617_0%,#0f172a_45%,#111827_100%)] px-4 py-10 text-white">
-      <div className="mx-auto max-w-7xl space-y-8">
-        <header className="space-y-4">
-          <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-primary-light">
-            Standalone tool
-          </span>
-          <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Landing Page Builder</h1>
-            <p className="max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-              Generate a complete landing page from a structured brief, then publish a shareable live preview URL without going through the marketing-agent skills UI.
-            </p>
+    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.3),_transparent_38%),radial-gradient(circle_at_80%_22%,_rgba(34,211,238,0.16),_transparent_34%),linear-gradient(165deg,#020617_0%,#0b1120_34%,#131c31_100%)] px-4 py-10 text-white sm:px-6 lg:py-12">
+      <div className="pointer-events-none absolute inset-0 opacity-40">
+        <div className="absolute -left-32 top-1/4 h-80 w-80 rounded-full bg-primary/25 blur-[130px]" />
+        <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-cyan-400/20 blur-[120px]" />
+      </div>
+
+      <div className="relative mx-auto max-w-7xl space-y-8">
+        <header className="rounded-[2rem] border border-white/15 bg-white/[0.04] px-6 py-7 shadow-[0_30px_90px_-45px_rgba(124,58,237,0.7)] backdrop-blur-xl sm:px-8">
+          <div className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr] lg:items-end">
+            <div className="space-y-4">
+              <span className="inline-flex rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-primary-light">
+                Standalone Premium Studio
+              </span>
+              <div className="space-y-3">
+                <h1 className="bg-gradient-to-r from-white via-primary-light to-cyan-200 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl lg:text-6xl">
+                  Landing Page Builder
+                </h1>
+                <p className="max-w-3xl text-sm leading-7 text-slate-200 sm:text-base">
+                  Transform structured briefs into polished, conversion-ready landing pages with AI, then instantly publish a shareable live preview link.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-2 text-xs text-slate-200">
+                  <p className="font-semibold text-white">Guided workflow</p>
+                  <p className="mt-0.5 text-slate-400">Brief → Build → Share</p>
+                </div>
+                <div className="rounded-2xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs text-primary-light">
+                  <p className="font-semibold text-white">{stepProgressPercent}% complete</p>
+                  <p className="mt-0.5 text-primary-light/80">{completedSteps} of {LANDING_PAGE_WIZARD_STEPS.length} steps finished</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-slate-950/45 p-4 text-sm text-slate-300">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-light">Live workflow state</p>
+              <div className="mt-4 space-y-2">
+                <p>
+                  Active step:{' '}
+                  <span className="font-semibold text-white">
+                    {stepIndex + 1}. {currentStep.title}
+                  </span>
+                </p>
+                <p>
+                  Output status:{' '}
+                  <span className="font-semibold text-white">{result ? 'Generated' : 'Waiting for build'}</span>
+                </p>
+                <p>
+                  Preview status:{' '}
+                  <span className="font-semibold text-white">{preview ? 'Published' : publishing ? 'Publishing' : 'Not published yet'}</span>
+                </p>
+              </div>
+            </div>
           </div>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_1.35fr]">
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-glow backdrop-blur">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
+          <section className="rounded-[2rem] border border-white/15 bg-white/[0.05] p-5 shadow-[0_18px_50px_-26px_rgba(15,23,42,0.9)] backdrop-blur-xl sm:p-6">
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-light">Step 1 · Brief</p>
-                  <h2 className="mt-2 text-lg font-bold text-white">Capture the landing-page brief</h2>
+                  <h2 className="mt-2 text-xl font-bold text-white">Craft your page strategy</h2>
+                  <p className="mt-1 text-sm text-slate-400">Define goals, offer, audience, and proof in a guided sequence.</p>
                 </div>
-                <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-slate-300">
-                  {completedSteps}/{LANDING_PAGE_WIZARD_STEPS.length} steps complete
+                <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs text-slate-300">
+                  {completedSteps}/{LANDING_PAGE_WIZARD_STEPS.length} complete
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-cyan-300 transition-all"
+                  style={{ width: `${stepProgressPercent}%` }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
                 {LANDING_PAGE_WIZARD_STEPS.map((step, index) => {
                   const active = index === stepIndex;
+                  const completed = index < completedSteps;
                   return (
                     <button
                       key={step.id}
@@ -246,11 +300,14 @@ export default function HomePage() {
                       onClick={() => setStepIndex(index)}
                       className={`rounded-2xl border px-3 py-3 text-left transition ${
                         active
-                          ? 'border-primary bg-primary/10 text-white'
-                          : 'border-white/10 bg-black/10 text-slate-400 hover:border-primary/40 hover:text-white'
+                          ? 'border-primary/70 bg-primary/15 text-white shadow-[0_8px_30px_-18px_rgba(124,58,237,0.8)]'
+                          : 'border-white/10 bg-black/20 text-slate-400 hover:border-primary/40 hover:text-white'
                       }`}
                     >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">0{index + 1}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">
+                        {String(index + 1).padStart(2, '0')}
+                        {completed ? ' · done' : ''}
+                      </p>
                       <p className="mt-1 text-sm font-semibold">{step.title}</p>
                     </button>
                   );
@@ -258,7 +315,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+            <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/50 p-4 sm:p-5">
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-white">{currentStep.title}</h3>
                 <p className="mt-1 text-sm text-slate-400">{currentStep.description}</p>
@@ -295,7 +352,7 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setStepIndex((prev) => Math.max(prev - 1, 0))}
                   disabled={stepIndex === 0}
-                  className="rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border border-white/15 bg-black/20 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   ← Back
                 </button>
@@ -303,7 +360,7 @@ export default function HomePage() {
                   type="button"
                   onClick={() => setStepIndex((prev) => Math.min(prev + 1, LANDING_PAGE_WIZARD_STEPS.length - 1))}
                   disabled={stepIndex === LANDING_PAGE_WIZARD_STEPS.length - 1}
-                  className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full bg-gradient-to-r from-primary to-violet-500 px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next →
                 </button>
@@ -317,16 +374,17 @@ export default function HomePage() {
               type="button"
               onClick={onBuild}
               disabled={running}
-              className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-primary to-violet-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_38px_-20px_rgba(124,58,237,0.9)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {running ? 'Building landing page…' : 'Build landing page'}
             </button>
           </section>
 
-          <section className="flex min-h-[720px] flex-col rounded-3xl border border-white/10 bg-white/5 backdrop-blur">
-            <div className="border-b border-white/10 px-5 py-4">
+          <section className="flex min-h-[720px] flex-col rounded-[2rem] border border-white/15 bg-white/[0.05] shadow-[0_18px_50px_-26px_rgba(15,23,42,0.9)] backdrop-blur-xl">
+            <div className="border-b border-white/10 px-5 py-4 sm:px-6">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-light">Step 2 · Output</p>
-              <h2 className="mt-2 text-lg font-bold text-white">Preview, HTML, schema, and prompt</h2>
+              <h2 className="mt-2 text-xl font-bold text-white">Preview, code, schema, and prompt</h2>
+              <p className="mt-1 text-sm text-slate-400">Inspect generated assets, copy deliverables, and open the hosted preview.</p>
             </div>
 
             {!result ? (
@@ -335,7 +393,7 @@ export default function HomePage() {
               </div>
             ) : (
               <>
-                <div className="space-y-4 border-b border-white/10 px-5 py-4">
+                <div className="space-y-4 border-b border-white/10 px-5 py-4 sm:px-6">
                   <div className="flex flex-wrap items-center gap-2">
                     {(['output', 'html', 'schema', 'prompt'] as Tab[]).map((nextTab) => {
                       const disabled = nextTab === 'html' ? !htmlBlock : nextTab === 'schema' ? !jsonBlock : false;
@@ -347,7 +405,7 @@ export default function HomePage() {
                           onClick={() => setTab(nextTab)}
                           className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                             tab === nextTab
-                              ? 'bg-primary text-white'
+                              ? 'bg-gradient-to-r from-primary to-violet-500 text-white'
                               : 'border border-white/10 bg-black/20 text-slate-300 hover:border-primary/40 hover:text-white'
                           } disabled:cursor-not-allowed disabled:opacity-40`}
                         >
@@ -364,7 +422,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Model</p>
                       <p className="mt-2 text-white">{result.model}</p>
                       {result.usage ? (
@@ -373,7 +431,7 @@ export default function HomePage() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
+                    <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-300">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Published preview</p>
                       {publishing ? <p className="mt-2 text-white">Publishing preview…</p> : null}
                       {preview ? (
@@ -388,7 +446,7 @@ export default function HomePage() {
                             <button
                               type="button"
                               onClick={() => navigator.clipboard.writeText(preview.url)}
-                              className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-primary/40 hover:text-white"
+                              className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-primary/40 hover:text-white"
                             >
                               Copy URL
                             </button>
@@ -396,7 +454,7 @@ export default function HomePage() {
                               href={preview.path}
                               target="_blank"
                               rel="noreferrer"
-                              className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark"
+                              className="rounded-full bg-gradient-to-r from-primary to-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110"
                             >
                               Open preview
                             </a>
@@ -409,14 +467,14 @@ export default function HomePage() {
                 </div>
 
                 {preview ? (
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl">
+                  <div className="border-b border-white/10 px-5 py-4 sm:px-6">
+                    <div className="overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl ring-1 ring-primary/20">
                       <iframe title="Landing page preview" src={preview.path} className="h-[420px] w-full bg-white" />
                     </div>
                   </div>
                 ) : null}
 
-                <div className="flex-1 overflow-auto px-5 py-4">
+                <div className="flex-1 overflow-auto px-5 py-4 sm:px-6">
                   {tab === 'output' ? (
                     <pre className="whitespace-pre-wrap rounded-3xl border border-white/10 bg-slate-950/70 p-4 text-sm leading-7 text-slate-100">
                       {result.reply}
