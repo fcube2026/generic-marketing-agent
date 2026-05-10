@@ -133,7 +133,9 @@ export default function HomePage() {
       ).length,
     [values],
   );
-  const stepProgressPercent = Math.round((completedSteps / LANDING_PAGE_WIZARD_STEPS.length) * 100);
+  const stepProgressPercent = LANDING_PAGE_WIZARD_STEPS.length
+    ? Math.round((completedSteps / LANDING_PAGE_WIZARD_STEPS.length) * 100)
+    : 0;
   const prompt = useMemo(() => buildLandingPagePrompt(values), [values]);
   const htmlBlock = useMemo(() => (result ? extractHtmlBlock(result.reply) : null), [result]);
   const jsonBlock = useMemo(() => (result ? extractJsonBlock(result.reply) : null), [result]);
@@ -222,7 +224,7 @@ export default function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr] lg:items-end">
             <div className="space-y-4">
               <span className="inline-flex rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-primary-light">
-                Standalone premium studio
+                Standalone Premium Studio
               </span>
               <div className="space-y-3">
                 <h1 className="bg-gradient-to-r from-white via-primary-light to-cyan-200 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl lg:text-6xl">
@@ -290,7 +292,7 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-2.5">
                 {LANDING_PAGE_WIZARD_STEPS.map((step, index) => {
                   const active = index === stepIndex;
-                  const isCompleted = index < completedSteps;
+                  const completed = index < completedSteps;
                   return (
                     <button
                       key={step.id}
@@ -304,7 +306,7 @@ export default function HomePage() {
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em]">
                         {String(index + 1).padStart(2, '0')}
-                        {isCompleted ? ' · done' : ''}
+                        {completed ? ' · done' : ''}
                       </p>
                       <p className="mt-1 text-sm font-semibold">{step.title}</p>
                     </button>
