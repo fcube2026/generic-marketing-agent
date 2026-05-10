@@ -46,6 +46,19 @@ function joinGuardrails(guardrails: string[] | undefined): string {
   return `\n\nGuardrails (must obey):\n${guardrails.map((g) => `- ${g}`).join('\n')}`;
 }
 
+export function composeSkillSystemPrompt(args: {
+  skillName: string;
+  config: AdvancedSkillConfig;
+  orgContextText?: string;
+}): string {
+  const { skillName, config, orgContextText } = args;
+  return (
+    `Skill: ${skillName}\n\n${config.systemPrompt}` +
+    joinGuardrails(config.guardrails) +
+    (orgContextText ? `\n\n${orgContextText}` : '')
+  );
+}
+
 export async function runSkill(input: RunSkillInput): Promise<SkillRunResult> {
   const { skillName, config, inputs } = input;
 
@@ -56,10 +69,11 @@ export async function runSkill(input: RunSkillInput): Promise<SkillRunResult> {
 
   // 2. Render prompt + system.
   const userPrompt = renderPrompt(config.promptTemplate, inputs);
-  const systemPrompt =
-    `Skill: ${skillName}\n\n${config.systemPrompt}` +
-    joinGuardrails(config.guardrails) +
-    (orgContext.text ? `\n\n${orgContext.text}` : '');
+  const systemPrompt = composeSkillSystemPrompt({
+    skillName,
+    config,
+    orgContextText: orgContext.text,
+  });
 
   // 3. Call /api/ai/chat
   const chat = await generateChatReply({
