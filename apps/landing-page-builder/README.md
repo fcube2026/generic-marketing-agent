@@ -1,6 +1,6 @@
 # Landing Page Builder
 
-Standalone Next.js app for generating and previewing full landing pages with OpenAI.
+Standalone Next.js app for generating and previewing full landing pages with Claude (Anthropic) or OpenAI.
 
 ## Getting Started
 
@@ -16,8 +16,11 @@ pnpm --filter @curex24/landing-page-builder dev
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | Yes | Server-side OpenAI key used by `/api/ai/chat`. |
-| `OPENAI_TEXT_MODEL` | No | Chat model. Defaults to `gpt-4o-mini`. |
+| `ANTHROPIC_API_KEY` | Recommended | Server-side Claude key. When present, `/api/ai/chat` uses Claude for generation. |
+| `CLAUDE_TEXT_MODEL` | No | Claude model. Defaults to `claude-3-5-sonnet-latest`. |
+| `ANTHROPIC_BASE_URL` | No | Optional Anthropic-compatible base URL override. |
+| `OPENAI_API_KEY` | Fallback | OpenAI key used only when `ANTHROPIC_API_KEY` is not set. |
+| `OPENAI_TEXT_MODEL` | No | OpenAI chat model. Defaults to `gpt-4o-mini`. |
 | `OPENAI_BASE_URL` | No | Optional OpenAI-compatible base URL override. |
 
 ## Building
