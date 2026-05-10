@@ -495,12 +495,19 @@ Non-negotiable design bar — every page you ship must demonstrate ALL of these:
 You ground every claim in the live brand context provided. You never invent testimonials, names, ratings, prices, or stats — if the user did not give you a proof point, you OMIT that section rather than fabricate it.`,
     promptTemplate: `Build a **premium, production-ready landing page** for **{{pageGoal}}**.
 
+Business / brand name: **{{businessName}}**
+Industry / category: **{{industry}}**
 Audience: **{{audience}}**
 Primary CTA: **{{primaryCta}}**
 Secondary CTA (optional): **{{secondaryCta}}**
 Offer / value proposition: **{{offer}}**
 Tone: **{{tone}}**
 Design style: **{{designStyle}}**
+Technical output: **{{outputFormat}}**
+{{#if colorPalette}}Preferred palette / visual cues: **{{colorPalette}}**{{/if}}
+{{#if referenceUrls}}Reference URLs / inspiration:
+{{referenceUrls}}{{/if}}
+{{#if formIntegration}}Form integration / handoff requirement: **{{formIntegration}}**{{/if}}
 Sections to include (in order): **{{sections}}**
 {{#if keyBenefits}}Key benefits / features to highlight:
 {{keyBenefits}}{{/if}}
@@ -508,6 +515,8 @@ Sections to include (in order): **{{sections}}**
 {{socialProof}}{{/if}}
 {{#if mustInclude}}Must-include phrases or compliance lines: {{mustInclude}}{{/if}}
 {{#if avoidWords}}Avoid: {{avoidWords}}{{/if}}
+{{#if sectionDrafts}}Use these approved section drafts as the source of truth where possible:
+{{sectionDrafts}}{{/if}}
 
 Deliver, in this exact order:
 
@@ -524,9 +533,10 @@ Deliver, in this exact order:
    - One or two premium Google Fonts loaded via \`<link rel="preconnect">\` + \`<link href="https://fonts.googleapis.com/css2?...">\` and applied via the Tailwind config.
    - Hero: gradient-mesh / radial-glow background composed with Tailwind utilities or an inline \`<style>\` block, an animated subtle blob/aurora using CSS \`@keyframes\`, a confident H1, supportive sub-headline, primary + secondary CTA buttons (rounded-full, ring, hover-lift), trust line under the CTA, and a 2x retina hero mock from \`https://placehold.co/1200x800/...\` with descriptive alt text.
    - Mobile-first responsive layout with a working \`<details>\`-based mobile nav, sticky header with subtle blur (\`backdrop-blur\`), and a footer with brand mark, nav, legal links, and copyright.
-   - Accessible: skip-to-content link, focus-visible rings, ARIA labels where needed, sufficient contrast, and a \`@media (prefers-reduced-motion: reduce)\` block that disables animations.
-   - All copy from step 2 wired in. Use placeholder \`https://placehold.co/...\` URLs for any product mock-ups, avatars, and logos with descriptive alt text.
-   - No external JS frameworks, no tracking pixels, no \`<form>\` action that posts to a third party. Both CTAs link to \`#cta\` anchors.
+    - Accessible: skip-to-content link, focus-visible rings, ARIA labels where needed, sufficient contrast, and a \`@media (prefers-reduced-motion: reduce)\` block that disables animations.
+    - All copy from step 2 wired in. Use placeholder \`https://placehold.co/...\` URLs for any product mock-ups, avatars, and logos with descriptive alt text.
+    - No external JS frameworks, no tracking pixels, no \`<form>\` action that posts to a third party. Both CTAs link to \`#cta\` anchors.
+    - Respect technical requirements. If the requested output is React-oriented, keep the markup JSX-safe and append a short "React implementation notes" list after the HTML block. If a form integration is specified, show the hook-up points in copy / notes without posting directly to the third party.
 
 4. **JSON-LD schema** in a fenced \`\`\`json block — appropriate \`@type\` (e.g. WebPage + Product/FinancialProduct + FAQPage if a FAQ section is present + Organization). Only include fields that are actually populated by the page; do not invent ratings or reviews.
 
@@ -534,6 +544,20 @@ Deliver, in this exact order:
 
 6. **Measurement plan** — exact GA4 events to fire on the page (event name, trigger, parameters) covering page_view, CTA clicks, scroll depth, and form submit if relevant.`,
     inputs: [
+      {
+        name: 'businessName',
+        label: 'Business / brand name',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. Acme Health',
+      },
+      {
+        name: 'industry',
+        label: 'Industry / category',
+        type: 'text',
+        required: true,
+        placeholder: 'e.g. Healthcare clinic, B2B SaaS, fitness coaching',
+      },
       {
         name: 'pageGoal',
         label: 'Page goal',
@@ -589,6 +613,18 @@ Deliver, in this exact order:
         defaultValue: 'Clean + minimal (lots of whitespace)',
       },
       {
+        name: 'colorPalette',
+        label: 'Preferred color palette / art direction',
+        type: 'text',
+        placeholder: 'e.g. Forest green, cream, muted gold accents',
+      },
+      {
+        name: 'referenceUrls',
+        label: 'Reference URLs / inspiration (one per line)',
+        type: 'textarea',
+        placeholder: 'https://example.com\nhttps://another-example.com',
+      },
+      {
         name: 'sections',
         label: 'Sections to include',
         type: 'multiselect',
@@ -627,6 +663,19 @@ Deliver, in this exact order:
         label: 'Social proof / testimonials / numbers (optional)',
         type: 'textarea',
         placeholder: 'Paste real testimonials, member counts, ratings — only what you can verify.',
+      },
+      {
+        name: 'outputFormat',
+        label: 'Technical output format',
+        type: 'select',
+        options: ['Responsive HTML', 'React-ready markup', 'HTML with implementation notes'],
+        defaultValue: 'Responsive HTML',
+      },
+      {
+        name: 'formIntegration',
+        label: 'Form integration / CRM handoff (optional)',
+        type: 'text',
+        placeholder: 'e.g. HubSpot form embed, Mailchimp webhook, custom POST endpoint',
       },
       { name: 'mustInclude', label: 'Must-include phrases / compliance lines', type: 'textarea' },
       { name: 'avoidWords', label: 'Words / claims to avoid', type: 'textarea' },
