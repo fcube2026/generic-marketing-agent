@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint",
+    "test:datasource": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\",\"target\":\"ES2020\",\"esModuleInterop\":true,\"isolatedModules\":false}' node --no-warnings --require ts-node/register --test src/lib/server/dataSource/prismaDataSource.test.ts",
 
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
